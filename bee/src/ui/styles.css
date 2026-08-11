@@ -1,0 +1,611 @@
+:root {
+  --safe-t: env(safe-area-inset-top, 0px);
+  --safe-b: env(safe-area-inset-bottom, 0px);
+  --safe-l: env(safe-area-inset-left, 0px);
+  --safe-r: env(safe-area-inset-right, 0px);
+  --panel: rgba(24, 30, 40, 0.42);
+  --panel-strong: rgba(20, 26, 36, 0.72);
+  --stroke: rgba(255, 255, 255, 0.28);
+  font-family: 'Avenir Next', 'Nunito', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overflow: hidden;
+  background: #8fd0e8;
+  overscroll-behavior: none;
+  /* Stop Safari from scrolling / zooming / selecting under our fingers.
+     `touch-action: none` also kills double-tap-to-zoom; see core/lockZoom.ts
+     for the rest of the zoom lock, which CSS can't do on its own. */
+  touch-action: none;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+#app,
+.game-canvas {
+  touch-action: none;
+}
+
+#app {
+  position: fixed;
+  inset: 0;
+}
+
+.game-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* ---------- HUD ---------- */
+
+.hud {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  color: #fff;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+}
+
+.ui-interactive {
+  pointer-events: auto;
+}
+
+.hud-topleft {
+  position: absolute;
+  top: calc(var(--safe-t) + 14px);
+  left: calc(var(--safe-l) + 16px);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.hud-banner {
+  position: absolute;
+  top: calc(var(--safe-t) + 16px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--panel);
+  border: 1px solid var(--stroke);
+  border-radius: 999px;
+  padding: 7px 22px;
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  backdrop-filter: blur(8px);
+  white-space: nowrap;
+}
+
+.hud-objective {
+  position: absolute;
+  top: calc(var(--safe-t) + 58px);
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 14px;
+  font-weight: 600;
+  opacity: 0.9;
+  background: rgba(0, 0, 0, 0.22);
+  border-radius: 999px;
+  padding: 4px 16px;
+  white-space: nowrap;
+}
+
+.pollen {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--panel);
+  border: 1px solid var(--stroke);
+  border-radius: 999px;
+  padding: 6px 16px 6px 7px;
+  min-width: 148px;
+  backdrop-filter: blur(8px);
+  transition: transform 140ms cubic-bezier(0.3, 1.6, 0.5, 1);
+}
+
+.pollen.pop {
+  transform: scale(1.14);
+}
+
+.pollen.done .pollen-count {
+  color: #b6f7a0;
+}
+
+.pollen-dot {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.75);
+  box-shadow: inset 0 -3px 6px rgba(0, 0, 0, 0.18);
+  flex: 0 0 auto;
+}
+
+.pollen-label {
+  font-size: 12px;
+  font-weight: 600;
+  opacity: 0.82;
+  flex: 1 1 auto;
+}
+
+.pollen-count {
+  font-size: 16px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Harvest progress ring, centred under the reticle */
+.harvest {
+  position: absolute;
+  left: 50%;
+  top: 56%;
+  width: 74px;
+  height: 74px;
+  margin: -37px 0 0 -37px;
+  opacity: 0;
+  transition: opacity 120ms linear;
+}
+
+.harvest.on {
+  opacity: 1;
+}
+
+.harvest circle {
+  fill: none;
+  stroke-width: 6;
+  stroke-linecap: round;
+}
+
+.harvest .track {
+  stroke: rgba(0, 0, 0, 0.28);
+}
+
+.harvest .fill {
+  stroke: #ffe07a;
+  transform: rotate(-90deg);
+  transform-origin: 50% 50%;
+  transition: stroke-dashoffset 60ms linear;
+}
+
+/* Buttons — top right, clear of the altitude slider */
+.hud-buttons {
+  position: absolute;
+  right: calc(var(--safe-r) + 18px);
+  top: calc(var(--safe-t) + 42px);
+  display: flex;
+  gap: 10px;
+}
+
+.icon-btn {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: 1px solid var(--stroke);
+  background: var(--panel);
+  color: #fff;
+  font-size: 20px;
+  display: grid;
+  place-items: center;
+  backdrop-filter: blur(8px);
+  cursor: pointer;
+}
+
+.icon-btn:active {
+  transform: scale(0.93);
+}
+
+.hud-perf {
+  position: absolute;
+  right: calc(var(--safe-r) + 18px);
+  top: calc(var(--safe-t) + 14px);
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.65;
+}
+
+/* ---------- Joystick ---------- */
+
+.stick {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+  opacity: 0;
+  transition: opacity 130ms ease-out;
+  pointer-events: none;
+}
+
+.stick.active {
+  opacity: 1;
+}
+
+.stick-ring {
+  position: absolute;
+  width: 136px;
+  height: 136px;
+  margin: -68px 0 0 -68px;
+  border-radius: 50%;
+  border: 3px solid rgba(255, 255, 255, 0.45);
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(2px);
+}
+
+.stick-knob {
+  position: absolute;
+  width: 58px;
+  height: 58px;
+  margin: -29px 0 0 -29px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+}
+
+/* ---------- Altitude slider ---------- */
+
+.alt {
+  position: absolute;
+  right: calc(var(--safe-r) + 26px);
+  bottom: calc(var(--safe-b) + 26px);
+  width: 64px;
+  height: min(300px, 44vh);
+  pointer-events: auto;
+  touch-action: none;
+}
+
+.alt-track {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  border: 3px solid rgba(255, 255, 255, 0.45);
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(2px);
+  overflow: hidden;
+}
+
+/* Warm fill from the bottom up to the requested altitude. */
+.alt-fill {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(180deg, rgba(255, 224, 122, 0.42), rgba(255, 224, 122, 0.12));
+}
+
+/* The knob travels within the rail, which is inset by the knob's radius so it
+   never overhangs the rounded ends of the track. */
+.alt-rail {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 32px;
+  bottom: 32px;
+}
+
+.alt-knob {
+  position: absolute;
+  left: 50%;
+  width: 56px;
+  height: 56px;
+  margin: 0 0 -28px -28px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+  transition: transform 100ms ease-out;
+}
+
+.alt-knob.active {
+  transform: scale(1.1);
+}
+
+/* Ghost bar: where the bee actually is right now. */
+.alt-current {
+  position: absolute;
+  left: 9px;
+  right: 9px;
+  height: 4px;
+  margin-bottom: -2px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.6);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+}
+
+.alt-cap {
+  position: absolute;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: 13px;
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.alt-cap-top {
+  top: 7px;
+}
+
+.alt-cap-bottom {
+  bottom: 7px;
+}
+
+/* ---------- Carry chip ---------- */
+
+.carry {
+  position: absolute;
+  left: 50%;
+  bottom: calc(var(--safe-b) + 26px);
+  transform: translate(-50%, 14px);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 18px 7px 8px;
+  border-radius: 999px;
+  background: var(--panel-strong);
+  border: 1px solid var(--stroke);
+  backdrop-filter: blur(8px);
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    opacity 160ms ease-out,
+    transform 200ms cubic-bezier(0.3, 1.5, 0.5, 1);
+}
+
+.carry.on {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+.carry-dot {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.8);
+  box-shadow: inset 0 -3px 6px rgba(0, 0, 0, 0.2);
+}
+
+.carry-label {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+}
+
+/* ---------- Celebration flash ---------- */
+
+.screen-flash {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  background: radial-gradient(
+    circle at 50% 45%,
+    rgba(255, 255, 255, 0.85) 0%,
+    rgba(255, 210, 63, 0.55) 22%,
+    rgba(255, 77, 109, 0.4) 45%,
+    rgba(77, 212, 255, 0.32) 68%,
+    rgba(155, 107, 255, 0) 100%
+  );
+}
+
+.screen-flash.on {
+  animation: flash 620ms ease-out forwards;
+}
+
+@keyframes flash {
+  0% {
+    opacity: 0;
+    transform: scale(1.35);
+  }
+  12% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.08);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .screen-flash.on {
+    animation-duration: 240ms;
+  }
+}
+
+/* ---------- Overlays ---------- */
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(180deg, rgba(20, 40, 60, 0.55), rgba(20, 40, 60, 0.75));
+  backdrop-filter: blur(10px);
+  pointer-events: auto;
+  z-index: 10;
+}
+
+.overlay.hidden {
+  display: none;
+}
+
+.card {
+  width: min(520px, 86vw);
+  background: rgba(255, 255, 255, 0.96);
+  color: #23303c;
+  border-radius: 28px;
+  padding: 34px 34px 28px;
+  text-align: center;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
+}
+
+.card h1 {
+  margin: 0 0 6px;
+  font-size: 34px;
+  letter-spacing: -0.5px;
+}
+
+.card p {
+  margin: 0 0 22px;
+  font-size: 15px;
+  line-height: 1.5;
+  opacity: 0.72;
+}
+
+.card input {
+  width: 100%;
+  /* Must stay >= 16px: Safari auto-zooms when focusing smaller text. */
+  -webkit-user-select: text;
+  user-select: text;
+  touch-action: manipulation;
+  font-size: 22px;
+  font-weight: 700;
+  text-align: center;
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 2px solid #d7e0e8;
+  background: #f6f9fb;
+  color: #23303c;
+  outline: none;
+  font-family: inherit;
+}
+
+.card input:focus {
+  border-color: #ffc93c;
+  background: #fffdf5;
+}
+
+/* Level picker on the welcome-back card */
+
+.levels {
+  margin-top: 18px;
+  text-align: left;
+}
+
+.levels-heading {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  opacity: 0.5;
+  margin-bottom: 8px;
+}
+
+.levels-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.card .level-chip {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  margin: 0;
+  padding: 10px 14px;
+  border: 2px solid #d7e0e8;
+  border-radius: 14px;
+  background: #f6f9fb;
+  box-shadow: none;
+  color: #23303c;
+  text-align: left;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.card .level-chip:active {
+  transform: scale(0.99);
+  box-shadow: none;
+}
+
+.card .level-chip.selected {
+  border-color: #f7b32b;
+  background: #fffdf5;
+}
+
+.level-chip-num {
+  flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: #dfe5ea;
+  color: #6b7883;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.level-chip.selected .level-chip-num {
+  background: linear-gradient(180deg, #ffd75e, #f7b32b);
+  color: #4a3208;
+}
+
+.level-chip-text {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.level-chip-text em {
+  display: block;
+  font-style: normal;
+  font-size: 11px;
+  font-weight: 600;
+  opacity: 0.55;
+  margin-top: 1px;
+}
+
+.card button {
+  margin-top: 18px;
+  width: 100%;
+  padding: 16px;
+  font-size: 19px;
+  font-weight: 800;
+  border: none;
+  border-radius: 16px;
+  background: linear-gradient(180deg, #ffd75e, #f7b32b);
+  color: #4a3208;
+  box-shadow: 0 6px 0 #d9930f;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.card button:active {
+  transform: translateY(3px);
+  box-shadow: 0 3px 0 #d9930f;
+}
+
+.card button:disabled {
+  opacity: 0.5;
+  box-shadow: 0 6px 0 #bfc7cd;
+  background: #dfe5ea;
+  color: #8b98a3;
+}
+
+.card .ghost {
+  margin-top: 10px;
+  background: none;
+  box-shadow: none;
+  color: #8b98a3;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px;
+}
+
+.card .ghost:active {
+  transform: none;
+}

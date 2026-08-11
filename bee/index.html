@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Bee</title>
+
+    <!-- viewport-fit=cover + no user scaling: required for true fullscreen touch games on iPad -->
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover"
+    />
+
+    <!-- Add to Home Screen -> runs without Safari chrome -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Bee" />
+    <meta name="theme-color" content="#8fd0e8" />
+
+    <!--
+      Manifest inlined as a data URI so the build stays a single file. iOS
+      drives Add to Home Screen from the apple-mobile-web-app-* metas above,
+      not from this, so it degrades harmlessly if a browser ignores it.
+    -->
+    <link
+      rel="manifest"
+      href="data:application/manifest+json,%7B%22name%22%3A%22Bee%22%2C%22short_name%22%3A%22Bee%22%2C%22description%22%3A%22A%203D%20bee%20game%20for%20iPad%22%2C%22start_url%22%3A%22.%2F%22%2C%22display%22%3A%22standalone%22%2C%22orientation%22%3A%22landscape%22%2C%22background_color%22%3A%22%238fd0e8%22%2C%22theme_color%22%3A%22%238fd0e8%22%7D"
+    />
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

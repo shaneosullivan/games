@@ -1,0 +1,5 @@
+**/node_modules
+**/.last_modified_timestamp
+dist
+.DS_Store
+**/dist
