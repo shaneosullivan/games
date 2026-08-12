@@ -1,4 +1,4 @@
-# Bee
+# Bee a Queen
 
 A touch-native 3D bee game for iPad. TypeScript + Three.js + Vite, served as a
 fullscreen web app.

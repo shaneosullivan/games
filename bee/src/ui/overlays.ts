@@ -94,7 +94,7 @@ export function createCodenameScreen(host: HTMLElement, opts: CodenameOptions): 
   const { root, card } = makeOverlay(host);
 
   const h1 = document.createElement('h1');
-  h1.textContent = existing ? `Welcome back` : 'Bee';
+  h1.textContent = existing ? `Welcome back` : 'Bee a Queen';
   const p = document.createElement('p');
   p.textContent = existing
     ? levels.length > 1

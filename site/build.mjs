@@ -76,6 +76,11 @@ const APP_STORE = [
     id: '6752374114',
     icon: 'super-bubbly.png',
   },
+  {
+    name: 'Kidz Fun Art',
+    id: '6443621939',
+    icon: 'kidz-fun-art.png',
+  },
 ];
 
 /** Folders that are never games, whatever they contain. */
