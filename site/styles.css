@@ -47,6 +47,36 @@ body {
   text-align: center;
 }
 
+/*
+ * Mark and title on one line. It wraps rather than shrinking the title on a
+ * narrow phone — a 38px heading next to a 44px mark is already tight.
+ */
+.hero-title {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(10px, 2vw, 18px);
+  flex-wrap: wrap;
+}
+
+.hero-mark {
+  width: clamp(44px, 8vw, 76px);
+  height: auto;
+  /*
+   * The mark is transparent, and its top half is nearly as dark as the dark
+   * theme's background. A cream disc behind it in dark mode keeps the knotwork
+   * legible; in light mode the page is already cream, so it needs nothing.
+   */
+  border-radius: 22%;
+}
+
+@media (prefers-color-scheme: dark) {
+  .hero-mark {
+    background: #fdf7ec;
+    padding: 4px;
+  }
+}
+
 .hero h1 {
   margin: 0;
   font-size: clamp(38px, 8vw, 68px);
