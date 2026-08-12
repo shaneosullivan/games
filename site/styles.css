@@ -196,3 +196,62 @@ footer {
     transform: none;
   }
 }
+
+/* ---- "a new version is ready" ------------------------------------------- */
+
+/*
+ * The gallery polls version.json the same way a game does; see
+ * "Telling a running app it's out of date" in the README. Fixed to the bottom
+ * of the viewport so it's found whether or not the page has been scrolled, and
+ * inset for the home indicator on an installed copy.
+ */
+.update-banner {
+  position: fixed;
+  left: 50%;
+  bottom: calc(18px + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding: 10px 22px;
+  border: none;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #ffd75e, var(--honey));
+  color: #4a2f07;
+  font: inherit;
+  text-align: center;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.28);
+  cursor: pointer;
+  animation: update-rise 320ms ease-out;
+}
+
+.update-banner[hidden] {
+  display: none;
+}
+
+.update-banner b {
+  font-size: 15px;
+}
+
+.update-banner span {
+  font-size: 12px;
+  opacity: 0.75;
+}
+
+.update-banner:active {
+  transform: translateX(-50%) scale(0.97);
+}
+
+.update-banner.taken {
+  pointer-events: none;
+  opacity: 0.75;
+}
+
+@keyframes update-rise {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(14px);
+  }
+}

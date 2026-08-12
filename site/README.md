@@ -65,9 +65,9 @@ Its cache name carries the build timestamp, so each deploy replaces the old one.
 ## Telling a running app it's out of date
 
 Every build writes `version.json` — at the root and next to each game — holding
-the same build stamp. A running game reads it once a minute (and whenever the
+the same build stamp. The gallery and every game read it once a minute (and whenever the
 app is brought back to the foreground), and if the stamp has changed since the
-copy it first saw, it offers "A new version is ready". Taking the offer deletes
+copy it first saw, they offer "A new version is ready". Taking the offer deletes
 every cache and reloads, which is the part that matters: without the cache
 purge the service worker would hand back the very page you're trying to
 replace.
@@ -75,6 +75,11 @@ replace.
 The service worker deliberately does *not* intercept `version.json` — a cached
 update-check can never notice an update. Keep it that way if you touch
 `renderServiceWorker`.
+
+The game's copy of this lives in `bee/src/core/updates.ts`; the gallery's is a
+small inline script in `build.mjs` (`UPDATE_WATCH`), so the gallery stays two
+files with no build step of its own. They implement the same contract — change
+one and check the other.
 
 Other scripts:
 

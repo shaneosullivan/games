@@ -334,6 +334,56 @@ self.addEventListener('fetch', (event) => {
 `;
 }
 
+/**
+ * The gallery's own update check, inlined.
+ *
+ * Same contract as the games': read the stamp, keep the first one seen, and
+ * offer a reload when it changes. Deleting the caches before reloading is the
+ * whole point — the service worker would otherwise serve the very page being
+ * replaced. Kept as a small inline copy rather than a shared module so the
+ * gallery stays two files with no build step of its own.
+ */
+const UPDATE_WATCH = `      (function () {
+        var banner = document.querySelector('.update-banner');
+        if (!banner) return;
+        var current = null;
+        var offered = false;
+
+        function read() {
+          return fetch('${VERSION_FILE}', { cache: 'no-store' })
+            .then(function (r) { return r.ok ? r.json() : null; })
+            .then(function (d) { return d && typeof d.build === 'string' ? d.build : null; })
+            .catch(function () { return null; });
+        }
+
+        function check() {
+          if (offered) return;
+          read().then(function (build) {
+            if (!build) return;
+            if (current === null) { current = build; return; }
+            if (build === current) return;
+            offered = true;
+            banner.hidden = false;
+          });
+        }
+
+        banner.addEventListener('click', function () {
+          banner.classList.add('taken');
+          banner.querySelector('span').textContent = 'Updating…';
+          var done = function () { location.reload(); };
+          if (!window.caches) return done();
+          caches.keys()
+            .then(function (names) { return Promise.all(names.map(function (n) { return caches.delete(n); })); })
+            .then(done, done);
+        });
+
+        check();
+        setInterval(check, 60000);
+        document.addEventListener('visibilitychange', function () {
+          if (document.visibilityState === 'visible') check();
+        });
+      })();`;
+
 /** Registration snippet, inlined so the gallery stays two files. */
 const SW_REGISTER = `      if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
@@ -375,6 +425,14 @@ ${games.length ? cards : empty}
     <footer>
       <p>${games.length} game${games.length === 1 ? '' : 's'} · built ${new Date().toISOString().slice(0, 10)}</p>
     </footer>
+
+    <button type="button" class="update-banner" hidden>
+      <b>A new version is ready</b><span>Tap to update</span>
+    </button>
+
+    <script>
+${UPDATE_WATCH}
+    </script>
   </body>
 </html>
 `;
