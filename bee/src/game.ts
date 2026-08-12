@@ -214,6 +214,11 @@ export class Game {
     if (import.meta.env.DEV) (window as unknown as Record<string, unknown>).game = this;
   }
 
+  /** Re-measure the canvas. Called when the visible viewport changes. */
+  resize(): void {
+    this.stage.resize();
+  }
+
   // ---- level management ---------------------------------------------------
 
   /** The levels that actually exist. Saves beyond the last one clamp back. */

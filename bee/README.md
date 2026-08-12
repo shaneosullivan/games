@@ -262,6 +262,17 @@ Things worth knowing before changing anything:
   when every scene was built around it; the cottage isn't, so `ctx.placeBee()`
   takes an optional yaw and level 4 passes one. A level that places the bee far
   from the origin and skips it will find the camera pointing at the hive.
+- **`core/fitViewport.ts` sizes the app in pixels, not CSS.** In an installed
+  iPad app `position: fixed; inset: 0` isn't reliably "the screen" — the page
+  can be laid out against a viewport a status bar taller than what's on show,
+  leaving a band of bare background under the game. `visualViewport` is the one
+  measurement that always describes what's visible, so the root is sized to it
+  and the renderer re-measures whenever it changes.
+- **Coplanar faces z-fight.** The cottage's doorway recess and its door both
+  used to end exactly on the wall's front face (z = 2.1 in house units), which
+  showed up as brown lines flickering across the door. Anything laid *on* a
+  surface here — recesses, sills, panes, the mat — has to stand a little proud
+  of it, and the comments say by how much.
 - **A deployed build tells itself when it's stale.** `core/updates.ts` polls
   the `version.json` the site build writes next to the game, and offers a
   reload when the stamp changes. It clears every cache before reloading —

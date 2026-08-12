@@ -80,14 +80,15 @@ export function createCottage(rng: Rng): CottageScene {
   // Hinge on the left edge of the doorway.
   doorPivot.position.set(-0.95, 0, 2.02);
   const door = new THREE.Mesh(new THREE.BoxGeometry(1.9, 2.7, 0.16), solidToon(0x7b4a22));
-  // Stand proud of the doorway recess (front face at z = 2.1) — flush with it
-  // and the two faces z-fight into a checkerboard.
-  door.position.set(0.95, 1.35, 0.16);
+  // Clear of the recess's front face (z = 2.12) for the same reason — the door
+  // used to end exactly on it.
+  door.position.set(0.95, 1.35, 0.26);
   door.castShadow = true;
   doorPivot.add(door);
 
   const knob = new THREE.Mesh(new THREE.SphereGeometry(0.12, 10, 8), solidToon(0xffd75e));
-  knob.position.set(1.68, 1.35, 0.12);
+  // Proud of the door's own front face, which is at z = 0.34 in this frame.
+  knob.position.set(1.68, 1.35, 0.42);
   doorPivot.add(knob);
 
   // Icing trim around the doorway.
@@ -187,8 +188,13 @@ function createHouse(): THREE.Group {
   }
 
   // Doorway recess, so the door reads as set into the wall.
+  //
+  // Its front face must not land *on* the wall's, which is at z = 2.1: two
+  // coplanar faces z-fight, and at this scale that shows up as brown lines
+  // flickering across the doorway. Sitting a hair proud of the wall reads the
+  // same and is unambiguous about which is in front.
   const recess = new THREE.BoxGeometry(2.1, 2.8, 0.2);
-  recess.translate(0, 1.4, 2.0);
+  recess.translate(0, 1.4, 2.02);
   push(recess, 0x3a2412);
 
   // Chimney.

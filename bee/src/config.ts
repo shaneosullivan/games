@@ -94,22 +94,26 @@ export const POLLEN_COLOR: Record<PollenKind, number> = {
   orange: 0xff8a3d,
 };
 
-/**
- * Level 2: the royal chamber inside the hive.
- *
- * The dome has to be a good deal wider than the player's bounds, because the
- * chase camera sits behind and above the bee — at the far edge of the play
- * area the *camera* is what would clip through the wall.
- */
+/** Level 2: the royal chamber inside the hive. */
 export const INTERIOR = {
-  domeRadius: 30,
+  /**
+   * Wider than the play area needs, because the camera sits behind and above
+   * the bee: at the edge of the bounds it's the *camera* that would punch
+   * through the shell. Sized for the pulled-back rig below —
+   * sqrt((15 + 9.6)^2 + (11 + 6.3)^2) = 30.1, so 34 keeps it inside.
+   */
+  domeRadius: 34,
   /** How far from the centre the player may fly. */
   boundsRadius: 15,
   minHeight: 1.0,
   maxHeight: 11,
-  /** Tighter camera than outdoors, so it stays clear of the dome shell. */
-  cameraDistance: 6.4,
-  cameraHeight: 4.2,
+  /**
+   * Pulled back 1.5x from where it started: feeding is about spotting which
+   * baby wants what colour, and the close rig had you nose-to-nose with one
+   * of them with the rest of the ring off-screen.
+   */
+  cameraDistance: 9.6,
+  cameraHeight: 6.3,
   /** Pollen stores sit against the wall; babies ring the queen at the centre. */
   storeRingRadius: 13.0,
   storeHeight: 1.5,
