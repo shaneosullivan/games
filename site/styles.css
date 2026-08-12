@@ -59,21 +59,27 @@ body {
   flex-wrap: wrap;
 }
 
-.hero-mark {
-  width: clamp(44px, 8vw, 76px);
+/*
+ * The logo carries the word "Chofter", so the heading beside it is only
+ * "Games" — and its alt text is the word, not empty, or the page announces
+ * itself as just "Games".
+ */
+.hero-logo {
+  width: clamp(160px, 28vw, 300px);
   height: auto;
   /*
-   * The mark is transparent, and its top half is nearly as dark as the dark
-   * theme's background. A cream disc behind it in dark mode keeps the knotwork
-   * legible; in light mode the page is already cream, so it needs nothing.
+   * The wordmark is near-black on transparency, which vanishes against the
+   * dark theme. A cream plate in dark mode keeps the brand colours honest
+   * rather than recolouring someone's logo; light mode is already this cream,
+   * so the plate is invisible there and costs nothing.
    */
-  border-radius: 22%;
+  border-radius: 14px;
 }
 
 @media (prefers-color-scheme: dark) {
-  .hero-mark {
+  .hero-logo {
     background: #fdf7ec;
-    padding: 4px;
+    padding: 10px 14px;
   }
 }
 

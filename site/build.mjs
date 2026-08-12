@@ -453,8 +453,8 @@ ${SW_REGISTER}
   <body>
     <header class="hero">
       <div class="hero-title">
-        <img class="hero-mark" src="mark.png" alt="" width="96" height="96">
-        <h1>${escapeHtml(APP.name)}</h1>
+        <img class="hero-logo" src="logo.png" alt="Chofter" width="320" height="118">
+        <h1>Games</h1>
       </div>
       <p>Little games, made for fun. Best on a tablet.</p>
     </header>
@@ -514,7 +514,7 @@ for (const game of games) {
 
 fs.writeFileSync(path.join(OUT_DIR, 'index.html'), renderPage(staged));
 fs.cpSync(path.join(SITE_DIR, 'styles.css'), path.join(OUT_DIR, 'styles.css'));
-fs.cpSync(path.join(SITE_DIR, 'assets', 'chofter-mark.png'), path.join(OUT_DIR, 'mark.png'));
+fs.cpSync(path.join(SITE_DIR, 'assets', 'chofter-logo-640.png'), path.join(OUT_DIR, 'logo.png'));
 
 // ---- installable bits -----------------------------------------------------
 
