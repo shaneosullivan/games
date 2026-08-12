@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { BEAR, CAMERA, COTTAGE, DANCE, FLIGHT, INSIDE, WORLD } from '../config';
+import { BEAR, CAMERA, COTTAGE, DANCE, FLIGHT, INSIDE } from '../config';
 import { DanceMat } from '../entities/danceMat';
 import type { Music } from '../core/music';
 import { Rng } from '../core/rng';
@@ -18,11 +18,17 @@ const CENTRE_PAD = 4;
  * and a straight lerp for what it's looking at, from the cottage down to the
  * mat. It ends exactly where the follow rig wants to be, so handing control
  * back is invisible.
+ *
+ * The three points below are relative to the house; the clearing itself stands
+ * away at COTTAGE.yardOffsetZ, so they're shifted by `YARD` when used.
  */
 const PAN_TIME = 4.6;
 const PAN_FROM = new THREE.Vector3(-42, 24, 16);
 const PAN_CONTROL = new THREE.Vector3(-14, 40, 54);
 const PAN_LOOK_FROM = new THREE.Vector3(0, 17, 0);
+
+/** The clearing's offset from the world origin. */
+const YARD = new THREE.Vector3(0, 0, COTTAGE.yardOffsetZ);
 
 type Phase =
   | 'establishing'
@@ -33,6 +39,7 @@ type Phase =
   | 'inside'
   | 'carrying'
   | 'leaving'
+  | 'emerging'
   | 'chased'
   | 'delivering'
   | 'distracting'
@@ -43,6 +50,7 @@ type Phase =
 
 const tmp = new THREE.Vector3();
 const tmpB = new THREE.Vector3();
+const tmpMob = new THREE.Vector3();
 const panEye = new THREE.Vector3();
 const panLook = new THREE.Vector3();
 
@@ -59,9 +67,9 @@ const panLook = new THREE.Vector3();
  */
 export class CottageLevel implements Level {
   readonly name = 'Caramel Cottage';
-  readonly completionTitle = 'The door is open!';
+  readonly completionTitle = 'The hive is safe!';
   readonly completionBody =
-    'You danced the lock right off it. Inside the cottage is next — that part is still being built.';
+    'You danced the door open, carried the honey home, and sent that bear packing. Some day for a small bee.';
 
   complete = false;
 
@@ -70,6 +78,9 @@ export class CottageLevel implements Level {
   /** Seconds of fallback musical time when there's no audio context. */
   private silentTime = 0;
   private nextFirework = 0;
+
+  /** True once the brood has poured out of the hive to tease the bear. */
+  private babiesOut = false;
 
   private mat: DanceMat | null = null;
   private music: Music | null = null;
@@ -89,7 +100,10 @@ export class CottageLevel implements Level {
   enter(ctx: GameContext): void {
     ctx.setEnvironment('cottage');
     ctx.configureFlight({
-      boundsRadius: COTTAGE.boundsRadius,
+      // Bounds are a circle about the world origin — which is the hive, not the
+      // cottage. It has to be wide enough to hold the clearing off at the north
+      // end, or the bee is shoved out of her own level.
+      boundsRadius: COTTAGE.flightRadius,
       minHeight: COTTAGE.minHeight,
       maxHeight: COTTAGE.maxHeight,
       cameraDistance: COTTAGE.cameraDistance,
@@ -103,9 +117,9 @@ export class CottageLevel implements Level {
 
     // Arrive from out in the clearing, facing the cottage.
     const start = new THREE.Vector3().copy(this.hover).add(tmpB.set(0, 1.4, 9));
-    ctx.placeBee(start, DANCE.hoverHeight + 1.4);
-    // placeBee snaps the rig facing the origin, which puts the camera directly
-    // behind the bee on +Z. That's where the pan has to land.
+    // Facing the house, i.e. down -Z, which puts the camera behind her on +Z.
+    // That's where the pan has to land.
+    ctx.placeBee(start, DANCE.hoverHeight + 1.4, Math.PI);
     this.panTo
       .copy(start)
       .add(tmpB.set(0, COTTAGE.cameraHeight, COTTAGE.cameraDistance));
@@ -124,6 +138,7 @@ export class CottageLevel implements Level {
     this.rounds = 0;
     this.complete = false;
     this.hop = null;
+    this.babiesOut = false;
     this.mat = null;
     this.music = null;
 
@@ -136,6 +151,9 @@ export class CottageLevel implements Level {
     this.phaseTime += dt;
     ctx.cottage.update(this.phaseTime);
     this.updateHop(dt, ctx);
+    // Once the brood is out it flies itself, in every phase from here on —
+    // without this they simply hang in the hive doorway where they hatched.
+    if (this.babiesOut) ctx.babies.update(dt, ctx.bee.position, null);
 
     switch (this.phase) {
       case 'establishing':
@@ -166,6 +184,9 @@ export class CottageLevel implements Level {
         break;
       case 'leaving':
         this.updateLeaving(ctx);
+        break;
+      case 'emerging':
+        this.updateEmerging(dt, ctx);
         break;
       case 'chased':
         this.updateChase(dt, ctx);
@@ -200,11 +221,16 @@ export class CottageLevel implements Level {
     const inv = 1 - u;
     panEye
       .copy(PAN_FROM)
+      .add(YARD)
       .multiplyScalar(inv * inv)
-      .addScaledVector(PAN_CONTROL, 2 * inv * u)
+      .addScaledVector(tmp.copy(PAN_CONTROL).add(YARD), 2 * inv * u)
       .addScaledVector(this.panTo, u * u);
 
-    panLook.lerpVectors(PAN_LOOK_FROM, this.hover, ease(Math.max(0, t * 1.35 - 0.35)));
+    panLook.lerpVectors(
+      tmp.copy(PAN_LOOK_FROM).add(YARD),
+      this.hover,
+      ease(Math.max(0, t * 1.35 - 0.35)),
+    );
     ctx.setCameraCinematic(panEye, panLook);
 
     if (t < 1) return;
@@ -398,7 +424,7 @@ export class CottageLevel implements Level {
 
   // ---- stage 3: the bear ---------------------------------------------------
 
-  /** Out the door and straight into trouble. */
+  /** Out the door: shrink into the doorway from inside… */
   private updateLeaving(ctx: GameContext): void {
     const t = Math.min(1, this.phaseTime / 1.4);
     ctx.bee.scripted = true;
@@ -406,53 +432,90 @@ export class CottageLevel implements Level {
     ctx.bee.position.lerpVectors(this.hover, ctx.inside.entryPosition, ease(t));
     ctx.bee.setScale(Math.max(0.001, 1 - t * t * 0.9));
     if (t < 1) return;
-    this.beginChase(ctx);
+    this.beginEmerging(ctx);
   }
 
   /**
-   * Cut to the meadow with the bear already on her tail. The hive is a long
-   * way off, and the bear corners badly — the flight home is the level.
+   * …and back out over the mat, where the bear is waiting.
+   *
+   * The clearing sits at the north end of the meadow's world, so there is no
+   * cut here and none later: the camera pulls right back, the bear lumbers in
+   * from the left, and through the gate in the fence the hive is already
+   * glowing at the far end of the flight. Everything from here to the hive is
+   * one continuous shot.
    */
-  private beginChase(ctx: GameContext): void {
-    this.phase = 'chased';
+  private beginEmerging(ctx: GameContext): void {
+    this.phase = 'emerging';
     this.phaseTime = 0;
 
-    ctx.setEnvironment('meadow');
+    ctx.setEnvironment('cottage');
     ctx.configureFlight({
-      boundsRadius: WORLD.radius,
+      boundsRadius: COTTAGE.flightRadius,
       minHeight: FLIGHT.minHeight,
       maxHeight: FLIGHT.maxHeight,
       cameraDistance: CAMERA.distance,
       cameraHeight: CAMERA.height,
     });
-    ctx.hive.setProgress(1);
-    ctx.hive.setGlow(true);
 
-    // Start out at the far edge of the meadow, hive in the distance.
-    const start = new THREE.Vector3(0, 4, WORLD.radius - 8);
-    ctx.placeBee(start, 4);
+    // Back out over the mat she danced on — dark now, its job done.
+    this.mat?.reset();
+    this.hover.copy(ctx.cottage.matCentre).setY(DANCE.hoverHeight + 2.5);
+    // Facing the gate and the meadow beyond it — the way home.
+    ctx.placeBee(this.hover, this.hover.y, 0);
     ctx.bee.object.visible = true;
     ctx.bee.setScale(1);
-    ctx.bee.scripted = false;
+    ctx.bee.scripted = true;
     ctx.bee.setCrown(true);
-    ctx.setFlightControls(true);
-    // A flatter, wider chase shot: steeper and the dangling jar sits on top of
-    // the bee instead of below her.
-    ctx.setCameraZoom(1.3);
+    ctx.bee.setYaw(0); // facing the gate, and home
+    ctx.setFlightControls(false);
+    // Right back: a bear at this scale needs the room, and the gate and the
+    // meadow beyond it have to be readable from the off.
+    ctx.setCameraZoom(COTTAGE.chaseZoom);
 
     // The jar comes with her — it is the whole point of the trip.
     ctx.bringHoney();
-    ctx.honeyJar.pickUp(tmp.copy(start).setY(start.y - 0.35));
+    ctx.honeyJar.pickUp(tmp.copy(this.hover).setY(this.hover.y - 0.35));
 
-    // Off to one side as well as behind, so it is in shot from the first frame
-    // rather than hidden directly behind the camera.
-    ctx.bear.spawn(tmp.copy(start).add(tmpB.set(11, 0, BEAR.ambushOffset)), start);
-    ctx.bear.pursue();
+    // The hive is the destination and it says so, from this far off.
+    ctx.hive.setProgress(1);
+    ctx.hive.setGlow(true);
+    ctx.setObjectiveMarker(tmp.copy(ctx.hive.entrance).setY(ctx.hive.entrance.y + 1.4));
+
+    // In from the left of shot. The camera looks down +Z, which puts +X on the
+    // left — the sign here is not the one you'd guess.
+    ctx.bear.spawn(
+      tmp.copy(ctx.cottage.matCentre).add(tmpB.set(BEAR.ambushOffset * 3, 0, -3)),
+      this.hover,
+    );
 
     ctx.hud.setCounters([]);
-    ctx.hud.setObjective('A bear! Get the honey home to the hive!');
-    ctx.setObjectiveMarker(tmp.copy(ctx.hive.entrance).setY(ctx.hive.entrance.y + 1.4));
+    ctx.hud.setObjective('A bear!');
     ctx.audio.setThreat(0.4);
+  }
+
+  /** Let it lumber into shot, then hand the controls back and run. */
+  private updateEmerging(dt: number, ctx: GameContext): void {
+    ctx.bear.update(dt, ctx.bee.position);
+    // Hold station over the mat, bobbing, while it closes in.
+    ctx.bee.position.y = this.hover.y + Math.sin(this.phaseTime * 2.2) * 0.25;
+    // Long enough for the bear to walk into shot from off to the left.
+    if (this.phaseTime < 4) return;
+    this.beginChase(ctx);
+  }
+
+  /**
+   * The flight home. The bear corners badly, the gate is a bottleneck it has
+   * to lumber around, and the hive is a long way off.
+   */
+  private beginChase(ctx: GameContext): void {
+    this.phase = 'chased';
+    this.phaseTime = 0;
+
+    ctx.bee.scripted = false;
+    ctx.setFlightControls(true);
+    ctx.bear.pursue();
+
+    ctx.hud.setObjective('Through the gate — get the honey home to the hive!');
   }
 
   private updateChase(dt: number, ctx: GameContext): void {
@@ -505,6 +568,7 @@ export class CottageLevel implements Level {
     this.phase = 'distracting';
     this.phaseTime = 0;
     ctx.releaseBabies(ctx.hive.entrance);
+    this.babiesOut = true;
     ctx.bear.distract();
     ctx.audio.setThreat(0.25);
     ctx.hud.setObjective('The babies are teasing it — quick, while it is busy!');
@@ -512,6 +576,7 @@ export class CottageLevel implements Level {
 
   private updateDistracting(dt: number, ctx: GameContext): void {
     ctx.bear.update(dt, ctx.bee.position);
+    this.mobBear(ctx);
     // Park the bee safely to one side to watch.
     ctx.bee.position.lerp(tmp.copy(ctx.hive.entrance).add(tmpB.set(6, 2.5, 7)), 0.04);
     if (this.phaseTime < 2.4) return;
@@ -522,12 +587,23 @@ export class CottageLevel implements Level {
     ctx.hud.setObjective('Fix the scary picture to frighten it off!');
   }
 
+  /**
+   * Point the brood at the bear's head every frame. It's a live target, so
+   * they keep swirling around it even as the bear turns and rears.
+   */
+  private mobBear(ctx: GameContext): void {
+    ctx.babies.mobAround(ctx.bear.headPosition(tmpMob));
+  }
+
   private updatePuzzling(dt: number, ctx: GameContext): void {
     ctx.bear.update(dt, ctx.bee.position);
-    // Drift the camera onto the bear and the babies, which is the show.
+    this.mobBear(ctx);
+    // Drift the camera onto the bear and the babies, which is the show. It
+    // frames the head rather than the middle of the bear: reared up, that's
+    // where the swiping and the swarm are.
     ctx.setCameraCinematic(
-      tmp.copy(ctx.bear.position).add(tmpB.set(9, 9, 15)),
-      tmpB.copy(ctx.bear.position).setY(5),
+      tmp.copy(ctx.bear.position).add(tmpB.set(9, 11, 17)),
+      tmpB.copy(ctx.bear.position).setY(8),
     );
     void dt;
   }
@@ -538,6 +614,9 @@ export class CottageLevel implements Level {
     this.phase = 'scaring';
     this.phaseTime = 0;
     ctx.celebratePuzzle();
+    // Job done — they drift back to their own loops round the hive rather
+    // than chasing the bear off the map.
+    ctx.babies.mobAround(null);
     ctx.bear.flee(ctx.hive.position);
     ctx.audio.setThreat(0);
     ctx.audio.levelComplete();

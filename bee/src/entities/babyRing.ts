@@ -16,6 +16,17 @@ const CELEBRATION = {
   orbitWobble: 1.1,
 } as const;
 
+/** How tightly they crowd whatever they're teasing, in world units. */
+const MOB = {
+  /** Base loop radius around the head; each baby varies off this. */
+  radius: 2.6,
+  /** Extra radians/sec on top of the baby's own wander rate. */
+  rate: 1.5,
+  /** Loops sit a little above the head, so they buzz over it. */
+  rise: 0.9,
+  bob: 1.0,
+} as const;
+
 /** A wandering flight path for one baby, once they're loose in the meadow. */
 interface SwarmPath {
   centreX: number;
@@ -89,6 +100,11 @@ export class BabyRing {
   private swarmTime = 0;
   private readonly swarmOrigin = new THREE.Vector3();
 
+  /** Set while they're teasing something — they crowd this point instead. */
+  private mobbing = false;
+  private mobBlend = 0;
+  private readonly mobPoint = new THREE.Vector3();
+
   constructor(
     positions: readonly THREE.Vector3[],
     private readonly rng: Rng,
@@ -136,6 +152,8 @@ export class BabyRing {
     this.celebrating = false;
     this.celebrateTime = 0;
     this.swarming = false;
+    this.mobbing = false;
+    this.mobBlend = 0;
     this.feedTarget = null;
     this.feedTime = 0;
     for (const baby of this.babies) {
@@ -286,6 +304,8 @@ export class BabyRing {
   swarm(origin: THREE.Vector3): void {
     this.swarming = true;
     this.celebrating = false;
+    this.mobbing = false;
+    this.mobBlend = 0;
     this.swarmTime = 0;
     this.swarmOrigin.copy(origin);
 
@@ -319,8 +339,24 @@ export class BabyRing {
     });
   }
 
+  /**
+   * Aim the loose brood at a moving point — the bear's head, while they're
+   * teasing it — or pass null to send them back to wandering the meadow.
+   *
+   * Call it every frame with a live position: the point is only a target, and
+   * they ease onto it over about a second, so a moving one just drags the
+   * whole cloud along with it.
+   */
+  mobAround(point: THREE.Vector3 | null): void {
+    this.mobbing = point !== null;
+    if (point) this.mobPoint.copy(point);
+  }
+
   private updateSwarm(dt: number): void {
     this.swarmTime += dt;
+    // Ease the whole cloud between wandering and mobbing rather than snapping,
+    // so they visibly fly over to the bear and back off again afterwards.
+    this.mobBlend += ((this.mobbing ? 1 : 0) - this.mobBlend) * Math.min(1, 1.1 * dt);
 
     for (const baby of this.babies) {
       const p = baby.swarm;
@@ -335,6 +371,20 @@ export class BabyRing {
         p.height + Math.sin(t * p.rateY + p.phaseY) * p.bob,
         p.centreZ + Math.cos(t * p.rateZ + p.phaseZ) * p.radiusZ,
       );
+
+      if (this.mobBlend > 0.001) {
+        // A tight, tilted loop of its own around the head. The rates are
+        // deliberately faster and mutually prime-ish so the cloud churns
+        // instead of settling into a tidy carousel.
+        const radius = MOB.radius + (p.radiusX - 3.5) * 0.3;
+        const spin = t * (p.rateX + MOB.rate);
+        tmpMob.set(
+          this.mobPoint.x + Math.sin(spin + p.phaseX) * radius,
+          this.mobPoint.y + MOB.rise + Math.sin(t * (p.rateY + 1.4) + p.phaseY) * MOB.bob,
+          this.mobPoint.z + Math.cos(spin * 1.27 + p.phaseZ) * radius,
+        );
+        tmpTarget.lerp(tmpMob, this.mobBlend);
+      }
 
       baby.prev.copy(baby.position);
       baby.position.lerpVectors(this.swarmOrigin, tmpTarget, out);
@@ -405,6 +455,7 @@ export class BabyRing {
 }
 
 const tmpTarget = new THREE.Vector3();
+const tmpMob = new THREE.Vector3();
 const tmpDelta = new THREE.Vector3();
 
 /** Fast start, gentle arrival — reads as bursting out of the doorway. */

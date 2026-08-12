@@ -105,10 +105,17 @@ export class CameraRig {
     this.camera.lookAt(smoothedLook);
   }
 
-  /** Snap immediately, used on level entry so there's no swoop-in. */
-  snap(bee: BeeActor): void {
+  /**
+   * Snap immediately, used on level entry so there's no swoop-in.
+   *
+   * @param yaw which way to look. Defaults to facing the world origin, which
+   *   is right for scenes built around it — but not for the cottage clearing,
+   *   which stands off at the far end of the meadow, so levels that place the
+   *   bee somewhere else say what they mean.
+   */
+  snap(bee: BeeActor, yaw = Math.atan2(-bee.position.x, -bee.position.z)): void {
     this.zoom = this.zoomTarget;
-    this.yaw = Math.atan2(-bee.position.x, -bee.position.z);
+    this.yaw = yaw;
     this.camera.position.set(
       bee.position.x - Math.sin(this.yaw) * this.distance * this.zoom,
       bee.position.y + this.height * this.zoom,

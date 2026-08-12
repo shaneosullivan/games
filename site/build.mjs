@@ -23,6 +23,24 @@ const SITE_DIR = path.dirname(fileURLToPath(import.meta.url));
 const REPO_DIR = path.resolve(SITE_DIR, '..');
 const OUT_DIR = path.join(SITE_DIR, 'dist');
 const GAMES_OUT = path.join(OUT_DIR, 'games');
+const ICONS_SRC = path.join(SITE_DIR, 'assets', 'icons');
+const ICONS_OUT = path.join(OUT_DIR, 'icons');
+
+/**
+ * The installed app's identity. The icons are Chofter's own knotwork C, taken
+ * from chofter.com and flattened onto the site's cream so iOS — which drops
+ * transparency — doesn't render it on black.
+ */
+const APP = {
+  name: 'Chofter Games',
+  shortName: 'Chofter',
+  description: 'Little games, made for fun.',
+  themeColor: '#f7b32b',
+  backgroundColor: '#fdf7ec',
+};
+
+/** Bumped every build, so an installed copy picks up new games. */
+const BUILD_ID = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14);
 
 /** Folders that are never games, whatever they contain. */
 const IGNORED = new Set(['site', 'node_modules', 'docs', 'dist']);
@@ -104,6 +122,53 @@ function stageGame(game) {
   return true;
 }
 
+/**
+ * Make a staged game installable in its own right.
+ *
+ * Games build standalone and know nothing about the gallery, so this rewrites
+ * their `<head>`: out goes whatever inlined manifest and icon they shipped with,
+ * in goes a manifest sitting next to them and the shared Chofter icons two
+ * levels up. Nothing else in the file is touched.
+ */
+function installGame(game) {
+  const dir = path.join(GAMES_OUT, game.name);
+  const indexPath = path.join(dir, 'index.html');
+  const title = game.title;
+
+  fs.writeFileSync(
+    path.join(dir, 'manifest.webmanifest'),
+    renderManifest({
+      name: `${title} · ${APP.shortName}`,
+      shortName: title,
+      description: game.description || APP.description,
+      start: './index.html',
+      up: '../../',
+    }),
+  );
+
+  const head = renderInstallHead({
+    title,
+    manifest: 'manifest.webmanifest',
+    up: '../../',
+  });
+
+  const html = fs
+    .readFileSync(indexPath, 'utf8')
+    // Drop the game's own install metadata so it can't compete with ours.
+    .replace(/^[ \t]*<link[^>]*rel="(manifest|apple-touch-icon|icon)"[^>]*>\s*$/gim, '')
+    .replace(/^[ \t]*<meta[^>]*name="(theme-color|apple-mobile-web-app-[\w-]+|mobile-web-app-capable)"[^>]*>\s*$/gim, '')
+    // …including the comments explaining them, which would now describe tags
+    // that are no longer there.
+    // The `(?!-->)` guards keep the match inside one comment; a plain lazy
+    // wildcard happily runs from one comment to a later one's terminator and
+    // swallows the tags in between.
+    .replace(/^[ \t]*<!--(?:(?!-->)[\s\S])*?(?:Home Screen|anifest)(?:(?!-->)[\s\S])*?-->[ \t]*$/gm, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .replace(/[ \t]*<\/head>/, `${head}\n  </head>`);
+
+  fs.writeFileSync(indexPath, html);
+}
+
 // ---------------------------------------------------------------------------
 
 const escapeHtml = (s) =>
@@ -139,6 +204,134 @@ function renderCard(game) {
       </li>`;
 }
 
+/**
+ * The install metadata, shared by the gallery and by each game.
+ *
+ * `display: fullscreen` with a display_override chain is what actually gets rid
+ * of the browser chrome on Android; iOS ignores all of it and goes by the
+ * apple-mobile-web-app-* metas instead, hence both being emitted.
+ *
+ * Every path is relative, so the same file works at the domain root or under a
+ * sub-path — which is exactly how the per-game copies are used.
+ *
+ * @param up how many levels up the shared icons/ folder is
+ */
+function renderManifest({ name, shortName, description, start = './', up = '' }) {
+  const icon = (file, sizes, purpose) => ({
+    src: `${up}icons/${file}`,
+    sizes,
+    type: 'image/png',
+    ...(purpose ? { purpose } : {}),
+  });
+
+  return JSON.stringify(
+    {
+      name,
+      short_name: shortName,
+      description,
+      id: start,
+      start_url: start,
+      scope: './',
+      display: 'fullscreen',
+      display_override: ['fullscreen', 'standalone', 'minimal-ui'],
+      orientation: 'any',
+      background_color: APP.backgroundColor,
+      theme_color: APP.themeColor,
+      icons: [
+        icon('icon-192.png', '192x192'),
+        icon('icon-512.png', '512x512'),
+        icon('icon-maskable-512.png', '512x512', 'maskable'),
+      ],
+    },
+    null,
+    2,
+  );
+}
+
+/**
+ * The head tags that make a page installable. iOS needs the apple-* metas and
+ * an explicit apple-touch-icon; everyone else reads the manifest.
+ *
+ * @param up how many levels up the shared icons/ folder is
+ */
+function renderInstallHead({ title, manifest, up = '' }) {
+  return `    <link rel="manifest" href="${manifest}" />
+    <meta name="theme-color" content="${APP.themeColor}" />
+    <link rel="icon" type="image/png" sizes="192x192" href="${up}icons/icon-192.png" />
+    <link rel="apple-touch-icon" href="${up}icons/apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="${escapeHtml(title)}" />`;
+}
+
+/**
+ * The service worker. Its only real job is making an installed copy work with
+ * no network — a tablet in a car park should still open the games it has
+ * already played.
+ *
+ * Strategy: precache the gallery shell up front, then stale-while-revalidate
+ * everything else on the same origin. Games are one big immutable HTML file
+ * each, so caching one on first play is both cheap and exactly right; the
+ * revalidate half is what lets a rebuilt game replace it next time.
+ */
+function renderServiceWorker(shell) {
+  return `/* Generated by site/build.mjs — do not edit. */
+const CACHE = 'chofter-${BUILD_ID}';
+const SHELL = ${JSON.stringify(shell, null, 2)};
+
+self.addEventListener('install', (event) => {
+  event.waitUntil(
+    caches.open(CACHE).then((cache) => cache.addAll(SHELL)).then(() => self.skipWaiting()),
+  );
+});
+
+// A new build means a new cache name; bin every older one.
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    caches
+      .keys()
+      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
+      .then(() => self.clients.claim()),
+  );
+});
+
+self.addEventListener('fetch', (event) => {
+  const { request } = event;
+  if (request.method !== 'GET') return;
+
+  const url = new URL(request.url);
+  if (url.origin !== self.location.origin) return;
+
+  event.respondWith(
+    caches.open(CACHE).then(async (cache) => {
+      const hit = await cache.match(request, { ignoreSearch: true });
+
+      const live = fetch(request)
+        .then((response) => {
+          if (response.ok) cache.put(request, response.clone());
+          return response;
+        })
+        // Offline and never seen: for a page, fall back to the gallery so the
+        // app opens to something useful instead of the browser's error page.
+        .catch(() => hit ?? (request.mode === 'navigate' ? cache.match('./index.html') : undefined));
+
+      return hit ?? live;
+    }),
+  );
+});
+`;
+}
+
+/** Registration snippet, inlined so the gallery stays two files. */
+const SW_REGISTER = `      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('sw.js').catch(() => {
+            /* Offline support is a bonus; the site works fine without it. */
+          });
+        });
+      }`;
+
 function renderPage(games) {
   const cards = games.map(renderCard).join('\n');
   const empty = `      <li class="empty">No games built yet. Add a folder with its own build, then run this again.</li>`;
@@ -148,11 +341,13 @@ function renderPage(games) {
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <title>Chofter Games</title>
-    <meta name="description" content="Little games, made for fun." />
-    <meta name="theme-color" content="#f7b32b" />
-    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%90%9D%3C/text%3E%3C/svg%3E" />
+    <title>${escapeHtml(APP.name)}</title>
+    <meta name="description" content="${escapeHtml(APP.description)}" />
+${renderInstallHead({ title: APP.name, manifest: 'manifest.webmanifest' })}
     <link rel="stylesheet" href="styles.css" />
+    <script>
+${SW_REGISTER}
+    </script>
   </head>
   <body>
     <header class="hero">
@@ -201,5 +396,34 @@ for (const game of games) {
 
 fs.writeFileSync(path.join(OUT_DIR, 'index.html'), renderPage(staged));
 fs.cpSync(path.join(SITE_DIR, 'styles.css'), path.join(OUT_DIR, 'styles.css'));
+
+// ---- installable bits -----------------------------------------------------
+
+fs.cpSync(ICONS_SRC, ICONS_OUT, { recursive: true });
+fs.writeFileSync(
+  path.join(OUT_DIR, 'manifest.webmanifest'),
+  renderManifest({ name: APP.name, shortName: APP.shortName, description: APP.description }),
+);
+
+// Precache the gallery itself. Games are big and there may be many, so they're
+// left to the runtime cache — a game you've played is a game you can replay.
+fs.writeFileSync(
+  path.join(OUT_DIR, 'sw.js'),
+  renderServiceWorker([
+    './',
+    './index.html',
+    './styles.css',
+    './manifest.webmanifest',
+    './icons/icon-192.png',
+    './icons/apple-touch-icon.png',
+    ...staged.map((g) => `./games/${g.name}/card.png`).filter((_, i) => staged[i].card),
+  ]),
+);
+
+// Each game gets its own manifest too, so adding a game straight to the home
+// screen installs *that game* full-screen rather than the gallery.
+for (const game of staged) installGame(game);
+
+console.log(`  · PWA: manifest, icons and service worker (cache chofter-${BUILD_ID})`);
 
 console.log(`\nBuilt ${staged.length} game(s) into ${path.relative(REPO_DIR, OUT_DIR)}/`);

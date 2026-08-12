@@ -66,7 +66,7 @@ export const CAMERA = {
 export const WORLD = {
   /** Playable radius; the bee is softly pushed back inside. */
   radius: 52,
-  groundSize: 220,
+  groundSize: 320,
   flowerCount: { white: 22, yellow: 22, orange: 22 },
   /** Seconds before a harvested flower blooms again. */
   regrowSeconds: 18,
@@ -235,9 +235,33 @@ export const COTTAGE = {
   cameraHeight: 11,
   /**
    * Well clear of the scaled-up house front (z = 10.5 at 5x), so the camera
-   * can frame the mat and still show the door it is going to open.
+   * can frame the mat and still show the door it is going to open — and far
+   * enough out that the 3x pull-back when the bear arrives doesn't reverse the
+   * camera into the gingerbread wall.
    */
-  matOffsetZ: 30,
+  matOffsetZ: 36,
+  /**
+   * Where the whole clearing sits in the meadow's world.
+   *
+   * The cottage used to be its own scene at the origin, swapped in and out.
+   * It now stands at the north end of the same world as the hive, so the flight
+   * home is one continuous flight rather than a cut: mat at z = -48, gate at
+   * z = -28, hive at the origin.
+   */
+  yardOffsetZ: -78,
+  /** The mown clearing around the house. Sits inside the meadow's ground. */
+  clearingRadius: 40,
+  /** Gap in the hedge, in radians either side of due south (+Z). */
+  gateGap: 0.24,
+  /** Half-width of the gateway itself. */
+  gateHalfWidth: 4.5,
+  /** Bounds for the flight home: has to hold the yard and the hive both. */
+  flightRadius: 115,
+  /**
+   * How far back the camera pulls once the bear turns up. A bear this size
+   * needs the room — at normal framing it fills the screen or sits off it.
+   */
+  chaseZoom: 3,
 } as const;
 
 /**

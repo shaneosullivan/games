@@ -106,8 +106,12 @@ it light on the beat, and you tap each before it goes dark. 90% opens the door.
 Inside is a lamplit room with a jar of honey glowing on the counter — fly over,
 pick it up, and it hangs from you on a rope that swings with real momentum.
 
-Then stage three: a bear is waiting outside, and you have to get the honey home
-across the meadow with it on your tail. It's faster than you but corners badly,
+Then stage three: you come back out over the mat, the camera pulls right back,
+and a bear lumbers in from the left. The clearing stands at the north end of the
+meadow's own world rather than in a scene of its own, so what happens next is
+one continuous flight with no cut in it: out through the gate in the fence and
+across the meadow to the hive, glowing at you from the far end, with the bear on
+your tail. It's faster than you but corners badly,
 same as the wasp, so turning is what saves you. Drop the honey into the hive and
 the brood pours out to mob the bear; it rears up on its hind legs and swipes at
 them (never connecting). While it's busy the screen splits — bear and bees on
@@ -238,7 +242,21 @@ Things worth knowing before changing anything:
   level back to `ready` and clears `complete` so the hive can be flown into
   again — without it the finished hive goes inert and approaching it does
   nothing. Any future level needs to re-arm itself there too.
-- **Both environments live in the scene at once** and are toggled with
+- **The cottage clearing is part of the meadow's world**, parked at
+  `COTTAGE.yardOffsetZ` with a fence and gate at its mouth, and both are drawn
+  together. That's what makes stage 3 a single flight rather than a cut — but it
+  means bounds, fog and camera all have to span the pair: `COTTAGE.flightRadius`
+  is a circle about the *hive* wide enough to hold the clearing, `COTTAGE_ENV`
+  fogs much further out than the meadow, and the meadow's boundary hedge and
+  treeline leave a gap on that side (`facingCottage` in
+  `render/geometry/world.ts`). Anything placed at the clearing works in world
+  space: `cottage.matCentre`, `padCentres`, `doorway` and `gate` are all shifted
+  before they're handed out.
+- **`rig.snap()` faces the world origin unless told otherwise.** That was fine
+  when every scene was built around it; the cottage isn't, so `ctx.placeBee()`
+  takes an optional yaw and level 4 passes one. A level that places the bee far
+  from the origin and skips it will find the camera pointing at the hive.
+- **All environments live in the scene at once** and are toggled with
   `.visible` (`meadowGroup` vs `interior.group`) rather than added and removed.
   They're small, and it makes level switching instant. `ctx.setEnvironment()`
   flips them along with sky, fog and lights; `ctx.configureFlight()` re-bounds

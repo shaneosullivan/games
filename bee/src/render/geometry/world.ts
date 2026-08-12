@@ -65,13 +65,20 @@ export function createMeadow(rng: Rng): THREE.Group {
   }
   group.add(tufts);
 
-  // Boundary hedge: a ring of bushes that reads as "don't go further".
+  // Boundary hedge: a ring of bushes that reads as "don't go further" — open
+  // to the north, where the lane to Caramel Cottage runs.
   const bushGeo = new THREE.IcosahedronGeometry(1, 1);
   const bushes = new THREE.InstancedMesh(bushGeo, solidToon(0x4e8f47), 120);
   bushes.castShadow = true;
   bushes.receiveShadow = true;
   for (let i = 0; i < bushes.count; i++) {
     const a = (i / bushes.count) * Math.PI * 2 + rng.range(-0.02, 0.02);
+    if (facingCottage(a)) {
+      // Instances can't be skipped, only hidden.
+      m.makeScale(0, 0, 0);
+      bushes.setMatrixAt(i, m);
+      continue;
+    }
     const r = WORLD.radius + rng.range(1.5, 4);
     const s = rng.range(1.6, 3.1);
     m.compose(
@@ -85,6 +92,21 @@ export function createMeadow(rng: Rng): THREE.Group {
 
   group.add(createTrees(rng));
   return group;
+}
+
+/**
+ * True for ring positions that would stand between the meadow and the cottage.
+ *
+ * The clearing is off to the north (-Z, i.e. angle -PI/2) and the fence at its
+ * mouth is the boundary on that side, so the meadow's own hedge and treeline
+ * step aside to leave the lane open — otherwise they cut straight across the
+ * flight home.
+ */
+function facingCottage(a: number): boolean {
+  let d = (a + Math.PI / 2) % (Math.PI * 2);
+  if (d > Math.PI) d -= Math.PI * 2;
+  if (d < -Math.PI) d += Math.PI * 2;
+  return Math.abs(d) < 0.6;
 }
 
 function createTrees(rng: Rng): THREE.Group {
@@ -111,6 +133,11 @@ function createTrees(rng: Rng): THREE.Group {
   const m = new THREE.Matrix4();
   for (let i = 0; i < trees.count; i++) {
     const a = (i / trees.count) * Math.PI * 2 + rng.range(-0.12, 0.12);
+    if (facingCottage(a)) {
+      m.makeScale(0, 0, 0);
+      trees.setMatrixAt(i, m);
+      continue;
+    }
     const r = WORLD.radius + rng.range(6, 24);
     const s = rng.range(0.85, 1.5);
     m.compose(

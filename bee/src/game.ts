@@ -163,7 +163,7 @@ export class Game {
       flashScreen: () => this.flashScreen(),
       setEnvironment: (name) => this.setEnvironment(name),
       configureFlight: (s) => this.configureFlight(s),
-      placeBee: (position, desiredHeight) => this.placeBee(position, desiredHeight),
+      placeBee: (position, desiredHeight, yaw) => this.placeBee(position, desiredHeight, yaw),
       setCameraZoom: (z) => this.rig.setZoom(z),
       setCameraCinematic: (eye, look) => this.rig.setCinematic(eye, look),
       showPuzzle: (on) => {
@@ -278,9 +278,14 @@ export class Game {
   }
 
   private setEnvironment(name: EnvironmentName): void {
-    this.meadowGroup.visible = name === 'meadow';
+    // The cottage clearing stands at the north end of the meadow rather than in
+    // a world of its own, so 'cottage' shows both: from the mat you can see
+    // through the gate to the hive, and the flight home needs no cut.
+    this.meadowGroup.visible = name === 'meadow' || name === 'cottage';
+    // …and the clearing shows in the meadow too, so the gap in the hedge to the
+    // north has a cottage at the end of it rather than nothing.
+    this.cottage.group.visible = name === 'meadow' || name === 'cottage';
     this.interior.group.visible = name === 'hive';
-    this.cottage.group.visible = name === 'cottage';
     this.inside.group.visible = name === 'inside';
     this.stage.setEnvironment(
       name === 'hive' ? HIVE_ENV : name === 'inside' ? INSIDE_ENV : name === 'cottage' ? COTTAGE_ENV : MEADOW_ENV,
@@ -302,7 +307,7 @@ export class Game {
     );
   }
 
-  private placeBee(position: THREE.Vector3, desiredHeight?: number): void {
+  private placeBee(position: THREE.Vector3, desiredHeight?: number, yaw?: number): void {
     this.bee.scripted = false;
     this.bee.object.visible = true;
     this.bee.setScale(1);
@@ -310,7 +315,7 @@ export class Game {
     const height = desiredHeight ?? position.y;
     this.bee.snapHeight(height);
     this.altitude.setHeight(height);
-    this.rig.snap(this.bee);
+    this.rig.snap(this.bee, yaw);
   }
 
   private buildOverlays(uiLayer: HTMLElement): void {
@@ -390,6 +395,10 @@ export class Game {
     if (this.uiLayer.parentElement) {
       this.uiLayer.parentElement.classList.toggle('split', on);
     }
+    // The panel only makes sense while the screen is split for it. Tying the
+    // two together here means every path that ends a level — the menu, a level
+    // switch, a restart — puts the puzzle away without having to remember to.
+    if (!on) this.puzzle.hide();
     this.stage.resize();
   }
 

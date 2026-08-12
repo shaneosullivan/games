@@ -16,6 +16,8 @@ export interface CottageScene {
   setDoorOpen(open: boolean): void;
   /** Where the bee flies to once the door is open. */
   doorway: THREE.Vector3;
+  /** The gap in the fence, and the way home to the meadow. */
+  gate: THREE.Vector3;
   update(elapsed: number): void;
 }
 
@@ -32,10 +34,22 @@ const ICING = 0xfff6e8;
  */
 export function createCottage(rng: Rng): CottageScene {
   const group = new THREE.Group();
+  // The clearing stands at the north end of the meadow's world rather than in
+  // a scene of its own, so the flight home is one continuous flight. Everything
+  // below is authored around a local origin at the house and shifted bodily;
+  // the vectors handed back are converted to world space at the end.
+  group.position.z = COTTAGE.yardOffsetZ;
 
   // ---- clearing ----------------------------------------------------------
-  const ground = new THREE.Mesh(new THREE.CircleGeometry(160, 48), solidToon(0x8ecb6d));
+  // Mown grass, a shade lighter than the meadow's, laid just above it. It has
+  // to stay inside the meadow's ground disc or it hangs over the edge of the
+  // world.
+  const ground = new THREE.Mesh(
+    new THREE.CircleGeometry(COTTAGE.clearingRadius, 48),
+    solidToon(0x8ecb6d),
+  );
   ground.rotation.x = -Math.PI / 2;
+  ground.position.y = 0.02;
   ground.receiveShadow = true;
   group.add(ground);
 
@@ -47,6 +61,7 @@ export function createCottage(rng: Rng): CottageScene {
   group.add(path);
 
   group.add(createHedge(rng));
+  group.add(createFence());
 
   // ---- the house, at house scale -----------------------------------------
   //
@@ -90,13 +105,18 @@ export function createCottage(rng: Rng): CottageScene {
 
   let doorOpen = false;
 
+  // Everything the level steers by is handed back in world space, so callers
+  // never have to know the clearing is parked away from the origin.
+  const toWorld = (v: THREE.Vector3) => v.clone().add(group.position);
+
   return {
     group,
-    matCentre,
+    matCentre: toWorld(matCentre),
     pads,
-    padCentres,
+    padCentres: padCentres.map(toWorld),
     // Doorway centre in world units: (0, 1.35, 2.02) at house scale.
-    doorway: new THREE.Vector3(0, 1.35, 2.0).multiplyScalar(COTTAGE.houseScale),
+    doorway: toWorld(new THREE.Vector3(0, 1.35, 2.0).multiplyScalar(COTTAGE.houseScale)),
+    gate: toWorld(new THREE.Vector3(0, 3, COTTAGE.boundsRadius)),
     setDoorOpen(open) {
       doorOpen = open;
     },
@@ -202,7 +222,95 @@ function createHouse(): THREE.Group {
   return g;
 }
 
-/** A ring of bushes so the clearing reads as enclosed. */
+/** Signed difference between two angles, in (-PI, PI]. */
+function shortestAngle(from: number, to: number): number {
+  let d = (to - from) % (Math.PI * 2);
+  if (d > Math.PI) d -= Math.PI * 2;
+  if (d < -Math.PI) d += Math.PI * 2;
+  return d;
+}
+
+/**
+ * A picket fence across the gap in the hedge, with an open gate in the middle.
+ *
+ * It's the signpost for the whole of stage 3: the way home is through there,
+ * and from over the mat you can see the hive glowing beyond it. The gate leaves
+ * are swung wide and stay that way — nothing here should ever read as a wall
+ * you have to open.
+ */
+function createFence(): THREE.Group {
+  const g = new THREE.Group();
+  const parts: THREE.BufferGeometry[] = [];
+  const push = (geo: THREE.BufferGeometry, color: number) => parts.push(paint(geo, color));
+
+  const WOOD = 0xdcc39a;
+  const WOOD_DARK = 0xb69466;
+  const z = COTTAGE.boundsRadius;
+  const half = COTTAGE.gateHalfWidth;
+  // The hedge gap is an arc; the fence is a straight run filling it either side
+  // of the gateway.
+  const reach = Math.sin(COTTAGE.gateGap) * (COTTAGE.boundsRadius + 5);
+
+  const picket = (x: number, height: number, color: number) => {
+    const post = new THREE.BoxGeometry(0.55, height, 0.4);
+    post.translate(x, height / 2, z);
+    push(post, color);
+    // Pointed cap, so it reads as a picket rather than a block.
+    const cap = new THREE.ConeGeometry(0.42, 0.7, 4);
+    cap.rotateY(Math.PI / 4);
+    cap.translate(x, height + 0.3, z);
+    push(cap, color);
+  };
+
+  for (const side of [-1, 1]) {
+    for (let x = half + 1.4; x <= reach; x += 1.7) picket(side * x, 3.2, WOOD);
+    // Two rails tying the pickets together.
+    for (const y of [1.1, 2.4]) {
+      const run = reach - half;
+      const rail = new THREE.BoxGeometry(run, 0.34, 0.24);
+      rail.translate(side * (half + run / 2), y, z);
+      push(rail, WOOD_DARK);
+    }
+    // Gateposts, taller and chunkier than the pickets.
+    const gatepost = new THREE.BoxGeometry(0.9, 4.4, 0.9);
+    gatepost.translate(side * half, 2.2, z);
+    push(gatepost, WOOD_DARK);
+    const finial = new THREE.SphereGeometry(0.55, 12, 10);
+    finial.translate(side * half, 4.6, z);
+    push(finial, WOOD);
+  }
+
+  const merged = mergeGeometries(parts, false);
+  if (!merged) throw new Error('cottage fence: geometry merge failed');
+  merged.computeVertexNormals();
+  const mesh = new THREE.Mesh(merged, vertexToon());
+  mesh.castShadow = true;
+  g.add(mesh);
+
+  // The two gate leaves, hinged on the gateposts and standing open.
+  for (const side of [-1, 1]) {
+    const hinge = new THREE.Object3D();
+    hinge.position.set(side * half, 0, z);
+    hinge.rotation.y = side * 1.25;
+    const leaf = new THREE.Mesh(new THREE.BoxGeometry(3.6, 2.9, 0.22), solidToon(WOOD));
+    leaf.position.set(side * 1.8, 1.55, 0);
+    leaf.castShadow = true;
+    hinge.add(leaf);
+    for (const y of [0.9, 2.2]) {
+      const bar = new THREE.Mesh(new THREE.BoxGeometry(3.7, 0.3, 0.3), solidToon(WOOD_DARK));
+      bar.position.set(side * 1.8, y, 0.12);
+      hinge.add(bar);
+    }
+    g.add(hinge);
+  }
+
+  return g;
+}
+
+/**
+ * A ring of bushes so the clearing reads as enclosed — with a gap left at the
+ * south side, where the gate through to the meadow is.
+ */
 function createHedge(rng: Rng): THREE.InstancedMesh {
   const geo = new THREE.IcosahedronGeometry(1, 1);
   const bushes = new THREE.InstancedMesh(geo, solidToon(0x4e8f47), 90);
@@ -210,6 +318,13 @@ function createHedge(rng: Rng): THREE.InstancedMesh {
   const m = new THREE.Matrix4();
   for (let i = 0; i < bushes.count; i++) {
     const a = (i / bushes.count) * Math.PI * 2 + rng.range(-0.03, 0.03);
+    // Due south is +Z, i.e. angle PI/2 — leave that stretch clear.
+    if (Math.abs(shortestAngle(a, Math.PI / 2)) < COTTAGE.gateGap) {
+      // Instances can't be skipped, only hidden: scale it to nothing.
+      m.makeScale(0, 0, 0);
+      bushes.setMatrixAt(i, m);
+      continue;
+    }
     const r = COTTAGE.boundsRadius + rng.range(1.5, 5);
     const s = rng.range(1.8, 3.4);
     m.compose(

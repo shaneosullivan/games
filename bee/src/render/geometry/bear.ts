@@ -6,6 +6,11 @@ import { paint, solidToon, vertexToon } from '../materials';
 export interface BearModel {
   group: THREE.Group;
   /**
+   * An empty parked inside the head, so callers can find where the head
+   * actually is once the bear has reared up — the babies mob that point.
+   */
+  head: THREE.Object3D;
+  /**
    * @param elapsed seconds, for the gait
    * @param speed01 0..1 of top speed, drives how hard it lopes
    * @param rear 0..1 up onto its hind legs
@@ -14,9 +19,9 @@ export interface BearModel {
   animate(elapsed: number, speed01: number, rear: number, swat: number): void;
 }
 
-const FUR = 0x7a4a2b;
-const FUR_DARK = 0x5c3520;
-const MUZZLE = 0xc79a6b;
+const FUR = 0xc08753;
+const FUR_DARK = 0x9d6a3c;
+const MUZZLE = 0xecc79c;
 
 /**
  * A big brown bear, built from the same merged primitives as everything else.
@@ -84,6 +89,11 @@ export function createBear(): BearModel {
     push(thigh, FUR_DARK);
   }
 
+  // Rides with the torso, so it tips back with the head when the bear rears.
+  const headAnchor = new THREE.Object3D();
+  headAnchor.position.set(0, 0.35, 1.85);
+  torso.add(headAnchor);
+
   const merged = mergeGeometries(parts, false);
   if (!merged) throw new Error('bear: geometry merge failed');
   merged.computeVertexNormals();
@@ -125,6 +135,7 @@ export function createBear(): BearModel {
 
   return {
     group,
+    head: headAnchor,
     animate(elapsed, speed01, rear, swat) {
       // Rearing tips the whole torso back over the hips.
       torso.rotation.x = -rear * 1.15;

@@ -197,6 +197,23 @@ export class BearActor {
     this.yaw += shortestAngle(this.yaw, this.heading) * Math.min(1, 6 * dt);
   }
 
+  /**
+   * Where its head is right now, in world space — the point the babies buzz
+   * around while they're teasing it.
+   *
+   * Read off the model rather than guessed from `position`, so it follows the
+   * head up as the bear rears onto its hind legs. The matrices are only
+   * refreshed at render time, so force them current for the caller.
+   */
+  headPosition(out: THREE.Vector3): THREE.Vector3 {
+    this.model.head.updateWorldMatrix(true, false);
+    this.model.head.getWorldPosition(out);
+    // Report it in the same space as `position` — i.e. the parent group's —
+    // so it can be compared with anything else living in the meadow.
+    if (this.object.parent) this.object.parent.worldToLocal(out);
+    return out;
+  }
+
   render(alpha: number): void {
     this.object.position.lerpVectors(this.prevPosition, this.position, alpha);
     this.object.rotation.y = this.prevYaw + shortestAngle(this.prevYaw, this.yaw) * alpha;

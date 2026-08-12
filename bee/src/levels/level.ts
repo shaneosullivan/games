@@ -55,7 +55,13 @@ export interface GameContext {
   /** Re-bound the player and re-frame the camera for this level. */
   configureFlight(settings: FlightSettings): void;
   /** Drop the bee somewhere and settle the camera behind it immediately. */
-  placeBee(position: THREE.Vector3, desiredHeight?: number): void;
+  /**
+   * Drop the bee somewhere and snap the camera behind her.
+   *
+   * @param yaw which way the shot faces; defaults to looking at the world
+   *   origin, which is only right for scenes built around it.
+   */
+  placeBee(position: THREE.Vector3, desiredHeight?: number, yaw?: number): void;
   /**
    * Widen or tighten the shot, as a multiple of the level's camera settings.
    * Eases in and out; 1 is normal.

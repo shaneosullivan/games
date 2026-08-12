@@ -15,11 +15,50 @@ which is entirely self-contained — deploy that folder and nothing else:
 site/dist/
   index.html          the gallery
   styles.css
+  manifest.webmanifest
+  sw.js               offline cache
+  icons/              the Chofter mark, at every size the install needs
   games/
     bee/
       index.html      the game
+      manifest.webmanifest
       card.png
 ```
+
+## Installing it
+
+The gallery is a PWA. Add it to the home screen and it opens full-screen with
+no browser chrome, under the Chofter knotwork icon — and because games live on
+the same origin, tapping one stays inside the installed app.
+
+Each game also gets its own manifest, so a game page can be installed directly
+as its own app if you'd rather skip the gallery.
+
+The icons in `site/assets/icons/` are generated from `assets/web-app-manifest-512x512.png`
+(Chofter's own mark) flattened onto the site's cream — iOS drops transparency,
+so an unflattened icon would sit on black. To regenerate them after a logo
+change:
+
+```bash
+python3 - <<'PY'
+from PIL import Image
+src = Image.open('site/assets/web-app-manifest-512x512.png').convert('RGBA')
+BG = (253, 247, 236, 255)
+def render(size, inset):
+    c = Image.new('RGBA', (size, size), BG)
+    box = round(size * (1 - inset * 2))
+    c.alpha_composite(src.resize((box, box), Image.LANCZOS), ((size - box) // 2,) * 2)
+    return c
+render(192, 0.08).save('site/assets/icons/icon-192.png')
+render(512, 0.08).save('site/assets/icons/icon-512.png')
+render(512, 0.20).save('site/assets/icons/icon-maskable-512.png')  # 80% safe zone
+render(180, 0.10).save('site/assets/icons/apple-touch-icon.png')
+PY
+```
+
+The service worker precaches the gallery and stale-while-revalidates everything
+else on the origin, so a game you've played once keeps working with no network.
+Its cache name carries the build timestamp, so each deploy replaces the old one.
 
 Other scripts:
 
