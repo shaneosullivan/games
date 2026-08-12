@@ -42,6 +42,15 @@ const APP = {
 /** Bumped every build, so an installed copy picks up new games. */
 const BUILD_ID = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14);
 
+/**
+ * The stamp file a running page polls to notice it has been replaced.
+ *
+ * One next to every page that might be open for a long time — the gallery and
+ * each game — so a page can always fetch it relative to itself, whatever
+ * sub-path it's served from.
+ */
+const VERSION_FILE = 'version.json';
+
 /** Folders that are never games, whatever they contain. */
 const IGNORED = new Set(['site', 'node_modules', 'docs', 'dist']);
 
@@ -302,6 +311,8 @@ self.addEventListener('fetch', (event) => {
 
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
+  // The update check has to see the network or it can never notice a deploy.
+  if (url.pathname.endsWith('/${VERSION_FILE}')) return;
 
   event.respondWith(
     caches.open(CACHE).then(async (cache) => {
@@ -423,6 +434,14 @@ fs.writeFileSync(
 // Each game gets its own manifest too, so adding a game straight to the home
 // screen installs *that game* full-screen rather than the gallery.
 for (const game of staged) installGame(game);
+
+// The stamp every long-lived page polls for. Written last, so it can never
+// advertise a build that isn't fully staged.
+const stamp = `${JSON.stringify({ build: BUILD_ID }, null, 2)}\n`;
+fs.writeFileSync(path.join(OUT_DIR, VERSION_FILE), stamp);
+for (const game of staged) {
+  fs.writeFileSync(path.join(GAMES_OUT, game.name, VERSION_FILE), stamp);
+}
 
 console.log(`  · PWA: manifest, icons and service worker (cache chofter-${BUILD_ID})`);
 

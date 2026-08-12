@@ -23,6 +23,8 @@ site/dist/
       index.html      the game
       manifest.webmanifest
       card.png
+      version.json
+  version.json          build stamp, polled by running pages
 ```
 
 ## Installing it
@@ -59,6 +61,20 @@ PY
 The service worker precaches the gallery and stale-while-revalidates everything
 else on the origin, so a game you've played once keeps working with no network.
 Its cache name carries the build timestamp, so each deploy replaces the old one.
+
+## Telling a running app it's out of date
+
+Every build writes `version.json` — at the root and next to each game — holding
+the same build stamp. A running game reads it once a minute (and whenever the
+app is brought back to the foreground), and if the stamp has changed since the
+copy it first saw, it offers "A new version is ready". Taking the offer deletes
+every cache and reloads, which is the part that matters: without the cache
+purge the service worker would hand back the very page you're trying to
+replace.
+
+The service worker deliberately does *not* intercept `version.json` — a cached
+update-check can never notice an update. Keep it that way if you touch
+`renderServiceWorker`.
 
 Other scripts:
 

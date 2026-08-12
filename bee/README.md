@@ -259,6 +259,11 @@ Things worth knowing before changing anything:
   when every scene was built around it; the cottage isn't, so `ctx.placeBee()`
   takes an optional yaw and level 4 passes one. A level that places the bee far
   from the origin and skips it will find the camera pointing at the hive.
+- **A deployed build tells itself when it's stale.** `core/updates.ts` polls
+  the `version.json` the site build writes next to the game, and offers a
+  reload when the stamp changes. It clears every cache before reloading —
+  a plain reload would be served the same stale page by the service worker.
+  Development has no `version.json`, so it's a no-op there.
 - **All environments live in the scene at once** and are toggled with
   `.visible` (`meadowGroup` vs `interior.group`) rather than added and removed.
   They're small, and it makes level switching instant. `ctx.setEnvironment()`
