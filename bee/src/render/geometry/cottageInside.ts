@@ -1,8 +1,10 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { INSIDE } from '../../config';
+import bearPictureUrl from '../../assets/bearPicture.jpg';
+import bearFamilyUrl from '../../assets/bearFamily.jpg';
 import { createGlowBubble, type GlowBubble } from '../glow';
-import { paint, vertexToon } from '../materials';
+import { paint, solidToon, vertexToon } from '../materials';
 
 export interface CottageInside {
   group: THREE.Group;
@@ -85,6 +87,20 @@ export function createCottageInside(): CottageInside {
   shell.receiveShadow = true;
   group.add(shell);
 
+  // Back wall, above the counter — the first thing you see on the way in.
+  group.add(
+    createWallPicture(bearPictureUrl, 5.6, new THREE.Vector3(0, INSIDE.pictureHeight, -R + 0.32)),
+  );
+  // Left-hand wall as you face the honey, so it's in view on the way over.
+  group.add(
+    createWallPicture(
+      bearFamilyUrl,
+      5.0,
+      new THREE.Vector3(-R + 0.32, INSIDE.pictureHeight, -2),
+      Math.PI / 2,
+    ),
+  );
+
   // A warm lamp over the counter.
   const lamp = new THREE.PointLight(0xffd9a0, 40, 26, 2);
   lamp.position.set(0, INSIDE.roomHeight - 1.5, counterZ + 1);
@@ -119,6 +135,59 @@ export function createCottageInside(): CottageInside {
       jar.getWorldPosition(glow.mesh.position);
     },
   };
+}
+
+/**
+ * A framed picture hung flat against a wall.
+ *
+ * Built facing +Z and then rotated onto whichever wall it belongs to, so the
+ * frame/mount/picture stack only has to be reasoned about once.
+ *
+ * The picture itself is unlit (MeshBasicMaterial) rather than toon-shaded: the
+ * room is deliberately dim, and banding a hand-drawn image across a three-step
+ * toon ramp makes a mess of it. It's dimmed slightly so it reads as lit paper
+ * rather than a lightbox.
+ *
+ * @param yaw rotation onto the wall — 0 for the back wall, +PI/2 for the left.
+ */
+function createWallPicture(
+  url: string,
+  width: number,
+  position: THREE.Vector3,
+  yaw = 0,
+): THREE.Group {
+  const g = new THREE.Group();
+  g.position.copy(position);
+  g.rotation.y = yaw;
+
+  const height = width * (530 / 620); // the source images share this aspect
+
+  const texture = new THREE.TextureLoader().load(url);
+  texture.colorSpace = THREE.SRGBColorSpace;
+
+  // Frame, then a pale mount, then the picture, each a touch proud of the last.
+  const frame = new THREE.Mesh(
+    new THREE.BoxGeometry(width + 0.7, height + 0.7, 0.22),
+    solidToon(0x7b4a22),
+  );
+  frame.castShadow = true;
+  g.add(frame);
+
+  const mount = new THREE.Mesh(
+    new THREE.PlaneGeometry(width + 0.3, height + 0.3),
+    solidToon(0xfff6e8),
+  );
+  mount.position.z = 0.12;
+  g.add(mount);
+
+  const picture = new THREE.Mesh(
+    new THREE.PlaneGeometry(width, height),
+    new THREE.MeshBasicMaterial({ map: texture, color: 0xd8d2c6 }),
+  );
+  picture.position.z = 0.13;
+  g.add(picture);
+
+  return g;
 }
 
 /** A fat jar of honey with a cork stopper and a paper label. */

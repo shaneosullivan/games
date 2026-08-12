@@ -257,6 +257,8 @@ export const INSIDE = {
   roomHeight: 11,
   counterHeight: 3.0,
   jarHeight: 1.5,
+  /** Height of the framed picture's centre on the back wall. */
+  pictureHeight: 5.7,
   /** Fly this close to take the jar. Generous: the counter is against the
    *  back wall, just past where the bee is allowed to fly. */
   pickupRadius: 3.2,
