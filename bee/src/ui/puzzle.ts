@@ -53,10 +53,98 @@ export function createSlidePuzzle(
   for (let i = 0; i < TILES; i++) {
     const cell = document.createElement('div');
     cell.className = 'puzzle-tile';
-    cell.addEventListener('click', () => tryMove(i));
+    cell.addEventListener('click', () => {
+      // A drag ends with a click on the same cell; the slide already happened.
+      if (dragged) return;
+      tryMove(i);
+    });
+    cell.addEventListener('pointerdown', (e) => beginDrag(i, e));
     board.appendChild(cell);
     cells.push(cell);
   }
+
+  // ---- dragging ------------------------------------------------------------
+  //
+  // Tapping a tile next to the gap moves it, but a sliding puzzle should slide:
+  // a tile follows your finger toward the gap and drops into it once it's more
+  // than a third of the way there, otherwise it springs back.
+  //
+  // The travel is measured from the two cells' own offsets rather than a
+  // computed tile size, so it stays exact whatever the board's gap or scale is.
+
+  /** How far along the gap you must drag before it counts as a move. */
+  const COMMIT = 0.34;
+
+  interface Drag {
+    slot: number;
+    pointerId: number;
+    startX: number;
+    startY: number;
+    /** Pixels from this tile to the gap; one of the two is always zero. */
+    spanX: number;
+    spanY: number;
+  }
+  let drag: Drag | null = null;
+  /** Set when a drag has moved the tile, to swallow the click that follows. */
+  let dragged = false;
+
+  function beginDrag(slot: number, e: PointerEvent): void {
+    dragged = false;
+    if (solved) return;
+
+    const blankSlot = order.indexOf(BLANK);
+    // Only a tile that could move at all can be dragged, and only toward the
+    // gap — which is the single direction it can go.
+    if (!neighbours(blankSlot).includes(slot)) return;
+
+    const cell = cells[slot];
+    const gap = cells[blankSlot];
+    drag = {
+      slot,
+      pointerId: e.pointerId,
+      startX: e.clientX,
+      startY: e.clientY,
+      spanX: gap.offsetLeft - cell.offsetLeft,
+      spanY: gap.offsetTop - cell.offsetTop,
+    };
+    cell.setPointerCapture(e.pointerId);
+    cell.style.transition = 'none';
+    cell.style.zIndex = '2';
+  }
+
+  /** 0..1 of the way to the gap, ignoring any drag across the other axis. */
+  function dragProgress(e: PointerEvent, d: Drag): number {
+    const along = d.spanX !== 0 ? e.clientX - d.startX : e.clientY - d.startY;
+    const span = d.spanX !== 0 ? d.spanX : d.spanY;
+    return Math.max(0, Math.min(1, along / span));
+  }
+
+  board.addEventListener('pointermove', (e) => {
+    if (!drag || e.pointerId !== drag.pointerId) return;
+    // Any real movement counts as a drag, including away from the gap — that's
+    // a deliberate "no", and the click that follows shouldn't move it anyway.
+    if (Math.abs(e.clientX - drag.startX) + Math.abs(e.clientY - drag.startY) > 6) {
+      dragged = true;
+    }
+    const t = dragProgress(e, drag);
+    cells[drag.slot].style.transform = `translate(${drag.spanX * t}px, ${drag.spanY * t}px)`;
+  });
+
+  const endDrag = (e: PointerEvent): void => {
+    if (!drag || e.pointerId !== drag.pointerId) return;
+    const { slot } = drag;
+    const commit = dragProgress(e, drag) >= COMMIT;
+    const cell = cells[slot];
+    // Clearing the transform first lets the tile spring back on its own
+    // transition when the drag falls short; on a commit the redraw beats it.
+    cell.style.transform = '';
+    cell.style.transition = '';
+    cell.style.zIndex = '';
+    drag = null;
+    if (commit) tryMove(slot);
+  };
+  board.addEventListener('pointerup', endDrag);
+  board.addEventListener('pointercancel', endDrag);
 
   function draw(): void {
     for (let slot = 0; slot < TILES; slot++) {
