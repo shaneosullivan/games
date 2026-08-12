@@ -81,13 +81,29 @@ export function createBear(): BearModel {
     push(eye, 0x1a0f08);
   }
 
-  // Hind legs stay with the torso so they carry it when it rears.
+  // Hind legs get a pivot of their own at the hips.
+  //
+  // They used to be part of the torso, which meant that tipping the torso back
+  // to rear swung the haunches a long way *forward*, out in front of the bear
+  // where they read as a tail on the wrong end. A real bear's back legs stay
+  // roughly upright underneath it and take the weight, so these barely tilt.
+  const haunches = new THREE.Group();
+  haunches.position.copy(torso.position);
+  group.add(haunches);
+
+  const thighParts: THREE.BufferGeometry[] = [];
   for (const sx of [-1, 1]) {
     const thigh = new THREE.SphereGeometry(0.46, 12, 10);
     thigh.scale(1, 1.15, 1);
     thigh.translate(sx * 0.72, -0.85, -0.45);
-    push(thigh, FUR_DARK);
+    thighParts.push(paint(thigh, FUR_DARK));
   }
+  const thighGeo = mergeGeometries(thighParts, false);
+  if (!thighGeo) throw new Error('bear: haunch merge failed');
+  thighGeo.computeVertexNormals();
+  const haunchMesh = new THREE.Mesh(thighGeo, vertexToon());
+  haunchMesh.castShadow = true;
+  haunches.add(haunchMesh);
 
   // Rides with the torso, so it tips back with the head when the bear rears.
   const headAnchor = new THREE.Object3D();
@@ -137,9 +153,13 @@ export function createBear(): BearModel {
     group,
     head: headAnchor,
     animate(elapsed, speed01, rear, swat) {
-      // Rearing tips the whole torso back over the hips.
+      // Rearing tips the whole torso back over the hips. The haunches rise
+      // with it — they're what it's standing on — but keep their own near
+      // upright angle instead of being swung around to the front.
       torso.rotation.x = -rear * 1.15;
       torso.position.y = 1.35 + rear * 0.55;
+      haunches.rotation.x = -rear * 0.25;
+      haunches.position.y = torso.position.y;
 
       const gait = Math.sin(elapsed * (5 + speed01 * 6));
       for (let i = 0; i < arms.length; i++) {

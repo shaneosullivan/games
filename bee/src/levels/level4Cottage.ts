@@ -51,6 +51,7 @@ type Phase =
 const tmp = new THREE.Vector3();
 const tmpB = new THREE.Vector3();
 const tmpMob = new THREE.Vector3();
+const tmpOrbit = new THREE.Vector3();
 const panEye = new THREE.Vector3();
 const panLook = new THREE.Vector3();
 
@@ -81,6 +82,8 @@ export class CottageLevel implements Level {
 
   /** True once the brood has poured out of the hive to tease the bear. */
   private babiesOut = false;
+  /** Bearing of the circling camera while the bear is reared up. */
+  private orbit = 0;
 
   private mat: DanceMat | null = null;
   private music: Music | null = null;
@@ -571,7 +574,10 @@ export class CottageLevel implements Level {
     this.phaseTime = 0;
     ctx.releaseBabies(ctx.hive.entrance);
     this.babiesOut = true;
-    ctx.bear.distract();
+    // Start the circle from roughly where the follow camera already is, so the
+    // handover isn't a jump cut.
+    this.orbit = 0.5;
+    ctx.bear.distract(ctx.hive.position, BEAR.distractStandoff);
     ctx.audio.setThreat(0.25);
     ctx.hud.setObjective('The babies are teasing it — quick, while it is busy!');
   }
@@ -579,6 +585,7 @@ export class CottageLevel implements Level {
   private updateDistracting(dt: number, ctx: GameContext): void {
     ctx.bear.update(dt, ctx.bee.position);
     this.mobBear(ctx);
+    this.orbitBear(dt, ctx);
     // Park the bee safely to one side to watch.
     ctx.bee.position.lerp(tmp.copy(ctx.hive.entrance).add(tmpB.set(6, 2.5, 7)), 0.04);
     if (this.phaseTime < 2.4) return;
@@ -597,17 +604,39 @@ export class CottageLevel implements Level {
     ctx.babies.mobAround(ctx.bear.headPosition(tmpMob));
   }
 
+  /**
+   * Circle the reared bear, slowly, for as long as it's up on its hind legs.
+   *
+   * The shot holds for a minute or more while the puzzle is solved, and a fixed
+   * camera makes that minute feel like a still image. Circling keeps it alive
+   * and shows the swarm from every side.
+   *
+   * It orbits the midpoint between the bear and the hive rather than the bear
+   * itself: the bear is enormous and stands close enough to the hive to eclipse
+   * it entirely from a camera centred on the bear alone.
+   *
+   * @param towardHive 0 centres on the bear, 1 on the hive. Once the bear is
+   *   fleeing it heads for the horizon, and a camera still tracking it would be
+   *   flung along with it — so that beat holds on the hive and lets it run out
+   *   of shot, which is the point of the beat anyway.
+   */
+  private orbitBear(dt: number, ctx: GameContext, towardHive = 0.5): void {
+    this.orbit += dt * BEAR.orbitRate;
+    const centre = tmpOrbit.copy(ctx.bear.position).lerp(ctx.hive.position, towardHive);
+    ctx.setCameraCinematic(
+      tmp.set(
+        centre.x + Math.sin(this.orbit) * BEAR.orbitRadius,
+        BEAR.orbitHeight,
+        centre.z + Math.cos(this.orbit) * BEAR.orbitRadius,
+      ),
+      tmpB.copy(centre).setY(BEAR.orbitLookHeight),
+    );
+  }
+
   private updatePuzzling(dt: number, ctx: GameContext): void {
     ctx.bear.update(dt, ctx.bee.position);
     this.mobBear(ctx);
-    // Drift the camera onto the bear and the babies, which is the show. It
-    // frames the head rather than the middle of the bear: reared up, that's
-    // where the swiping and the swarm are.
-    ctx.setCameraCinematic(
-      tmp.copy(ctx.bear.position).add(tmpB.set(9, 11, 17)),
-      tmpB.copy(ctx.bear.position).setY(8),
-    );
-    void dt;
+    this.orbitBear(dt, ctx);
   }
 
   /** Called by the Game when the sliding puzzle is completed. */
@@ -627,10 +656,8 @@ export class CottageLevel implements Level {
 
   private updateScaring(dt: number, ctx: GameContext): void {
     const event = ctx.bear.update(dt, ctx.bee.position);
-    ctx.setCameraCinematic(
-      tmp.copy(ctx.bear.position).add(tmpB.set(9, 9, 15)),
-      tmpB.copy(ctx.bear.position).setY(4),
-    );
+    // Keep circling as it turns tail, and let go of the camera once it's away.
+    this.orbitBear(dt, ctx, 1);
     if (this.phaseTime < 1.2) return;
     ctx.showPuzzle(false);
     if (event !== 'departed' && this.phaseTime < BEAR.fleeSeconds) return;

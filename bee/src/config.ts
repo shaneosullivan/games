@@ -348,6 +348,24 @@ export const BEAR = {
   /** Where it waits outside the cottage, relative to the door. */
   ambushOffset: 14,
   fleeSeconds: 4.0,
+  /**
+   * How far from the hive it backs off to when the brood mobs it.
+   *
+   * It arrives at the hive doorstep, and at this size that means standing on
+   * top of the hive and hiding it completely. Giving ground to the swarm reads
+   * as recoiling from them and puts both it and the hive in shot.
+   */
+  distractStandoff: 10,
+  /**
+   * The camera circles the reared bear while the puzzle is being solved.
+   * A shade under six degrees a second: a slow look around the standoff, not a
+   * carousel. One full turn takes about forty seconds.
+   */
+  orbitRate: 0.1,
+  orbitRadius: 26,
+  orbitHeight: 14,
+  /** Height of the point it circles, between the bear's chest and the hive. */
+  orbitLookHeight: 5.5,
 } as const;
 
 export const PUZZLE = {

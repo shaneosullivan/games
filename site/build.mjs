@@ -33,7 +33,12 @@ const ICONS_OUT = path.join(OUT_DIR, 'icons');
  */
 const APP = {
   name: 'Chofter Games',
-  shortName: 'Chofter',
+  /**
+   * What the home screen calls it once installed. Deliberately the full name
+   * rather than an abbreviation — iOS elides the middle of anything too long
+   * to fit, and "Chofter Games" fits.
+   */
+  shortName: 'Chofter Games',
   description: 'Little games, made for fun.',
   themeColor: '#f7b32b',
   backgroundColor: '#fdf7ec',

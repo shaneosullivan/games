@@ -84,13 +84,25 @@ export class BearActor {
     this.phaseTime = 0;
   }
 
-  /** The babies have its attention: stand and swipe at the air. */
-  distract(): void {
+  /**
+   * The babies have its attention: give ground, then stand and swipe at air.
+   *
+   * @param from something to keep clear of — the hive, which it would
+   *   otherwise stand on top of and hide.
+   * @param standoff how far from `from` to end up
+   */
+  distract(from?: THREE.Vector3, standoff = 0): void {
     if (this.phase === 'gone') return;
     this.phase = 'distracted';
     this.phaseTime = 0;
     this.anchor.copy(this.position);
-    this.velocity.set(0, 0, 0);
+
+    if (from && standoff > 0) {
+      tmpDir.copy(this.position).sub(from).setY(0);
+      // Dead on top of it: any direction will do, so pick the one it's facing.
+      if (tmpDir.lengthSq() < 0.01) tmpDir.set(Math.sin(this.yaw), 0, Math.cos(this.yaw));
+      this.anchor.copy(from).addScaledVector(tmpDir.normalize(), standoff).setY(0);
+    }
   }
 
   /** Frightened off. */
@@ -180,8 +192,9 @@ export class BearActor {
       this.heading += THREE.MathUtils.clamp(swing, -turnRate * dt, turnRate * dt);
     }
 
-    // It plants itself while distracted or winded rather than drifting.
-    const wants = this.phase === 'distracted' || this.phase === 'recovering' ? 0 : 1;
+    // Winded, it plants. Distracted, it backs away to its standoff and *then*
+    // plants — the speed taper below brings it to a stop on arrival.
+    const wants = this.phase === 'recovering' ? 0 : 1;
     const speed = BEAR.speed * wants * Math.min(1, distance / 3);
 
     tmpDir.set(Math.sin(this.heading), 0, Math.cos(this.heading)).multiplyScalar(speed);
