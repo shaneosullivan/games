@@ -25,6 +25,8 @@ const OUT_DIR = path.join(SITE_DIR, 'dist');
 const GAMES_OUT = path.join(OUT_DIR, 'games');
 const ICONS_SRC = path.join(SITE_DIR, 'assets', 'icons');
 const ICONS_OUT = path.join(OUT_DIR, 'icons');
+const APPS_SRC = path.join(SITE_DIR, 'assets', 'apps');
+const APPS_OUT = path.join(OUT_DIR, 'apps');
 
 /**
  * The installed app's identity. The icons are Chofter's own knotwork C, taken
@@ -55,6 +57,26 @@ const BUILD_ID = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14);
  * sub-path it's served from.
  */
 const VERSION_FILE = 'version.json';
+
+/**
+ * Games that aren't in this repo because they aren't web games at all.
+ *
+ * Listed by hand — there's nothing to build or discover. The links deliberately
+ * drop Apple's `/ie/` storefront segment: without it the App Store sends each
+ * visitor to their own country's store instead of Ireland's.
+ */
+const APP_STORE = [
+  {
+    name: 'Mazers',
+    id: '6760861069',
+    icon: 'mazers.png',
+  },
+  {
+    name: 'Super Bubbly',
+    id: '6752374114',
+    icon: 'super-bubbly.png',
+  },
+];
 
 /** Folders that are never games, whatever they contain. */
 const IGNORED = new Set(['site', 'node_modules', 'docs', 'dist']);
@@ -398,6 +420,19 @@ const SW_REGISTER = `      if ('serviceWorker' in navigator) {
         });
       }`;
 
+/** A link out to the App Store, under the game's own icon. */
+function renderAppCard(app) {
+  return `      <li class="app-card">
+        <a href="https://apps.apple.com/app/id${app.id}">
+          <img src="apps/${app.icon}" alt="" loading="lazy" width="128" height="128">
+          <div>
+            <h3>${escapeHtml(app.name)}</h3>
+            <span>On the App Store</span>
+          </div>
+        </a>
+      </li>`;
+}
+
 function renderPage(games) {
   const cards = games.map(renderCard).join('\n');
   const empty = `      <li class="empty">No games built yet. Add a folder with its own build, then run this again.</li>`;
@@ -424,6 +459,12 @@ ${SW_REGISTER}
     <main>
       <ul class="grid">
 ${games.length ? cards : empty}
+      </ul>
+
+      <h2 class="section-title">Also on the App Store</h2>
+      <p class="section-note">Not web games — these ones live on your iPhone or iPad.</p>
+      <ul class="app-grid">
+${APP_STORE.map(renderAppCard).join('\n')}
       </ul>
     </main>
 
@@ -474,6 +515,7 @@ fs.cpSync(path.join(SITE_DIR, 'styles.css'), path.join(OUT_DIR, 'styles.css'));
 // ---- installable bits -----------------------------------------------------
 
 fs.cpSync(ICONS_SRC, ICONS_OUT, { recursive: true });
+fs.cpSync(APPS_SRC, APPS_OUT, { recursive: true });
 fs.writeFileSync(
   path.join(OUT_DIR, 'manifest.webmanifest'),
   renderManifest({ name: APP.name, shortName: APP.shortName, description: APP.description }),

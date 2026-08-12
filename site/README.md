@@ -89,6 +89,16 @@ Other scripts:
 | `npm --prefix site run build:site` | Gallery only — fast, for tweaking the design |
 | `npm --prefix site run serve` | Preview `site/dist` at http://localhost:4173 |
 
+## Games that aren't in this repo
+
+Native apps are listed by hand in `APP_STORE` at the top of `build.mjs` — name,
+App Store id, and an icon in `site/assets/apps/`. They render in their own
+section under the playable games, as links out rather than cards you can press
+play on.
+
+The links are built as `apps.apple.com/app/id<id>`, without Apple's `/ie/`
+storefront segment: with it, every visitor lands in the Irish store.
+
 ## How a folder becomes a game
 
 `build.mjs` treats every top-level folder in the repo as a candidate, skipping
