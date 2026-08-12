@@ -16,9 +16,31 @@ const CELEBRATION = {
   orbitWobble: 1.1,
 } as const;
 
+/** A wandering flight path for one baby, once they're loose in the meadow. */
+interface SwarmPath {
+  centreX: number;
+  centreZ: number;
+  radiusX: number;
+  radiusZ: number;
+  rateX: number;
+  rateZ: number;
+  rateY: number;
+  phaseX: number;
+  phaseZ: number;
+  phaseY: number;
+  height: number;
+  bob: number;
+  /** Seconds before this one leaves the doorway. */
+  delay: number;
+}
+
 interface Baby {
   index: number;
   model: BabyModel;
+  /** Set while swarming outside; null when they're on their perches. */
+  swarm: SwarmPath | null;
+  /** Previous position, so we can face them along their own path. */
+  readonly prev: THREE.Vector3;
   /** Perch it hatched on — the anchor the celebration orbit is built from. */
   readonly home: THREE.Vector3;
   /** Angle around the queen, for the celebration orbit. */
@@ -62,6 +84,11 @@ export class BabyRing {
   private celebrating = false;
   private celebrateTime = 0;
 
+  /** Loose in the meadow, wandering their own paths. */
+  private swarming = false;
+  private swarmTime = 0;
+  private readonly swarmOrigin = new THREE.Vector3();
+
   constructor(
     positions: readonly THREE.Vector3[],
     private readonly rng: Rng,
@@ -81,6 +108,8 @@ export class BabyRing {
       const baby: Baby = {
         index,
         model,
+        swarm: null,
+        prev: position.clone(),
         home: position.clone(),
         angle: Math.atan2(position.z, position.x),
         position: position.clone(),
@@ -95,6 +124,33 @@ export class BabyRing {
       model.setGrowth(0);
       this.babies.push(baby);
     });
+  }
+
+  /**
+   * Put every baby back on its perch, hungry and un-grown. Level 2 calls this
+   * on entry so replaying it from the menu actually replays it — the ring
+   * lives on the Game, not the level, so it would otherwise still be a room
+   * full of grown bees with nothing to feed.
+   */
+  reset(): void {
+    this.celebrating = false;
+    this.celebrateTime = 0;
+    this.swarming = false;
+    this.feedTarget = null;
+    this.feedTime = 0;
+    for (const baby of this.babies) {
+      baby.swarm = null;
+      baby.feeds = 0;
+      baby.grown = false;
+      baby.craving = null;
+      baby.contentFor = baby.index * 0.9;
+      baby.position.copy(baby.home);
+      baby.model.setGrowth(0);
+      baby.model.group.position.copy(baby.home);
+      baby.model.group.rotation.set(0, Math.atan2(baby.home.x, baby.home.z), 0);
+      baby.bubble.visible = false;
+      baby.bubble.position.copy(baby.home).add(new THREE.Vector3(0, 1.7, 0));
+    }
   }
 
   get grownCount(): number {
@@ -118,6 +174,10 @@ export class BabyRing {
   update(dt: number, beePosition: THREE.Vector3, carrying: PollenKind | null): FeedResult | null {
     this.elapsed += dt;
 
+    if (this.swarming) {
+      this.updateSwarm(dt);
+      return null;
+    }
     if (this.celebrating) {
       this.updateCelebration(dt);
       return null;
@@ -215,6 +275,82 @@ export class BabyRing {
     }
   }
 
+  /**
+   * Let the whole brood out of the hive to fly around the meadow.
+   *
+   * They pour out of `origin` one after another and then wander their own
+   * lissajous loops around it — two out-of-step sines per axis, so the paths
+   * drift and cross instead of looking like a carousel. They're grown by now,
+   * so they fly at full size.
+   */
+  swarm(origin: THREE.Vector3): void {
+    this.swarming = true;
+    this.celebrating = false;
+    this.swarmTime = 0;
+    this.swarmOrigin.copy(origin);
+
+    this.babies.forEach((baby, i) => {
+      baby.grown = true;
+      baby.craving = null;
+      baby.bubble.visible = false;
+      baby.model.setGrowth(1);
+      baby.position.copy(origin);
+      baby.prev.copy(origin);
+      baby.model.group.position.copy(origin);
+
+      // Spread the loop centres around the hive so nobody parks on the doorway.
+      const bearing = (i / this.babies.length) * Math.PI * 2 + this.rng.range(-0.4, 0.4);
+      const spread = this.rng.range(7, 14);
+      baby.swarm = {
+        centreX: origin.x + Math.cos(bearing) * spread,
+        centreZ: origin.z + Math.sin(bearing) * spread,
+        radiusX: this.rng.range(3.5, 7.5),
+        radiusZ: this.rng.range(3.5, 7.5),
+        rateX: this.rng.range(0.35, 0.7),
+        rateZ: this.rng.range(0.35, 0.7),
+        rateY: this.rng.range(0.5, 1.1),
+        phaseX: this.rng.range(0, Math.PI * 2),
+        phaseZ: this.rng.range(0, Math.PI * 2),
+        phaseY: this.rng.range(0, Math.PI * 2),
+        height: this.rng.range(2.6, 6.5),
+        bob: this.rng.range(0.6, 1.6),
+        delay: i * 0.18 + this.rng.range(0, 0.14),
+      };
+    });
+  }
+
+  private updateSwarm(dt: number): void {
+    this.swarmTime += dt;
+
+    for (const baby of this.babies) {
+      const p = baby.swarm;
+      if (!p) continue;
+
+      const t = Math.max(0, this.swarmTime - p.delay);
+      // Burst out of the doorway, then settle onto the wandering loop.
+      const out = easeOutCubic(Math.min(1, t / 1.3));
+
+      tmpTarget.set(
+        p.centreX + Math.sin(t * p.rateX + p.phaseX) * p.radiusX,
+        p.height + Math.sin(t * p.rateY + p.phaseY) * p.bob,
+        p.centreZ + Math.cos(t * p.rateZ + p.phaseZ) * p.radiusZ,
+      );
+
+      baby.prev.copy(baby.position);
+      baby.position.lerpVectors(this.swarmOrigin, tmpTarget, out);
+      baby.model.group.position.copy(baby.position);
+
+      // Face the way they're actually travelling.
+      tmpDelta.copy(baby.position).sub(baby.prev);
+      if (tmpDelta.lengthSq() > 1e-6) {
+        baby.model.group.rotation.y = Math.atan2(tmpDelta.x, tmpDelta.z);
+        baby.model.group.rotation.z = Math.sin(t * 2.3 + baby.index) * 0.35;
+        baby.model.group.rotation.x = -tmpDelta.y * 6;
+      }
+      baby.model.animate(this.elapsed + baby.index * 1.7, 1);
+    }
+  }
+
   /** Live positions, so fireworks can track the rising babies. */
   positionOf(index: number): THREE.Vector3 {
     return this.babies[index % this.babies.length].position;
@@ -266,6 +402,15 @@ export class BabyRing {
     }
     return best;
   }
+}
+
+const tmpTarget = new THREE.Vector3();
+const tmpDelta = new THREE.Vector3();
+
+/** Fast start, gentle arrival — reads as bursting out of the doorway. */
+function easeOutCubic(t: number): number {
+  const u = 1 - Math.min(1, Math.max(0, t));
+  return 1 - u * u * u;
 }
 
 /** Overshoots slightly before settling — reads as an eager little jump. */

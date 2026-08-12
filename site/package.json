@@ -1,0 +1,12 @@
+{
+  "name": "chofter-games-site",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Static gallery for games.chofter.com",
+  "scripts": {
+    "build": "node build.mjs",
+    "build:site": "node build.mjs --skip-games",
+    "serve": "node serve.mjs"
+  }
+}

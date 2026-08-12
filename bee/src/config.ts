@@ -139,12 +139,25 @@ export const INTERIOR = {
 export const WASP = {
   scale: 1.35,
   /**
-   * Just under FLIGHT.maxSpeed (9.5). The bee has to be able to stay ahead —
-   * but only barely, or a straight-line flee outruns the wasp's interest
-   * entirely and the chase can never be held for the full countdown.
+   * Slightly *faster* than FLIGHT.maxSpeed (9.5), so you can't simply outrun
+   * it in a straight line. What saves you is that it corners badly: see
+   * `chaseTurnRate` and `reactionLag`. Escape is about turning, not speed.
    */
-  speed: 8.7,
+  speed: 10.2,
   accel: 11,
+  /**
+   * Radians per second its heading may swing while chasing. At 10.2 units/s
+   * that's a turning circle of about 7 units — change direction sharply and it
+   * sails past before it can come around.
+   */
+  chaseTurnRate: 1.5,
+  /** It turns normally when it isn't locked on to anything. */
+  turnRate: 3.2,
+  /**
+   * Seconds of lag on where it thinks you are. Combined with the turn cap this
+   * is what makes it keep going the old way for a moment after you cut away.
+   */
+  reactionLag: 0.5,
   /** Cruise altitude; it climbs and dives toward the bee within limits. */
   height: 3.4,
   minHeight: 1.4,
@@ -171,6 +184,137 @@ export const WASP = {
   /** How long the fly-in takes, and how long the fly-off takes. */
   arriveSeconds: 3.0,
   leaveSeconds: 3.2,
+} as const;
+
+/**
+ * Level 4, stage 1: the dance mat outside Caramel Cottage.
+ *
+ * A 3x3 mat. The bee hovers over the centre pad; the eight around it light up
+ * one per beat and you tap each before it goes dark. The beat is deliberately
+ * unhurried — this is a rhythm game for a child, so the window to react is
+ * most of a beat rather than a few frames.
+ */
+export const DANCE = {
+  /** Beats per minute of the backing track. */
+  bpm: 96,
+  /** Pads light on every Nth beat, so there's a rest between prompts. */
+  beatsPerPrompt: 2,
+  /** How long a pad stays lit, as a fraction of the gap between prompts. */
+  litFraction: 0.85,
+  /** Prompts in a full round. */
+  prompts: 24,
+  /** Fraction of prompts you must hit to open the door. */
+  passRatio: 0.9,
+  /** Beats of lead-in before the first prompt, so the beat is established. */
+  countInBeats: 8,
+
+  /** Mat geometry. */
+  padSize: 1.5,
+  padGap: 0.16,
+  padHeight: 0.12,
+  /** How high the bee hovers over the mat. */
+  hoverHeight: 1.5,
+  /** Seconds for one hop out to a pad and back. */
+  hopTime: 0.42,
+  hopArc: 1.1,
+} as const;
+
+export const COTTAGE = {
+  /**
+   * The house is authored small and scaled up bodily. A bee is ~1.5 units
+   * long, so a cottage has to be tens of units tall to read as a building.
+   * At 6x the walls stand 26 units and the ridge nearly 40 — the bee is a
+   * speck at the door, which is the point.
+   */
+  houseScale: 5,
+  boundsRadius: 50,
+  minHeight: 1.0,
+  maxHeight: 10,
+  // Well back and high: the whole 3x3 mat has to be visible and tappable.
+  cameraDistance: 13,
+  cameraHeight: 11,
+  /**
+   * Well clear of the scaled-up house front (z = 10.5 at 5x), so the camera
+   * can frame the mat and still show the door it is going to open.
+   */
+  matOffsetZ: 30,
+} as const;
+
+/**
+ * Level 4, stage 2: inside Caramel Cottage.
+ *
+ * A room you can actually fly around, with a jar of honey on the counter. Pick
+ * it up and it hangs from the bee on a rope — see entities/honeyJar.ts for the
+ * pendulum that gives it weight.
+ */
+export const INSIDE = {
+  /**
+   * Sized around the *camera*, not the bee: the chase rig sits behind and
+   * above, so the room has to be wider than boundsRadius + cameraDistance or
+   * the camera ends up embedded in a wall looking at nothing.
+   */
+  roomSize: 34,
+  roomHeight: 11,
+  counterHeight: 3.0,
+  jarHeight: 1.5,
+  /** Fly this close to take the jar. Generous: the counter is against the
+   *  back wall, just past where the bee is allowed to fly. */
+  pickupRadius: 3.2,
+
+  boundsRadius: 10.5,
+  minHeight: 1.2,
+  maxHeight: 7,
+  cameraDistance: 6.0,
+  cameraHeight: 3.4,
+
+  /** Rope length from the bee's belly to the jar. Long enough that the jar
+   *  hangs clear of the bee rather than covering her from a high camera. */
+  ropeLength: 2.6,
+  /** Gravity on the hanging jar. Higher swings faster and settles harder. */
+  jarGravity: 22,
+  /** Per-second velocity retained; below 1 the swing dies down. */
+  jarDamping: 0.86,
+} as const;
+
+/**
+ * Level 4, stage 3: the bear chase home, and the puzzle that sees it off.
+ *
+ * The bear works like the wasp — faster than the bee but slow to corner — so
+ * the same trick saves you: turn, and it sails past before it can come round.
+ */
+export const BEAR = {
+  scale: 2.6,
+  speed: 10.6,
+  accel: 14,
+  /** Radians/sec its heading may swing while chasing. Worse than the wasp. */
+  chaseTurnRate: 1.2,
+  turnRate: 2.4,
+  /** Seconds of lag on where it thinks the bee is. */
+  reactionLag: 0.6,
+  /** Close enough to swipe at the bee and knock her spinning. */
+  swipeRadius: 3.2,
+  stunSeconds: 0.9,
+  knockbackSpeed: 13,
+  /** How long it stays winded after a swipe before chasing again. */
+  recoverSeconds: 2.0,
+  /** How close to the hive the bee must get to deliver the honey. */
+  deliverRadius: 4.0,
+  /** Where it waits outside the cottage, relative to the door. */
+  ambushOffset: 14,
+  fleeSeconds: 4.0,
+} as const;
+
+export const PUZZLE = {
+  /**
+   * Scramble depth for the 4x4 sliding puzzle.
+   *
+   * These are random *walk* steps, not distance from solved — the blank
+   * backtracks over itself, so 30 steps leaves the picture perhaps 15-20 moves
+   * from finished. Enough to be a puzzle, few enough that a child can see how
+   * the picture wants to go back together. Raising this toward 100 approaches
+   * the puzzle's full difficulty.
+   */
+  scrambleMoves: 30,
 } as const;
 
 export const LEVELS = {

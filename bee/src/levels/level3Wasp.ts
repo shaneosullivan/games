@@ -1,12 +1,13 @@
 import * as THREE from 'three';
 import { CAMERA, FLIGHT, LEVELS, WASP, WORLD } from '../config';
 import { FIREWORK_PALETTE } from '../fx/particles';
+import { HiveEntry } from './hiveEntry';
 import type { GameContext, Level } from './level';
 
 const HOLD_TARGET = LEVELS.waspSeconds;
 const CELEBRATION_TIME = 3.2;
 
-type Phase = 'defending' | 'celebrating' | 'done';
+type Phase = 'defending' | 'returning' | 'entering' | 'celebrating' | 'done';
 
 const tmp = new THREE.Vector3();
 
@@ -37,9 +38,13 @@ export class WaspLevel implements Level {
   private shownSeconds = -1;
   private nextFirework = 0;
   private objectiveKey = '';
+  /** True once the brood is out of the hive and needs ticking each frame. */
+  private released = false;
+
+  private readonly entry = new HiveEntry();
 
   get controlsLocked(): boolean {
-    return this.phase === 'celebrating';
+    return this.phase === 'entering' || this.phase === 'celebrating';
   }
 
   enter(ctx: GameContext): void {
@@ -52,9 +57,10 @@ export class WaspLevel implements Level {
       cameraHeight: CAMERA.height,
     });
 
-    // Her hive is built and lit — that's what's being threatened.
+    // Her hive is built — that's what's being threatened. No glow yet though:
+    // the glow means "you can fly in here", and right now you can't.
     ctx.hive.setProgress(1);
-    ctx.hive.setGlow(true);
+    ctx.hive.setGlow(false);
     ctx.placeBee(tmp.copy(ctx.hive.position).add(new THREE.Vector3(0, 3.2, 11)), 3.2);
     ctx.bee.setCrown(true);
 
@@ -70,13 +76,33 @@ export class WaspLevel implements Level {
     this.held = 0;
     this.shownSeconds = -1;
     this.objectiveKey = '';
+    this.released = false;
 
     ctx.wasp.spawn(ctx.hive.position, 0.8);
   }
 
   update(dt: number, ctx: GameContext): void {
+    // The brood needs ticking in every phase once it's out, and this has to
+    // come before the early returns below or they hang motionless in the air.
+    if (this.released) ctx.babies.update(dt, ctx.bee.position, null);
+
     if (this.phase === 'celebrating') {
       this.updateCelebration(dt, ctx);
+      return;
+    }
+    if (this.phase === 'entering') {
+      if (this.entry.update(dt, ctx)) this.beginCelebration(ctx);
+      return;
+    }
+    if (this.phase === 'returning') {
+      // Same beat as level 1: the door is lit, fly in to finish.
+      ctx.setObjectiveMarker(tmp.copy(ctx.hive.entrance).setY(ctx.hive.entrance.y + 1.4));
+      if (HiveEntry.inRange(ctx)) {
+        this.phase = 'entering';
+        this.entry.begin(ctx);
+        ctx.hive.setGlow(false); // she's on her way in; nothing left to enter
+        ctx.hud.setObjective('Home safe!');
+      }
       return;
     }
 
@@ -110,7 +136,7 @@ export class WaspLevel implements Level {
     }
 
     if (event === 'departed') {
-      this.beginCelebration(ctx);
+      this.beginReturn(ctx);
       return;
     }
 
@@ -176,6 +202,31 @@ export class WaspLevel implements Level {
     }
   }
 
+  /**
+   * The wasp is gone. Rather than ending on the spot, send her home — the same
+   * "fly into the hive" beat that closes level 1, so the meadow levels bookend
+   * each other.
+   */
+  private beginReturn(ctx: GameContext): void {
+    this.phase = 'returning';
+    ctx.setCameraZoom(1);
+    ctx.audio.setThreat(0);
+    ctx.audio.quotaComplete();
+    ctx.hud.setObjective('The wasp is gone — fly back into your hive!');
+    // The glow means "you can fly in here", so it comes on only now.
+    ctx.hive.setGlow(true);
+    // A puff over the door so the eye goes there.
+    ctx.puff.burst(tmp.copy(ctx.hive.entrance).setY(ctx.hive.entrance.y + 0.6), {
+      color: FIREWORK_PALETTE,
+      count: 26,
+      speed: 2.4,
+      ttl: 1.1,
+    });
+    // The whole brood pours out to celebrate the all-clear.
+    ctx.releaseBabies(ctx.hive.entrance);
+    this.released = true;
+  }
+
   private beginCelebration(ctx: GameContext): void {
     this.phase = 'celebrating';
     this.phaseTime = 0;
@@ -213,6 +264,8 @@ export class WaspLevel implements Level {
     }
 
     if (this.phaseTime >= CELEBRATION_TIME) {
+      // Back out on the doorstep, as level 1 does.
+      this.entry.restore(ctx);
       this.phase = 'done';
       this.complete = true;
       ctx.save.mutate((d) => {
@@ -224,6 +277,9 @@ export class WaspLevel implements Level {
   resumeAfterCompletion(ctx: GameContext): void {
     if (this.phase !== 'done') return;
     this.complete = false;
+    // The level is over: nothing to fly into, so no glow. Free flight with the
+    // brood swarming around, and 🏠 to move on.
+    ctx.hive.setGlow(false);
     ctx.hud.setObjective('Fly around your meadow');
     ctx.setObjectiveMarker(null);
     ctx.audio.setThreat(0);

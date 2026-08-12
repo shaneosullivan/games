@@ -32,7 +32,11 @@ export class Hud {
   private readonly perf: HTMLDivElement;
   private showPerf = false;
 
-  constructor(host: HTMLElement, onMuteToggle: (muted: boolean) => void) {
+  constructor(
+    host: HTMLElement,
+    onMuteToggle: (muted: boolean) => void,
+    onMenu: () => void,
+  ) {
     this.root = document.createElement('div');
     this.root.className = 'hud';
 
@@ -59,9 +63,21 @@ export class Hud {
     this.carry.append(this.carryDot, this.carryLabel);
 
     const buttons = el('div', 'hud-buttons ui-interactive');
+
+    // Always-available way out: back to the level menu. Without it, finishing
+    // the last level leaves you flying with nowhere to go but a page reload.
+    const menu = document.createElement('button');
+    menu.className = 'icon-btn ui-interactive';
+    menu.textContent = '🏠';
+    menu.title = 'Level menu';
+    menu.setAttribute('aria-label', 'Level menu');
+    menu.addEventListener('click', onMenu);
+    buttons.appendChild(menu);
+
     const mute = document.createElement('button');
     mute.className = 'icon-btn ui-interactive';
     mute.textContent = '🔊';
+    mute.setAttribute('aria-label', 'Mute');
     let muted = false;
     mute.addEventListener('click', () => {
       muted = !muted;

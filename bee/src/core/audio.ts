@@ -1,3 +1,5 @@
+import { Music } from './music';
+
 /**
  * Tiny WebAudio synth — no asset files, no loading. iOS requires the context
  * to be created/resumed inside a user gesture, which is what the codename
@@ -25,6 +27,22 @@ export class Audio {
     this.master.gain.value = 0.5;
     this.master.connect(this.ctx.destination);
     this.startHum();
+  }
+
+  /**
+   * A backing track for the dance mat. Returns null if audio was never
+   * unlocked (no user gesture yet) — the level then runs on its own clock and
+   * simply plays silent.
+   */
+  createMusic(bpm: number): Music | null {
+    if (!this.ctx || !this.master) return null;
+    void this.ctx.resume();
+    return new Music(this.ctx, this.master, bpm);
+  }
+
+  /** Wall-clock seconds from the audio clock, for syncing visuals to a track. */
+  get currentTime(): number {
+    return this.ctx?.currentTime ?? 0;
   }
 
   setMuted(m: boolean): void {

@@ -108,6 +108,18 @@ export class BeeActor {
     return target.set(0, 0.42, 0.46).applyMatrix4(this.object.matrixWorld);
   }
 
+  /**
+   * Move without interpolating from where she used to be. Render lerps from
+   * `prevPosition`, so a teleport that doesn't reset it draws one frame back
+   * at the old location — across a level change, that's a flicker on the far
+   * side of the map.
+   */
+  teleport(position: THREE.Vector3): void {
+    this.position.copy(position);
+    this.prevPosition.copy(position);
+    this.velocity.set(0, 0, 0);
+  }
+
   /** Jump to an altitude without the climb, for level entry. */
   snapHeight(h: number): void {
     this.baseHeight = h;

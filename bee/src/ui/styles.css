@@ -432,6 +432,12 @@ body {
   inset: 0;
   display: grid;
   place-items: center;
+  /* Room to breathe, and a scroll of last resort: with the iPad keyboard up
+     the visible viewport can be shorter than the card. See
+     trackVisualViewport in ui/overlays.ts. */
+  padding: 16px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   background: linear-gradient(180deg, rgba(20, 40, 60, 0.55), rgba(20, 40, 60, 0.75));
   backdrop-filter: blur(10px);
   pointer-events: auto;
@@ -486,6 +492,152 @@ body {
 .card input:focus {
   border-color: #ffc93c;
   background: #fffdf5;
+}
+
+/* World map picker */
+
+.card.card-wide {
+  width: min(1060px, 95vw);
+  padding: 26px 28px 22px;
+  text-align: left;
+}
+
+.card.card-wide h1,
+.card.card-wide > p {
+  text-align: center;
+}
+
+/* Map left, choices and controls right. Collapses to one column when there
+   isn't the width for two. */
+.picker-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(260px, 0.85fr);
+  gap: 22px;
+  align-items: start;
+}
+
+@media (max-width: 720px) {
+  .picker-split {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.picker-side {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.picker-side .levels-row {
+  margin-bottom: 4px;
+}
+
+/* Push the name field and buttons to the bottom of the right column so they
+   line up with the foot of the map. */
+.picker-side input {
+  margin-top: auto;
+}
+
+.map {
+  position: relative;
+  /* Locked to the source image's ratio so the percentage-positioned pins line
+     up at any size, and capped by height so the card still fits a landscape
+     iPad without scrolling. */
+  aspect-ratio: 920 / 790;
+  width: 100%;
+  max-height: 58vh;
+  margin: 0 auto 10px;
+  border-radius: 16px;
+  overflow: hidden;
+  border: 2px solid #e4d9c6;
+  background: #efe3cc;
+  line-height: 0;
+}
+
+.map-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* Pins sit at fractions of the image, so they track any scale.
+   Scoped under .card to outrank the full-width `.card button` rule. */
+.card .map-pin {
+  position: absolute;
+  width: 38px;
+  height: 38px;
+  margin: 0;
+  padding: 0;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.9);
+  display: grid;
+  place-items: center;
+  font-size: 17px;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.3);
+  transition:
+    transform 140ms cubic-bezier(0.3, 1.4, 0.5, 1),
+    box-shadow 140ms ease-out;
+}
+
+.card .map-pin.open {
+  background: linear-gradient(180deg, #ffd75e, #f7b32b);
+}
+
+.card .map-pin.locked,
+.card .map-pin.soon {
+  background: rgba(60, 52, 44, 0.72);
+  filter: saturate(0.4);
+  font-size: 14px;
+}
+
+.card .map-pin.selected {
+  transform: translate(-50%, -50%) scale(1.22);
+  border-color: #fff;
+  box-shadow:
+    0 0 0 4px rgba(247, 179, 43, 0.55),
+    0 4px 12px rgba(0, 0, 0, 0.35);
+}
+
+.card .map-pin:active {
+  transform: translate(-50%, -50%) scale(0.94);
+}
+
+/* A soft pulse on the pin you can actually play, so the eye lands on it. */
+@keyframes pin-pulse {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 4px rgba(247, 179, 43, 0.5),
+      0 4px 12px rgba(0, 0, 0, 0.35);
+  }
+  50% {
+    box-shadow:
+      0 0 0 9px rgba(247, 179, 43, 0.16),
+      0 4px 12px rgba(0, 0, 0, 0.35);
+  }
+}
+
+.card .map-pin.selected {
+  animation: pin-pulse 2s ease-in-out infinite;
+}
+
+.land-name {
+  font-size: 17px;
+  font-weight: 800;
+  color: #23303c;
+  margin-bottom: 10px;
+  min-height: 22px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card .map-pin,
+  .card .map-pin.selected {
+    animation: none;
+    transition: none;
+  }
 }
 
 /* Level picker on the welcome-back card */
@@ -608,4 +760,149 @@ body {
 
 .card .ghost:active {
   transform: none;
+}
+
+/* Levels that aren't about flying hide the stick and slider entirely. */
+.no-flight .stick,
+.no-flight .alt {
+  display: none;
+}
+
+.land-hint {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #8b7c66;
+  margin: -6px 0 8px;
+  min-height: 16px;
+}
+
+/* ---------- Sliding puzzle (level 4, stage 3) ---------- */
+
+/* While the puzzle is up the 3D view gives up the right-hand side of the
+   screen. The renderer measures the canvas rather than the window, so this
+   rule alone re-frames the game. */
+.split .game-canvas {
+  width: 56%;
+}
+
+.puzzle {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 44%;
+  padding: calc(var(--safe-t) + 14px) calc(var(--safe-r) + 18px) calc(var(--safe-b) + 14px) 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: linear-gradient(180deg, rgba(24, 16, 10, 0.92), rgba(12, 8, 5, 0.96));
+  border-left: 2px solid rgba(255, 255, 255, 0.14);
+  color: #fff;
+  overflow: hidden;
+}
+
+.puzzle.hidden {
+  display: none;
+}
+
+.puzzle-title {
+  font-size: clamp(15px, 2.4vw, 20px);
+  font-weight: 800;
+  letter-spacing: 0.3px;
+}
+
+.puzzle-hint {
+  font-size: 12.5px;
+  font-weight: 600;
+  opacity: 0.7;
+  text-align: center;
+}
+
+.puzzle-board {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 3px;
+  /* Square, and as big as the shorter axis of the panel allows. */
+  width: min(100%, 62vh);
+  aspect-ratio: 1;
+  padding: 3px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.puzzle-tile {
+  background-size: 400% 400%;
+  background-repeat: no-repeat;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: transform 90ms ease-out;
+}
+
+.puzzle-tile:active {
+  transform: scale(0.96);
+}
+
+.puzzle-tile.blank {
+  background: rgba(0, 0, 0, 0.45);
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.12);
+  cursor: default;
+}
+
+.puzzle.solved .puzzle-board {
+  background: rgba(255, 225, 77, 0.7);
+}
+
+.puzzle.solved .puzzle-tile {
+  border-radius: 0;
+}
+
+.confetti {
+  position: absolute;
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  pointer-events: none;
+  animation: confetti-fly 1.5s ease-out forwards;
+}
+
+@keyframes confetti-fly {
+  0% {
+    opacity: 1;
+    transform: translate(0, 0) rotate(0deg);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--dx), var(--dy)) rotate(540deg);
+  }
+}
+
+/* Portrait: stack the puzzle under the game instead of beside it. */
+@media (max-aspect-ratio: 1/1) {
+  .split .game-canvas {
+    width: 100%;
+    height: 45%;
+  }
+  .puzzle {
+    top: 45%;
+    width: 100%;
+    border-left: none;
+    border-top: 2px solid rgba(255, 255, 255, 0.14);
+  }
+}
+
+/* Keep the HUD over the game, not under the puzzle panel. */
+.split .hud {
+  right: 44%;
+}
+
+@media (max-aspect-ratio: 1/1) {
+  .split .hud {
+    right: 0;
+    bottom: 55%;
+  }
+  .puzzle-board {
+    width: min(100%, 40vh);
+  }
 }

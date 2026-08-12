@@ -69,6 +69,8 @@ export class RoyalChamberLevel implements Level {
     ctx.placeBee(ctx.interior.entryPosition, 3.2);
     // The player is a worker in here — the crown belongs to the queen on the dais.
     ctx.bee.setCrown(false);
+    // The ring outlives any one level instance, so entering always restarts it.
+    ctx.babies.reset();
 
     ctx.hud.setBanner(this.name);
     ctx.hud.setCounters([

@@ -11,17 +11,13 @@ import {
 } from '../config';
 import type { HarvestEvent } from '../entities/flowerField';
 import { FIREWORK_PALETTE } from '../fx/particles';
+import { HiveEntry, ENTRY_RADIUS } from './hiveEntry';
 import type { GameContext, Level } from './level';
 
 const QUOTA = LEVELS.foundingQuota;
 const TOTAL = QUOTA.white + QUOTA.yellow + QUOTA.orange;
 
-/** How close the bee must get to the doorway before it's drawn inside. */
-const ENTRY_RADIUS = 3.4;
-
-/** Cutscene timings, in seconds. */
-const APPROACH_TIME = 0.8;
-const INTO_DOOR_TIME = 0.85;
+/** Cutscene timing, in seconds. */
 const CELEBRATION_TIME = 2.4;
 
 /** Golds and pinks picked to match the crown's band and jewels. */
@@ -30,7 +26,6 @@ const CROWN_SPARKLE = [0xffe066, 0xffd23f, 0xfff3c4, 0xff5b8a, 0xffb347] as cons
 type Phase = 'gathering' | 'ready' | 'entering' | 'celebrating' | 'done';
 
 const tmpA = new THREE.Vector3();
-const tmpB = new THREE.Vector3();
 
 /**
  * Level 1 — Founding the hive.
@@ -54,9 +49,7 @@ export class FoundingLevel implements Level {
 
   private phase: Phase = 'gathering';
   private phaseTime = 0;
-  /** Where the bee was when the entry cutscene took over. */
-  private readonly entryStart = new THREE.Vector3();
-  private readonly approach = new THREE.Vector3();
+  private readonly entry = new HiveEntry();
   private nextFirework = 0;
 
   /** Cycles the beacon between kinds still needed, so it never nags about one. */
@@ -251,37 +244,14 @@ export class FoundingLevel implements Level {
 
   private beginEntry(ctx: GameContext): void {
     this.phase = 'entering';
-    this.phaseTime = 0;
-    this.entryStart.copy(ctx.bee.position);
-    // Hold station just outside the door, then go straight in along +Z.
-    this.approach.copy(ctx.hive.entrance).add(tmpB.set(0, 0.1, 2.4));
-
-    ctx.bee.scripted = true;
-    ctx.bee.velocity.set(0, 0, 0);
-    ctx.bee.setYaw(Math.PI); // face -Z, into the doorway
-    ctx.setObjectiveMarker(null);
+    this.entry.begin(ctx);
+    // The glow advertises an enterable doorway; she's already going in.
+    ctx.hive.setGlow(false);
     ctx.hud.setObjective('Welcome home!');
-    ctx.hud.setHarvest(0);
   }
 
   private updateEntry(dt: number, ctx: GameContext): void {
-    this.phaseTime += dt;
-
-    if (this.phaseTime < APPROACH_TIME) {
-      const u = ease(this.phaseTime / APPROACH_TIME);
-      ctx.bee.position.lerpVectors(this.entryStart, this.approach, u);
-      ctx.bee.setScale(1);
-      return;
-    }
-
-    const u = Math.min(1, (this.phaseTime - APPROACH_TIME) / INTO_DOOR_TIME);
-    // Slightly past the doorway plane so she genuinely goes inside.
-    tmpA.copy(ctx.hive.entrance).add(tmpB.set(0, 0, -0.35));
-    ctx.bee.position.lerpVectors(this.approach, tmpA, ease(u));
-    // Shrink into the hole; the last stretch drops away fast.
-    ctx.bee.setScale(Math.max(0.001, 1 - u * u * 0.995));
-
-    if (u >= 1) this.beginCelebration(ctx);
+    if (this.entry.update(dt, ctx)) this.beginCelebration(ctx);
   }
 
   // ---- fireworks ----------------------------------------------------------
@@ -306,16 +276,8 @@ export class FoundingLevel implements Level {
     }
 
     if (this.phaseTime >= CELEBRATION_TIME) {
-      // Pop the queen back out on the doorstep, facing away and clear of
-      // ENTRY_RADIUS so she doesn't instantly fly straight back in. Once
-      // level 2 exists this hands over to the hive interior instead.
-      ctx.bee.scripted = false;
-      ctx.bee.object.visible = true;
-      ctx.bee.setScale(1);
-      ctx.bee.position.copy(this.approach).add(tmpB.set(0, 0.25, 2.8));
-      ctx.bee.velocity.set(0, 0, 0);
-      ctx.bee.setYaw(0); // nose pointing out of the doorway
-      ctx.bee.desiredHeight = ctx.bee.position.y;
+      // Back out on the doorstep. Dismissing the card hands over to level 2.
+      this.entry.restore(ctx);
 
       this.phase = 'done';
       this.complete = true;
@@ -395,10 +357,4 @@ export class FoundingLevel implements Level {
     for (const kind of POLLEN_KINDS) sum += Math.min(this.got(ctx, kind), QUOTA[kind]);
     return THREE.MathUtils.clamp(sum / TOTAL, 0, 1);
   }
-}
-
-/** Smoothstep, so the cutscene eases in and out instead of jerking. */
-function ease(t: number): number {
-  const u = THREE.MathUtils.clamp(t, 0, 1);
-  return u * u * (3 - 2 * u);
 }

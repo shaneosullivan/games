@@ -26,6 +26,9 @@ export class Joystick {
   /** 0..1 */
   magnitude = 0;
 
+  /** Levels that aren't about flying switch this off so taps reach the world. */
+  enabled = true;
+
   private pointerId: number | null = null;
   private baseX = 0;
   private baseY = 0;
@@ -59,7 +62,7 @@ export class Joystick {
   }
 
   private onDown = (e: PointerEvent): void => {
-    if (this.pointerId !== null) return;
+    if (!this.enabled || this.pointerId !== null) return;
     // Ignore taps on HUD buttons.
     if ((e.target as HTMLElement)?.closest?.('.ui-interactive')) return;
     if (!this.inZone(e.clientX, e.clientY)) return;
@@ -115,6 +118,7 @@ export class Joystick {
   private onKey = (e: KeyboardEvent): void => {
     const down = e.type === 'keydown';
     const k = e.key.toLowerCase();
+    if (!this.enabled) return;
     if (!['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(k)) return;
     if (down) this.keys.add(k);
     else this.keys.delete(k);

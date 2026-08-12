@@ -41,6 +41,7 @@ touchscreen.
 - Hover over a bloomed flower for half a second to gather its pollen — you have
   to drop down to it, cruising altitude is too high to collect.
 - Once the hive is finished, fly into its doorway to end the level.
+- **🏠 top right** — pause and go back to the level menu, from anywhere.
 
 ## What's built
 
@@ -53,14 +54,21 @@ touchscreen.
 | 3b — Altitude control, hive force field, fly-in + fireworks | done |
 | 4 — Level 2: the Royal Chamber (queen, babies, feeding) | done |
 | 5 — Level 3: Wasp at the Hive | done |
-| 6 — Wall-clock day system | not started |
+| 6 — Level 4: Caramel Cottage (dance mat, then inside) | done |
+| 7 — Wall-clock day system | not started |
 
 ## Levels
 
-Once you've finished a level, the welcome-back screen offers a picker: any level
-you've reached, with your current one preselected so plain "Continue" resumes.
-Choosing a level you've already completed replays it from the start (level 1
-resets its flower counts), and your furthest unlock is kept either way.
+The welcome screen is the world map (`assets/planning/levelmap.png`, downsized
+into `src/assets/`), with a pin on each land. Pins sit at fractions of the image
+so they track any scale — see `levels/lands.ts`. The Mellow Meadow holds levels
+1–3 and is always open; Caramel Cottage is level 4 and unlocks after level 3;
+the rest are padlocked or marked as still to come. Picking a land with more than
+one level shows those levels beside the map.
+
+Your current level is preselected, so plain "Continue" resumes. Choosing a level
+you've already completed replays it from the start (level 1 resets its flower
+counts), and your furthest unlock is kept either way.
 
 
 **1 — Sunny Meadow.** Gather 10 each of white rose, yellow flower and orange
@@ -72,7 +80,8 @@ through the door to finish.
 babies ringed around her on perches. You're a worker now: hover at one of the
 three wall stores to load that colour of pollen, carry it to a baby whose
 floating bubble asks for it, repeat. Babies get hungry on their own clocks and
-crave a random colour each time; three feeds and one grows up. When all six are
+crave a random colour each time; three feeds and one grows up — plumping out and
+earning a proper bee stripe, so you can see at a glance who's done. When all six are
 grown they lift off their perches in a staggered wave and circle the queen while
 fireworks go off around them — and they stay flying afterwards, so the finished
 chamber is full of bees.
@@ -84,6 +93,33 @@ countdown only runs while it's actually chasing, so hiding gets you nowhere.
 Let it clip you and you're knocked spinning while it goes back to the hive.
 Hold the chase for 30 seconds and it gives up and leaves. There is no losing;
 the worst case is having to bait it again.
+
+Once it's gone the whole brood pours out of the hive to wander the meadow, and —
+as in level 1 — you fly back in through the doorway to finish.
+
+**4 — Caramel Cottage.** Opens with an establishing sweep past the cottage —
+levels can take the camera with `ctx.setCameraCinematic()`, and handing it back
+lets the follow spring glide in from wherever the shot ended. Two stages after
+that. Outside, the door is locked and a 3x3 dance
+mat sits in front of it: the bee hovers over the middle square, the eight around
+it light on the beat, and you tap each before it goes dark. 90% opens the door.
+Inside is a lamplit room with a jar of honey glowing on the counter — fly over,
+pick it up, and it hangs from you on a rope that swings with real momentum.
+
+Then stage three: a bear is waiting outside, and you have to get the honey home
+across the meadow with it on your tail. It's faster than you but corners badly,
+same as the wasp, so turning is what saves you. Drop the honey into the hive and
+the brood pours out to mob the bear; it rears up on its hind legs and swipes at
+them (never connecting). While it's busy the screen splits — bear and bees on
+the left, a 4x4 sliding puzzle of a scary bear on the right. Finish the picture
+and the real bear bolts, with rainbow confetti over the puzzle.
+
+**The puzzle art is a placeholder** — a hand-authored SVG in
+`src/assets/bearPuzzle.ts`. To use the real picture, drop the image into
+`src/assets/` and swap that module's export for an image import; `ui/puzzle.ts`
+only ever sees a URL. Shuffling walks the blank around with random legal moves
+rather than permuting the tiles: a random permutation of a 15-puzzle is
+unsolvable half the time.
 
 ## Building
 
@@ -148,6 +184,30 @@ Things worth knowing before changing anything:
   `gathered`, but must never lower `maxLevel` or the player loses the unlock.
   Saves written before the picker existed have no `maxLevel`; `read()` back-fills
   it from `level`.
+- **The menu card is rebuilt every time it opens**, because the unlocked levels,
+  the "play again" notes and the default selection all move as the player
+  progresses. `openMenu()` guards on the menu already being visible rather than
+  on `running`, so 🏠 still works with a completion card up.
+- **State owned by the Game, not the level, must be reset on entry.** The baby
+  ring is a Game field, so `RoyalChamberLevel.enter()` calls `babies.reset()` —
+  otherwise replaying level 2 from the menu drops you into a room of already-grown
+  bees with nothing to feed. `switchLevel()` likewise reparents the ring back
+  into the hive interior and despawns the wasp, so no level has to undo another's
+  scenery.
+- **Anything the Game owns must also be *ticked* by whichever level is using
+  it.** Level 3 releases the brood into the meadow but originally never called
+  `babies.update()`, so they hung motionless outside the hive. That tick has to
+  sit above the phase early-returns.
+- **The hive glow means "you can fly in here"**, not "the hive is finished". It
+  comes on with the `ready`/`returning` phases and goes off the moment the
+  entry cutscene starts. Both meadow levels end with the shared `HiveEntry`
+  cutscene in `levels/hiveEntry.ts`.
+- **Overlays size themselves to `visualViewport`.** The iPad keyboard doesn't
+  shrink the layout viewport, so a centred card stays put and the keys cover the
+  codename field. `trackVisualViewport` in `ui/overlays.ts` pins the overlay to
+  the visible area instead. The codename field is also sanitised on every input
+  and hardened against iOS AutoFill (`name`, `autocomplete`, `data-*-ignore`),
+  which is what put `[object Object]`-shaped junk in it.
 - **Audio is a WebAudio synth**, no files. It must be unlocked inside a real
   touch handler — that's what the Start button on the codename screen is for.
 - **Zoom is locked** in `core/lockZoom.ts`. iOS Safari has ignored
@@ -203,6 +263,16 @@ Things worth knowing before changing anything:
   from any other level (or from the picker) is well-defined. A level that skips
   it inherits wherever the last one left the bee, and the camera has to chase
   across the map to catch up.
+- **Rhythm timing leads with the frame clock and eases toward the audio clock.**
+  Neither works alone: frame deltas drift off the track within a few bars, and
+  the audio clock is wrong in both directions — it keeps running while the game
+  is paused or backgrounded (come back to find the whole round expired), and it
+  *stops* if the context is suspended (which would stall the level forever). See
+  `updateDance` in `levels/level4Cottage.ts`; a large divergence re-anchors the
+  music, never the game.
+- **Indoor rooms are sized around the camera, not the bee.** The chase rig sits
+  behind and above, so a room narrower than `boundsRadius + cameraDistance` puts
+  the camera inside a wall looking at nothing. Same trap as the hive dome.
 - **`FLIGHT.maxHeight` is tied to the tree geometry** in
   `render/geometry/world.ts`. Change the trees and the ceiling needs to change
   with them; the constant has the arithmetic in a comment.

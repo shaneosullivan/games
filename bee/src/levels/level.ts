@@ -4,14 +4,18 @@ import type { Save } from '../core/save';
 import type { BabyRing } from '../entities/babyRing';
 import type { BeeActor } from '../entities/beeActor';
 import type { FlowerField, HarvestEvent } from '../entities/flowerField';
+import type { BearActor } from '../entities/bearActor';
 import type { WaspActor } from '../entities/waspActor';
 import type { ParticleBurst } from '../fx/particles';
 import type { HiveInterior } from '../render/geometry/hiveInterior';
+import type { HoneyJar } from '../entities/honeyJar';
+import type { CottageScene } from '../render/geometry/cottage';
+import type { CottageInside } from '../render/geometry/cottageInside';
 import type { HiveSite } from '../render/geometry/world';
 import type { Hud } from '../ui/hud';
 
 /** Which set of scenery is on screen. */
-export type EnvironmentName = 'meadow' | 'hive';
+export type EnvironmentName = 'meadow' | 'hive' | 'cottage' | 'inside';
 
 /** Playable volume and camera framing, which differ per level. */
 export interface FlightSettings {
@@ -33,6 +37,10 @@ export interface GameContext {
   interior: HiveInterior;
   babies: BabyRing;
   wasp: WaspActor;
+  bear: BearActor;
+  cottage: CottageScene;
+  inside: CottageInside;
+  honeyJar: HoneyJar;
   /** Small pollen motes. */
   puff: ParticleBurst;
   /** Big sparks for celebrations. */
@@ -53,6 +61,32 @@ export interface GameContext {
    * Eases in and out; 1 is normal.
    */
   setCameraZoom(zoom: number): void;
+  /**
+   * Drive the camera directly for a scripted shot; pass null to hand it back
+   * to the follow rig, which then glides in from wherever the shot ended.
+   */
+  setCameraCinematic(eye: THREE.Vector3 | null, look?: THREE.Vector3): void;
+  /** Split the screen and show the sliding puzzle, or put it away. */
+  showPuzzle(on: boolean): void;
+  /** Rainbow confetti over the puzzle panel. */
+  celebratePuzzle(): void;
+  /** Move the honey jar into the meadow so it survives the scene change. */
+  bringHoney(): void;
+  /**
+   * Show or hide the thumbstick and altitude slider. Levels that aren't about
+   * flying (the dance mat) turn them off so taps reach the world instead.
+   */
+  setFlightControls(enabled: boolean): void;
+  /**
+   * Consume this frame's screen tap, if any, and return the first of
+   * `objects` under it. Null when nothing was tapped.
+   */
+  pickTap(objects: readonly THREE.Object3D[]): THREE.Object3D | null;
+  /**
+   * Turn the brood loose in the meadow, pouring out of `origin`. Moves the ring
+   * out of the hive interior so it renders outdoors.
+   */
+  releaseBabies(origin: THREE.Vector3): void;
 }
 
 export interface Level {
@@ -69,6 +103,8 @@ export interface Level {
    * replayed, rather than leaving the world inert.
    */
   resumeAfterCompletion(ctx: GameContext): void;
+  /** Called when the sliding puzzle is completed, if this level uses one. */
+  onPuzzleSolved?(ctx: GameContext): void;
   /** Shown on the level-complete card. */
   readonly completionTitle: string;
   readonly completionBody: string;

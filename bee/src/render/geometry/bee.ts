@@ -240,6 +240,27 @@ export function createBaby(): BabyModel {
   body.castShadow = true;
   group.add(body);
 
+  // Proper bee stripes, earned at full growth. Parented to the body mesh so
+  // they inherit the growth scaling for free. A torus lies in the XY plane,
+  // which wraps the Z axis — the direction the body runs. Each radius is
+  // matched to the body's girth where it sits.
+  const stripes: THREE.Mesh[] = [];
+  for (const [z, r] of [
+    [-0.29, 0.288],
+    [0.02, 0.302],
+  ] as const) {
+    const stripe = new THREE.Mesh(
+      new THREE.TorusGeometry(r, 0.07, 6, 18),
+      solidToon(PALETTE.beeStripe),
+    );
+    stripe.position.z = z;
+    stripe.scale.y = 0.92; // match the body's squash
+    stripe.castShadow = true;
+    stripe.visible = false;
+    body.add(stripe);
+    stripes.push(stripe);
+  }
+
   // Stubby wings that only flutter when it wiggles.
   const wingMat = solidToon(PALETTE.wing);
   wingMat.transparent = true;
@@ -273,12 +294,14 @@ export function createBaby(): BabyModel {
     group,
     setGrowth(t) {
       growth = THREE.MathUtils.clamp(t, 0, 1);
-      // Starts already chunky — a newly hatched baby still has to read as a
-      // bee from across the dome — and puffs up by half again as it grows.
-      const s = 1.0 + growth * 0.55;
+      // Big enough to read as a bee from across the dome even when newly
+      // hatched, and it lengthens out rather than ballooning as it grows.
+      const s = 0.92 + growth * 0.4;
       body.scale.setScalar(s);
       const w = 0.85 + growth * 0.5;
       for (let i = 0; i < wings.length; i++) wings[i].scale.set(wingSigns[i] * w, w, w);
+      // Fully grown, so it earns its stripes.
+      for (const stripe of stripes) stripe.visible = growth >= 1;
     },
     animate(elapsed, wiggle) {
       // Hungry babies rock side to side and flap; full ones just breathe.

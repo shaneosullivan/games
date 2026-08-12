@@ -33,6 +33,10 @@ export class CameraRig {
   private zoomTarget = 1;
   private zoom = 1;
 
+  /** Set while a level is driving the camera itself. */
+  private cinematicEye: THREE.Vector3 | null = null;
+  private readonly cinematicLook = new THREE.Vector3();
+
   constructor(private readonly camera: THREE.PerspectiveCamera) {
     smoothedLook.set(0, 1, 0);
   }
@@ -43,7 +47,30 @@ export class CameraRig {
     if (immediate) this.zoom = z;
   }
 
+  /**
+   * Hand the camera to a level for a scripted shot, or pass null to give it
+   * back. While a cinematic is running the follow spring is bypassed entirely;
+   * releasing it lets that same spring glide the camera back behind the bee,
+   * so the handoff needs no extra blending.
+   */
+  setCinematic(eye: THREE.Vector3 | null, look?: THREE.Vector3): void {
+    if (!eye) {
+      this.cinematicEye = null;
+      return;
+    }
+    this.cinematicEye = (this.cinematicEye ?? new THREE.Vector3()).copy(eye);
+    if (look) this.cinematicLook.copy(look);
+  }
+
   update(dt: number, bee: BeeActor): void {
+    if (this.cinematicEye) {
+      this.camera.position.copy(this.cinematicEye);
+      // Ease the look target so a moving subject doesn't make the shot jitter.
+      smoothedLook.lerp(this.cinematicLook, 1 - Math.exp(-9 * dt));
+      this.camera.lookAt(smoothedLook);
+      return;
+    }
+
     const planarSpeed = Math.hypot(bee.velocity.x, bee.velocity.z);
     if (planarSpeed > 1.2) {
       const heading = Math.atan2(bee.velocity.x, bee.velocity.z);

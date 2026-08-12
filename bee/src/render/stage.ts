@@ -43,6 +43,34 @@ export const HIVE_ENV: EnvironmentSettings = {
   sunOffset: [4, 20, 6],
 };
 
+/** A warmer, later-in-the-day version of the meadow light. */
+export const COTTAGE_ENV: EnvironmentSettings = {
+  background: 0xbfe0e8,
+  fogColor: 0xe3ddc8,
+  fogNear: 40,
+  fogFar: 130,
+  hemiSky: 0xffeccf,
+  hemiGround: 0x7a9c5a,
+  hemiIntensity: 1.1,
+  sunColor: 0xffe6bb,
+  sunIntensity: 1.45,
+  sunOffset: [14, 24, 16],
+};
+
+/** Indoors at the cottage: lamplit, close, no sky. */
+export const INSIDE_ENV: EnvironmentSettings = {
+  background: 0x2b1d12,
+  fogColor: 0x3d2a19,
+  fogNear: 20,
+  fogFar: 60,
+  hemiSky: 0xffdcae,
+  hemiGround: 0x6b4a2a,
+  hemiIntensity: 0.95,
+  sunColor: 0xffe3bb,
+  sunIntensity: 0.5,
+  sunOffset: [3, 14, 5],
+};
+
 export interface Stage {
   renderer: THREE.WebGLRenderer;
   scene: THREE.Scene;
@@ -101,8 +129,11 @@ export function createStage(host: HTMLElement): Stage {
   scene.add(sun.target);
 
   function resize(): void {
-    const w = window.innerWidth;
-    const h = window.innerHeight;
+    // Measure the canvas, not the window: level 4's puzzle takes the right-hand
+    // side of the screen with CSS, and the renderer has to follow it.
+    const rect = canvas.getBoundingClientRect();
+    const w = Math.max(1, Math.round(rect.width) || window.innerWidth);
+    const h = Math.max(1, Math.round(rect.height) || window.innerHeight);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, RENDER.maxPixelRatio));
     renderer.setSize(w, h, false);
     camera.aspect = w / h;

@@ -47,6 +47,9 @@ function read(): SaveData {
     // Saves written before the level picker existed have no maxLevel; the
     // level they were on is the best evidence of how far they got.
     merged.maxLevel = Math.max(1, parsed.maxLevel ?? 1, merged.level);
+    // Never trust the stored codename to be a string — a bad write would
+    // otherwise surface as "[object Object]" in the name field.
+    if (typeof merged.codename !== 'string') merged.codename = '';
     return merged;
   } catch {
     return blank();

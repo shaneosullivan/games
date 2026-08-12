@@ -38,8 +38,12 @@ export class WaspActor {
   private readonly prevPosition = new THREE.Vector3();
   private readonly hive = new THREE.Vector3();
   private readonly veerTarget = new THREE.Vector3();
+  /** Lagged guess at where the bee is, used while chasing. */
+  private readonly aim = new THREE.Vector3();
 
   private yaw = 0;
+  /** Direction it is actually committed to flying, separate from its facing. */
+  private heading = 0;
   private prevYaw = 0;
   private elapsed = 0;
   private phaseTime = 0;
@@ -77,6 +81,8 @@ export class WaspActor {
     this.velocity.set(0, 0, 0);
     this.yaw = Math.atan2(hive.x - this.position.x, hive.z - this.position.z);
     this.prevYaw = this.yaw;
+    this.heading = this.yaw;
+    this.aim.copy(this.position);
     this.orbitAngle = fromAngle;
     this.phase = 'arriving';
     this.phaseTime = 0;
@@ -127,13 +133,19 @@ export class WaspActor {
         if (distance < WASP.baitRadius && this.beeIsInFront(toBee, distance)) {
           this.phase = 'chasing';
           this.phaseTime = 0;
+          // Start the lag from where the bee actually is, or it lunges at stale
+          // coordinates from before it noticed you.
+          this.aim.copy(beePosition);
           event = 'locked-on';
         }
         break;
       }
 
       case 'chasing':
-        tmpTarget.copy(beePosition);
+        // Aim at a lagged copy of the bee, so it commits to where you *were*
+        // for a beat after you cut away.
+        this.aim.lerp(beePosition, 1 - Math.exp(-dt / WASP.reactionLag));
+        tmpTarget.copy(this.aim);
         if (distance < WASP.catchRadius) {
           this.beginVeer(beePosition);
           event = 'bumped';
@@ -196,26 +208,43 @@ export class WaspActor {
       .setY(WASP.maxHeight);
   }
 
+  /**
+   * Fly toward `target` like something with momentum rather than something
+   * being dragged.
+   *
+   * The heading is what steers, and it can only swing so fast — while chasing,
+   * slowly. So a sharp turn by the bee sends the wasp sailing past on its old
+   * course before it can arc back round. That's the whole reason a slower bee
+   * can escape a faster wasp.
+   */
   private steerToward(dt: number, target: THREE.Vector3): void {
     tmpDir.copy(target).sub(this.position);
     const distance = tmpDir.length();
-    if (distance > 0.001) tmpDir.divideScalar(distance);
+
+    const chasing = this.phase === 'chasing';
+    const turnRate = chasing ? WASP.chaseTurnRate : WASP.turnRate;
+
+    if (distance > 0.001) {
+      const desired = Math.atan2(tmpDir.x, tmpDir.z);
+      const swing = shortestAngle(this.heading, desired);
+      this.heading += THREE.MathUtils.clamp(swing, -turnRate * dt, turnRate * dt);
+    }
 
     // Ease off near the target so it doesn't jitter around orbit points.
     const speed = WASP.speed * Math.min(1, distance / 2.5);
-    tmpDir.multiplyScalar(speed).sub(this.velocity);
+    tmpForward.set(Math.sin(this.heading), 0, Math.cos(this.heading)).multiplyScalar(speed);
+    // Climb and dive freely; only the horizontal turn is constrained.
+    tmpForward.y = THREE.MathUtils.clamp(target.y - this.position.y, -WASP.speed, WASP.speed);
+
+    tmpForward.sub(this.velocity);
     const maxChange = WASP.accel * dt;
-    if (tmpDir.length() > maxChange) tmpDir.setLength(maxChange);
-    this.velocity.add(tmpDir);
+    if (tmpForward.length() > maxChange) tmpForward.setLength(maxChange);
+    this.velocity.add(tmpForward);
 
     this.position.addScaledVector(this.velocity, dt);
     this.position.y = THREE.MathUtils.clamp(this.position.y, WASP.minHeight, WASP.maxHeight + 16);
 
-    const planar = Math.hypot(this.velocity.x, this.velocity.z);
-    if (planar > 0.4) {
-      const heading = Math.atan2(this.velocity.x, this.velocity.z);
-      this.yaw += shortestAngle(this.yaw, heading) * Math.min(1, 6 * dt);
-    }
+    this.yaw += shortestAngle(this.yaw, this.heading) * Math.min(1, 8 * dt);
   }
 
   render(alpha: number): void {
