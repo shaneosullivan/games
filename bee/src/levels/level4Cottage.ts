@@ -149,7 +149,6 @@ export class CottageLevel implements Level {
 
   update(dt: number, ctx: GameContext): void {
     this.phaseTime += dt;
-    ctx.cottage.update(this.phaseTime);
     this.updateHop(dt, ctx);
     // Once the brood is out it flies itself, in every phase from here on —
     // without this they simply hang in the hive doorway where they hatched.

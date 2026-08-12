@@ -1,7 +1,7 @@
 import { PUZZLE } from '../config';
 import { bearPuzzleUrl } from '../assets/bearPuzzle';
 
-const SIZE = 4;
+const SIZE = 3;
 const TILES = SIZE * SIZE;
 /** The blank always starts (and finishes) in the bottom-right. */
 const BLANK = TILES - 1;
@@ -15,13 +15,18 @@ export interface SlidePuzzle {
 }
 
 /**
- * A 4x4 sliding-tile puzzle of the bear.
+ * A 3x3 sliding-tile puzzle of the bear.
  *
  * Tiles are one background image offset per tile, so there's a single image to
  * load and no slicing. Shuffling is done by walking the blank around with
  * random legal moves rather than permuting the array — a random permutation of
- * a 15-puzzle is unsolvable half the time, and an unsolvable puzzle in a game
- * for a child is unforgivable.
+ * a sliding puzzle is unsolvable half the time, and an unsolvable puzzle in a
+ * game for a child is unforgivable.
+ *
+ * Nine tiles rather than sixteen: at 4x4 it was a real 15-puzzle, which is a
+ * long sit for a child who just wants the bear to go away. `SIZE` and the
+ * board's `grid-template-columns` / `background-size` in styles.css have to
+ * agree — change one and change the others.
  */
 export function createSlidePuzzle(
   host: HTMLElement,
@@ -157,7 +162,9 @@ export function createSlidePuzzle(
       }
       cell.classList.remove('blank');
       cell.style.backgroundImage = `url("${imageUrl}")`;
-      // 4 columns => each step is 1/3 of the background's extra width.
+      // The background is SIZE times the tile's size, so each step across is
+      // 1/(SIZE-1) of the extra width — a percentage offset, not pixels, which
+      // is what lets the board resize freely.
       const col = piece % SIZE;
       const row = Math.floor(piece / SIZE);
       cell.style.backgroundPosition = `${(col * 100) / (SIZE - 1)}% ${(row * 100) / (SIZE - 1)}%`;

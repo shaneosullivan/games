@@ -332,15 +332,18 @@ export const BEAR = {
 
 export const PUZZLE = {
   /**
-   * Scramble depth for the 4x4 sliding puzzle.
+   * Scramble depth for the 3x3 sliding puzzle.
    *
    * These are random *walk* steps, not distance from solved — the blank
-   * backtracks over itself, so 30 steps leaves the picture perhaps 15-20 moves
-   * from finished. Enough to be a puzzle, few enough that a child can see how
-   * the picture wants to go back together. Raising this toward 100 approaches
-   * the puzzle's full difficulty.
+   * backtracks over itself, so the state ends up no further away than the
+   * count and usually nearer.
+   *
+   * Measured against a full breadth-first search of the 8-puzzle: 12 steps
+   * lands 6-12 optimal moves from finished, which is a puzzle a child can see
+   * their way through. The board's own ceiling is 31, and 30 steps very nearly
+   * reaches it — so this number matters much more than it looks.
    */
-  scrambleMoves: 30,
+  scrambleMoves: 12,
 } as const;
 
 export const LEVELS = {

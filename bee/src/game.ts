@@ -31,6 +31,8 @@ import { createCodenameScreen, createMessageScreen, type Overlay } from './ui/ov
 import { burstRainbow, createSlidePuzzle, type SlidePuzzle } from './ui/puzzle';
 
 const WORLD_SEED = 20260811;
+/** How far south of a shut gate the bee is held. */
+const GATE_STANDOFF = 4;
 const tmpBelly = new THREE.Vector3();
 
 export class Game {
@@ -254,6 +256,22 @@ export class Game {
     this.level = this.createLevel(clamped);
     this.completeScreen.setText(this.level.completionTitle, this.level.completionBody);
     this.level.enter(this.ctx);
+    this.syncCottageGate();
+  }
+
+  /**
+   * The gate at the mouth of the cottage lane.
+   *
+   * Caramel Cottage sits in the same world as the meadow, so from level 1 you
+   * can see the lane leading north to it — and could fly up it. Until the
+   * cottage is unlocked there's nothing there to do, so the gate stays shut and
+   * the meadow stops at the fence. Level 4 itself is always allowed through,
+   * whatever the save says.
+   */
+  private syncCottageGate(): void {
+    const open = this.save.data.maxLevel >= 4 || this.levelNumber >= 4;
+    this.cottage.setGateOpen(open);
+    this.bee.bounds.minZ = open ? -Infinity : this.cottage.gate.z + GATE_STANDOFF;
   }
 
   /**
@@ -294,6 +312,9 @@ export class Game {
 
   private configureFlight(s: FlightSettings): void {
     this.bee.bounds.radius = s.boundsRadius;
+    // The lane north is walled off or not by syncCottageGate, which runs after
+    // the level has had its say; clear it here so nothing leaks between levels.
+    this.bee.bounds.minZ = -Infinity;
     this.rig.distance = s.cameraDistance;
     this.rig.height = s.cameraHeight;
     // A new level starts framed normally; it can widen the shot itself.
@@ -475,6 +496,9 @@ export class Game {
     if (this.wasp.visible) this.wasp.render(alpha);
     if (this.bear.visible) this.bear.render(alpha);
     if (this.meadowGroup.visible) this.hive.updateGlow(this.elapsed);
+    // The door and the gate both live here, and the gate matters in every
+    // outdoor level, not just level 4's.
+    if (this.cottage.group.visible) this.cottage.update(this.elapsed);
     if (this.interior.group.visible) this.queen.animate(this.elapsed, 0, 0);
     if (this.inside.group.visible) this.inside.update(this.elapsed);
 

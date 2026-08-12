@@ -14,6 +14,8 @@ export interface CottageScene {
   padCentres: THREE.Vector3[];
   /** Swing the door open once the dance is passed. */
   setDoorOpen(open: boolean): void;
+  /** Swing the gate to the meadow. Shut until the cottage is unlocked. */
+  setGateOpen(open: boolean): void;
   /** Where the bee flies to once the door is open. */
   doorway: THREE.Vector3;
   /** The gap in the fence, and the way home to the meadow. */
@@ -61,7 +63,8 @@ export function createCottage(rng: Rng): CottageScene {
   group.add(path);
 
   group.add(createHedge(rng));
-  group.add(createFence());
+  const fence = createFence();
+  group.add(fence.group);
 
   // ---- the house, at house scale -----------------------------------------
   //
@@ -120,11 +123,15 @@ export function createCottage(rng: Rng): CottageScene {
     setDoorOpen(open) {
       doorOpen = open;
     },
+    setGateOpen(open) {
+      fence.setOpen(open);
+    },
     update(elapsed) {
       // Swing the door open, and let it settle with a little overshoot.
       const target = doorOpen ? -1.9 : 0;
       doorPivot.rotation.y += (target - doorPivot.rotation.y) * 0.06;
       if (doorOpen) doorPivot.rotation.y += Math.sin(elapsed * 3) * 0.004;
+      fence.update();
     },
   };
 }
@@ -231,14 +238,14 @@ function shortestAngle(from: number, to: number): number {
 }
 
 /**
- * A picket fence across the gap in the hedge, with an open gate in the middle.
+ * A picket fence across the gap in the hedge, with a gate in the middle.
  *
  * It's the signpost for the whole of stage 3: the way home is through there,
- * and from over the mat you can see the hive glowing beyond it. The gate leaves
- * are swung wide and stay that way — nothing here should ever read as a wall
- * you have to open.
+ * and from over the mat you can see the hive glowing beyond it. It's shut until
+ * Caramel Cottage is unlocked, though — there's nothing up the lane before
+ * then, and a gate is a kinder way to say so than an invisible wall.
  */
-function createFence(): THREE.Group {
+function createFence(): { group: THREE.Group; setOpen(open: boolean): void; update(): void } {
   const g = new THREE.Group();
   const parts: THREE.BufferGeometry[] = [];
   const push = (geo: THREE.BufferGeometry, color: number) => parts.push(paint(geo, color));
@@ -287,24 +294,47 @@ function createFence(): THREE.Group {
   mesh.castShadow = true;
   g.add(mesh);
 
-  // The two gate leaves, hinged on the gateposts and standing open.
+  // The two gate leaves, hinged on the gateposts. Shut, they meet in the
+  // middle; open, they swing back against the fence.
+  const hinges: THREE.Object3D[] = [];
   for (const side of [-1, 1]) {
     const hinge = new THREE.Object3D();
     hinge.position.set(side * half, 0, z);
-    hinge.rotation.y = side * 1.25;
-    const leaf = new THREE.Mesh(new THREE.BoxGeometry(3.6, 2.9, 0.22), solidToon(WOOD));
-    leaf.position.set(side * 1.8, 1.55, 0);
+    // Shut to begin with: the lane is closed until the cottage is unlocked.
+    hinge.rotation.y = Math.PI;
+    // Wide enough that the pair meet in the middle when shut — a gap between
+    // them is an invitation to try to fly through it.
+    const leaf = new THREE.Mesh(new THREE.BoxGeometry(4.4, 2.9, 0.22), solidToon(WOOD));
+    leaf.position.set(side * 2.2, 1.55, 0);
     leaf.castShadow = true;
     hinge.add(leaf);
     for (const y of [0.9, 2.2]) {
-      const bar = new THREE.Mesh(new THREE.BoxGeometry(3.7, 0.3, 0.3), solidToon(WOOD_DARK));
-      bar.position.set(side * 1.8, y, 0.12);
+      const bar = new THREE.Mesh(new THREE.BoxGeometry(4.5, 0.3, 0.3), solidToon(WOOD_DARK));
+      bar.position.set(side * 2.2, y, 0.12);
       hinge.add(bar);
     }
     g.add(hinge);
+    hinges.push(hinge);
   }
 
-  return g;
+  let open = false;
+  return {
+    group: g,
+    setOpen(next) {
+      open = next;
+    },
+    update() {
+      // A leaf sits along its own +x from the hinge, so PI points it across the
+      // gap (shut) and the swing back out through 0 leaves it standing proud of
+      // the fence. Eased rather than snapped, so a gate that opens mid-level
+      // swings rather than teleports.
+      for (let i = 0; i < hinges.length; i++) {
+        const side = i === 0 ? -1 : 1;
+        const target = open ? side * 1.25 : Math.PI;
+        hinges[i].rotation.y += (target - hinges[i].rotation.y) * 0.08;
+      }
+    },
+  };
 }
 
 /**

@@ -822,7 +822,8 @@ body {
 
 .puzzle-board {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  /* 3x3 — see SIZE in ui/puzzle.ts; the two have to agree. */
+  grid-template-columns: repeat(3, 1fr);
   gap: 3px;
   /* Square, and as big as the shorter axis of the panel allows. */
   width: min(100%, 62vh);
@@ -833,7 +834,7 @@ body {
 }
 
 .puzzle-tile {
-  background-size: 400% 400%;
+  background-size: 300% 300%;
   background-repeat: no-repeat;
   border-radius: 5px;
   cursor: pointer;

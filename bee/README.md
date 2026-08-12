@@ -115,7 +115,7 @@ your tail. It's faster than you but corners badly,
 same as the wasp, so turning is what saves you. Drop the honey into the hive and
 the brood pours out to mob the bear; it rears up on its hind legs and swipes at
 them (never connecting). While it's busy the screen splits — bear and bees on
-the left, a 4x4 sliding puzzle of a scary bear on the right. Finish the picture
+the left, a 3x3 sliding puzzle of a scary bear on the right. Finish the picture
 and the real bear bolts, with rainbow confetti over the puzzle.
 
 **The puzzle art is a placeholder** — a hand-authored SVG in

@@ -1,5 +1,5 @@
 /**
- * Placeholder art for the 4x4 bear puzzle.
+ * Placeholder art for the 3x3 bear puzzle.
  *
  * Hand-authored SVG so there's no binary to generate and it stays crisp at any
  * tile size. Swap this whole module's export for a real image import when the

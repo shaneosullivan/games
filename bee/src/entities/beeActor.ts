@@ -41,8 +41,17 @@ export class BeeActor {
   /**
    * Playable volume. Levels override this — the meadow is a wide disc, the
    * hive interior is a much tighter one.
+   *
+   * `minZ` is a straight wall across the disc, used for the shut gate at the
+   * mouth of the cottage lane: until the cottage is unlocked there's nothing up
+   * there to find, so the meadow stops at the fence.
    */
-  bounds = { radius: WORLD.radius as number, centreX: 0, centreZ: 0 };
+  bounds = {
+    radius: WORLD.radius as number,
+    centreX: 0,
+    centreZ: 0,
+    minZ: -Infinity as number,
+  };
 
   /** Altitude the player has asked for, via the right-hand slider. */
   desiredHeight: number = FLIGHT.hoverHeight;
@@ -179,6 +188,13 @@ export class BeeActor {
       const push = Math.min(1, over / 6) * 22 * dt;
       this.position.x -= (dx / horiz) * push;
       this.position.z -= (dz / horiz) * push;
+      this.velocity.multiplyScalar(1 - Math.min(0.9, over / 8) * dt * 4);
+    }
+
+    // The same soft push, against a flat wall this time.
+    if (this.position.z < this.bounds.minZ) {
+      const over = this.bounds.minZ - this.position.z;
+      this.position.z += Math.min(1, over / 6) * 22 * dt;
       this.velocity.multiplyScalar(1 - Math.min(0.9, over / 8) * dt * 4);
     }
 
