@@ -190,22 +190,42 @@ export const WASP = {
  * Level 4, stage 1: the dance mat outside Caramel Cottage.
  *
  * A 3x3 mat. The bee hovers over the centre pad; the eight around it light up
- * one per beat and you tap each before it goes dark. The beat is deliberately
- * unhurried — this is a rhythm game for a child, so the window to react is
- * most of a beat rather than a few frames.
+ * and you tap each before it goes dark. The beat is deliberately unhurried —
+ * this is a rhythm game for a child, so the window to react is most of a beat
+ * rather than a few frames.
+ *
+ * It starts one pad at a time and then steps up to two per cue, offset by
+ * `pairOffset` beats. The difficulty is deliberately in *how many* pads you're
+ * tracking rather than in how fast you have to be.
  */
 export const DANCE = {
   /** Beats per minute of the backing track. */
   bpm: 96,
-  /** Pads light on every Nth beat, so there's a rest between prompts. */
-  beatsPerPrompt: 2,
-  /** How long a pad stays lit, as a fraction of the gap between prompts. */
+  /** Cues land on every Nth beat, so there's a rest between them. */
+  beatsPerCue: 2,
+  /** How long a pad stays lit, as a fraction of the gap between cues. */
   litFraction: 0.85,
-  /** Prompts in a full round. */
-  prompts: 24,
-  /** Fraction of prompts you must hit to open the door. */
+  /** Cues in a full round. */
+  cues: 20,
+  /**
+   * How many cues are a single pad before it steps up to two at a time.
+   *
+   * The round has to teach itself before it tests you: eight cues is enough to
+   * learn where to look and how long you have.
+   */
+  soloCues: 8,
+  /**
+   * Beats between the two pads of a pair.
+   *
+   * Deliberately not zero — two pads lighting together read as one wide
+   * target, whereas a beat apart they read as "that one, then that one", which
+   * is the thing that's actually harder. Each pad keeps the full window, so
+   * what's added is having to watch two places, not having to be quicker.
+   */
+  pairOffset: 0.6,
+  /** Fraction of pads you must hit to open the door. */
   passRatio: 0.9,
-  /** Beats of lead-in before the first prompt, so the beat is established. */
+  /** Beats of lead-in before the first cue, so the beat is established. */
   countInBeats: 8,
 
   /** Mat geometry. */

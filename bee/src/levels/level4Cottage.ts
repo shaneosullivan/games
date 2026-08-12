@@ -143,7 +143,7 @@ export class CottageLevel implements Level {
     this.music = null;
 
     ctx.hud.setCounters([
-      { key: 'dance', label: 'Steps', color: 0xffd75e, value: 0, target: DANCE.prompts },
+      { key: 'dance', label: 'Steps', color: 0xffd75e, value: 0, target: DanceMat.totalPads },
     ]);
   }
 
@@ -265,7 +265,7 @@ export class CottageLevel implements Level {
     this.music = ctx.audio.createMusic(DANCE.bpm);
     this.music?.start();
 
-    ctx.hud.setCount('dance', 0, DANCE.prompts);
+    ctx.hud.setCount('dance', 0, DanceMat.totalPads);
     ctx.hud.setObjective('Tap each square as it lights up!');
   }
 
@@ -319,10 +319,13 @@ export class CottageLevel implements Level {
             ttl: 0.6,
             spherical: 1,
           });
-          ctx.hud.setCount('dance', this.mat.hits, DANCE.prompts, true);
+          ctx.hud.setCount('dance', this.mat.hits, this.mat.total, true);
           break;
         case 'miss':
-          ctx.hud.setCount('dance', this.mat.hits, DANCE.prompts);
+          ctx.hud.setCount('dance', this.mat.hits, this.mat.total);
+          break;
+        case 'stepUp':
+          ctx.hud.setObjective('Two at a time now!');
           break;
         case 'finished':
           this.onRoundFinished(ctx, event.passed);
@@ -338,7 +341,7 @@ export class CottageLevel implements Level {
 
     if (!passed) {
       // No failing in this game — just go again, with a fresh pattern.
-      const scored = this.mat ? Math.round((this.mat.hits / DANCE.prompts) * 100) : 0;
+      const scored = this.mat ? Math.round(this.mat.ratio * 100) : 0;
       ctx.hud.setObjective(`${scored}% — so close! Let's try that again`);
       this.phase = 'arriving';
       // Skip the fly-in; she's already on the mat.

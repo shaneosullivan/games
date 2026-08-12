@@ -102,7 +102,10 @@ levels can take the camera with `ctx.setCameraCinematic()`, and handing it back
 lets the follow spring glide in from wherever the shot ended. Two stages after
 that. Outside, the door is locked and a 3x3 dance
 mat sits in front of it: the bee hovers over the middle square, the eight around
-it light on the beat, and you tap each before it goes dark. 90% opens the door.
+it light on the beat, and you tap each before it goes dark. It starts one at a
+time and then steps up to two per cue, the second half a beat behind the first —
+the window on each stays as long, so what gets harder is watching two places at
+once rather than reacting faster. 90% opens the door.
 Inside is a lamplit room with a jar of honey glowing on the counter — fly over,
 pick it up, and it hangs from you on a rope that swings with real momentum.
 
