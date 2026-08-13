@@ -87,8 +87,22 @@ they don't live in the per-build cache at all. Every image gets a content hash
 in its filename — Vite does it for a game's own assets, `stampAsset` does it
 for the gallery's cards, logo and App Store icons — and anything named that way
 is kept in `chofter-assets`, a cache with no build stamp on it that a deploy
-never bins. `vercel.json` serves the same URLs with `max-age=31536000,
-immutable`, so a returning browser doesn't even ask.
+never bins.
+
+`vercel.json` puts the same policy at the HTTP level, so a returning browser
+doesn't even ask. It holds three rules, and since JSON can't carry comments,
+here is what each is for:
+
+| `source`                                          | why                                                                                                                                               |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/:prefix*/:name-:hash([A-Za-z0-9_-]{8}).:ext(…)` | The hashed images: `max-age=31536000, immutable`. Matching on the hash is what keeps `icons/icon-192.png` out of it.                              |
+| `/(.*)version.json`                               | `no-store`. Cached, the stamp would advertise its own deploy for as long as the CDN felt like it and no open tab would ever hear about a new one. |
+| `/sw.js`                                          | `no-cache`. It carries the build id, so it has to be revalidated or the worker never updates.                                                     |
+
+Vercel validates that file against its schema before it builds anything, and
+rejects unknown keys — including `"//"` used as a comment. A deployment that
+fails with nothing but a link to the project-configuration docs is this, not
+your build.
 
 The hash is what makes that safe rather than reckless: the name is a promise
 about the bytes. Redraw a card and it is staged as `card-<newhash>.png`, the
