@@ -180,7 +180,12 @@ export function createStage(host: HTMLElement): Stage {
     if (pageDim) {
       colour.lerp(SCRIM, SCRIM_ALPHA);
     }
-    document.documentElement.style.backgroundColor = `#${colour.getHexString()}`;
+    const hex = `#${colour.getHexString()}`;
+    // Both, deliberately. The page canvas comes from the root element when it
+    // has a background of its own and from the body when it doesn't, and it
+    // costs nothing to stop caring which rule applies.
+    document.documentElement.style.backgroundColor = hex;
+    document.body.style.backgroundColor = hex;
   }
 
   function setPageDim(on: boolean): void {

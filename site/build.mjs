@@ -320,7 +320,15 @@ function renderInstallHead({title, manifest, up = ""}) {
     <link rel="apple-touch-icon" href="${up}icons/apple-touch-icon.png" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <!--
+      \`default\`, not \`black-translucent\`. Translucent puts the page *under* the
+      status bar, and iOS then makes the web view a status bar shorter than the
+      screen while still starting it at the top — which is where the strip of
+      bare page along the bottom of an installed iPad app came from: 810pt of
+      screen, 790pt of viewport, 20pt of status bar. Sitting below the bar
+      costs those 20pt at the top instead, where nothing is drawn anyway.
+    -->
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="${escapeHtml(title)}" />`;
 }
 

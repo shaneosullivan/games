@@ -186,6 +186,15 @@ function installConsoleApi(): ChofterApi {
         screen: [window.screen.width, window.screen.height],
         app: app ? [Math.round(app.width), Math.round(app.height)] : null,
         safeArea: getComputedStyle(doc).getPropertyValue("--safe-b").trim(),
+        // What the page is painting itself, which is what iOS uses for the
+        // strip it keeps — if this tracks the scene and the strip doesn't,
+        // then iOS isn't reading it and no colour here can ever match.
+        pageColour: getComputedStyle(doc).backgroundColor,
+        bodyColour: getComputedStyle(document.body).backgroundColor,
+        overlay: !!document.querySelector(".overlay:not(.hidden)"),
+        displayMode: ["fullscreen", "standalone", "minimal-ui", "browser"].find(
+          m => window.matchMedia(`(display-mode: ${m})`).matches,
+        ),
         caches: "caches" in window ? await caches.keys() : [],
         workers: ((await navigator.serviceWorker?.getRegistrations?.()) ?? [])
           .length,
