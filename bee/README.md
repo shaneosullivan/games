@@ -285,21 +285,22 @@ Things worth knowing before changing anything:
   flips them along with sky, fog and lights; `ctx.configureFlight()` re-bounds
   the player and re-frames the camera. Every level must call both in `enter()`,
   including level 1 — otherwise going back would inherit the other's settings.
-- **The dome is much wider than the play area** (radius 30 vs bounds 15). At the
+- **The dome is much wider than the play area** (radius 34 vs bounds 15). At the
   edge of the bounds it's the *camera*, sitting behind and above the bee, that
-  would punch through the shell. If you widen `INTERIOR.boundsRadius` or raise
-  `maxHeight`, check `sqrt((bounds + cameraDistance)^2 + (maxHeight +
-  cameraHeight)^2)` still clears `domeRadius`.
+  would punch through the shell. If you widen `INTERIOR.boundsRadius`, raise
+  `maxHeight` or pull the camera back, check `sqrt((bounds + cameraDistance)^2 +
+  (maxHeight + cameraHeight)^2)` still clears `domeRadius` — pulling the rig
+  back to 9.6 for the feeding levels is exactly what forced 30 up to 34.
 - **A model's `animate()` must not write to the group the caller positioned.**
   The queen's bob originally set `group.position.y` directly, which silently
   dragged her from her dais down to the floor. Bobs and sways belong on an
   inner group.
-- **The wasp's speed and `loseRadius` are coupled.** The bee must be able to
-  stay ahead (`WASP.speed` 8.7 vs `FLIGHT.maxSpeed` 9.5) but only just — at the
-  original 7.2 a straight-line flee outran the wasp's interest in about eleven
-  seconds and the 30-second chase could never be held at all. If you slow the
-  wasp down, widen `loseRadius` to match, and re-check that a fleeing player can
-  actually bank the full countdown.
+- **The wasp's speed and `loseRadius` are coupled.** It is now slightly *faster*
+  than the bee (`WASP.speed` 10.2 vs `FLIGHT.maxSpeed` 9.5) and escapes by
+  cornering badly instead — at the original 7.2 a straight-line flee outran its
+  interest in about eleven seconds and the 30-second chase could never be held
+  at all. If you slow the wasp down, widen `loseRadius` to match, and re-check
+  that a fleeing player can actually bank the full countdown.
 - **Every level places the bee in `enter()`** via `ctx.placeBee()`, so arriving
   from any other level (or from the picker) is well-defined. A level that skips
   it inherits wherever the last one left the bee, and the camera has to chase

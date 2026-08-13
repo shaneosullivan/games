@@ -1,0 +1,131 @@
+# Working in this repo
+
+Static web games plus the generated gallery that publishes them. See
+[README.md](README.md) for what it all is. This file is how to work on it.
+
+## Layout
+
+```
+bee/            Bee a Queen. Self-contained npm project, own deps, own dev server.
+  src/config.ts     every tunable number in the game
+  src/core/         loop, input, save, audio, rng, zoom lock, viewport fit, update check
+  src/render/       stage, materials, camera rig, procedural geometry
+  src/entities/     bee/wasp/bear actors, flower field, baby ring, dance mat, honey jar
+  src/levels/       the Level interface, one file per level, the map's lands
+  src/ui/           HUD, overlays, sliding puzzle, stylesheet
+  src/game.ts       owns everything and hands levels a GameContext
+site/           the gallery. Zero dependencies, no build step of its own.
+  build.mjs         discovers games, builds them, generates the site, writes the PWA
+  styles.css        the gallery's stylesheet, hand-written
+  serve.mjs         a static server for previewing site/dist
+```
+
+Games don't share code. The gallery finds them by looking for top-level folders
+with a `build` script, so adding one is dropping a folder in.
+
+## Commands
+
+```bash
+npm --prefix bee run dev         # dev server on :5173, hot reload
+npm --prefix bee run typecheck   # tsc --noEmit
+npm --prefix bee run build       # typechecks, then one self-contained dist/index.html
+
+npm --prefix site run build      # every game, then the gallery, into site/dist
+npm --prefix site run build:site # gallery only — fast, for styling
+npm --prefix site run serve      # preview site/dist on :4173
+```
+
+Always typecheck before saying a change is done; `npm run build` does it for
+you. There is no test suite — verification is done by driving the real game (see
+below), which for a game of this kind catches far more than unit tests would.
+
+## House style
+
+- **Every tunable number lives in `bee/src/config.ts`**, grouped by system, with
+  a comment saying what it does and — where it isn't obvious — the arithmetic
+  that produced it. No magic numbers at the call site.
+- **Comments explain why, not what.** The valuable ones here record a constraint
+  or a decision that isn't visible from the code: why the dome is wider than the
+  play area, why the fog throws further in the cottage, why a face stands 0.02
+  proud of another. Match the density of the surrounding file.
+- **Prefer fixing the cause.** Most of the bugs in the git history were one
+  level up from where they showed: babies frozen at the hive because nobody
+  ticked them, a hive invisible because the bear stood on it, a "tail" in front
+  because the haunches rode the torso.
+- Keep the reading level plain. This is a game for a child; the user-facing
+  copy should sound like it.
+
+## Architecture, in one breath
+
+The `Game` owns the scene, every actor and the save; a `Level` is a state
+machine that gets a `GameContext` and drives them. Levels call
+`ctx.setEnvironment()` and `ctx.configureFlight()` in `enter()`, place the bee
+with `ctx.placeBee()`, and can take the camera with `ctx.setCameraCinematic()`.
+The simulation is fixed-timestep (`SIM.step`, 1/60) and the render interpolates
+between steps, so actors keep a `prevPosition` and a `render(alpha)`.
+
+All 3D assets are generated in code — merged primitives with vertex colours,
+toon-shaded, one draw call per assembly. There are no model files, no rigs and
+no textures beyond the map and the two framed pictures.
+
+**Before changing anything in `bee/`, read
+[bee/README.md § Architecture](bee/README.md#architecture).** It is a list of
+the constraints that have already caught someone out, each with the symptom that
+found it. The ones that bite most often:
+
+- State the `Game` owns must be **reset** by the level that uses it, and
+  **ticked** by it too, above any phase early-returns.
+- A model's `animate()` must not write to the group the caller positioned.
+- Coplanar faces z-fight; anything laid on a surface stands slightly proud.
+- Instanced meshes can't skip an instance — scale it to zero.
+- `paint()` needs non-indexed geometry, and particle materials need a flat white
+  `color` attribute or they render invisibly.
+- Bounds are a circle about the **world origin**, which is the hive — not
+  wherever the level happens to be.
+
+## Verifying a change
+
+The browser preview tools drive a real instance of the game. In dev builds
+`window.game` is the live `Game`, which is the whole toolkit. Most of its fields
+are `private`, which TypeScript enforces at compile time and the console does
+not — from devtools they're ordinary properties:
+
+```js
+const g = window.game;
+g.loop.stop();            // take over the clock
+g.running = true;         // update() no-ops unless this is set
+g.switchLevel(4);
+document.querySelectorAll('.overlay').forEach(o => o.classList.add('hidden'));
+for (let i = 0; i < 600; i++) { g.update(1/60); g.render(1, 1/60); }
+```
+
+- Feed `g.stick` directly to autopilot a chase; call a level's phase methods
+  (`g.level.beginEmerging(g.ctx)`) to jump to a beat without playing to it.
+- **Screenshots after manual stepping can be a frame stale.** If a shot looks
+  wrong, `g.loop.start()` and take it again before believing it.
+- `g.save.mutate(d => ...)` to fake progress. Don't write localStorage directly —
+  the save flush will clobber it.
+- Measure rather than eyeball anything numeric. Puzzle difficulty in this repo
+  is quoted from a breadth-first search of the actual board, not a guess.
+
+When testing the **built site**, the service worker will serve you the previous
+build. Purge it or you'll debug a page that no longer exists:
+
+```js
+caches.keys().then(ks => Promise.all(ks.map(k => caches.delete(k)))).then(() => location.reload());
+```
+
+## Deploying
+
+`site/dist` is gitignored and built in CI. Vercel: build `node site/build.mjs`,
+output `site/dist`, no install command. Every build stamps a `version.json`
+that running copies poll, so an open tab offers a reload within a minute of a
+deploy — see [site/README.md](site/README.md).
+
+## Target device
+
+An iPad, held in two hands, used by a child. Nothing may need a keyboard, a
+right-click or a hover. Text is large, targets are generous, and failure states
+are gentle — the dance mat just plays again, and nothing in the game can hurt
+you. Test at a phone-ish viewport too; the puzzle panel switches from
+side-by-side to stacked under `max-aspect-ratio: 1/1`.
