@@ -26,7 +26,6 @@ site/dist/
       card-<hash>.png
       <asset>-<hash>.jpg  the game's own pictures, emitted by its build
       manifest.webmanifest
-      card.png
       version.json
   version.json          build stamp, polled by running pages
 ```
@@ -89,6 +88,12 @@ for the gallery's cards, logo and App Store icons — and anything named that wa
 is kept in `chofter-assets`, a cache with no build stamp on it that a deploy
 never bins.
 
+The hash is what makes that safe rather than reckless: the name is a promise
+about the bytes. Redraw a card and it is staged as `card-<newhash>.png`, the
+page links to the new name, and the old file is simply never requested again —
+the cache-bust is the URL. Nothing has to be expired, and nothing that hasn't
+changed is downloaded twice.
+
 `vercel.json` puts the same policy at the HTTP level, so a returning browser
 doesn't even ask. It holds three rules, and since JSON can't carry comments,
 here is what each is for:
@@ -103,12 +108,6 @@ Vercel validates that file against its schema before it builds anything, and
 rejects unknown keys — including `"//"` used as a comment. A deployment that
 fails with nothing but a link to the project-configuration docs is this, not
 your build.
-
-The hash is what makes that safe rather than reckless: the name is a promise
-about the bytes. Redraw a card and it is staged as `card-<newhash>.png`, the
-page links to the new name, and the old file is simply never requested again —
-the cache-bust is the URL. Nothing has to be expired, and nothing that hasn't
-changed is downloaded twice.
 
 Two consequences worth keeping in mind if you touch it. The immutable rule is
 matched on the filename (a dash, eight hash characters, a media extension), so
