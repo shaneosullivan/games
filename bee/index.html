@@ -22,7 +22,16 @@
          bare page along the bottom of the installed app. -->
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="Bee a Queen" />
-    <meta name="theme-color" content="#8fd0e8" />
+    <!-- iOS tints an installed app's status bar with this; matching the system
+         is what looks right behind the clock and battery. -->
+    <meta
+      name="theme-color"
+      media="(prefers-color-scheme: light)"
+      content="#ffffff" />
+    <meta
+      name="theme-color"
+      media="(prefers-color-scheme: dark)"
+      content="#000000" />
 
     <!--
       Manifest inlined as a data URI so the build stays a single file. iOS

@@ -42,7 +42,12 @@ const APP = {
    */
   shortName: "Chofter Games",
   description: "Little games, made for fun.",
-  themeColor: "#f7b32b",
+  /**
+   * What browser and OS chrome is tinted with — the iOS status bar of an
+   * installed app included, which is why it isn't the brand amber. White reads
+   * as the system's own bar; the dark-mode counterpart is emitted alongside it.
+   */
+  themeColor: "#ffffff",
   backgroundColor: "#fdf7ec",
 };
 
@@ -315,7 +320,14 @@ function renderManifest({name, shortName, description, start = "./", up = ""}) {
  */
 function renderInstallHead({title, manifest, up = ""}) {
   return `    <link rel="manifest" href="${manifest}" />
-    <meta name="theme-color" content="${APP.themeColor}" />
+    <!--
+      Two, media-scoped, and neither of them the brand amber: iOS tints the
+      status bar of an installed app with theme-color, and an orange bar behind
+      the clock and battery looks like a mistake. White on light and black on
+      dark is what the system does on its own.
+    -->
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#ffffff" />
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#000000" />
     <link rel="icon" type="image/png" sizes="192x192" href="${up}icons/icon-192.png" />
     <link rel="apple-touch-icon" href="${up}icons/apple-touch-icon.png" />
     <meta name="apple-mobile-web-app-capable" content="yes" />

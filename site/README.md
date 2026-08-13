@@ -29,6 +29,20 @@ site/dist/
 
 ## Installing it
 
+Two metas decide how an installed copy sits on the screen, and both are set the
+way they are for a reason:
+
+- `apple-mobile-web-app-status-bar-style: default` — sits the app _below_ the
+  status bar. `black-translucent` puts it underneath, and iOS then makes the
+  web view a status bar shorter than the screen while still starting it at the
+  top, stranding those 20pt as a bare strip along the bottom.
+- `theme-color` is white on light and black on dark, not the brand amber. iOS
+  tints the status bar of an installed app with it, and an orange bar behind
+  the clock and battery looks like a bug rather than a brand.
+
+iOS records both when the app is added to the home screen, so changing them
+only takes effect for a copy installed afterwards.
+
 The gallery is a PWA. Add it to the home screen and it opens full-screen with
 no browser chrome, under the Chofter knotwork icon — and because games live on
 the same origin, tapping one stays inside the installed app.
