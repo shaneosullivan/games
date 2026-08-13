@@ -242,7 +242,12 @@ export function createQueen(): BeeModel {
 
 export interface BabyModel {
   group: THREE.Group;
-  animate(elapsed: number, wiggle: number): void;
+  /**
+   * @param wiggle 0..1 how much it rocks and flaps
+   * @param rear 0..1 up on end, mouth to the sky, waiting to be fed — the
+   *   caller supplies the lift, because it owns the group's position
+   */
+  animate(elapsed: number, wiggle: number, rear?: number): void;
   /** 0..1 through its three feeds; drives how plump and grown it looks. */
   setGrowth(t: number): void;
 }
@@ -358,17 +363,23 @@ export function createBaby(): BabyModel {
         stripe.visible = growth >= 1;
       }
     },
-    animate(elapsed, wiggle) {
+    animate(elapsed, wiggle, rear = 0) {
       // Hungry babies rock side to side and flap; full ones just breathe.
       const rock = Math.sin(elapsed * 5.5) * 0.22 * wiggle;
-      group.rotation.z = rock;
-      group.rotation.x = Math.sin(elapsed * 2.2) * 0.05;
+      group.rotation.z = rock * (1 - rear);
+      // Reared: nose to the sky like a chick in a nest, with a quick eager
+      // bob on top. The body runs along +Z with the head at the far end, so
+      // pitching negative about x is what tips the face upward.
+      group.rotation.x =
+        Math.sin(elapsed * 2.2) * 0.05 -
+        rear * (1.05 + Math.sin(elapsed * 7.5) * 0.09);
       const flap = Math.sin(elapsed * Math.PI * 2 * 9) * (0.15 + wiggle * 0.5);
       for (let i = 0; i < wings.length; i++) {
         wings[i].rotation.z = (i === 0 ? -1 : 1) * (0.2 + flap);
       }
       const breathe = 1 + Math.sin(elapsed * 1.7 + growth) * 0.03;
-      group.scale.y = breathe;
+      // Stretching up as it begs, which is most of what sells the reach.
+      group.scale.y = breathe * (1 + rear * 0.18);
     },
   };
 }

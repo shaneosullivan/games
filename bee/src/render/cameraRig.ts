@@ -5,6 +5,7 @@ import type {BeeActor} from "../entities/beeActor";
 const desired = new THREE.Vector3();
 const lookTarget = new THREE.Vector3();
 const smoothedLook = new THREE.Vector3();
+const boom = new THREE.Vector3();
 
 function shortestAngle(from: number, to: number): number {
   let d = (to - from) % (Math.PI * 2);
@@ -41,8 +42,51 @@ export class CameraRig {
   private cinematicEye: THREE.Vector3 | null = null;
   private readonly cinematicLook = new THREE.Vector3();
 
+  /**
+   * A sphere about the world origin the camera may not leave, or null.
+   *
+   * This is what lets a level be played right up against a wall. The rig sits
+   * `distance` behind the bee, so flying at anything solid puts the camera on
+   * the far side of it — in the royal chamber, where the food is in the dome
+   * wall itself, that would mean looking at the back of the honeycomb every
+   * time you went to feed. Clamped, the boom shortens instead, and the shot
+   * tightens as you come in. It's what a third-person camera does when it
+   * meets geometry; this one only has to know about the one sphere.
+   */
+  private enclosure: number | null = null;
+
   constructor(private readonly camera: THREE.PerspectiveCamera) {
     smoothedLook.set(0, 1, 0);
+  }
+
+  /** Keep the camera inside a sphere of this radius, or pass null to stop. */
+  setEnclosure(radius: number | null): void {
+    this.enclosure = radius;
+  }
+
+  /**
+   * Pull `point` back inside the enclosure, along the line from the bee — so
+   * the boom shortens rather than the shot swinging somewhere else.
+   */
+  private clampToEnclosure(point: THREE.Vector3, bee: THREE.Vector3): void {
+    if (this.enclosure === null || point.length() <= this.enclosure) {
+      return;
+    }
+    // Walk from the bee toward the desired eye, stopping at the sphere. The
+    // bee is always well inside it, so there is always a crossing to find.
+    boom.copy(point).sub(bee);
+    const a = boom.lengthSq();
+    if (a < 1e-6) {
+      return;
+    }
+    const b = 2 * boom.dot(bee);
+    const c = bee.lengthSq() - this.enclosure * this.enclosure;
+    const disc = b * b - 4 * a * c;
+    if (disc < 0) {
+      return;
+    }
+    const t = (-b + Math.sqrt(disc)) / (2 * a);
+    point.copy(bee).addScaledVector(boom, Math.max(0, Math.min(1, t)));
   }
 
   /** `immediate` skips the ease — used when a level places the bee. */
@@ -103,6 +147,8 @@ export class CameraRig {
       bee.position.z - Math.cos(this.yaw) * this.distance * this.zoom,
     );
 
+    this.clampToEnclosure(desired, bee.position);
+
     const k = 1 - Math.exp(-CAMERA.followLerp * dt);
     this.camera.position.lerp(desired, k);
 
@@ -128,11 +174,13 @@ export class CameraRig {
   ): void {
     this.zoom = this.zoomTarget;
     this.yaw = yaw;
-    this.camera.position.set(
+    desired.set(
       bee.position.x - Math.sin(this.yaw) * this.distance * this.zoom,
       bee.position.y + this.height * this.zoom,
       bee.position.z - Math.cos(this.yaw) * this.distance * this.zoom,
     );
+    this.clampToEnclosure(desired, bee.position);
+    this.camera.position.copy(desired);
     smoothedLook
       .copy(bee.position)
       .add(new THREE.Vector3(0, CAMERA.lookHeight, 0));

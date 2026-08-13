@@ -76,9 +76,16 @@ lights up, your bee is crowned queen with a burst of sparkles, and you fly in
 through the door to finish.
 
 **2 — The Royal Chamber.** Inside the dome. The queen sits on her dais with six
-babies ringed around her on perches. You're a worker now: hover at one of the
-three wall stores to load that colour of pollen, carry it to a baby whose
-floating bubble asks for it, repeat. Babies get hungry on their own clocks and
+babies ringed around her on perches, and the food is in the walls: the
+honeycomb lining the dome is the hive's larder, and the cells with something in
+them are coloured for their pollen and pulsing inside a glowing border. You're
+a worker now — fly up to a glowing hexagon and it comes away with you, swinging
+under the bee on a rope; carry it to a baby whose floating bubble asks for that
+colour and the baby rears up on end like a chick, mouth to the sky, and the
+hexagon flies out of your hands into it. The food is scattered up the wall as
+well as around it, so half the job is climbing to the right one. An emptied
+cell goes dark and fills again a few seconds later, so the wall can't run out.
+Babies get hungry on their own clocks and
 crave a random colour each time; three feeds and one grows up — plumping out and
 earning a proper bee stripe, so you can see at a glance who's done. When all six are
 grown they lift off their perches in a staggered wave and circle the queen while
@@ -322,12 +329,16 @@ Things worth knowing before changing anything:
   flips them along with sky, fog and lights; `ctx.configureFlight()` re-bounds
   the player and re-frames the camera. Every level must call both in `enter()`,
   including level 1 — otherwise going back would inherit the other's settings.
-- **The dome is much wider than the play area** (radius 34 vs bounds 15). At the
-  edge of the bounds it's the _camera_, sitting behind and above the bee, that
-  would punch through the shell. If you widen `INTERIOR.boundsRadius`, raise
-  `maxHeight` or pull the camera back, check `sqrt((bounds + cameraDistance)^2 +
-(maxHeight + cameraHeight)^2)` still clears `domeRadius` — pulling the rig
-  back to 9.6 for the feeding levels is exactly what forced 30 up to 34.
+- **The play area now reaches the dome wall, and the camera is fenced in.**
+  The food is in the honeycomb lining the shell, so the bee has to be able to
+  fly right up to it (`INTERIOR.boundsRadius` 31.5 against a dome of 34). No
+  amount of arithmetic makes that work by itself — the rig sits
+  `cameraDistance` behind the bee, so flying at the wall would always put the
+  camera outside it. What makes it playable is `rig.setEnclosure()`, a sphere
+  the camera may not leave (`INTERIOR.cameraEnclosure`): the boom shortens as
+  the bee closes on the comb and the shot tightens instead of turning inside
+  out. Any level played against a wall wants the same thing; pass
+  `cameraEnclosure` in its `configureFlight()`.
 - **A model's `animate()` must not write to the group the caller positioned.**
   The queen's bob originally set `group.position.y` directly, which silently
   dragged her from her dais down to the floor. Bobs and sways belong on an

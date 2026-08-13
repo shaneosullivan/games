@@ -3,6 +3,7 @@ import {mergeGeometries} from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import {
   INTERIOR,
   INTERIOR_PALETTE as P,
+  FOOD,
   POLLEN_COLOR,
   POLLEN_KINDS,
   type PollenKind,
@@ -10,11 +11,15 @@ import {
 import type {Rng} from "../../core/rng";
 import {paint, solidToon, vertexToon} from "../materials";
 
-export interface PollenStore {
+/** One hexagon of the dome's honeycomb that holds food. */
+export interface FoodCell {
   kind: PollenKind;
-  /** Where the bee hovers to load up. */
+  /** Where the bee hovers to take it: in from the wall along its own normal. */
   position: THREE.Vector3;
-  mound: THREE.Mesh;
+  /** The pulsing border around it, hidden while the cell is empty. */
+  ring: THREE.Mesh;
+  /** Colour the cell for its pollen, or back to empty wax once taken. */
+  setFull(full: boolean): void;
 }
 
 export interface HiveInterior {
@@ -23,10 +28,24 @@ export interface HiveInterior {
   queenPosition: THREE.Vector3;
   /** Perch positions ringing the queen. */
   babyPositions: Array<THREE.Vector3>;
-  stores: Array<PollenStore>;
+  /** The hexagons in the larder wall that hold food. */
+  foodCells: Array<FoodCell>;
+  /** The hexagon the bee is carrying, hidden until she takes one. */
+  carried: CarriedHex;
   /** Where the player enters from, so level 2 can place the bee sensibly. */
   entryPosition: THREE.Vector3;
   update(elapsed: number): void;
+}
+
+/** The single hexagon that stands in for whichever cell was taken. */
+export interface CarriedHex {
+  /** Positioned by the rope, so nothing else may write to it. */
+  group: THREE.Group;
+  /** Recolour it to the food it's standing in for. */
+  setKind(kind: PollenKind): void;
+  setVisible(visible: boolean): void;
+  /** Shrink it away as it arrives at a baby. 1 is full size. */
+  setScale(scale: number): void;
 }
 
 /**
@@ -66,7 +85,11 @@ export function createHiveInterior(rng: Rng): HiveInterior {
   floor.receiveShadow = true;
   group.add(floor);
 
-  group.add(createWallCells(rng));
+  const wall = createWallCells(rng);
+  group.add(wall.mesh);
+  for (const cell of wall.foodCells) {
+    group.add(cell.ring);
+  }
   group.add(createDais());
 
   // ---- baby perches ------------------------------------------------------
@@ -106,61 +129,80 @@ export function createHiveInterior(rng: Rng): HiveInterior {
   perches.castShadow = true;
   group.add(perches);
 
-  // ---- pollen stores -----------------------------------------------------
-  const stores: Array<PollenStore> = [];
-  POLLEN_KINDS.forEach((kind, i) => {
-    const a = (i / POLLEN_KINDS.length) * Math.PI * 2 - Math.PI / 2;
-    const x = Math.cos(a) * INTERIOR.storeRingRadius;
-    const z = Math.sin(a) * INTERIOR.storeRingRadius;
-
-    const pot = new THREE.Mesh(
-      new THREE.CylinderGeometry(1.5, 1.15, 1.6, 8),
-      solidToon(P.waxDark),
-    );
-    pot.position.set(x, 0.8, z);
-    pot.castShadow = true;
-    pot.receiveShadow = true;
-    group.add(pot);
-
-    const rim = new THREE.Mesh(
-      new THREE.TorusGeometry(1.5, 0.16, 6, 16),
-      solidToon(P.dais),
-    );
-    rim.rotation.x = Math.PI / 2;
-    rim.position.set(x, 1.6, z);
-    group.add(rim);
-
-    const mound = new THREE.Mesh(
-      new THREE.SphereGeometry(1.35, 16, 10),
-      solidToon(POLLEN_COLOR[kind]),
-    );
-    mound.scale.y = 0.5;
-    mound.position.set(x, 1.62, z);
-    group.add(mound);
-
-    stores.push({
-      kind,
-      position: new THREE.Vector3(x, INTERIOR.storeHeight + 1.2, z),
-      mound,
-    });
-  });
+  const carried = createCarriedHex();
+  group.add(carried.group);
 
   const queenPosition = new THREE.Vector3(0, INTERIOR.queenHeight, 0);
-  // The player arrives near the wall behind the queen, facing in.
-  const entryPosition = new THREE.Vector3(0, 3.2, INTERIOR.boundsRadius - 3);
+  // The player arrives out in the middle of the chamber, facing the queen —
+  // well clear of the wall, so nothing is picked up before the player has
+  // touched anything.
+  const entryPosition = new THREE.Vector3(0, 3.2, 12);
 
   return {
     group,
     queenPosition,
     babyPositions,
-    stores,
+    foodCells: wall.foodCells,
+    carried,
     entryPosition,
     update(elapsed) {
-      // Pollen mounds breathe gently so the stores look alive from across the dome.
-      for (let i = 0; i < stores.length; i++) {
-        const s = 1 + Math.sin(elapsed * 1.4 + i * 2.1) * 0.04;
-        stores[i].mound.scale.set(s, 0.5 * s, s);
+      // The borders pulse so a full cell reads as "come and take this" from
+      // across the dome. Each is offset by its index, so the wall shimmers
+      // rather than blinking all at once.
+      for (let i = 0; i < wall.foodCells.length; i++) {
+        const cell = wall.foodCells[i];
+        if (!cell.ring.visible) {
+          continue;
+        }
+        const pulse =
+          1 + Math.sin(elapsed * FOOD.pulseRate + i * 1.7) * FOOD.pulseDepth;
+        cell.ring.scale.set(pulse, pulse, 1);
+        const mat = cell.ring.material as THREE.MeshBasicMaterial;
+        mat.opacity = 0.45 + (pulse - 1) * 0.9;
       }
+    },
+  };
+}
+
+/**
+ * The hexagon the bee carries: one mesh, recoloured for whichever cell was
+ * taken, rather than one per cell. Only ever visible while something is being
+ * carried or delivered, and positioned by the rope — see DanglingLoad.
+ */
+function createCarriedHex(): CarriedHex {
+  const group = new THREE.Group();
+  group.visible = false;
+
+  const material = new THREE.MeshBasicMaterial({color: 0xffffff});
+  const hex = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.55, 0.55, 0.34, 6),
+    material,
+  );
+  group.add(hex);
+
+  // A faint shell around it, so it stays legible against a pale floor.
+  const halo = new THREE.Mesh(
+    new THREE.TorusGeometry(0.62, 0.07, 6, 6),
+    new THREE.MeshBasicMaterial({
+      color: 0xffffff,
+      transparent: true,
+      opacity: 0.5,
+      depthWrite: false,
+    }),
+  );
+  halo.rotation.x = Math.PI / 2;
+  group.add(halo);
+
+  return {
+    group,
+    setKind(kind) {
+      material.color.set(POLLEN_COLOR[kind]);
+    },
+    setVisible(visible) {
+      group.visible = visible;
+    },
+    setScale(scale) {
+      group.scale.setScalar(Math.max(0.0001, scale));
     },
   };
 }
@@ -169,8 +211,18 @@ export function createHiveInterior(rng: Rng): HiveInterior {
  * Honeycomb lining the dome wall. Points are spread over the hemisphere with a
  * Fibonacci spiral and each cell is turned to face the centre; per-instance
  * colour decides whether a cell reads as full of honey or empty.
+ *
+ * Some of them hold the brood's food. Those are the same instances as the
+ * rest — the wall is the larder — recoloured for the pollen they hold and
+ * given a glowing border. Which ones is not left to the spiral: they're chosen
+ * to spread around the dome *and* up it, from FOOD.minHeight to maxHeight, so
+ * the colour a baby is asking for is as likely to be up under the roof as
+ * down by the floor.
  */
-function createWallCells(rng: Rng): THREE.InstancedMesh {
+function createWallCells(rng: Rng): {
+  mesh: THREE.InstancedMesh;
+  foodCells: Array<FoodCell>;
+} {
   const cell = new THREE.CylinderGeometry(1.05, 1.05, 0.5, 6);
   // Cylinder's axis is +Y; tip it so the axis points along +Z, which is what
   // lookAt orients.
@@ -191,6 +243,9 @@ function createWallCells(rng: Rng): THREE.InstancedMesh {
   const empty = new THREE.Color(P.cellEmpty);
   const golden = Math.PI * (3 - Math.sqrt(5));
 
+  /** Cells sitting in the band the bee can actually fly to, by height. */
+  const reachable: Array<{index: number; position: THREE.Vector3}> = [];
+
   for (let i = 0; i < count; i++) {
     // Upper hemisphere only, biased away from the very apex.
     const t = (i + 0.5) / count;
@@ -198,19 +253,100 @@ function createWallCells(rng: Rng): THREE.InstancedMesh {
     const r = Math.sqrt(Math.max(0, 1 - y * y));
     const a = i * golden;
 
-    dummy.position.set(Math.cos(a) * r * R, y * R, Math.sin(a) * r * R);
+    const position = new THREE.Vector3(
+      Math.cos(a) * r * R,
+      y * R,
+      Math.sin(a) * r * R,
+    );
+    dummy.position.copy(position);
     dummy.lookAt(0, 0, 0);
     const s = 0.85 + rng.next() * 0.35;
     dummy.scale.set(s, s, 1);
     dummy.updateMatrix();
     mesh.setMatrixAt(i, dummy.matrix);
     mesh.setColorAt(i, rng.next() < 0.62 ? full : empty);
+
+    if (position.y >= FOOD.minHeight && position.y <= FOOD.maxHeight) {
+      reachable.push({index: i, position});
+    }
   }
+
+  const foodCells = chooseFoodCells(reachable, mesh, empty);
+
   mesh.instanceMatrix.needsUpdate = true;
   if (mesh.instanceColor) {
     mesh.instanceColor.needsUpdate = true;
   }
-  return mesh;
+  return {mesh, foodCells};
+}
+
+/**
+ * Pick the cells that hold food, and build a border for each.
+ *
+ * The spiral visits the dome top to bottom, so the reachable cells arrive
+ * sorted by height: stepping through them at an even stride takes one from
+ * each level in turn, which is what spreads the food up the wall rather than
+ * banding it. The golden angle has already scattered them around the dome, so
+ * no two consecutive picks end up side by side.
+ */
+function chooseFoodCells(
+  reachable: ReadonlyArray<{index: number; position: THREE.Vector3}>,
+  mesh: THREE.InstancedMesh,
+  emptyColor: THREE.Color,
+): Array<FoodCell> {
+  const foodCells: Array<FoodCell> = [];
+  if (reachable.length === 0) {
+    return foodCells;
+  }
+
+  const wanted = Math.min(FOOD.cells, reachable.length);
+  const stride = reachable.length / wanted;
+  const colors = POLLEN_KINDS.map(k => new THREE.Color(POLLEN_COLOR[k]));
+
+  for (let n = 0; n < wanted; n++) {
+    const {index, position} = reachable[Math.floor(n * stride)];
+    const kind = POLLEN_KINDS[n % POLLEN_KINDS.length];
+    const color = colors[n % POLLEN_KINDS.length];
+
+    // A six-sided torus is a hexagon. Laid on the cell and turned to face the
+    // middle of the dome, like the cell it rings, standing a little proud of
+    // it so the two don't z-fight.
+    const ring = new THREE.Mesh(
+      new THREE.TorusGeometry(1.15, 0.13, 6, 6),
+      new THREE.MeshBasicMaterial({
+        color: 0xffffff,
+        transparent: true,
+        opacity: 0.6,
+        depthWrite: false,
+        // The far side of the dome is well past HIVE_ENV's fog, and a food
+        // cell that fades out is a food cell the player can't plan a trip to.
+        fog: false,
+      }),
+    );
+    ring.position.copy(position).multiplyScalar(1 - 0.4 / position.length());
+    ring.lookAt(0, 0, 0);
+    ring.rotateZ(Math.PI / 6);
+
+    // In from the wall along its own normal: the bee stops short of the comb
+    // rather than trying to fly into it.
+    const hover = position
+      .clone()
+      .multiplyScalar(1 - FOOD.hoverOut / position.length());
+
+    foodCells.push({
+      kind,
+      position: hover,
+      ring,
+      setFull(isFull) {
+        mesh.setColorAt(index, isFull ? color : emptyColor);
+        if (mesh.instanceColor) {
+          mesh.instanceColor.needsUpdate = true;
+        }
+      },
+    });
+  }
+
+  return foodCells;
 }
 
 /** The queen's raised hexagonal dais. */

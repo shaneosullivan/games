@@ -489,6 +489,8 @@ body {
 }
 
 .card {
+  /* The home link in the corner is positioned against this. */
+  position: relative;
   width: min(520px, 86vw);
   background: rgba(255, 255, 255, 0.96);
   color: #23303c;
@@ -496,6 +498,44 @@ body {
   padding: 34px 34px 28px;
   text-align: center;
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
+}
+
+/*
+ * The way back to the gallery, in the corner of the menu card.
+ *
+ * Sized as a 56px target rather than by the mark inside it: this is an iPad
+ * game for a child, and the icon itself is only 40px. It is deliberately quiet
+ * — nothing here should compete with Start.
+ */
+.home-link {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  width: 56px;
+  height: 56px;
+  display: grid;
+  place-items: center;
+  border-radius: 16px;
+  opacity: 0.75;
+  transition: opacity 120ms ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.home-link:hover,
+.home-link:focus-visible {
+  opacity: 1;
+}
+
+.home-link:active {
+  transform: scale(0.94);
+  opacity: 1;
+}
+
+.home-link img {
+  width: 40px;
+  height: 40px;
+  border-radius: 11px;
+  display: block;
 }
 
 .card h1 {

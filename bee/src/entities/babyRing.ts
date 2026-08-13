@@ -73,6 +73,8 @@ interface Baby {
   /** The floating want-bubble above its head. */
   bubble: THREE.Group;
   bubbleBall: THREE.Mesh;
+  /** 0..1 eased, how far up on end it is begging to be fed. */
+  rear: number;
 }
 
 export interface FeedResult {
@@ -142,6 +144,7 @@ export class BabyRing {
         grown: false,
         bubble,
         bubbleBall: ball,
+        rear: 0,
       };
       model.setGrowth(0);
       this.babies.push(baby);
@@ -167,6 +170,7 @@ export class BabyRing {
       baby.feeds = 0;
       baby.grown = false;
       baby.craving = null;
+      baby.rear = 0;
       baby.contentFor = baby.index * 0.9;
       baby.position.copy(baby.home);
       baby.model.setGrowth(0);
@@ -223,16 +227,37 @@ export class BabyRing {
 
       const hungry = baby.craving !== null;
       baby.bubble.visible = hungry;
+
+      // Up on end the moment the food it asked for is on its way over —
+      // eased, so it rises to meet the bee rather than snapping upright, and
+      // sinks back down if she carries it somewhere else.
+      const begging =
+        hungry &&
+        carrying === baby.craving &&
+        baby.position.distanceToSquared(beePosition) <
+          INTERIOR.noticeRadius * INTERIOR.noticeRadius;
+      baby.rear += ((begging ? 1 : 0) - baby.rear) * Math.min(1, 7 * dt);
+
+      // The lift is applied here rather than in the model: animate() must not
+      // write to the group the ring positions, or the two fight each other.
+      const lift = baby.rear * INTERIOR.rearLift;
+      baby.model.group.position.y = baby.position.y + lift;
+
       if (hungry) {
         const mat = baby.bubbleBall.material as THREE.MeshBasicMaterial;
         mat.color.set(POLLEN_COLOR[baby.craving!]);
         baby.bubble.position.y =
           baby.position.y +
+          lift +
           1.7 +
           Math.sin(this.elapsed * 2.6 + baby.index) * 0.14;
         baby.bubble.rotation.y = this.elapsed * 0.9;
       }
-      baby.model.animate(this.elapsed + baby.index * 1.7, hungry ? 1 : 0.12);
+      baby.model.animate(
+        this.elapsed + baby.index * 1.7,
+        hungry ? 1 : 0.12,
+        baby.rear,
+      );
     }
 
     // Feeding: hover near a baby that wants exactly what you're carrying.

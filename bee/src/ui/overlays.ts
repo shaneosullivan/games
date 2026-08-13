@@ -1,3 +1,4 @@
+import chofterUrl from "../assets/chofter.png";
 import mapUrl from "../assets/levelmap.jpg";
 import {LANDS, landForLevel, type Land} from "../levels/lands";
 
@@ -24,6 +25,32 @@ function makeOverlay(host: HTMLElement): {
   root.appendChild(card);
   host.appendChild(root);
   return {root, card};
+}
+
+/**
+ * The Chofter mark in the corner of the menu, and the way out of the game.
+ *
+ * It points at the site root rather than a relative path on purpose: the game
+ * is staged at /games/<name>/, and the thing a player wants from this is the
+ * gallery of every game, which is always at "/". That holds in the installed
+ * app too — games live on the gallery's own origin, so this stays inside it
+ * rather than kicking out to a browser.
+ */
+function createHomeLink(): HTMLAnchorElement {
+  const link = document.createElement("a");
+  link.className = "home-link";
+  link.href = "/";
+  link.title = "All the Chofter games";
+  link.setAttribute("aria-label", "All the Chofter games");
+
+  const img = document.createElement("img");
+  img.src = chofterUrl;
+  img.alt = "";
+  img.width = 40;
+  img.height = 40;
+  link.appendChild(img);
+
+  return link;
 }
 
 /**
@@ -102,6 +129,7 @@ export function createCodenameScreen(
   const {levels, unlocked, selected, onStart, onReset} = opts;
   const existing = sanitizeCodename(opts.existing);
   const {root, card} = makeOverlay(host);
+  card.appendChild(createHomeLink());
 
   const h1 = document.createElement("h1");
   h1.textContent = existing ? `Welcome back` : "Bee a Queen";

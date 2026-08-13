@@ -2,13 +2,14 @@ import type * as THREE from "three";
 import type {Audio} from "../core/audio";
 import type {Save} from "../core/save";
 import type {BabyRing} from "../entities/babyRing";
+import type {Larder} from "../entities/larder";
 import type {BeeActor} from "../entities/beeActor";
 import type {FlowerField, HarvestEvent} from "../entities/flowerField";
 import type {BearActor} from "../entities/bearActor";
 import type {WaspActor} from "../entities/waspActor";
 import type {ParticleBurst} from "../fx/particles";
 import type {HiveInterior} from "../render/geometry/hiveInterior";
-import type {HoneyJar} from "../entities/honeyJar";
+import type {DanglingLoad} from "../entities/danglingLoad";
 import type {CottageScene} from "../render/geometry/cottage";
 import type {CottageInside} from "../render/geometry/cottageInside";
 import type {HiveSite} from "../render/geometry/world";
@@ -24,6 +25,12 @@ export interface FlightSettings {
   maxHeight: number;
   cameraDistance: number;
   cameraHeight: number;
+  /**
+   * Radius of a sphere about the origin the camera may not leave. Set it for a
+   * level played up against a wall — the boom shortens instead of the shot
+   * ending up outside the room. Omit it and the camera is unconstrained.
+   */
+  cameraEnclosure?: number;
 }
 
 export interface GameContext {
@@ -36,11 +43,12 @@ export interface GameContext {
   hive: HiveSite;
   interior: HiveInterior;
   babies: BabyRing;
+  larder: Larder;
   wasp: WaspActor;
   bear: BearActor;
   cottage: CottageScene;
   inside: CottageInside;
-  honeyJar: HoneyJar;
+  honeyJar: DanglingLoad;
   /** Small pollen motes. */
   puff: ParticleBurst;
   /** Big sparks for celebrations. */

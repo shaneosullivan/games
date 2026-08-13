@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import {LEVELS, POLLEN_KINDS} from "./config";
+import {INSIDE, LEVELS, POLLEN_KINDS} from "./config";
 import {Audio} from "./core/audio";
 import {AltitudeStick} from "./core/altitudeStick";
 import {Joystick, type StickInput} from "./core/input";
@@ -24,7 +24,8 @@ import type {
 import {CameraRig} from "./render/cameraRig";
 import {createQueen} from "./render/geometry/bee";
 import {BearActor} from "./entities/bearActor";
-import {HoneyJar} from "./entities/honeyJar";
+import {DanglingLoad} from "./entities/danglingLoad";
+import {Larder} from "./entities/larder";
 import {createCottage, type CottageScene} from "./render/geometry/cottage";
 import {
   createCottageInside,
@@ -78,6 +79,7 @@ export class Game {
   private readonly interior: HiveInterior;
   private readonly queen = createQueen();
   private readonly babies: BabyRing;
+  private readonly larder: Larder;
   private readonly wasp = new WaspActor();
   private readonly bear = new BearActor();
   private puzzle!: SlidePuzzle;
@@ -91,7 +93,7 @@ export class Game {
   private readonly uiLayer: HTMLDivElement;
   private readonly cottage: CottageScene;
   private readonly inside: CottageInside;
-  private readonly honeyJar: HoneyJar;
+  private readonly honeyJar: DanglingLoad;
   private readonly raycaster = new THREE.Raycaster();
   /** NDC of a tap waiting to be consumed by a level. */
   private pendingTap: THREE.Vector2 | null = null;
@@ -131,7 +133,11 @@ export class Game {
     this.inside = createCottageInside();
     this.inside.group.visible = false;
     this.stage.scene.add(this.inside.group);
-    this.honeyJar = new HoneyJar(this.inside.jar);
+    this.honeyJar = new DanglingLoad(this.inside.jar, {
+      ropeLength: INSIDE.ropeLength,
+      gravity: INSIDE.jarGravity,
+      damping: INSIDE.jarDamping,
+    });
     this.inside.group.add(this.honeyJar.rope);
 
     // --- hive interior (level 2) ---
@@ -140,6 +146,8 @@ export class Game {
     this.interior.group.add(this.queen.group);
     this.babies = new BabyRing(this.interior.babyPositions, rng);
     this.interior.group.add(this.babies.group);
+    this.larder = new Larder(this.interior.foodCells, this.interior.carried);
+    this.interior.group.add(this.larder.rope);
     this.interior.group.visible = false;
     this.stage.scene.add(this.interior.group);
 
@@ -191,6 +199,7 @@ export class Game {
       hive: this.hive,
       interior: this.interior,
       babies: this.babies,
+      larder: this.larder,
       wasp: this.wasp,
       bear: this.bear,
       puff: this.puff,
@@ -399,6 +408,9 @@ export class Game {
     this.bee.bounds.minZ = -Infinity;
     this.rig.distance = s.cameraDistance;
     this.rig.height = s.cameraHeight;
+    // Only the hive interior asks to be fenced in; everywhere else the camera
+    // has open sky behind it.
+    this.rig.setEnclosure(s.cameraEnclosure ?? null);
     // A new level starts framed normally; it can widen the shot itself.
     this.rig.setZoom(1, true);
     // A new level starts with the follow rig in charge.

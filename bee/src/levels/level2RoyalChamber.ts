@@ -6,7 +6,6 @@ import {
   POLLEN_LABEL,
   type PollenKind,
 } from "../config";
-import type {PollenStore} from "../render/geometry/hiveInterior";
 import {FIREWORK_PALETTE} from "../fx/particles";
 import type {GameContext, Level} from "./level";
 
@@ -23,13 +22,16 @@ const FIREWORK_LIFT = new THREE.Vector3(0, 0.9, 0);
  * Level 2 — The Royal Chamber.
  *
  * The queen is stationary on her dais with a ring of babies around her. The
- * player is now a worker: load pollen from one of the three wall stores, carry
- * it to a baby craving that colour, repeat. Three feeds and a baby grows up;
- * all six grown finishes the level.
+ * player is now a worker, and the food is in the wall: the larder is a band of
+ * honeycomb ringing the chamber, and the cells with something in them are
+ * coloured and ringed with a pulsing glow. Fly to one and the hexagon comes
+ * away with you, swinging under the bee on a rope; carry it to a baby craving
+ * that colour and it rears up like a chick to take it.
  *
- * The bee carries one load at a time. That's deliberate — it keeps the loop a
- * legible there-and-back rather than a routing puzzle, and it gives the
- * beacon exactly one thing to point at.
+ * The bee carries one hexagon at a time. That's deliberate — it keeps the loop
+ * a legible there-and-back rather than a routing puzzle, and it gives the
+ * beacon exactly one thing to point at. Three feeds and a baby grows up; all
+ * six grown finishes the level.
  */
 export class RoyalChamberLevel implements Level {
   readonly name = "The Royal Chamber";
@@ -44,12 +46,18 @@ export class RoyalChamberLevel implements Level {
   private nextFirework = 0;
   private fireworkIndex = 0;
 
-  /** What the worker is holding, or null. */
-  private carrying: PollenKind | null = null;
-
-  /** Dwell progress while loading up at a store. */
-  private loadTarget: PollenStore | null = null;
-  private loadTime = 0;
+  /**
+   * A feed that has landed on a baby but whose hexagon is still in the air.
+   *
+   * The sparks, the counter and the celebration all wait for it to arrive, so
+   * they answer the delivery rather than going off half a second before the
+   * food gets there.
+   */
+  private pending: {
+    at: THREE.Vector3;
+    kind: PollenKind;
+    grewUp: boolean;
+  } | null = null;
   /** Last objective string state, so we only touch the DOM when it changes. */
   private objectiveKey = "";
 
@@ -65,12 +73,16 @@ export class RoyalChamberLevel implements Level {
       maxHeight: INTERIOR.maxHeight,
       cameraDistance: INTERIOR.cameraDistance,
       cameraHeight: INTERIOR.cameraHeight,
+      // The food is in the wall, so the bee flies right up to it — without
+      // this the camera would spend every pickup outside the dome.
+      cameraEnclosure: INTERIOR.cameraEnclosure,
     });
     ctx.placeBee(ctx.interior.entryPosition, 3.2);
     // The player is a worker in here — the crown belongs to the queen on the dais.
     ctx.bee.setCrown(false);
-    // The ring outlives any one level instance, so entering always restarts it.
+    // Both of these outlive any one level instance, so entering restarts them.
     ctx.babies.reset();
+    ctx.larder.reset();
 
     ctx.hud.setBanner(this.name);
     ctx.hud.setCounters([
@@ -84,7 +96,7 @@ export class RoyalChamberLevel implements Level {
     ]);
     this.phase = ctx.babies.allGrown ? "done" : "feeding";
     this.complete = false;
-    this.carrying = null;
+    this.pending = null;
     ctx.hud.setCarrying(null);
     this.refreshObjective(ctx);
   }
@@ -92,6 +104,13 @@ export class RoyalChamberLevel implements Level {
   update(dt: number, ctx: GameContext): void {
     this.elapsed += dt;
     ctx.interior.update(this.elapsed);
+
+    // Above the phase branches: the hexagon's flight into a baby has to finish
+    // even if that feed was the one that started the celebration, or it hangs
+    // in the air over the party.
+    if (ctx.larder.update(dt, ctx.bee.position) === "delivered") {
+      this.onDelivered(ctx);
+    }
 
     if (this.phase === "celebrating") {
       this.updateCelebration(dt, ctx);
@@ -103,84 +122,66 @@ export class RoyalChamberLevel implements Level {
     }
 
     this.phaseTime += dt;
-    this.updateLoading(dt, ctx);
+    this.updateTaking(ctx);
 
-    const fed = ctx.babies.update(dt, ctx.bee.position, this.carrying);
+    const fed = ctx.babies.update(dt, ctx.bee.position, ctx.larder.carrying);
     if (fed) {
       this.onFed(ctx, fed.position, fed.kind, fed.grewUp);
     }
-    // That last feed may have kicked off the celebration; if so, everything
-    // below would immediately undo the HUD it just set up.
-    if (this.phase !== "feeding") {
-      return;
-    }
 
-    // Dwell meter shows whichever action is in progress.
-    const dwell = this.carrying
-      ? ctx.babies.feedProgress
-      : this.loadTarget
-        ? Math.min(1, this.loadTime / INTERIOR.pickupSeconds)
-        : 0;
-    ctx.hud.setHarvest(dwell);
-
+    // Dwell meter follows the hand-over.
+    ctx.hud.setHarvest(ctx.babies.feedProgress);
     this.updateBeacon(ctx);
 
     // Babies get hungry on their own clocks, so the objective has to track
     // what's wanted rather than only refreshing on pickups and feeds.
-    const key = `${this.carrying ?? "-"}|${this.wantedElsewhere(ctx) ?? "-"}`;
+    const key = `${ctx.larder.carrying ?? "-"}|${this.wantedElsewhere(ctx) ?? "-"}`;
     if (key !== this.objectiveKey) {
       this.objectiveKey = key;
       this.refreshObjective(ctx);
     }
   }
 
-  /** Hovering over a store loads that colour, replacing anything held. */
-  private updateLoading(dt: number, ctx: GameContext): void {
-    const near = this.nearestStore(ctx);
-    if (near !== this.loadTarget) {
-      this.loadTarget = near;
-      this.loadTime = 0;
-    }
-    if (!this.loadTarget) {
+  /** Flying up to a glowing cell takes its hexagon. */
+  private updateTaking(ctx: GameContext): void {
+    const took = ctx.larder.tryTake(ctx.bee.position);
+    if (!took) {
       return;
     }
-
-    // Already holding this colour? Nothing to do.
-    if (this.carrying === this.loadTarget.kind) {
-      return;
-    }
-
-    this.loadTime += dt;
-    if (this.loadTime < INTERIOR.pickupSeconds) {
-      return;
-    }
-
-    this.carrying = this.loadTarget.kind;
-    this.loadTime = 0;
-    ctx.hud.setCarrying(this.carrying, POLLEN_LABEL[this.carrying]);
+    ctx.hud.setCarrying(took.kind, POLLEN_LABEL[took.kind]);
     ctx.audio.collect(1);
-    ctx.puff.burst(
-      tmp.copy(this.loadTarget.position).setY(this.loadTarget.position.y + 0.2),
-      {
-        color: POLLEN_COLOR[this.carrying],
-        count: 14,
-      },
-    );
+    ctx.puff.burst(took.at, {color: POLLEN_COLOR[took.kind], count: 14});
     this.refreshObjective(ctx);
   }
 
+  /**
+   * The baby has taken it: send the hexagon on its way and hold everything
+   * else until it lands.
+   */
   private onFed(
     ctx: GameContext,
     at: THREE.Vector3,
     kind: PollenKind,
     grewUp: boolean,
   ): void {
-    this.carrying = null;
+    ctx.larder.deliverTo(at);
+    this.pending = {at: at.clone(), kind, grewUp};
     ctx.hud.setCarrying(null);
+    ctx.hud.setHarvest(0);
+  }
+
+  /** The hexagon has reached the baby and vanished into it. */
+  private onDelivered(ctx: GameContext): void {
+    const fed = this.pending;
+    if (!fed) {
+      return;
+    }
+    this.pending = null;
+    const {at, kind, grewUp} = fed;
     ctx.puff.burst(at, {color: POLLEN_COLOR[kind], count: 18, speed: 2.0});
     ctx.hud.setCount("grown", ctx.babies.grownCount, TOTAL_BABIES, grewUp);
 
-    // Spend the pollen the queen gathered in level 1, so the stores feel real.
+    // Spend the pollen the queen gathered in level 1, so the larder feels real.
     ctx.save.mutate(d => {
       d.pollen[kind] = Math.max(0, d.pollen[kind] - 1);
     });
@@ -212,7 +213,6 @@ export class RoyalChamberLevel implements Level {
     this.phaseTime = 0;
     this.nextFirework = 0;
     this.fireworkIndex = 0;
-    this.carrying = null;
     ctx.hud.setCarrying(null);
     ctx.hud.setHarvest(0);
     ctx.hud.setObjective("Everybody up!");
@@ -264,25 +264,23 @@ export class RoyalChamberLevel implements Level {
   }
 
   /**
-   * Empty-handed, point at a hungry baby so the player learns what's wanted.
-   * Holding pollen, point at whoever wants that colour — or back at a store if
-   * nobody does, since the load can be swapped.
+   * Holding a hexagon, point at whoever wants that colour. Empty-handed —
+   * or holding one nobody wants — point at a cell in the wall holding the
+   * colour that is being asked for.
    */
   private updateBeacon(ctx: GameContext): void {
-    if (this.carrying) {
-      const target = ctx.babies.guidanceTarget(ctx.bee.position, this.carrying);
+    const carrying = ctx.larder.carrying;
+    if (carrying) {
+      const target = ctx.babies.guidanceTarget(ctx.bee.position, carrying);
       if (target) {
         ctx.setObjectiveMarker(target);
         return;
       }
-      const store = this.storeFor(ctx, this.wantedElsewhere(ctx));
-      ctx.setObjectiveMarker(store ? store.position.clone() : null);
-      return;
     }
-
     const wanted = this.wantedElsewhere(ctx);
-    const store = this.storeFor(ctx, wanted);
-    ctx.setObjectiveMarker(store ? store.position.clone() : null);
+    ctx.setObjectiveMarker(
+      wanted ? ctx.larder.nearestFull(wanted, ctx.bee.position) : null,
+    );
   }
 
   /** The colour the most babies are asking for right now. */
@@ -306,44 +304,22 @@ export class RoyalChamberLevel implements Level {
     return best;
   }
 
-  private storeFor(
-    ctx: GameContext,
-    kind: PollenKind | null,
-  ): PollenStore | null {
-    if (!kind) {
-      return null;
-    }
-    return ctx.interior.stores.find(s => s.kind === kind) ?? null;
-  }
-
-  private nearestStore(ctx: GameContext): PollenStore | null {
-    let best: PollenStore | null = null;
-    let bestDist = INTERIOR.pickupRadius * INTERIOR.pickupRadius;
-    for (const store of ctx.interior.stores) {
-      const d = store.position.distanceToSquared(ctx.bee.position);
-      if (d < bestDist) {
-        bestDist = d;
-        best = store;
-      }
-    }
-    return best;
-  }
-
   private refreshObjective(ctx: GameContext): void {
     if (this.phase === "done") {
       ctx.hud.setObjective("The whole brood is grown!");
       return;
     }
-    if (this.carrying) {
+    const carrying = ctx.larder.carrying;
+    if (carrying) {
       ctx.hud.setObjective(
-        `Take the ${POLLEN_LABEL[this.carrying]} pollen to a hungry baby`,
+        `Take the ${POLLEN_LABEL[carrying]} food to a hungry baby`,
       );
       return;
     }
     const wanted = this.wantedElsewhere(ctx);
     ctx.hud.setObjective(
       wanted
-        ? `A baby wants ${POLLEN_LABEL[wanted]} — collect some from the stores`
+        ? `A baby wants ${POLLEN_LABEL[wanted]} — fetch it from the glowing wall`
         : "The babies are full for now",
     );
   }

@@ -135,16 +135,28 @@ export const POLLEN_COLOR: Record<PollenKind, number> = {
 /** Level 2: the royal chamber inside the hive. */
 export const INTERIOR = {
   /**
-   * Wider than the play area needs, because the camera sits behind and above
-   * the bee: at the edge of the bounds it's the *camera* that would punch
-   * through the shell. Sized for the pulled-back rig below —
-   * sqrt((15 + 9.6)^2 + (11 + 6.3)^2) = 30.1, so 34 keeps it inside.
+   * The shell. The play area reaches almost to it, because the food is in the
+   * honeycomb lining it — what keeps the camera from ending up outside is the
+   * enclosure below, not a gap between the two.
    */
   domeRadius: 34,
-  /** How far from the centre the player may fly. */
-  boundsRadius: 15,
+  /**
+   * How far from the centre the player may fly.
+   *
+   * Out to the wall, near enough: the food is in the honeycomb lining it, and
+   * the hover point for a cell is FOOD.hoverOut in from the shell. What keeps
+   * the camera out of the wall is not this number but the rig's enclosure —
+   * see cameraEnclosure below.
+   */
+  boundsRadius: 31.5,
   minHeight: 1.0,
+  /** Above the highest food, so the top of the wall is still flyable. */
   maxHeight: 11,
+  /**
+   * The sphere the camera may not leave. Just inside the shell, so the boom
+   * shortens as the bee closes on the wall instead of ending up behind it.
+   */
+  cameraEnclosure: 32.5,
   /**
    * Pulled back 1.5x from where it started: feeding is about spotting which
    * baby wants what colour, and the close rig had you nose-to-nose with one
@@ -152,21 +164,61 @@ export const INTERIOR = {
    */
   cameraDistance: 9.6,
   cameraHeight: 6.3,
-  /** Pollen stores sit against the wall; babies ring the queen at the centre. */
-  storeRingRadius: 13.0,
-  storeHeight: 1.5,
   babyRingRadius: 4.8,
   babyHeight: 2.3,
   queenHeight: 2.5,
-  /** Hover distances and dwell times for picking up and feeding. */
-  pickupRadius: 2.8,
-  pickupSeconds: 0.45,
+  /** How close to a baby counts as delivering, and how long the hand-over takes. */
   feedRadius: 2.5,
   feedSeconds: 0.5,
+  /**
+   * How close the bee has to be for a baby to rear up at her — comfortably
+   * further than feedRadius, so the beg comes first and the feed answers it.
+   */
+  noticeRadius: 5.5,
+  /** How far a fully reared baby lifts off its perch as it stretches up. */
+  rearLift: 0.35,
   /** Seconds a fed baby stays content before wanting its next meal. */
   hungerDelay: 5.5,
   /** Hex cells lining the dome wall. */
   wallCells: 320,
+} as const;
+
+/**
+ * The food in the walls.
+ *
+ * Some of the honeycomb lining the dome is full: those cells are coloured for
+ * the pollen they hold and ringed with a glow that pulses. They are the same
+ * instances as the rest of the comb — the wall *is* the larder — so taking one
+ * empties it and it fills again a few seconds later.
+ *
+ * They're spread from just above the floor to near the top of the flight
+ * ceiling, so getting the colour a baby wants often means climbing for it.
+ */
+export const FOOD = {
+  /** How many cells hold food. Divided evenly between the pollen colours. */
+  cells: 12,
+  /**
+   * The band of the dome they're placed in, as a height in world units. The
+   * top of the range is what makes the level a climb; keep it under
+   * INTERIOR.maxHeight or the highest food can't be reached at all.
+   */
+  minHeight: 1.6,
+  maxHeight: 9.6,
+  /** How far in from the wall the bee hovers to take one. */
+  hoverOut: 2.6,
+  /** Close enough to take it. Generous: this is a tap-free, one-handed game. */
+  takeRadius: 3.4,
+  /** Seconds before an emptied cell fills again. */
+  refillSeconds: 6.0,
+  /** Rate and depth of the glow pulse around a full cell. */
+  pulseRate: 2.2,
+  pulseDepth: 0.35,
+  /** The rope the taken hexagon swings on under the bee. */
+  ropeLength: 1.5,
+  gravity: 26,
+  damping: 0.82,
+  /** How long the hexagon takes to fly from the bee into a baby. */
+  deliverTime: 0.42,
 } as const;
 
 /**
@@ -347,7 +399,7 @@ export const COTTAGE = {
  * Level 4, stage 2: inside Caramel Cottage.
  *
  * A room you can actually fly around, with a jar of honey on the counter. Pick
- * it up and it hangs from the bee on a rope — see entities/honeyJar.ts for the
+ * it up and it hangs from the bee on a rope — see entities/danglingLoad.ts for the
  * pendulum that gives it weight.
  */
 export const INSIDE = {
