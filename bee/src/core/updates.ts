@@ -16,7 +16,7 @@
  */
 
 /** Where the build leaves the stamp, relative to the page. */
-const VERSION_URL = 'version.json';
+const VERSION_URL = "version.json";
 const POLL_MS = 60_000;
 /** How long to wait for the caches to clear before reloading regardless. */
 const PURGE_TIMEOUT_MS = 1500;
@@ -29,7 +29,9 @@ export function watchForUpdates(host: HTMLElement): void {
   // Available in every build, including this one's dev server: when a copy is
   // wedged on an old version, the console is the only way in.
   const api = installConsoleApi();
-  if (!import.meta.env.PROD) return;
+  if (!import.meta.env.PROD) {
+    return;
+  }
 
   let current: string | null = null;
   let offered = false;
@@ -43,10 +45,14 @@ export function watchForUpdates(host: HTMLElement): void {
     try {
       // `no-store` keeps the browser's own cache out of it; the service worker
       // is told separately to leave this URL alone.
-      const response = await fetch(VERSION_URL, { cache: 'no-store' });
-      if (!response.ok) return null;
+      const response = await fetch(VERSION_URL, {cache: "no-store"});
+      if (!response.ok) {
+        return null;
+      }
       const data = (await response.json()) as Version;
-      if (typeof data.build !== 'string') return null;
+      if (typeof data.build !== "string") {
+        return null;
+      }
       api.build = data.build;
       return data.build;
     } catch {
@@ -56,14 +62,20 @@ export function watchForUpdates(host: HTMLElement): void {
   };
 
   const check = async (): Promise<void> => {
-    if (offered) return;
+    if (offered) {
+      return;
+    }
     const build = await read();
-    if (!build) return;
+    if (!build) {
+      return;
+    }
     if (current === null) {
       current = build;
       return;
     }
-    if (build === current) return;
+    if (build === current) {
+      return;
+    }
     offered = true;
     banner.show();
   };
@@ -72,8 +84,10 @@ export function watchForUpdates(host: HTMLElement): void {
   setInterval(() => void check(), POLL_MS);
   // An installed app is usually resumed rather than opened, and a resume after
   // a day shouldn't wait out the poll before noticing.
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') void check();
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") {
+      void check();
+    }
   });
 }
 
@@ -98,10 +112,12 @@ async function applyUpdate(): Promise<void> {
 }
 
 /** Bin every cache, so the reload can't be served the page we're replacing. */
-async function purgeCaches(): Promise<string[]> {
-  if (!('caches' in window)) return [];
+async function purgeCaches(): Promise<Array<string>> {
+  if (!("caches" in window)) {
+    return [];
+  }
   const names = await caches.keys();
-  await Promise.all(names.map((name) => caches.delete(name)));
+  await Promise.all(names.map(name => caches.delete(name)));
   return names;
 }
 
@@ -113,8 +129,11 @@ interface ChofterApi {
   update(): Promise<void>;
   /** The big hammer — see below. */
   reset(): Promise<void>;
-  /** Everything worth knowing when something looks wrong. */
-  diagnose(): Promise<Record<string, unknown>>;
+  /**
+   * Everything worth knowing when something looks wrong: logged, copied to the
+   * clipboard, and returned as the string to paste.
+   */
+  diagnose(): Promise<string>;
 }
 
 /**
@@ -138,31 +157,52 @@ function installConsoleApi(): ChofterApi {
     },
     reset: async () => {
       const regs = (await navigator.serviceWorker?.getRegistrations?.()) ?? [];
-      await Promise.all(regs.map((r) => r.unregister()));
+      await Promise.all(regs.map(r => r.unregister()));
       const names = await purgeCaches();
-      console.log(`chofter.reset: ${regs.length} worker(s) unregistered, caches cleared:`, names);
-      window.location.replace(`${window.location.pathname}?fresh=${Date.now()}`);
+      console.log(
+        `chofter.reset: ${regs.length} worker(s) unregistered, caches cleared:`,
+        names,
+      );
+      window.location.replace(
+        `${window.location.pathname}?fresh=${Date.now()}`,
+      );
     },
     diagnose: async () => {
       const doc = document.documentElement;
       const vv = window.visualViewport;
-      const app = document.getElementById('app')?.getBoundingClientRect();
-      return {
+      const app = document.getElementById("app")?.getBoundingClientRect();
+      const info = {
         build: api.build,
         url: window.location.href,
         standalone:
-          (navigator as unknown as { standalone?: boolean }).standalone ??
-          window.matchMedia('(display-mode: standalone)').matches,
+          (navigator as unknown as {standalone?: boolean}).standalone ??
+          window.matchMedia("(display-mode: standalone)").matches,
         // The viewport question: which of these disagree, and by how much.
-        visualViewport: vv ? [Math.round(vv.width), Math.round(vv.height)] : null,
+        visualViewport: vv
+          ? [Math.round(vv.width), Math.round(vv.height)]
+          : null,
         documentElement: [doc.clientWidth, doc.clientHeight],
         inner: [window.innerWidth, window.innerHeight],
         screen: [window.screen.width, window.screen.height],
         app: app ? [Math.round(app.width), Math.round(app.height)] : null,
-        safeArea: getComputedStyle(doc).getPropertyValue('--safe-b').trim(),
-        caches: 'caches' in window ? await caches.keys() : [],
-        workers: ((await navigator.serviceWorker?.getRegistrations?.()) ?? []).length,
+        safeArea: getComputedStyle(doc).getPropertyValue("--safe-b").trim(),
+        caches: "caches" in window ? await caches.keys() : [],
+        workers: ((await navigator.serviceWorker?.getRegistrations?.()) ?? [])
+          .length,
       };
+
+      const text = JSON.stringify(info);
+      console.log(info);
+      console.log(text);
+      try {
+        await navigator.clipboard?.writeText(text);
+        console.log("(copied to the clipboard)");
+      } catch {
+        // Safari can refuse a clipboard write outside a gesture. The line above
+        // is the fallback: select it and copy by hand.
+        console.log("(clipboard refused — copy the line above)");
+      }
+      return text;
     },
   };
 
@@ -170,21 +210,21 @@ function installConsoleApi(): ChofterApi {
   return api;
 }
 
-function createBanner(host: HTMLElement, onTake: () => void): { show(): void } {
-  const banner = document.createElement('button');
-  banner.type = 'button';
-  banner.className = 'update-banner ui-interactive hidden';
-  banner.innerHTML = '<b>A new version is ready</b><span>Tap to update</span>';
-  banner.addEventListener('click', () => {
-    banner.classList.add('taken');
-    banner.querySelector('span')!.textContent = 'Updating…';
+function createBanner(host: HTMLElement, onTake: () => void): {show(): void} {
+  const banner = document.createElement("button");
+  banner.type = "button";
+  banner.className = "update-banner ui-interactive hidden";
+  banner.innerHTML = "<b>A new version is ready</b><span>Tap to update</span>";
+  banner.addEventListener("click", () => {
+    banner.classList.add("taken");
+    banner.querySelector("span")!.textContent = "Updating…";
     onTake();
   });
   host.appendChild(banner);
 
   return {
     show() {
-      banner.classList.remove('hidden');
+      banner.classList.remove("hidden");
     },
   };
 }

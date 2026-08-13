@@ -1,34 +1,60 @@
-import * as THREE from 'three';
-import { LEVELS, POLLEN_KINDS } from './config';
-import { Audio } from './core/audio';
-import { AltitudeStick } from './core/altitudeStick';
-import { Joystick, type StickInput } from './core/input';
-import { GameLoop } from './core/loop';
-import { Rng } from './core/rng';
-import { Save } from './core/save';
-import { BabyRing } from './entities/babyRing';
-import { BeeActor } from './entities/beeActor';
-import { WaspActor } from './entities/waspActor';
-import { FlowerField } from './entities/flowerField';
-import { createFireworks, createPollenPuff } from './fx/particles';
-import { FoundingLevel } from './levels/level1Founding';
-import { RoyalChamberLevel } from './levels/level2RoyalChamber';
-import { WaspLevel } from './levels/level3Wasp';
-import { CottageLevel } from './levels/level4Cottage';
-import type { EnvironmentName, FlightSettings, GameContext, Level } from './levels/level';
-import { CameraRig } from './render/cameraRig';
-import { createQueen } from './render/geometry/bee';
-import { BearActor } from './entities/bearActor';
-import { HoneyJar } from './entities/honeyJar';
-import { createCottage, type CottageScene } from './render/geometry/cottage';
-import { createCottageInside, type CottageInside } from './render/geometry/cottageInside';
-import { createHiveInterior, type HiveInterior } from './render/geometry/hiveInterior';
-import { createHiveSite, createMeadow, type HiveSite } from './render/geometry/world';
-import { solidToon } from './render/materials';
-import { createStage, COTTAGE_ENV, HIVE_ENV, INSIDE_ENV, MEADOW_ENV, type Stage } from './render/stage';
-import { Hud } from './ui/hud';
-import { createCodenameScreen, createMessageScreen, type Overlay } from './ui/overlays';
-import { burstRainbow, createSlidePuzzle, type SlidePuzzle } from './ui/puzzle';
+import * as THREE from "three";
+import {LEVELS, POLLEN_KINDS} from "./config";
+import {Audio} from "./core/audio";
+import {AltitudeStick} from "./core/altitudeStick";
+import {Joystick, type StickInput} from "./core/input";
+import {GameLoop} from "./core/loop";
+import {Rng} from "./core/rng";
+import {Save} from "./core/save";
+import {BabyRing} from "./entities/babyRing";
+import {BeeActor} from "./entities/beeActor";
+import {WaspActor} from "./entities/waspActor";
+import {FlowerField} from "./entities/flowerField";
+import {createFireworks, createPollenPuff} from "./fx/particles";
+import {FoundingLevel} from "./levels/level1Founding";
+import {RoyalChamberLevel} from "./levels/level2RoyalChamber";
+import {WaspLevel} from "./levels/level3Wasp";
+import {CottageLevel} from "./levels/level4Cottage";
+import type {
+  EnvironmentName,
+  FlightSettings,
+  GameContext,
+  Level,
+} from "./levels/level";
+import {CameraRig} from "./render/cameraRig";
+import {createQueen} from "./render/geometry/bee";
+import {BearActor} from "./entities/bearActor";
+import {HoneyJar} from "./entities/honeyJar";
+import {createCottage, type CottageScene} from "./render/geometry/cottage";
+import {
+  createCottageInside,
+  type CottageInside,
+} from "./render/geometry/cottageInside";
+import {
+  createHiveInterior,
+  type HiveInterior,
+} from "./render/geometry/hiveInterior";
+import {
+  createHiveSite,
+  createMeadow,
+  type HiveSite,
+} from "./render/geometry/world";
+import {solidToon} from "./render/materials";
+import {
+  createStage,
+  COTTAGE_ENV,
+  HIVE_ENV,
+  INSIDE_ENV,
+  MEADOW_ENV,
+  type Stage,
+} from "./render/stage";
+import {Hud} from "./ui/hud";
+import {
+  createCodenameScreen,
+  createMessageScreen,
+  type Overlay,
+} from "./ui/overlays";
+import {burstRainbow, createSlidePuzzle, type SlidePuzzle} from "./ui/puzzle";
 
 const WORLD_SEED = 20260811;
 /** How far south of a shut gate the bee is held. */
@@ -68,7 +94,7 @@ export class Game {
   /** NDC of a tap waiting to be consumed by a level. */
   private pendingTap: THREE.Vector2 | null = null;
   /** Neutral input handed to the bee while a cutscene owns it. */
-  private readonly idleStick: StickInput = { x: 0, y: 0, magnitude: 0 };
+  private readonly idleStick: StickInput = {x: 0, y: 0, magnitude: 0};
 
   private level: Level = new FoundingLevel();
   private levelNumber = 1;
@@ -126,25 +152,27 @@ export class Game {
     this.rig = new CameraRig(this.stage.camera);
     this.rig.snap(this.bee);
 
-    const uiLayer = document.createElement('div');
+    const uiLayer = document.createElement("div");
     this.uiLayer = uiLayer;
-    uiLayer.style.position = 'absolute';
-    uiLayer.style.inset = '0';
-    uiLayer.style.pointerEvents = 'none';
+    uiLayer.style.position = "absolute";
+    uiLayer.style.inset = "0";
+    uiLayer.style.pointerEvents = "none";
     host.appendChild(uiLayer);
 
     this.hud = new Hud(
       uiLayer,
-      (muted) => this.audio.setMuted(muted),
+      muted => this.audio.setMuted(muted),
       () => this.openMenu(),
     );
     this.stick = new Joystick(uiLayer);
     this.altitude = new AltitudeStick(uiLayer, this.bee.desiredHeight);
 
-    this.puzzle = createSlidePuzzle(uiLayer, () => this.level.onPuzzleSolved?.(this.ctx));
+    this.puzzle = createSlidePuzzle(uiLayer, () =>
+      this.level.onPuzzleSolved?.(this.ctx),
+    );
 
-    this.flash = document.createElement('div');
-    this.flash.className = 'screen-flash';
+    this.flash = document.createElement("div");
+    this.flash.className = "screen-flash";
     uiLayer.appendChild(this.flash);
 
     this.ctx = {
@@ -161,21 +189,25 @@ export class Game {
       bear: this.bear,
       puff: this.puff,
       fireworks: this.fireworks,
-      setObjectiveMarker: (p) => this.setObjectiveMarker(p),
+      setObjectiveMarker: p => this.setObjectiveMarker(p),
       flashScreen: () => this.flashScreen(),
-      setEnvironment: (name) => this.setEnvironment(name),
-      configureFlight: (s) => this.configureFlight(s),
-      placeBee: (position, desiredHeight, yaw) => this.placeBee(position, desiredHeight, yaw),
-      setCameraZoom: (z) => this.rig.setZoom(z),
+      setEnvironment: name => this.setEnvironment(name),
+      configureFlight: s => this.configureFlight(s),
+      placeBee: (position, desiredHeight, yaw) =>
+        this.placeBee(position, desiredHeight, yaw),
+      setCameraZoom: z => this.rig.setZoom(z),
       setCameraCinematic: (eye, look) => this.rig.setCinematic(eye, look),
-      showPuzzle: (on) => {
+      showPuzzle: on => {
         this.setSplit(on);
-        if (on) this.puzzle.show();
-        else this.puzzle.hide();
+        if (on) {
+          this.puzzle.show();
+        } else {
+          this.puzzle.hide();
+        }
       },
       celebratePuzzle: () => burstRainbow(this.puzzle.root),
-      setFlightControls: (on) => this.setFlightControls(on),
-      pickTap: (objects) => this.pickTap(objects),
+      setFlightControls: on => this.setFlightControls(on),
+      pickTap: objects => this.pickTap(objects),
       cottage: this.cottage,
       inside: this.inside,
       honeyJar: this.honeyJar,
@@ -185,7 +217,7 @@ export class Game {
         this.meadowGroup.add(this.inside.jar);
         this.meadowGroup.add(this.honeyJar.rope);
       },
-      releaseBabies: (origin) => {
+      releaseBabies: origin => {
         // Reparent so they render in the meadow rather than inside the dome.
         this.meadowGroup.add(this.babies.group);
         this.babies.swarm(origin);
@@ -193,14 +225,16 @@ export class Game {
     };
 
     this.loop = new GameLoop(
-      (dt) => this.update(dt),
+      dt => this.update(dt),
       (alpha, frameDt) => this.render(alpha, frameDt),
     );
 
     // Record taps on the world (not the UI) as normalised device coords, for
     // levels that raycast — the dance mat's pads.
-    window.addEventListener('pointerdown', (e) => {
-      if ((e.target as HTMLElement)?.closest?.('.ui-interactive')) return;
+    window.addEventListener("pointerdown", e => {
+      if ((e.target as HTMLElement)?.closest?.(".ui-interactive")) {
+        return;
+      }
       this.pendingTap = new THREE.Vector2(
         (e.clientX / window.innerWidth) * 2 - 1,
         -(e.clientY / window.innerHeight) * 2 + 1,
@@ -211,7 +245,9 @@ export class Game {
     this.loop.start();
 
     // Dev handle: lets us poke at flight/camera tuning from the console.
-    if (import.meta.env.DEV) (window as unknown as Record<string, unknown>).game = this;
+    if (import.meta.env.DEV) {
+      (window as unknown as Record<string, unknown>).game = this;
+    }
   }
 
   /** Re-measure the canvas. Called when the visible viewport changes. */
@@ -222,26 +258,35 @@ export class Game {
   // ---- level management ---------------------------------------------------
 
   /** The levels that actually exist. Saves beyond the last one clamp back. */
-  private static readonly LEVELS: ReadonlyArray<{ number: number; name: string }> = [
-    { number: 1, name: 'Sunny Meadow' },
-    { number: 2, name: 'The Royal Chamber' },
-    { number: 3, name: 'Wasp at the Hive' },
-    { number: 4, name: 'Caramel Cottage' },
+  private static readonly LEVELS: ReadonlyArray<{
+    number: number;
+    name: string;
+  }> = [
+    {number: 1, name: "Sunny Meadow"},
+    {number: 2, name: "The Royal Chamber"},
+    {number: 3, name: "Wasp at the Hive"},
+    {number: 4, name: "Caramel Cottage"},
   ];
 
   private static readonly LAST_LEVEL = Game.LEVELS.length;
 
   private createLevel(n: number): Level {
-    if (n >= 4) return new CottageLevel();
-    if (n === 3) return new WaspLevel();
-    if (n === 2) return new RoyalChamberLevel();
+    if (n >= 4) {
+      return new CottageLevel();
+    }
+    if (n === 3) {
+      return new WaspLevel();
+    }
+    if (n === 2) {
+      return new RoyalChamberLevel();
+    }
     return new FoundingLevel();
   }
 
   private switchLevel(n: number): void {
     const clamped = Math.min(Math.max(1, n), Game.LAST_LEVEL);
     this.levelNumber = clamped;
-    this.save.mutate((d) => {
+    this.save.mutate(d => {
       d.maxLevel = Math.max(d.maxLevel, clamped);
     });
     // Levels that don't want a wasp shouldn't have to say so; level 3 spawns
@@ -263,7 +308,10 @@ export class Game {
     // Flight is the default; a level turns it off in enter() if it wants taps.
     this.setFlightControls(true);
     this.level = this.createLevel(clamped);
-    this.completeScreen.setText(this.level.completionTitle, this.level.completionBody);
+    this.completeScreen.setText(
+      this.level.completionTitle,
+      this.level.completionBody,
+    );
     this.level.enter(this.ctx);
     this.syncCottageGate();
   }
@@ -280,7 +328,9 @@ export class Game {
   private syncCottageGate(): void {
     const open = this.save.data.maxLevel >= 4 || this.levelNumber >= 4;
     this.cottage.setGateOpen(open);
-    this.bee.bounds.minZ = open ? -Infinity : this.cottage.gate.z + GATE_STANDOFF;
+    this.bee.bounds.minZ = open
+      ? -Infinity
+      : this.cottage.gate.z + GATE_STANDOFF;
   }
 
   /**
@@ -291,16 +341,23 @@ export class Game {
    * starts fresh on a new session anyway.
    */
   private isLevelFinished(n: number): boolean {
-    if (n !== 1) return false;
-    const { gathered, maxLevel } = this.save.data;
-    return maxLevel > 1 && POLLEN_KINDS.every((k) => gathered[k] >= LEVELS.foundingQuota[k]);
+    if (n !== 1) {
+      return false;
+    }
+    const {gathered, maxLevel} = this.save.data;
+    return (
+      maxLevel > 1 &&
+      POLLEN_KINDS.every(k => gathered[k] >= LEVELS.foundingQuota[k])
+    );
   }
 
   /** Wind a finished level back to its start so it can be replayed. */
   private restartLevel(n: number): void {
-    if (n !== 1) return;
-    this.save.mutate((d) => {
-      d.gathered = { white: 0, yellow: 0, orange: 0 };
+    if (n !== 1) {
+      return;
+    }
+    this.save.mutate(d => {
+      d.gathered = {white: 0, yellow: 0, orange: 0};
     });
   }
 
@@ -308,14 +365,20 @@ export class Game {
     // The cottage clearing stands at the north end of the meadow rather than in
     // a world of its own, so 'cottage' shows both: from the mat you can see
     // through the gate to the hive, and the flight home needs no cut.
-    this.meadowGroup.visible = name === 'meadow' || name === 'cottage';
+    this.meadowGroup.visible = name === "meadow" || name === "cottage";
     // …and the clearing shows in the meadow too, so the gap in the hedge to the
     // north has a cottage at the end of it rather than nothing.
-    this.cottage.group.visible = name === 'meadow' || name === 'cottage';
-    this.interior.group.visible = name === 'hive';
-    this.inside.group.visible = name === 'inside';
+    this.cottage.group.visible = name === "meadow" || name === "cottage";
+    this.interior.group.visible = name === "hive";
+    this.inside.group.visible = name === "inside";
     this.stage.setEnvironment(
-      name === 'hive' ? HIVE_ENV : name === 'inside' ? INSIDE_ENV : name === 'cottage' ? COTTAGE_ENV : MEADOW_ENV,
+      name === "hive"
+        ? HIVE_ENV
+        : name === "inside"
+          ? INSIDE_ENV
+          : name === "cottage"
+            ? COTTAGE_ENV
+            : MEADOW_ENV,
     );
   }
 
@@ -337,7 +400,11 @@ export class Game {
     );
   }
 
-  private placeBee(position: THREE.Vector3, desiredHeight?: number, yaw?: number): void {
+  private placeBee(
+    position: THREE.Vector3,
+    desiredHeight?: number,
+    yaw?: number,
+  ): void {
     this.bee.scripted = false;
     this.bee.object.visible = true;
     this.bee.setScale(1);
@@ -353,7 +420,7 @@ export class Game {
       uiLayer,
       this.level.completionTitle,
       this.level.completionBody,
-      'Keep flying',
+      "Keep flying",
       () => {
         this.completeScreen.hide();
         this.running = true;
@@ -376,27 +443,34 @@ export class Game {
    * "play again" notes and the default selection all move as the player
    * progresses.
    */
-  private buildCodenameScreen(uiLayer: HTMLElement, selected = this.save.data.level): void {
+  private buildCodenameScreen(
+    uiLayer: HTMLElement,
+    selected = this.save.data.level,
+  ): void {
     const unlocked = Math.min(this.save.data.maxLevel, Game.LAST_LEVEL);
 
     this.codenameScreen = createCodenameScreen(uiLayer, {
       existing: this.save.data.codename,
       // The map shows every land, so hand over every level and let it decide
       // what to padlock.
-      levels: Game.LEVELS.map((l) => ({
+      levels: Game.LEVELS.map(l => ({
         ...l,
-        note: this.isLevelFinished(l.number) ? 'Play again from the start' : undefined,
+        note: this.isLevelFinished(l.number)
+          ? "Play again from the start"
+          : undefined,
       })),
       unlocked,
       selected: Math.min(Math.max(1, selected), Game.LAST_LEVEL),
       onStart: (codename, level) => {
         this.audio.unlock();
-        this.save.mutate((d) => {
+        this.save.mutate(d => {
           d.codename = codename;
           d.level = level;
         });
         // Picking a level you've already finished means replaying it.
-        if (this.isLevelFinished(level)) this.restartLevel(level);
+        if (this.isLevelFinished(level)) {
+          this.restartLevel(level);
+        }
         this.codenameScreen.hide();
         this.switchLevel(level);
         this.running = true;
@@ -413,7 +487,7 @@ export class Game {
    * wants taps on the world (the dance mat) isn't fighting a thumbstick.
    */
   private setFlightControls(enabled: boolean): void {
-    this.uiLayer.classList.toggle('no-flight', !enabled);
+    this.uiLayer.classList.toggle("no-flight", !enabled);
     this.stick.enabled = enabled;
   }
 
@@ -423,22 +497,31 @@ export class Game {
    */
   private setSplit(on: boolean): void {
     if (this.uiLayer.parentElement) {
-      this.uiLayer.parentElement.classList.toggle('split', on);
+      this.uiLayer.parentElement.classList.toggle("split", on);
     }
     // The panel only makes sense while the screen is split for it. Tying the
     // two together here means every path that ends a level — the menu, a level
     // switch, a restart — puts the puzzle away without having to remember to.
-    if (!on) this.puzzle.hide();
+    if (!on) {
+      this.puzzle.hide();
+    }
     this.stage.resize();
   }
 
   /** Raycast this frame's tap, if there was one, against `objects`. */
-  private pickTap(objects: readonly THREE.Object3D[]): THREE.Object3D | null {
+  private pickTap(
+    objects: ReadonlyArray<THREE.Object3D>,
+  ): THREE.Object3D | null {
     const tap = this.pendingTap;
     this.pendingTap = null;
-    if (!tap) return null;
+    if (!tap) {
+      return null;
+    }
     this.raycaster.setFromCamera(tap, this.stage.camera);
-    const hits = this.raycaster.intersectObjects(objects as THREE.Object3D[], false);
+    const hits = this.raycaster.intersectObjects(
+      objects as Array<THREE.Object3D>,
+      false,
+    );
     return hits.length ? hits[0].object : null;
   }
 
@@ -446,7 +529,9 @@ export class Game {
   private openMenu(): void {
     // Guard on the menu already being up, not on `running` — otherwise this
     // silently does nothing whenever another card is showing.
-    if (!this.codenameScreen.root.classList.contains('hidden')) return;
+    if (!this.codenameScreen.root.classList.contains("hidden")) {
+      return;
+    }
     this.completeScreen.hide();
     this.running = false;
     this.audio.setThreat(0);
@@ -462,20 +547,29 @@ export class Game {
   }
 
   private update(dt: number): void {
-    if (!this.running) return;
+    if (!this.running) {
+      return;
+    }
 
     const locked = this.level.controlsLocked;
 
-    if (!locked) this.bee.desiredHeight = this.altitude.desiredHeight;
+    if (!locked) {
+      this.bee.desiredHeight = this.altitude.desiredHeight;
+    }
     this.bee.update(dt, locked ? this.idleStick : this.stick, this.rig.yaw);
     // The jar hangs from the bee's belly wherever she goes.
-    this.honeyJar.update(dt, tmpBelly.copy(this.bee.position).setY(this.bee.position.y - 0.35));
+    this.honeyJar.update(
+      dt,
+      tmpBelly.copy(this.bee.position).setY(this.bee.position.y - 0.35),
+    );
     this.altitude.setActualHeight(this.bee.height);
 
     // Flowers only exist in the meadow, and harvesting is suspended during a
     // cutscene; the level still runs so its state machine can advance.
     const harvest =
-      locked || !this.meadowGroup.visible ? null : this.flowers.update(dt, this.bee.position);
+      locked || !this.meadowGroup.visible
+        ? null
+        : this.flowers.update(dt, this.bee.position);
     const wasComplete = this.level.complete;
     this.level.update(dt, this.ctx, harvest);
 
@@ -487,7 +581,9 @@ export class Game {
     this.fireworks.update(dt);
     this.audio.setFlightIntensity(locked ? 0 : this.bee.speed01);
     // Level 2 drives the dwell meter itself (loading and feeding).
-    if (this.meadowGroup.visible) this.hud.setHarvest(locked ? 0 : this.flowers.harvestProgress);
+    if (this.meadowGroup.visible) {
+      this.hud.setHarvest(locked ? 0 : this.flowers.harvestProgress);
+    }
 
     if (!wasComplete && this.level.complete) {
       this.running = false;
@@ -497,22 +593,34 @@ export class Game {
   }
 
   private flashScreen(): void {
-    this.flash.classList.remove('on');
+    this.flash.classList.remove("on");
     void this.flash.offsetWidth; // restart the animation
-    this.flash.classList.add('on');
+    this.flash.classList.add("on");
   }
 
   private render(alpha: number, frameDt: number): void {
     this.elapsed += frameDt;
     this.bee.render(alpha);
-    if (this.wasp.visible) this.wasp.render(alpha);
-    if (this.bear.visible) this.bear.render(alpha);
-    if (this.meadowGroup.visible) this.hive.updateGlow(this.elapsed);
+    if (this.wasp.visible) {
+      this.wasp.render(alpha);
+    }
+    if (this.bear.visible) {
+      this.bear.render(alpha);
+    }
+    if (this.meadowGroup.visible) {
+      this.hive.updateGlow(this.elapsed);
+    }
     // The door and the gate both live here, and the gate matters in every
     // outdoor level, not just level 4's.
-    if (this.cottage.group.visible) this.cottage.update(this.elapsed);
-    if (this.interior.group.visible) this.queen.animate(this.elapsed, 0, 0);
-    if (this.inside.group.visible) this.inside.update(this.elapsed);
+    if (this.cottage.group.visible) {
+      this.cottage.update(this.elapsed);
+    }
+    if (this.interior.group.visible) {
+      this.queen.animate(this.elapsed, 0, 0);
+    }
+    if (this.inside.group.visible) {
+      this.inside.update(this.elapsed);
+    }
 
     // Keep the shadow frustum on the bee so 1024px of shadow map isn't wasted
     // covering ground the player can't see.
@@ -531,6 +639,13 @@ export class Game {
       this.beacon.children[0].position.y =
         this.beaconHeight + 1.3 + Math.sin(this.beaconTime * 3) * 0.22;
     }
+
+    // A card over the game dims everything the page shows — except the strip
+    // iOS keeps for itself, which would sit there undimmed and obvious. One
+    // query a frame, and it only repaints when the answer changes.
+    this.stage.setPageDim(
+      !!this.uiLayer.querySelector(".overlay:not(.hidden)"),
+    );
 
     this.stage.renderer.render(this.stage.scene, this.stage.camera);
     this.hud.setPerf(this.loop.fps, this.stage.renderer.info.render.calls);

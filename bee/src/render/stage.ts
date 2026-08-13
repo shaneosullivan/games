@@ -1,5 +1,5 @@
-import * as THREE from 'three';
-import { CAMERA, PALETTE, RENDER } from '../config';
+import * as THREE from "three";
+import {CAMERA, PALETTE, RENDER} from "../config";
 
 /** Everything that changes when the player moves between the meadow and the hive. */
 export interface EnvironmentSettings {
@@ -81,19 +81,21 @@ export interface Stage {
   /** Offset the sun keeps from the bee; environment-dependent. */
   sunOffset: THREE.Vector3;
   setEnvironment(env: EnvironmentSettings): void;
+  /** Dim the page behind a card, so the strip iOS keeps matches the scrim. */
+  setPageDim(on: boolean): void;
   resize(): void;
   dispose(): void;
 }
 
 export function createStage(host: HTMLElement): Stage {
-  const canvas = document.createElement('canvas');
-  canvas.className = 'game-canvas';
+  const canvas = document.createElement("canvas");
+  canvas.className = "game-canvas";
   host.appendChild(canvas);
 
   const renderer = new THREE.WebGLRenderer({
     canvas,
     antialias: true,
-    powerPreference: 'high-performance',
+    powerPreference: "high-performance",
     stencil: false,
   });
   renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -107,7 +109,12 @@ export function createStage(host: HTMLElement): Stage {
   const fog = new THREE.Fog(PALETTE.fog, RENDER.fogNear, RENDER.fogFar);
   scene.fog = fog;
 
-  const camera = new THREE.PerspectiveCamera(CAMERA.fov, 1, CAMERA.near, CAMERA.far);
+  const camera = new THREE.PerspectiveCamera(
+    CAMERA.fov,
+    1,
+    CAMERA.near,
+    CAMERA.far,
+  );
   camera.position.set(0, 6, 10);
 
   const hemi = new THREE.HemisphereLight(0xdff3ff, 0x6b9c58, 1.15);
@@ -136,26 +143,58 @@ export function createStage(host: HTMLElement): Stage {
     const rect = canvas.getBoundingClientRect();
     const w = Math.max(1, Math.round(rect.width) || window.innerWidth);
     const h = Math.max(1, Math.round(rect.height) || window.innerHeight);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, RENDER.maxPixelRatio));
+    renderer.setPixelRatio(
+      Math.min(window.devicePixelRatio, RENDER.maxPixelRatio),
+    );
     renderer.setSize(w, h, false);
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
   }
 
   resize();
-  window.addEventListener('resize', resize);
-  window.addEventListener('orientationchange', () => setTimeout(resize, 120));
-  window.visualViewport?.addEventListener('resize', resize);
+  window.addEventListener("resize", resize);
+  window.addEventListener("orientationchange", () => setTimeout(resize, 120));
+  window.visualViewport?.addEventListener("resize", resize);
 
   const sunOffset = new THREE.Vector3(...MEADOW_ENV.sunOffset);
 
+  /**
+   * The page colour, which is what iOS paints the strip of an installed app it
+   * won't give us — the 20pt under the home indicator. It can't be drawn into,
+   * so the next best thing is for it to be the same colour as whatever is
+   * directly above it: the sky, or the scrim when a card is over the sky.
+   *
+   * It goes on the *root* element, not the body. When `html` has a background
+   * of its own that's the one that becomes the page canvas, and a background on
+   * `body` only paints the body's own box — which is why setting it there did
+   * nothing at all.
+   */
+  const pageBase = new THREE.Color(PALETTE.sky);
+  /** The bottom stop of the overlay scrim in ui/styles.css. */
+  const SCRIM = new THREE.Color(0x14283c);
+  const SCRIM_ALPHA = 0.75;
+  let pageDim = false;
+
+  function paintPage(): void {
+    const colour = pageBase.clone();
+    if (pageDim) {
+      colour.lerp(SCRIM, SCRIM_ALPHA);
+    }
+    document.documentElement.style.backgroundColor = `#${colour.getHexString()}`;
+  }
+
+  function setPageDim(on: boolean): void {
+    if (on === pageDim) {
+      return;
+    }
+    pageDim = on;
+    paintPage();
+  }
+
   function setEnvironment(env: EnvironmentSettings): void {
     (scene.background as THREE.Color).set(env.background);
-    // iOS paints the bits of an installed app it won't give us — the strip
-    // under the home indicator — with the *page* background, and it will not
-    // hand that strip over however the viewport is sized. Keeping the page
-    // colour in step with the sky is what makes it stop reading as a gap.
-    document.body.style.background = `#${new THREE.Color(env.background).getHexString()}`;
+    pageBase.set(env.background);
+    paintPage();
     fog.color.set(env.fogColor);
     fog.near = env.fogNear;
     fog.far = env.fogFar;
@@ -174,9 +213,10 @@ export function createStage(host: HTMLElement): Stage {
     sun,
     sunOffset,
     setEnvironment,
+    setPageDim,
     resize,
     dispose() {
-      window.removeEventListener('resize', resize);
+      window.removeEventListener("resize", resize);
       renderer.dispose();
     },
   };

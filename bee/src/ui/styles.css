@@ -6,7 +6,13 @@
   --panel: rgba(24, 30, 40, 0.42);
   --panel-strong: rgba(20, 26, 36, 0.72);
   --stroke: rgba(255, 255, 255, 0.28);
-  font-family: 'Avenir Next', 'Nunito', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  font-family:
+    "Avenir Next",
+    "Nunito",
+    -apple-system,
+    BlinkMacSystemFont,
+    system-ui,
+    sans-serif;
 }
 
 * {
@@ -20,9 +26,10 @@ body {
   padding: 0;
   height: 100%;
   overflow: hidden;
-  /* The meadow sky, until the stage says otherwise — see setEnvironment in
-     render/stage.ts, which keeps this in step with whatever scene is up. It's
-     what iOS paints the home-indicator strip of an installed app with. */
+  /* The meadow sky, until the stage says otherwise — see paintPage in
+     render/stage.ts, which keeps the *root* element in step with whatever is on
+     screen. That colour is what iOS paints the home-indicator strip of an
+     installed app with. */
   background: #8fd0e8;
   overscroll-behavior: none;
   /* Stop Safari from scrolling / zooming / selecting under our fingers.
@@ -294,7 +301,11 @@ body {
   left: 0;
   right: 0;
   bottom: 0;
-  background: linear-gradient(180deg, rgba(255, 224, 122, 0.42), rgba(255, 224, 122, 0.12));
+  background: linear-gradient(
+    180deg,
+    rgba(255, 224, 122, 0.42),
+    rgba(255, 224, 122, 0.12)
+  );
 }
 
 /* The knob travels within the rail, which is inset by the knob's radius so it
@@ -449,7 +460,11 @@ body {
   padding: 16px;
   overflow-y: auto;
   overscroll-behavior: contain;
-  background: linear-gradient(180deg, rgba(20, 40, 60, 0.55), rgba(20, 40, 60, 0.75));
+  background: linear-gradient(
+    180deg,
+    rgba(20, 40, 60, 0.55),
+    rgba(20, 40, 60, 0.75)
+  );
   backdrop-filter: blur(10px);
   pointer-events: auto;
   z-index: 10;
@@ -802,13 +817,18 @@ body {
   right: 0;
   bottom: 0;
   width: 44%;
-  padding: calc(var(--safe-t) + 14px) calc(var(--safe-r) + 18px) calc(var(--safe-b) + 14px) 14px;
+  padding: calc(var(--safe-t) + 14px) calc(var(--safe-r) + 18px)
+    calc(var(--safe-b) + 14px) 14px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 10px;
-  background: linear-gradient(180deg, rgba(24, 16, 10, 0.92), rgba(12, 8, 5, 0.96));
+  background: linear-gradient(
+    180deg,
+    rgba(24, 16, 10, 0.92),
+    rgba(12, 8, 5, 0.96)
+  );
   border-left: 2px solid rgba(255, 255, 255, 0.14);
   color: #fff;
   overflow: hidden;
@@ -851,7 +871,7 @@ body {
  * could slide into. The bottom row is a quarter of the height.
  */
 .puzzle-board::before {
-  content: '';
+  content: "";
   position: absolute;
   inset: 0 0 25% 0;
   border-radius: 12px;
