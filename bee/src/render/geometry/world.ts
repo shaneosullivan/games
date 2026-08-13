@@ -173,17 +173,74 @@ export function createHiveSite(position: THREE.Vector3): HiveSite {
   const group = new THREE.Group();
   group.position.copy(position);
 
-  const post = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.75, 5.5, 8), solidToon(0x8b6244));
-  post.position.y = 2.75;
-  post.castShadow = true;
-  post.receiveShadow = true;
-  group.add(post);
+  // ---- the bee tree ------------------------------------------------------
+  //
+  // One broad tree with a single branch reaching out over the hive, rather
+  // than the bare post this used to be — the map has always called this spot
+  // the Bee Tree, and a hive hanging off a two-piece frame read as a gallows.
+  //
+  // The canopy has to clear the hive. It's centred on the trunk, so its
+  // underside at the hive's own offset (x = 1.8) sits at
+  // 9.8 - 0.8 * sqrt(4.3^2 - 1.8^2) = 6.7, comfortably above the top of a
+  // finished hive at about y = 5.
+  const treeParts: THREE.BufferGeometry[] = [];
+  const pushTree = (geo: THREE.BufferGeometry, color: number) =>
+    treeParts.push(paint(geo, color));
 
-  const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.24, 2.2, 6), solidToon(0x8b6244));
-  arm.rotation.z = Math.PI / 2;
-  arm.position.set(0.9, 5.2, 0);
-  arm.castShadow = true;
-  group.add(arm);
+  const BARK = 0x8b6244;
+  const BARK_DARK = 0x6f4a2f;
+
+  // Slim enough at hive height that the hive hangs beside the trunk rather
+  // than sinking into it — the hive's near edge is at x = 0.65.
+  const trunk = new THREE.CylinderGeometry(0.5, 1.0, 9.6, 10);
+  trunk.translate(0, 4.8, 0);
+  pushTree(trunk, BARK);
+
+  // A flare of roots, so it grows out of the ground rather than being stuck in.
+  for (let i = 0; i < 5; i++) {
+    const a = (i / 5) * Math.PI * 2;
+    const root = new THREE.SphereGeometry(0.5, 8, 6);
+    root.scale(1, 0.55, 1.5);
+    root.rotateY(-a);
+    root.translate(Math.sin(a) * 1.05, 0.18, Math.cos(a) * 1.05);
+    pushTree(root, BARK_DARK);
+  }
+
+  // The branch the hive hangs from: out past the hive, tipped up a little, so
+  // it reads as carrying the weight rather than poking through it.
+  const branch = new THREE.CylinderGeometry(0.17, 0.3, 2.9, 6);
+  branch.rotateZ(Math.PI / 2 - 0.16);
+  branch.translate(1.2, 5.55, 0);
+  pushTree(branch, BARK);
+
+  const branchTip = new THREE.SphereGeometry(0.18, 8, 6);
+  branchTip.translate(2.6, 5.78, 0);
+  pushTree(branchTip, BARK);
+
+  // The short stub the hive itself hangs off, down to the top of the comb.
+  const stem = new THREE.CylinderGeometry(0.12, 0.12, 0.8, 6);
+  stem.translate(1.8, 5.25, 0);
+  pushTree(stem, BARK_DARK);
+
+  // Canopy: three squashed blobs, wide at the bottom and tapering up.
+  for (const [y, r, colour] of [
+    [9.8, 4.3, 0x4e8f47],
+    [11.4, 3.2, 0x5aa452],
+    [12.5, 2.0, 0x69b45c],
+  ] as const) {
+    const blob = new THREE.IcosahedronGeometry(r, 1);
+    blob.scale(1, 0.8, 1);
+    blob.translate(0, y, 0);
+    pushTree(blob, colour);
+  }
+
+  const treeGeo = mergeGeometries(treeParts, false);
+  if (!treeGeo) throw new Error('bee tree: geometry merge failed');
+  treeGeo.computeVertexNormals();
+  const tree = new THREE.Mesh(treeGeo, vertexToon());
+  tree.castShadow = true;
+  tree.receiveShadow = true;
+  group.add(tree);
 
   // The hive itself: stacked squashed spheres that scale in with progress.
   const hive = new THREE.Group();
