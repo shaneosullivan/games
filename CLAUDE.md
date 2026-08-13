@@ -39,6 +39,10 @@ npm --prefix site run build:site # gallery only — fast, for styling
 npm --prefix site run serve      # preview site/dist on :4173
 ```
 
+**Run `npm run format` before every commit**, not as a follow-up — an
+unformatted commit means the next format produces a diff that has nothing to do
+with the change it lands in.
+
 Formatting and lint rules are copied from the syncawesome repo so code moves
 between the two unchanged: double quotes, no bracket spacing, no parens on
 single-arg arrows, trailing commas, 80 columns, braces on every `if`, and
