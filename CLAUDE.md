@@ -112,7 +112,7 @@ When testing the **built site**, the service worker will serve you the previous
 build. Purge it or you'll debug a page that no longer exists:
 
 ```js
-caches.keys().then(ks => Promise.all(ks.map(k => caches.delete(k)))).then(() => location.reload());
+chofterReset()   // defined by every page: unregisters the worker, clears caches, reloads
 ```
 
 ## Deploying

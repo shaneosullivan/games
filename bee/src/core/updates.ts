@@ -26,6 +26,9 @@ interface Version {
 }
 
 export function watchForUpdates(host: HTMLElement): void {
+  // Available in every build, including this one's dev server: when a copy is
+  // wedged on an old version, the console is the only way in.
+  installResetHelper();
   if (!import.meta.env.PROD) return;
 
   let current: string | null = null;
@@ -92,10 +95,34 @@ async function applyUpdate(): Promise<void> {
 }
 
 /** Bin every cache, so the reload can't be served the page we're replacing. */
-async function purgeCaches(): Promise<void> {
-  if (!('caches' in window)) return;
+async function purgeCaches(): Promise<string[]> {
+  if (!('caches' in window)) return [];
   const names = await caches.keys();
   await Promise.all(names.map((name) => caches.delete(name)));
+  return names;
+}
+
+/**
+ * `chofterReset()` — the big hammer, from the console.
+ *
+ * The banner is the polite path: purge the caches and reload. This is for when
+ * a copy is wedged on a build old enough that its own update path is broken,
+ * which no amount of waiting will fix. It also unregisters the service worker
+ * (a live one serves its cache straight back, so purging alone isn't enough)
+ * and reloads with a cache-buster, since Safari's own HTTP cache may still be
+ * holding the page.
+ *
+ * Service workers and caches are per-origin, so running this in a browser tab
+ * fixes the installed app too.
+ */
+function installResetHelper(): void {
+  (window as unknown as Record<string, unknown>).chofterReset = async (): Promise<void> => {
+    const regs = (await navigator.serviceWorker?.getRegistrations?.()) ?? [];
+    await Promise.all(regs.map((r) => r.unregister()));
+    const names = await purgeCaches();
+    console.log(`chofterReset: ${regs.length} worker(s) unregistered, caches cleared:`, names);
+    window.location.replace(`${window.location.pathname}?fresh=${Date.now()}`);
+  };
 }
 
 function createBanner(host: HTMLElement, onTake: () => void): { show(): void } {

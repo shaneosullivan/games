@@ -382,6 +382,21 @@ self.addEventListener('fetch', (event) => {
  * gallery stays two files with no build step of its own.
  */
 const UPDATE_WATCH = `      (function () {
+        // The big hammer, for a copy wedged on a build whose own update path is
+        // broken: unregister the worker (a live one serves its cache straight
+        // back), bin every cache, and reload past Safari's HTTP cache too.
+        // Both are per-origin, so running this here fixes the installed app.
+        window.chofterReset = function () {
+          return navigator.serviceWorker.getRegistrations()
+            .then(function (regs) { return Promise.all(regs.map(function (r) { return r.unregister(); })); })
+            .then(function () { return caches.keys(); })
+            .then(function (names) {
+              console.log('chofterReset: caches cleared:', names);
+              return Promise.all(names.map(function (n) { return caches.delete(n); }));
+            })
+            .then(function () { location.replace(location.pathname + '?fresh=' + Date.now()); });
+        };
+
         var banner = document.querySelector('.update-banner');
         if (!banner) return;
         var current = null;
