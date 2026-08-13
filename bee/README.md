@@ -339,6 +339,30 @@ Things worth knowing before changing anything:
   the bee closes on the comb and the shot tightens instead of turning inside
   out. Any level played against a wall wants the same thing; pass
   `cameraEnclosure` in its `configureFlight()`.
+- **The enclosure swings the camera round; it does not shorten the boom.** The
+  first version walked the eye in along the line from the bee, which sounds
+  right and isn't: at a food cell the bee is a unit and a half off the comb, so
+  the instant the shot faced inward there was no room behind her at all. The
+  boom collapsed from 11.5 to 1.5, the screen filled with honeycomb, and the
+  bee dropped off the bottom edge. There is no _distance_ that frames that
+  shot, only a _direction_, so `clampToEnclosure` keeps the boom and rotates it
+  to the nearest legal one — the camera lifts and looks down instead.
+- **The soft boundary needs a hard clamp behind it.** The edge of the play area
+  is a push, not a wall, so it only holds if it can stop `FLIGHT.maxSpeed`
+  within `FLIGHT.boundsGive`: a push alone balances the stick at whatever
+  overshoot generates top speed. It used to ramp over 6 units, which balanced
+  **2.6 units past the edge** — invisible in the meadow until you notice the
+  bee sitting inside the boundary hedge, and fatal in the royal chamber, where
+  holding the stick at the wall parked her _inside_ the comb. The give is now 1
+  unit and the position is clamped there as well.
+- **A disc plus a ceiling is a cylinder, and a cylinder doesn't fit in a dome.**
+  `boundsRadius` with `maxHeight` puts the corner of the play volume outside
+  any domed shell — in the chamber that was 33.4 out against a shell of 34, so
+  flying to the edge at full altitude went through the roof. `bounds.sphereRadius`
+  (`INTERIOR.boundsSphere`, set via `configureFlight`) rounds the corner off by
+  giving up horizontal reach as you climb. It deliberately never touches the
+  height: that's the one axis the player sets directly, and sinking someone who
+  asked to be at the top of the room reads as broken controls, not as a wall.
 - **A model's `animate()` must not write to the group the caller positioned.**
   The queen's bob originally set `group.position.y` directly, which silently
   dragged her from her dais down to the floor. Bobs and sways belong on an

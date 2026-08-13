@@ -1,5 +1,7 @@
 node_modules
 dist
+# Claude Code owns this and rewrites it; formatting it just starts a fight.
+.claude
 **/dist
 site/assets
 bee/src/assets

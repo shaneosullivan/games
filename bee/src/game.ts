@@ -403,6 +403,7 @@ export class Game {
 
   private configureFlight(s: FlightSettings): void {
     this.bee.bounds.radius = s.boundsRadius;
+    this.bee.bounds.sphereRadius = s.boundsSphere ?? Infinity;
     // The lane north is walled off or not by syncCottageGate, which runs after
     // the level has had its say; clear it here so nothing leaks between levels.
     this.bee.bounds.minZ = -Infinity;

@@ -6,6 +6,8 @@ const desired = new THREE.Vector3();
 const lookTarget = new THREE.Vector3();
 const smoothedLook = new THREE.Vector3();
 const boom = new THREE.Vector3();
+const outward = new THREE.Vector3();
+const sideways = new THREE.Vector3();
 
 function shortestAngle(from: number, to: number): number {
   let d = (to - from) % (Math.PI * 2);
@@ -65,28 +67,69 @@ export class CameraRig {
   }
 
   /**
-   * Pull `point` back inside the enclosure, along the line from the bee — so
-   * the boom shortens rather than the shot swinging somewhere else.
+   * Swing `point` round the bee until it is inside the enclosure, keeping the
+   * boom the length it was.
+   *
+   * Shortening the boom instead — walking in along the line from the bee — is
+   * the obvious move and it doesn't work here. At a food cell the bee is a
+   * unit and a half off the comb, so the moment the shot faces inward there is
+   * no room behind her at all: the boom collapsed to 1.5 and the screen filled
+   * with honeycomb, with the bee off the bottom edge. There is no *distance*
+   * that works, only a *direction*, and swinging round to it is what a
+   * third-person camera does when it meets a wall.
+   *
+   * The eye must satisfy |bee + d|^2 <= E^2 with |d| fixed, which reduces to a
+   * cap on `bee · d` — a cone of legal directions about the inward axis. So
+   * take the desired direction, and if it falls outside the cone, rotate it in
+   * the plane it shares with the outward axis until it lands on the edge. That
+   * is the closest legal shot to the one that was asked for.
    */
   private clampToEnclosure(point: THREE.Vector3, bee: THREE.Vector3): void {
-    if (this.enclosure === null || point.length() <= this.enclosure) {
+    const limit = this.enclosure;
+    if (limit === null || point.length() <= limit) {
       return;
     }
-    // Walk from the bee toward the desired eye, stopping at the sphere. The
-    // bee is always well inside it, so there is always a crossing to find.
+
     boom.copy(point).sub(bee);
-    const a = boom.lengthSq();
-    if (a < 1e-6) {
+    const reach = boom.length();
+    const beeLen = bee.length();
+    if (reach < 1e-6) {
       return;
     }
-    const b = 2 * boom.dot(bee);
-    const c = bee.lengthSq() - this.enclosure * this.enclosure;
-    const disc = b * b - 4 * a * c;
-    if (disc < 0) {
+    // Bee at the very centre: any direction is as good as another, so the only
+    // thing that can be wrong is the distance.
+    if (beeLen < 1e-6) {
+      point.copy(bee).addScaledVector(boom, Math.min(1, limit / reach));
       return;
     }
-    const t = (-b + Math.sqrt(disc)) / (2 * a);
-    point.copy(bee).addScaledVector(boom, Math.max(0, Math.min(1, t)));
+
+    // |bee|^2 + 2(bee · d) + |d|^2 <= E^2
+    const maxDot = (limit * limit - beeLen * beeLen - reach * reach) / 2;
+    if (boom.dot(bee) <= maxDot) {
+      return;
+    }
+
+    outward.copy(bee).divideScalar(beeLen);
+    // The part of the boom at right angles to the outward axis — the direction
+    // we rotate toward. If the boom is dead along the axis there's no plane to
+    // rotate in, so pick one: straight up, which is where a chase camera would
+    // rather be anyway.
+    sideways.copy(boom).addScaledVector(outward, -boom.dot(outward));
+    if (sideways.lengthSq() < 1e-8) {
+      sideways.set(0, 1, 0).addScaledVector(outward, -outward.y);
+      if (sideways.lengthSq() < 1e-8) {
+        sideways.set(1, 0, 0).addScaledVector(outward, -outward.x);
+      }
+    }
+    sideways.normalize();
+
+    // Land exactly on the cone: cos from the dot cap, sin from the identity.
+    const cos = Math.max(-1, Math.min(1, maxDot / (beeLen * reach)));
+    const sin = Math.sqrt(Math.max(0, 1 - cos * cos));
+    point
+      .copy(bee)
+      .addScaledVector(outward, reach * cos)
+      .addScaledVector(sideways, reach * sin);
   }
 
   /** `immediate` skips the ease — used when a level places the bee. */

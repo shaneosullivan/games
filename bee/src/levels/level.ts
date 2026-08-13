@@ -21,6 +21,12 @@ export type EnvironmentName = "meadow" | "hive" | "cottage" | "inside";
 /** Playable volume and camera framing, which differ per level. */
 export interface FlightSettings {
   boundsRadius: number;
+  /**
+   * Distance from the centre the bee may not exceed, rounding off the corner
+   * where `boundsRadius` meets `maxHeight`. Set it for a level played inside a
+   * dome; omit it and only the disc and the ceiling apply.
+   */
+  boundsSphere?: number;
   minHeight: number;
   maxHeight: number;
   cameraDistance: number;

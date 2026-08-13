@@ -49,12 +49,19 @@ export class BeeActor {
    * `minZ` is a straight wall across the disc, used for the shut gate at the
    * mouth of the cottage lane: until the cottage is unlocked there's nothing up
    * there to find, so the meadow stops at the fence.
+   *
+   * `sphereRadius` caps the distance from the centre in 3D, not just across
+   * the ground. A disc plus a height ceiling is a cylinder, and a cylinder's
+   * top rim pokes out of anything domed: in the royal chamber, flying to the
+   * bounds at full altitude put the bee through the roof. Levels played inside
+   * a dome set this to keep the corner inside it; everywhere else it's off.
    */
   bounds = {
     radius: WORLD.radius as number,
     centreX: 0,
     centreZ: 0,
     minZ: -Infinity as number,
+    sphereRadius: Infinity as number,
   };
 
   /** Altitude the player has asked for, via the right-hand slider. */
@@ -188,21 +195,35 @@ export class BeeActor {
     this.position.addScaledVector(this.velocity, dt);
 
     // Soft boundary: push back rather than hard-clamp, so it feels like wind.
+    //
+    // The push ramps to full strength over FLIGHT.boundsGive and the position
+    // is then clamped at exactly that. Both matter. A push alone balances the
+    // stick at whatever overshoot generates maxSpeed, which is a long way out
+    // if the ramp is gentle — the bee used to settle 2.6 units past the edge,
+    // which put her inside the hedge in the meadow and inside the honeycomb in
+    // the royal chamber. The clamp is what makes the edge mean something; the
+    // push is what stops it feeling like a wall.
     const dx = this.position.x - this.bounds.centreX;
     const dz = this.position.z - this.bounds.centreZ;
     const horiz = Math.hypot(dx, dz);
     if (horiz > this.bounds.radius) {
       const over = horiz - this.bounds.radius;
-      const push = Math.min(1, over / 6) * 22 * dt;
-      this.position.x -= (dx / horiz) * push;
-      this.position.z -= (dz / horiz) * push;
+      const push = Math.min(1, over / FLIGHT.boundsGive) * FLIGHT.boundsPush;
+      const limit = this.bounds.radius + FLIGHT.boundsGive;
+      const pulled = Math.min(horiz - push * dt, limit);
+      this.position.x = this.bounds.centreX + (dx / horiz) * pulled;
+      this.position.z = this.bounds.centreZ + (dz / horiz) * pulled;
       this.velocity.multiplyScalar(1 - Math.min(0.9, over / 8) * dt * 4);
     }
 
     // The same soft push, against a flat wall this time.
     if (this.position.z < this.bounds.minZ) {
       const over = this.bounds.minZ - this.position.z;
-      this.position.z += Math.min(1, over / 6) * 22 * dt;
+      const push = Math.min(1, over / FLIGHT.boundsGive) * FLIGHT.boundsPush;
+      this.position.z = Math.max(
+        this.position.z + push * dt,
+        this.bounds.minZ - FLIGHT.boundsGive,
+      );
       this.velocity.multiplyScalar(1 - Math.min(0.9, over / 8) * dt * 4);
     }
 
@@ -217,6 +238,12 @@ export class BeeActor {
     this.bobPhase += dt * FLIGHT.bobRate * (1 + this.speed01);
     this.position.y =
       this.baseHeight + Math.sin(this.bobPhase) * FLIGHT.bobAmplitude;
+
+    // The domed ceiling, applied last because it needs the finished height.
+    // Pulling straight in toward the centre would drag the bee down the wall
+    // by itself, so only the horizontal part gives — the player keeps the
+    // altitude they asked for and loses a little reach instead.
+    this.clampToSphere();
 
     // Face the direction of travel.
     const planarSpeed = Math.hypot(this.velocity.x, this.velocity.z);
@@ -235,6 +262,32 @@ export class BeeActor {
       THREE.MathUtils.clamp(-turn * 2.2, -FLIGHT.maxBank, FLIGHT.maxBank) *
       this.speed01;
     this.roll += (targetRoll - this.roll) * Math.min(1, FLIGHT.bankLerp * dt);
+  }
+
+  /**
+   * Hold the bee inside `bounds.sphereRadius` by giving up horizontal reach.
+   *
+   * The height is left alone deliberately: it's the one axis the player sets
+   * directly, and silently sinking someone who asked to be at the top of the
+   * room reads as the controls being broken rather than as a wall.
+   */
+  private clampToSphere(): void {
+    const limit = this.bounds.sphereRadius;
+    if (!isFinite(limit)) {
+      return;
+    }
+    const dx = this.position.x - this.bounds.centreX;
+    const dz = this.position.z - this.bounds.centreZ;
+    const y = Math.min(Math.abs(this.position.y), limit);
+    // How much horizontal room is left at this height.
+    const room = Math.sqrt(limit * limit - y * y);
+    const horiz = Math.hypot(dx, dz);
+    if (horiz <= room || horiz < 1e-6) {
+      return;
+    }
+    const k = room / horiz;
+    this.position.x = this.bounds.centreX + dx * k;
+    this.position.z = this.bounds.centreZ + dz * k;
   }
 
   /** Called once per rendered frame with the sub-step interpolation factor. */

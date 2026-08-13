@@ -69,6 +69,7 @@ export class RoyalChamberLevel implements Level {
     ctx.setEnvironment("hive");
     ctx.configureFlight({
       boundsRadius: INTERIOR.boundsRadius,
+      boundsSphere: INTERIOR.boundsSphere,
       minHeight: INTERIOR.minHeight,
       maxHeight: INTERIOR.maxHeight,
       cameraDistance: INTERIOR.cameraDistance,
@@ -333,6 +334,7 @@ export class RoyalChamberLevel implements Level {
     ctx.hud.setObjective("Fly around your hive");
     ctx.setObjectiveMarker(null);
     ctx.bee.bounds.radius = INTERIOR.boundsRadius;
+    ctx.bee.bounds.sphereRadius = INTERIOR.boundsSphere;
     ctx.bee.desiredHeight = Math.min(ctx.bee.desiredHeight, INTERIOR.maxHeight);
   }
 }

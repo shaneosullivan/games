@@ -25,6 +25,21 @@ export const FLIGHT = {
    * render/geometry/world.ts. Keep these in step if the trees change.
    */
   maxHeight: 13.5,
+  /**
+   * How far past the edge of the playable disc the bee may get.
+   *
+   * The boundary is a push, not a wall, so it has to be strong enough to stop
+   * `maxSpeed` within this distance or the stick simply wins: the push balances
+   * the stick at `boundsGive * maxSpeed / boundsPush` past the edge, which is
+   * 0.43 units here. The position is hard-clamped at `boundsGive` as well, so
+   * a shove or a dive can't do better than the stick can.
+   *
+   * It used to ramp over 6 units, which balanced 2.6 units out — far enough to
+   * put the bee inside the meadow's boundary hedge and inside the royal
+   * chamber's honeycomb, both of which sit just past the edge of play.
+   */
+  boundsGive: 1.0,
+  boundsPush: 22,
   /** How fast the bee climbs or dives toward the altitude the player set. */
   climbSpeed: 4.2,
   /** Amplitude / rate of the idle up-down bob. */
@@ -149,14 +164,28 @@ export const INTERIOR = {
    * see cameraEnclosure below.
    */
   boundsRadius: 31.5,
+  /**
+   * The domed ceiling, as a distance from the centre.
+   *
+   * `boundsRadius` is a disc and `maxHeight` a flat lid, which together make a
+   * cylinder — and a cylinder's top rim stands outside a dome. At the bounds
+   * at full altitude the bee was 33.4 out with the shell at 34, and the soft
+   * edge's overshoot took her through it. This rounds the corner off.
+   *
+   * Matched to boundsRadius + FLIGHT.boundsGive so it costs nothing down at
+   * floor level and only tapers the reach as you climb. The comb's inner face
+   * is at 33.45, which leaves the bee a clear unit of air at every height.
+   */
+  boundsSphere: 32.5,
   minHeight: 1.0,
   /** Above the highest food, so the top of the wall is still flyable. */
   maxHeight: 11,
   /**
-   * The sphere the camera may not leave. Just inside the shell, so the boom
-   * shortens as the bee closes on the wall instead of ending up behind it.
+   * The sphere the camera may not leave. Just inside the comb's inner face
+   * (33.45), and outside everywhere the bee can reach, so the rig always has
+   * somewhere legal to stand.
    */
-  cameraEnclosure: 32.5,
+  cameraEnclosure: 33.2,
   /**
    * Pulled back 1.5x from where it started: feeding is about spotting which
    * baby wants what colour, and the close rig had you nose-to-nose with one
