@@ -21,6 +21,31 @@ export function lockZoom(): void {
       "input, textarea, button, select",
     );
 
+  /**
+   * Is this touch inside something that has somewhere to scroll?
+   *
+   * Cancelling every touchmove is what keeps the page from rubber-banding
+   * under the game, but it also cancels the only gesture a scrollable panel
+   * has: the menu card is taller than a short phone screen, and no amount of
+   * `overflow-y: auto` helps if the finger never reaches it. So walk up from
+   * whatever was touched looking for a scroller with room left in it, and
+   * leave that one alone.
+   */
+  const canScroll = (target: EventTarget | null): boolean => {
+    let node = target as HTMLElement | null;
+    while (node && node !== document.body) {
+      const style = getComputedStyle(node);
+      if (
+        /auto|scroll/.test(style.overflowY) &&
+        node.scrollHeight > node.clientHeight
+      ) {
+        return true;
+      }
+      node = node.parentElement;
+    }
+    return false;
+  };
+
   for (const type of ["gesturestart", "gesturechange", "gestureend"]) {
     document.addEventListener(type, e => e.preventDefault(), {passive: false});
   }
@@ -36,9 +61,18 @@ export function lockZoom(): void {
     {passive: false},
   );
 
-  document.addEventListener("touchmove", e => e.preventDefault(), {
-    passive: false,
-  });
+  // One finger inside a scroller is a scroll and belongs to it. Everything
+  // else — two fingers, or a drag over the game — is still ours to swallow.
+  document.addEventListener(
+    "touchmove",
+    e => {
+      if (e.touches.length === 1 && canScroll(e.target)) {
+        return;
+      }
+      e.preventDefault();
+    },
+    {passive: false},
+  );
 
   let lastTap = 0;
   document.addEventListener(

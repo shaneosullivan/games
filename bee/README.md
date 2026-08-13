@@ -255,6 +255,21 @@ Things worth knowing before changing anything:
   Form controls are exempt so the codename field still focuses. If you add any
   UI that needs a native gesture, exempt it there rather than loosening the
   global rules.
+- **A panel that scrolls has to be exempted from the zoom lock, twice.** The
+  menu card is taller than a short phone screen, and `overflow-y: auto` on the
+  overlay did nothing on a touch device: `lockZoom` cancelled _every_
+  `touchmove`, and `touch-action: none` up the tree took away the pan. It now
+  lets a single finger through when the touch is inside something that has
+  somewhere left to scroll — two fingers are still a pinch, and a finger on the
+  canvas is still the game's — and `.overlay` asks for `touch-action: pan-y`.
+  Both are needed; either alone leaves it stuck.
+- **A modal that can outgrow the screen must not be centred by the container.**
+  `place-items: center` (or `justify-content: center`) overflows in _both_
+  directions, so the top of a too-tall card ends up above the scroll origin
+  where nothing can reach it. `.overlay` is a column flexbox and `.card` has
+  `margin: auto 0`, which centres identically when it fits and collapses to
+  zero when it doesn't. The card also needs `flex-shrink: 0`, or it is squashed
+  to fit instead of overflowing and there is nothing to scroll.
 - **Particle materials need a white `color` attribute.** `vertexColors: true`
   makes the shader read a per-vertex `color`; with no such attribute it reads
   black, per-instance colour never multiplies in, and the particles render

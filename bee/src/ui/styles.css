@@ -466,14 +466,27 @@ body {
 .overlay {
   position: absolute;
   inset: 0;
-  display: grid;
-  place-items: center;
-  /* Room to breathe, and a scroll of last resort: with the iPad keyboard up
-     the visible viewport can be shorter than the card. See
-     trackVisualViewport in ui/overlays.ts. */
+  /*
+   * A column flexbox rather than a centred grid, because the card has to be
+   * able to be taller than the screen — a phone, or an iPad with the keyboard
+   * up (see trackVisualViewport in ui/overlays.ts). Centring with
+   * `place-items` / `justify-content` overflows in *both* directions, which
+   * pushes the top of the card out of reach above the scroll origin. The auto
+   * margins below centre it exactly the same way when it fits, and collapse to
+   * zero when it doesn't, so it starts at the top and scrolls.
+   */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   padding: 16px;
   overflow-y: auto;
   overscroll-behavior: contain;
+  /* Everything up the tree sets `touch-action: none` to keep fingers off the
+     page while flying, which also takes away this panel's only way to scroll.
+     Hand back the one axis it needs. core/lockZoom.ts stops cancelling
+     touchmove for the same reason. */
+  touch-action: pan-y;
+  -webkit-overflow-scrolling: touch;
   background: linear-gradient(
     180deg,
     rgba(20, 40, 60, 0.55),
@@ -491,6 +504,12 @@ body {
 .card {
   /* The home link in the corner is positioned against this. */
   position: relative;
+  /* Centres the card when there's room and gives up when there isn't — see
+     the note on .overlay. `flex-shrink: 0` stops a tall card being squashed
+     into the viewport instead of overflowing it, which is what makes the
+     overlay scroll at all. */
+  margin: auto 0;
+  flex-shrink: 0;
   width: min(520px, 86vw);
   background: rgba(255, 255, 255, 0.96);
   color: #23303c;
