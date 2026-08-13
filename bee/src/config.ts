@@ -162,10 +162,15 @@ export const POLLEN_KINDS: ReadonlyArray<PollenKind> = [
   "orange",
 ] as const;
 
+/*
+ * What the player calls them. The `orange` key keeps its name because it is in
+ * every save file (`pollen.orange`), but the flower on screen is 0xff8a3d under
+ * toon shading, which reads red — so red is what it's called.
+ */
 export const POLLEN_LABEL: Record<PollenKind, string> = {
   white: "White Rose",
   yellow: "Yellow Flower",
-  orange: "Orange Flower",
+  orange: "Red Flower",
 };
 
 export const POLLEN_COLOR: Record<PollenKind, number> = {
