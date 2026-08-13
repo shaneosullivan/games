@@ -205,6 +205,16 @@ Things worth knowing before changing anything:
   bees with nothing to feed. `switchLevel()` likewise reparents the ring back
   into the hive interior and despawns the wasp, so no level has to undo another's
   scenery.
+- **A level must put away anything that outlives its own `update()`.** The Game
+  builds a fresh level object on every switch and drops the old one on the
+  floor, so `Level.exit()` exists for exactly this: level 4 stops its music
+  there. Without it, leaving the dance mat mid-round left the track playing
+  under the next one, half a bar out — two of everything.
+- **Resting state belongs to whatever built the thing, not to the material.**
+  The dance mat used to read each pad's resting colour off its live material at
+  construction; a mat built while a pad was still lit adopted the lit colour as
+  its base and that pad glowed for the rest of the level. `cottage.padColours`
+  states them instead.
 - **Anything the Game owns must also be *ticked* by whichever level is using
   it.** Level 3 releases the brood into the meadow but originally never called
   `babies.update()`, so they hung motionless outside the hive. That tick has to

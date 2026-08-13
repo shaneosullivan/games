@@ -247,6 +247,8 @@ export class Game {
     // Levels that don't want a wasp shouldn't have to say so; level 3 spawns
     // its own in enter(). Same for the brood: they live in the hive unless a
     // level explicitly lets them out.
+    // Let the outgoing level put away anything that outlives it.
+    this.level.exit?.(this.ctx);
     this.wasp.reset();
     this.bear.reset();
     this.setSplit(false);

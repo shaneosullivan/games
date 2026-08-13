@@ -100,6 +100,18 @@ export class CottageLevel implements Level {
     return this.phase !== 'inside' && this.phase !== 'carrying' && this.phase !== 'chased';
   }
 
+  /**
+   * Leaving mid-round — the menu, or replaying the level — has to take the
+   * music with it. The Game builds a fresh level object every switch, so
+   * anything this one started is otherwise orphaned and keeps playing
+   * underneath its replacement, half a bar out.
+   */
+  exit(): void {
+    this.music?.stop();
+    this.music = null;
+    this.mat?.reset();
+  }
+
   enter(ctx: GameContext): void {
     ctx.setEnvironment('cottage');
     ctx.configureFlight({
@@ -143,6 +155,8 @@ export class CottageLevel implements Level {
     this.hop = null;
     this.babiesOut = false;
     this.mat = null;
+    // Belt and braces: entering is a fresh start, whatever came before.
+    this.music?.stop();
     this.music = null;
 
     ctx.hud.setCounters([
@@ -262,9 +276,15 @@ export class CottageLevel implements Level {
     this.rounds++;
     this.mat?.reset();
     // A fresh pattern each attempt, so a retry isn't the same round again.
-    this.mat = new DanceMat(ctx.cottage.pads, new Rng(0x51ce5 + this.rounds * 7919));
+    this.mat = new DanceMat(
+      ctx.cottage.pads,
+      ctx.cottage.padColours,
+      new Rng(0x51ce5 + this.rounds * 7919),
+    );
     this.silentTime = 0;
 
+    // Never start a second track over the first.
+    this.music?.stop();
     this.music = ctx.audio.createMusic(DANCE.bpm);
     this.music?.start();
 

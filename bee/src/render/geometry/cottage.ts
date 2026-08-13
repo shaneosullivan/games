@@ -10,6 +10,14 @@ export interface CottageScene {
   matCentre: THREE.Vector3;
   /** The nine pads, index 4 being the centre. */
   pads: THREE.Mesh[];
+  /**
+   * What colour each pad is at rest.
+   *
+   * Stated, not sampled from the live materials: the mat repaints pads as it
+   * lights them, so anything reading the material to learn the resting colour
+   * can adopt a lit one and leave that pad glowing for good.
+   */
+  padColours: readonly number[];
   /** World centres of each pad. */
   padCentres: THREE.Vector3[];
   /** Swing the door open once the dance is passed. */
@@ -104,7 +112,7 @@ export function createCottage(rng: Rng): CottageScene {
 
   // ---- dance mat ---------------------------------------------------------
   const matCentre = new THREE.Vector3(0, 0, COTTAGE.matOffsetZ);
-  const { mat, pads, padCentres } = createMat(matCentre);
+  const { mat, pads, padCentres, padColours } = createMat(matCentre);
   group.add(mat);
 
   let doorOpen = false;
@@ -117,6 +125,7 @@ export function createCottage(rng: Rng): CottageScene {
     group,
     matCentre: toWorld(matCentre),
     pads,
+    padColours,
     padCentres: padCentres.map(toWorld),
     // Doorway centre in world units: (0, 1.35, 2.02) at house scale.
     doorway: toWorld(new THREE.Vector3(0, 1.35, 2.0).multiplyScalar(COTTAGE.houseScale)),
@@ -383,6 +392,7 @@ function createMat(centre: THREE.Vector3): {
   mat: THREE.Group;
   pads: THREE.Mesh[];
   padCentres: THREE.Vector3[];
+  padColours: number[];
 } {
   const mat = new THREE.Group();
   mat.position.copy(centre);
@@ -400,16 +410,16 @@ function createMat(centre: THREE.Vector3): {
 
   const pads: THREE.Mesh[] = [];
   const padCentres: THREE.Vector3[] = [];
+  const padColours: number[] = [];
   const padGeo = new THREE.BoxGeometry(DANCE.padSize, DANCE.padHeight, DANCE.padSize);
 
   for (let row = 0; row < 3; row++) {
     for (let col = 0; col < 3; col++) {
       const i = row * 3 + col;
       const isCentre = i === 4;
-      const pad = new THREE.Mesh(
-        padGeo,
-        solidToon(isCentre ? 0xffd75e : 0x6f6890),
-      );
+      const colour = isCentre ? 0xffd75e : 0x6f6890;
+      padColours.push(colour);
+      const pad = new THREE.Mesh(padGeo, solidToon(colour));
       pad.position.set((col - 1) * step, 0.1, (row - 1) * step);
       pad.receiveShadow = true;
       mat.add(pad);
@@ -430,5 +440,5 @@ function createMat(centre: THREE.Vector3): {
     }
   }
 
-  return { mat, pads, padCentres };
+  return { mat, pads, padCentres, padColours };
 }

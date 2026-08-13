@@ -98,6 +98,12 @@ export interface GameContext {
 export interface Level {
   readonly name: string;
   enter(ctx: GameContext): void;
+  /**
+   * Called before the Game moves on to another level. Anything a level started
+   * that outlives its own `update()` — a music track, a timer — has to be
+   * stopped here; the level object itself is thrown away.
+   */
+  exit?(ctx: GameContext): void;
   update(dt: number, ctx: GameContext, harvest: HarvestEvent | null): void;
   /** True once the player has met the win condition. */
   readonly complete: boolean;

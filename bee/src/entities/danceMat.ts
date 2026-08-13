@@ -65,13 +65,20 @@ export class DanceMat {
   private readonly flashes = new Map<number, number>();
   private readonly baseColours: THREE.Color[] = [];
 
+  /**
+   * @param colours each pad's resting colour, from the scene that built them.
+   *   Deliberately not read off the live materials: a mat built while a pad is
+   *   still lit — replaying the level mid-round used to do exactly that — would
+   *   take the lit colour for its resting one and leave that pad on for good.
+   */
   constructor(
     private readonly pads: THREE.Mesh[],
+    colours: readonly number[],
     rng: Rng,
   ) {
-    for (const pad of pads) {
-      this.baseColours.push((pad.material as THREE.MeshToonMaterial).color.clone());
-    }
+    for (const colour of colours) this.baseColours.push(new THREE.Color(colour));
+    // Whatever the last round left behind is not this round's business.
+    this.reset();
 
     // Build the whole round up front so it's deterministic. A pad is never
     // asked for twice in a row — a repeat reads as a dropped beat rather than
