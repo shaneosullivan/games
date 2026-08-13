@@ -76,6 +76,17 @@ The service worker deliberately does *not* intercept `version.json` — a cached
 update-check can never notice an update. Keep it that way if you touch
 `renderServiceWorker`.
 
+Two rules the update path learned the hard way:
+
+- **Never await the service worker before reloading.** `registration.update()`
+  can simply never settle on iOS — the worker is torn down mid-install and the
+  promise hangs, which left the banner stuck on "Updating…" for good. Both
+  copies now purge the caches with a timeout and reload regardless.
+- **Precache one URL at a time, and don't precache `./`.** `cache.addAll` is
+  all-or-nothing, so a single URL that 404s or redirects fails the whole
+  install and kills the worker; a bare directory URL is the entry most likely
+  to redirect, and a redirected response can't be cached at all.
+
 The game's copy of this lives in `bee/src/core/updates.ts`; the gallery's is a
 small inline script in `build.mjs` (`UPDATE_WATCH`), so the gallery stays two
 files with no build step of its own. They implement the same contract — change

@@ -321,9 +321,15 @@ function renderServiceWorker(shell) {
 const CACHE = 'chofter-${BUILD_ID}';
 const SHELL = ${JSON.stringify(shell, null, 2)};
 
+// Cached one at a time rather than with addAll, which is all-or-nothing: a
+// single URL that 404s or redirects fails the whole install, the worker is torn
+// down, and the console fills with "Cannot load" and "context closed".
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE).then((cache) => cache.addAll(SHELL)).then(() => self.skipWaiting()),
+    caches
+      .open(CACHE)
+      .then((cache) => Promise.allSettled(SHELL.map((url) => cache.add(url))))
+      .then(() => self.skipWaiting()),
   );
 });
 
@@ -402,7 +408,11 @@ const UPDATE_WATCH = `      (function () {
         banner.addEventListener('click', function () {
           banner.classList.add('taken');
           banner.querySelector('span').textContent = 'Updating…';
-          var done = function () { location.reload(); };
+          // The reload happens either way: a cache API that never settles must
+          // not leave the banner stuck on "Updating…".
+          var reloaded = false;
+          var done = function () { if (!reloaded) { reloaded = true; location.reload(); } };
+          setTimeout(done, 1500);
           if (!window.caches) return done();
           caches.keys()
             .then(function (names) { return Promise.all(names.map(function (n) { return caches.delete(n); })); })
@@ -535,7 +545,8 @@ fs.writeFileSync(
 fs.writeFileSync(
   path.join(OUT_DIR, 'sw.js'),
   renderServiceWorker([
-    './',
+    // Not './' — a bare directory URL is the one entry that can redirect, and a
+    // redirected response can't be put in a cache.
     './index.html',
     './styles.css',
     './manifest.webmanifest',

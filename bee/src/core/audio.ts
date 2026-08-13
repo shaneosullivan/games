@@ -12,6 +12,15 @@ export class Audio {
   private humGain: GainNode | null = null;
   private threatOsc: OscillatorNode | null = null;
   private threatGain: GainNode | null = null;
+  /**
+   * The backing track, if one is playing.
+   *
+   * Held here rather than only by whoever asked for it, so there is exactly one
+   * place that knows a track is running. A level that is torn down, or a menu
+   * that opens over it, can silence the music without having to find the object
+   * that started it — and two tracks can never overlap.
+   */
+  private music: Music | null = null;
   muted = false;
 
   /** Must be called from inside a touch/click handler. */
@@ -35,9 +44,17 @@ export class Audio {
    * simply plays silent.
    */
   createMusic(bpm: number): Music | null {
+    this.stopMusic();
     if (!this.ctx || !this.master) return null;
     void this.ctx.resume();
-    return new Music(this.ctx, this.master, bpm);
+    this.music = new Music(this.ctx, this.master, bpm);
+    return this.music;
+  }
+
+  /** Silence whatever track is playing. Safe to call when there isn't one. */
+  stopMusic(): void {
+    this.music?.stop();
+    this.music = null;
   }
 
   /** Wall-clock seconds from the audio clock, for syncing visuals to a track. */

@@ -18,6 +18,8 @@
 /** Where the build leaves the stamp, relative to the page. */
 const VERSION_URL = 'version.json';
 const POLL_MS = 60_000;
+/** How long to wait for the caches to clear before reloading regardless. */
+const PURGE_TIMEOUT_MS = 1500;
 
 interface Version {
   build?: string;
@@ -71,19 +73,29 @@ export function watchForUpdates(host: HTMLElement): void {
 
 /** Bin every cache, then come back for the new build. */
 async function applyUpdate(): Promise<void> {
+  // Whatever happens below, the page reloads. This used to `await
+  // registration.update()` as well, and on iOS that can simply never settle —
+  // the worker is torn down mid-install and the promise is left hanging, so the
+  // banner sat at "Updating…" for good. The service worker doesn't need our
+  // help: the browser re-checks it on the next navigation anyway.
+  const done = () => window.location.reload();
+  const backstop = setTimeout(done, PURGE_TIMEOUT_MS);
+
   try {
-    if ('caches' in window) {
-      const names = await caches.keys();
-      await Promise.all(names.map((name) => caches.delete(name)));
-    }
-    // The worker itself is fine — it's the contents that were stale — but a
-    // waiting one should take over rather than leaving two generations around.
-    const registration = await navigator.serviceWorker?.getRegistration();
-    await registration?.update();
+    await purgeCaches();
   } catch {
     // A failed clean-up is not a reason to refuse to reload.
   }
-  window.location.reload();
+
+  clearTimeout(backstop);
+  done();
+}
+
+/** Bin every cache, so the reload can't be served the page we're replacing. */
+async function purgeCaches(): Promise<void> {
+  if (!('caches' in window)) return;
+  const names = await caches.keys();
+  await Promise.all(names.map((name) => caches.delete(name)));
 }
 
 function createBanner(host: HTMLElement, onTake: () => void): { show(): void } {

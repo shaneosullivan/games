@@ -247,8 +247,10 @@ export class Game {
     // Levels that don't want a wasp shouldn't have to say so; level 3 spawns
     // its own in enter(). Same for the brood: they live in the hive unless a
     // level explicitly lets them out.
-    // Let the outgoing level put away anything that outlives it.
+    // Let the outgoing level put away anything that outlives it, and take the
+    // backing track away regardless, so a level that forgets can't leak one.
     this.level.exit?.(this.ctx);
+    this.audio.stopMusic();
     this.wasp.reset();
     this.bear.reset();
     this.setSplit(false);
@@ -449,6 +451,9 @@ export class Game {
     this.running = false;
     this.audio.setThreat(0);
     this.audio.setFlightIntensity(0);
+    // Nothing resumes from here — the menu always ends in a level switch — so
+    // the backing track goes with the level it belonged to.
+    this.audio.stopMusic();
     // Drop the old card and rebuild it against current progress, defaulting to
     // the level they're actually on rather than whatever the save last stored.
     this.codenameScreen.root.remove();
