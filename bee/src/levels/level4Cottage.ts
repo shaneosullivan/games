@@ -124,6 +124,8 @@ export class CottageLevel implements Level {
       cameraDistance: COTTAGE.cameraDistance,
       cameraHeight: COTTAGE.cameraHeight,
     });
+    // configureFlight snaps the zoom back to 1, so this has to follow it.
+    ctx.setCameraZoom(DANCE.matZoom);
     ctx.setFlightControls(false);
     ctx.setObjectiveMarker(null);
     ctx.cottage.setDoorOpen(false);
@@ -135,9 +137,17 @@ export class CottageLevel implements Level {
     // Facing the house, i.e. down -Z, which puts the camera behind her on +Z.
     // That's where the pan has to land.
     ctx.placeBee(start, DANCE.hoverHeight + 1.4, Math.PI);
+    // Where the follow rig will actually sit — zoom scales both offsets, and
+    // the pan has to land there exactly or the handover jumps.
     this.panTo
       .copy(start)
-      .add(tmpB.set(0, COTTAGE.cameraHeight, COTTAGE.cameraDistance));
+      .add(
+        tmpB.set(
+          0,
+          COTTAGE.cameraHeight * DANCE.matZoom,
+          COTTAGE.cameraDistance * DANCE.matZoom,
+        ),
+      );
     ctx.bee.setCrown(true);
     ctx.bee.scripted = true;
     ctx.bee.setYaw(Math.PI); // face the door, which is at -Z of the mat

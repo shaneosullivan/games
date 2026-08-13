@@ -241,6 +241,14 @@ export const DANCE = {
   /** Seconds for one hop out to a pad and back. */
   hopTime: 0.42,
   hopArc: 1.1,
+  /**
+   * Camera zoom while you're on the mat, as a fraction of the level's own rig.
+   *
+   * The mat is the whole game for this stage and the pads are the targets, so
+   * the shot comes in until the mat fills the frame rather than sitting in the
+   * middle of a clearing.
+   */
+  matZoom: 0.75,
 } as const;
 
 export const COTTAGE = {
