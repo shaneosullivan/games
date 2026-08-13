@@ -378,6 +378,28 @@ Things worth knowing before changing anything:
   giving up horizontal reach as you climb. It deliberately never touches the
   height: that's the one axis the player sets directly, and sinking someone who
   asked to be at the top of the room reads as broken controls, not as a wall.
+- **The camera can't line up behind the bee while the stick is held, and it's
+  not a bug you can tune away.** The stick is read in the camera's frame, so
+  turning the camera turns the bee's heading by the same amount: the angle
+  between them is a fixed point of the loop, and no gain closes it. Hold the
+  stick 90° off forward and the bee flies side-on to the camera indefinitely —
+  measured at 89°, whatever `yawGain` says. What _can_ be fixed is the moment
+  the thumb comes off, when there is no loop left: `followYaw` switches to
+  `yawIdleGain` / `yawIdleMaxRate` and comes round in about a second. It used
+  to stop dead instead, gated on `planarSpeed > 1.2`, which a released stick
+  drops under inside a second — that is what left the bee parked sideways.
+  It aims at `bee.heading`, not the velocity direction, because the heading
+  still means something at a standstill.
+- **A small screen gets a wider shot** — `CAMERA.smallScreen`, applied by
+  `Game.syncViewportZoom()` off the _shorter_ side of the viewport so it
+  catches a phone either way up and leaves an iPad alone. It multiplies the
+  level's own zoom, so anywhere the boom is already close to something solid
+  has to say so: `maxCameraZoom` in `configureFlight` caps it, and the cottage
+  interior sets it to 1 because the room is only half a unit wider than the
+  boom needs. Note the deeper limit — a portrait phone has an aspect of 0.46,
+  so it sees 4.4 units across against an iPad's 12.8, and pulling back scales
+  both axes. Distance alone can't close that; widening the FOV on a narrow
+  aspect is the lever if it's ever needed.
 - **A model's `animate()` must not write to the group the caller positioned.**
   The queen's bob originally set `group.position.y` directly, which silently
   dragged her from her dais down to the floor. Bobs and sways belong on an

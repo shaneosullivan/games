@@ -40,6 +40,22 @@ export class CameraRig {
   private zoomTarget = 1;
   private zoom = 1;
 
+  /**
+   * A second multiplier on top of the level's, set from the viewport rather
+   * than from the game: a phone gets a much smaller window onto the same world,
+   * so the shot widens to compensate. Kept separate from `zoom` because it
+   * isn't eased — it changes when the screen does, and a rotate shouldn't look
+   * like a camera move.
+   */
+  private viewportZoom = 1;
+
+  /**
+   * Ceiling on the two multiplied together. Rooms that were sized around the
+   * camera can't take the extra pull-back — the cottage interior has half a
+   * unit of clearance between the boom and the wall — so they cap it.
+   */
+  private maxZoom = Infinity;
+
   /** Set while a level is driving the camera itself. */
   private cinematicEye: THREE.Vector3 | null = null;
   private readonly cinematicLook = new THREE.Vector3();
@@ -140,6 +156,21 @@ export class CameraRig {
     }
   }
 
+  /** Extra pull-back for a small screen. Applied at once, not eased. */
+  setViewportZoom(z: number): void {
+    this.viewportZoom = z;
+  }
+
+  /** Cap on zoom * viewportZoom, for a level with no room to widen into. */
+  setMaxZoom(z: number | null): void {
+    this.maxZoom = z ?? Infinity;
+  }
+
+  /** How far back the boom actually is, once everything has had its say. */
+  private get scale(): number {
+    return Math.min(this.zoom * this.viewportZoom, this.maxZoom);
+  }
+
   /**
    * Hand the camera to a level for a scripted shot, or pass null to give it
    * back. While a cinematic is running the follow spring is bypassed entirely;
@@ -157,7 +188,11 @@ export class CameraRig {
     }
   }
 
-  update(dt: number, bee: BeeActor): void {
+  /**
+   * @param steering whether the player is actually pushing the stick. It
+   *   decides which of the two follow rates applies — see `followYaw`.
+   */
+  update(dt: number, bee: BeeActor, steering = false): void {
     if (this.cinematicEye) {
       this.camera.position.copy(this.cinematicEye);
       // Ease the look target so a moving subject doesn't make the shot jitter.
@@ -166,28 +201,17 @@ export class CameraRig {
       return;
     }
 
-    const planarSpeed = Math.hypot(bee.velocity.x, bee.velocity.z);
-    if (planarSpeed > 1.2) {
-      const heading = Math.atan2(bee.velocity.x, bee.velocity.z);
-      const diff = shortestAngle(this.yaw, heading);
-      const off = Math.abs(diff) - CAMERA.yawDeadzone;
-      if (off > 0) {
-        const rate =
-          Math.min(off * CAMERA.yawGain, CAMERA.yawMaxRate) *
-          Math.min(1, planarSpeed / 4.5);
-        // Never overshoot the heading in a single step.
-        this.yaw += Math.sign(diff) * Math.min(rate * dt, Math.abs(diff));
-      }
-    }
+    this.followYaw(dt, bee, steering);
 
     // Ease the pull-back so entering and leaving a chase glides.
     this.zoom += (this.zoomTarget - this.zoom) * (1 - Math.exp(-2.6 * dt));
+    const scale = this.scale;
 
     // Sit behind the heading: bee position minus its forward vector.
     desired.set(
-      bee.position.x - Math.sin(this.yaw) * this.distance * this.zoom,
-      bee.position.y + this.height * this.zoom,
-      bee.position.z - Math.cos(this.yaw) * this.distance * this.zoom,
+      bee.position.x - Math.sin(this.yaw) * this.distance * scale,
+      bee.position.y + this.height * scale,
+      bee.position.z - Math.cos(this.yaw) * this.distance * scale,
     );
 
     this.clampToEnclosure(desired, bee.position);
@@ -204,6 +228,48 @@ export class CameraRig {
   }
 
   /**
+   * Drift the shot round to sit behind the bee.
+   *
+   * Two rates, because the problem is two different problems.
+   *
+   * While the player is steering, the stick is read in this camera's frame, so
+   * turning the camera turns the bee's heading by the same amount: the offset
+   * between them is a fixed point, and no gain closes it. All the follow can do
+   * is widen the arc, so it stays gentle and keeps its dead zone.
+   *
+   * The moment nobody is pushing, that loop is gone — the heading is fixed in
+   * the world and the camera can simply come round behind it. It used to stop
+   * dead here instead: the follow was gated on `planarSpeed > 1.2` and scaled
+   * by speed, and a released stick drops under that inside a second, which is
+   * what left the bee parked side-on to the camera after every turn. Now it
+   * lines up on `bee.heading`, which holds its value at a standstill.
+   */
+  private followYaw(dt: number, bee: BeeActor, steering: boolean): void {
+    const diff = shortestAngle(this.yaw, bee.heading);
+    const size = Math.abs(diff);
+    if (size < 1e-4) {
+      return;
+    }
+
+    let rate: number;
+    if (steering) {
+      const off = size - CAMERA.yawDeadzone;
+      if (off <= 0) {
+        return;
+      }
+      const planarSpeed = Math.hypot(bee.velocity.x, bee.velocity.z);
+      rate =
+        Math.min(off * CAMERA.yawGain, CAMERA.yawMaxRate) *
+        Math.min(1, planarSpeed / 4.5);
+    } else {
+      rate = Math.min(size * CAMERA.yawIdleGain, CAMERA.yawIdleMaxRate);
+    }
+
+    // Never overshoot the heading in a single step.
+    this.yaw += Math.sign(diff) * Math.min(rate * dt, size);
+  }
+
+  /**
    * Snap immediately, used on level entry so there's no swoop-in.
    *
    * @param yaw which way to look. Defaults to facing the world origin, which
@@ -217,10 +283,11 @@ export class CameraRig {
   ): void {
     this.zoom = this.zoomTarget;
     this.yaw = yaw;
+    const scale = this.scale;
     desired.set(
-      bee.position.x - Math.sin(this.yaw) * this.distance * this.zoom,
-      bee.position.y + this.height * this.zoom,
-      bee.position.z - Math.cos(this.yaw) * this.distance * this.zoom,
+      bee.position.x - Math.sin(this.yaw) * this.distance * scale,
+      bee.position.y + this.height * scale,
+      bee.position.z - Math.cos(this.yaw) * this.distance * scale,
     );
     this.clampToEnclosure(desired, bee.position);
     this.camera.position.copy(desired);

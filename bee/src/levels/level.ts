@@ -37,6 +37,13 @@ export interface FlightSettings {
    * ending up outside the room. Omit it and the camera is unconstrained.
    */
   cameraEnclosure?: number;
+  /**
+   * Ceiling on the camera's total pull-back, including the extra a small
+   * screen asks for. Set it in a room that was sized around the boom and has
+   * no slack to give — otherwise the phone's wider shot puts the camera
+   * through the wall. Omit it where there's open space behind the bee.
+   */
+  maxCameraZoom?: number;
 }
 
 export interface GameContext {

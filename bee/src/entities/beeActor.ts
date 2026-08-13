@@ -79,6 +79,15 @@ export class BeeActor {
     this.prevYaw = this.yaw;
   }
 
+  /**
+   * Which way the bee is pointing. This, not the velocity, is what the camera
+   * lines up behind: it holds its last value when she slows to a stop, where
+   * a velocity direction would be noise, and it's what the player can see.
+   */
+  get heading(): number {
+    return this.yaw;
+  }
+
   /** 0..1 fraction of top speed. */
   get speed01(): number {
     return Math.min(1, this.velocity.length() / FLIGHT.maxSpeed);

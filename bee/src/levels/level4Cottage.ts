@@ -474,6 +474,9 @@ export class CottageLevel implements Level {
       maxHeight: INSIDE.maxHeight,
       cameraDistance: INSIDE.cameraDistance,
       cameraHeight: INSIDE.cameraHeight,
+      // The room is only half a unit wider than the boom already needs (see
+      // INSIDE.roomSize), so there is nothing here to widen the shot into.
+      maxCameraZoom: 1,
     });
     ctx.honeyJar.reset(ctx.inside.jarRest);
     ctx.inside.glow.mesh.visible = true;

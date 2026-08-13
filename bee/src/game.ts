@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import {INSIDE, LEVELS, POLLEN_KINDS} from "./config";
+import {CAMERA, INSIDE, LEVELS, POLLEN_KINDS} from "./config";
 import {Audio} from "./core/audio";
 import {AltitudeStick} from "./core/altitudeStick";
 import {Joystick, type StickInput} from "./core/input";
@@ -160,6 +160,9 @@ export class Game {
     this.stage.scene.add(this.beacon);
 
     this.rig = new CameraRig(this.stage.camera);
+    // Before the first snap, so a phone opens on the wide shot rather than
+    // easing out to it once something happens to call resize().
+    this.syncViewportZoom();
     this.rig.snap(this.bee);
 
     const uiLayer = document.createElement("div");
@@ -269,6 +272,23 @@ export class Game {
   /** Re-measure the canvas. Called when the visible viewport changes. */
   resize(): void {
     this.stage.resize();
+    this.syncViewportZoom();
+  }
+
+  /**
+   * Widen the shot on a small screen.
+   *
+   * The world doesn't get smaller on a phone, the window onto it does, so the
+   * same rig that frames the meadow nicely on an iPad leaves a phone player
+   * flying into things they never saw. Keyed off the shorter side so it catches
+   * a phone in either orientation and leaves a tablet alone either way up.
+   */
+  private syncViewportZoom(): void {
+    const {narrow, wide, zoom} = CAMERA.smallScreen;
+    const shortSide = Math.min(window.innerWidth, window.innerHeight);
+    const t = (wide - shortSide) / (wide - narrow);
+    const amount = Math.max(0, Math.min(1, t));
+    this.rig.setViewportZoom(1 + (zoom - 1) * amount);
   }
 
   // ---- level management ---------------------------------------------------
@@ -412,6 +432,7 @@ export class Game {
     // Only the hive interior asks to be fenced in; everywhere else the camera
     // has open sky behind it.
     this.rig.setEnclosure(s.cameraEnclosure ?? null);
+    this.rig.setMaxZoom(s.maxCameraZoom ?? null);
     // A new level starts framed normally; it can widen the shot itself.
     this.rig.setZoom(1, true);
     // A new level starts with the follow rig in charge.
@@ -597,8 +618,9 @@ export class Game {
     this.level.update(dt, this.ctx, harvest);
 
     // After the level, so a cutscene's freshly written position is what the
-    // camera actually frames this step.
-    this.rig.update(dt, this.bee);
+    // camera actually frames this step. The rig follows harder when nobody is
+    // steering, so it needs to know whether a thumb is down.
+    this.rig.update(dt, this.bee, !locked && this.stick.magnitude > 0.05);
 
     this.puff.update(dt);
     this.fireworks.update(dt);

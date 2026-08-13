@@ -65,14 +65,41 @@ export const CAMERA = {
   /** Position spring stiffness (higher = tighter follow). */
   followLerp: 5.5,
   /**
-   * Yaw follow. Because the stick is interpreted in the camera's frame,
-   * a camera that snaps to the bee's heading feeds back into the input and
-   * the bee spins in a tight circle. A dead zone plus a hard rate cap turns
-   * that into a wide, deliberate arc instead.
+   * Yaw follow, while the player is steering. Because the stick is read in the
+   * camera's frame, a camera that snaps to the bee's heading feeds back into
+   * the input and the bee spins in a tight circle. A dead zone plus a hard rate
+   * cap turns that into a wide, deliberate arc instead.
+   *
+   * Note what this can and can't do. Holding the stick off-forward puts the
+   * bee's heading at exactly that angle from the camera, and turning the camera
+   * turns the heading with it — the offset is a fixed point of the loop, so no
+   * gain here will close it. That is why the numbers below only have to be
+   * gentle, and why the real re-centring is the idle case.
    */
   yawDeadzone: 0.38,
   yawGain: 1.5,
   yawMaxRate: 0.75,
+  /**
+   * Yaw follow when nobody is touching the stick — much brisker, because the
+   * feedback loop above only exists while the player is steering. Let go after
+   * a turn and the camera comes round behind the bee within about a second,
+   * instead of stopping wherever it happened to be and leaving her side-on.
+   */
+  yawIdleGain: 1.8,
+  yawIdleMaxRate: 1.4,
+  /**
+   * Extra pull-back on a small screen, keyed off the *shorter* side of the
+   * viewport so it catches a phone either way up and leaves an iPad alone.
+   * The world is the same size whatever it's shown on, so a phone gets a much
+   * smaller window onto it; widening the shot is what makes it steerable.
+   */
+  smallScreen: {
+    /** Shorter side at or below which the full amount applies. */
+    narrow: 380,
+    /** ...and at or above which none of it does. */
+    wide: 760,
+    zoom: 1.35,
+  },
   fov: 55,
   near: 0.1,
   /**
