@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import {mergeGeometries} from "three/examples/jsm/utils/BufferGeometryUtils.js";
-import {PALETTE, WORLD} from "../../config";
+import {COTTAGE, PALETTE, WORLD} from "../../config";
 import {paint, solidToon, vertexToon} from "../materials";
 import type {Rng} from "../../core/rng";
 
@@ -83,7 +83,7 @@ export function createMeadow(rng: Rng): THREE.Group {
       bushes.setMatrixAt(i, m);
       continue;
     }
-    const r = WORLD.radius + rng.range(1.5, 4);
+    const r = WORLD.radius + WORLD.hedgeOffset + rng.range(-1, 1.5);
     const s = rng.range(1.6, 3.1);
     m.compose(
       new THREE.Vector3(Math.cos(a) * r, s * 0.35, Math.sin(a) * r),
@@ -96,7 +96,9 @@ export function createMeadow(rng: Rng): THREE.Group {
   }
   group.add(bushes);
 
-  group.add(createTrees(rng));
+  const treeGeo = createTreeGeometry(rng);
+  group.add(createTreeRing(rng, treeGeo));
+  group.add(createLane(rng, treeGeo));
   return group;
 }
 
@@ -116,11 +118,10 @@ function facingCottage(a: number): boolean {
   if (d < -Math.PI) {
     d += Math.PI * 2;
   }
-  return Math.abs(d) < 0.6;
+  return Math.abs(d) < WORLD.laneGap;
 }
 
-function createTrees(rng: Rng): THREE.Group {
-  const g = new THREE.Group();
+function createTreeGeometry(rng: Rng): THREE.BufferGeometry {
   const parts: Array<THREE.BufferGeometry> = [];
   const trunk = new THREE.CylinderGeometry(0.42, 0.62, 4.4, 7);
   trunk.translate(0, 2.2, 0);
@@ -135,9 +136,14 @@ function createTrees(rng: Rng): THREE.Group {
     blob.translate(rng.range(-0.3, 0.3), y, rng.range(-0.3, 0.3));
     parts.push(paint(blob, y > 6 ? 0x69b45c : 0x4e8f47));
   }
-  const treeGeo = mergeGeometries(parts, false)!;
-  treeGeo.computeVertexNormals();
+  const geo = mergeGeometries(parts, false)!;
+  geo.computeVertexNormals();
+  return geo;
+}
 
+/** The treeline standing behind the meadow's boundary hedge. */
+function createTreeRing(rng: Rng, treeGeo: THREE.BufferGeometry): THREE.Group {
+  const g = new THREE.Group();
   const trees = new THREE.InstancedMesh(treeGeo, vertexToon(), 22);
   trees.castShadow = true;
   const m = new THREE.Matrix4();
@@ -158,6 +164,49 @@ function createTrees(rng: Rng): THREE.Group {
       new THREE.Vector3(s, s, s),
     );
     trees.setMatrixAt(i, m);
+  }
+  g.add(trees);
+  return g;
+}
+
+/**
+ * The lane north to Caramel Cottage: two verges of trees running from the gap
+ * in the meadow's treeline up to the clearing's hedge.
+ *
+ * They stand well back from the centreline. This stretch is the whole bear
+ * chase, flown at speed by a child, and the lane has to be a corridor rather
+ * than a slalom — the trees are there to make the speed legible, not to be
+ * dodged.
+ */
+function createLane(rng: Rng, treeGeo: THREE.BufferGeometry): THREE.Group {
+  const g = new THREE.Group();
+  const {trees: perSide, halfWidth, spread} = WORLD.lane;
+
+  // From just outside the meadow's hedge to just short of the clearing's, so
+  // neither end has trees growing out of another planting.
+  const from = -(WORLD.radius + 8);
+  const to = COTTAGE.yardOffsetZ + COTTAGE.boundsRadius + 6;
+
+  const trees = new THREE.InstancedMesh(treeGeo, vertexToon(), perSide * 2);
+  trees.castShadow = true;
+  const m = new THREE.Matrix4();
+  for (let i = 0; i < perSide; i++) {
+    const z = THREE.MathUtils.lerp(from, to, i / (perSide - 1));
+    for (const side of [-1, 1]) {
+      const s = rng.range(0.85, 1.5);
+      m.compose(
+        new THREE.Vector3(
+          side * (halfWidth + rng.range(0, spread)),
+          0,
+          z + rng.range(-4, 4),
+        ),
+        new THREE.Quaternion().setFromEuler(
+          new THREE.Euler(0, rng.range(0, 6.28), 0),
+        ),
+        new THREE.Vector3(s, s, s),
+      );
+      trees.setMatrixAt(i * 2 + (side === -1 ? 0 : 1), m);
+    }
   }
   g.add(trees);
   return g;

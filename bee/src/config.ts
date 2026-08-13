@@ -60,13 +60,47 @@ export const CAMERA = {
   yawMaxRate: 0.75,
   fov: 55,
   near: 0.1,
-  far: 300,
+  /**
+   * Past the cottage fog's far distance (320), so nothing still visible is
+   * clipped. The chase home is 168 units long and looks down the length of it.
+   */
+  far: 420,
 } as const;
 
 export const WORLD = {
   /** Playable radius; the bee is softly pushed back inside. */
   radius: 52,
-  groundSize: 320,
+  /**
+   * Diameter of the ground disc. It has to reach past the cottage clearing at
+   * the north end — |COTTAGE.yardOffsetZ| + clearingRadius = 244 — with enough
+   * to spare that the edge is never the nearest thing on the horizon.
+   */
+  groundSize: 640,
+  /** How far outside `radius` the boundary hedge is planted. */
+  hedgeOffset: 2.5,
+  /**
+   * The mouth of the lane north: the meadow's hedge and treeline both step
+   * aside within this many radians of due north, and the gate stands across
+   * the gap they leave.
+   */
+  laneGap: 0.6,
+  /**
+   * The lane north to Caramel Cottage: the corridor between the meadow's
+   * treeline and the clearing's hedge, which the bear chase runs the length of.
+   *
+   * Left bare it is a hundred units of flat green, and at that scale speed
+   * stops reading — the bee looks becalmed however hard you fly. Trees down
+   * either side give the flight something to sweep past, and the bear
+   * something to corner badly around.
+   */
+  lane: {
+    /** Trees per side. */
+    trees: 15,
+    /** Distance from the lane's centreline to a trunk, before jitter. */
+    halfWidth: 17,
+    /** Jitter on that, so the rows aren't an avenue of telegraph poles. */
+    spread: 7,
+  },
   flowerCount: {white: 22, yellow: 22, orange: 22},
   /** Seconds before a harvested flower blooms again. */
   regrowSeconds: 18,
@@ -280,19 +314,28 @@ export const COTTAGE = {
    * Where the whole clearing sits in the meadow's world.
    *
    * The cottage used to be its own scene at the origin, swapped in and out.
-   * It now stands at the north end of the same world as the hive, so the flight
-   * home is one continuous flight rather than a cut: mat at z = -48, gate at
-   * z = -28, hive at the origin.
+   * It now stands at the far north end of the same world as the hive, so the
+   * flight home is one continuous flight rather than a cut: mat at z = -168,
+   * gate at z = -154, hive at the origin.
+   *
+   * That run is deliberately long. The whole of stage 3 is the flight from the
+   * mat to the hive with the bear behind you, and at the old offset of -78 it
+   * was over in a few seconds. Four times the distance (42 units of escape,
+   * now 168) is four times the chase. The lane between the meadow and the
+   * clearing is planted to match — see WORLD.lane.
    */
-  yardOffsetZ: -78,
+  yardOffsetZ: -204,
   /** The mown clearing around the house. Sits inside the meadow's ground. */
   clearingRadius: 40,
   /** Gap in the hedge, in radians either side of due south (+Z). */
   gateGap: 0.24,
   /** Half-width of the gateway itself. */
   gateHalfWidth: 4.5,
-  /** Bounds for the flight home: has to hold the yard and the hive both. */
-  flightRadius: 115,
+  /**
+   * Bounds for the flight home: has to hold the yard and the hive both. The
+   * far side of the yard is the doorway at |z| = 194, so this clears it.
+   */
+  flightRadius: 240,
   /**
    * How far back the camera pulls once the bear turns up. A bear this size
    * needs the room — at normal framing it fills the screen or sits off it.
@@ -363,6 +406,12 @@ export const BEAR = {
   deliverRadius: 4.0,
   /** Where it waits outside the cottage, relative to the door. */
   ambushOffset: 14,
+  /**
+   * How close it comes before the chase proper starts. A bear at 2.6 scale is
+   * bigger than the mat; any nearer than this during the reveal and it is the
+   * only thing on screen.
+   */
+  ambushStandoff: 16,
   fleeSeconds: 4.0,
   /**
    * How far from the hive it backs off to when the brood mobs it.

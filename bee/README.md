@@ -108,12 +108,15 @@ once rather than reacting faster. 90% opens the door.
 Inside is a lamplit room with a jar of honey glowing on the counter — fly over,
 pick it up, and it hangs from you on a rope that swings with real momentum.
 
-Then stage three: you come back out over the mat, the camera pulls right back,
-and a bear lumbers in from the left. The clearing stands at the north end of the
-meadow's own world rather than in a scene of its own, so what happens next is
-one continuous flight with no cut in it: out through the gate in the fence and
-across the meadow to the hive, glowing at you from the far end, with the bear on
-your tail. It's faster than you but corners badly,
+Then stage three. The screen washes to white as you slip into the doorway, and
+opens again on the front of the house from out in the yard: you coming out of
+the door with the jar swinging under you, the camera arcing in behind you as a
+bear lumbers into shot. The clearing stands at the far north end of the meadow's
+own world rather than in a scene of its own, so what happens next has no cut in
+it at all: a hundred and seventy units down a tree-lined lane, out through the
+gate in the meadow's hedge and across to the hive, glowing at you from the far
+end, with the bear on your tail the whole way — about eighteen seconds flat out.
+It's faster than you but corners badly,
 same as the wasp, so turning is what saves you. Drop the honey into the hive and
 the brood pours out to mob the bear; it rears up on its hind legs and swipes at
 them (never connecting). While it's busy the screen splits — bear and bees on
@@ -259,15 +262,23 @@ Things worth knowing before changing anything:
   again — without it the finished hive goes inert and approaching it does
   nothing. Any future level needs to re-arm itself there too.
 - **The cottage clearing is part of the meadow's world**, parked at
-  `COTTAGE.yardOffsetZ` with a fence and gate at its mouth, and both are drawn
-  together. That's what makes stage 3 a single flight rather than a cut — but it
-  means bounds, fog and camera all have to span the pair: `COTTAGE.flightRadius`
-  is a circle about the _hive_ wide enough to hold the clearing, `COTTAGE_ENV`
-  fogs much further out than the meadow, and the meadow's boundary hedge and
-  treeline leave a gap on that side (`facingCottage` in
-  `render/geometry/world.ts`). Anything placed at the clearing works in world
-  space: `cottage.matCentre`, `padCentres`, `doorway` and `gate` are all shifted
-  before they're handed out.
+  `COTTAGE.yardOffsetZ`, and the two are drawn together. That's what makes
+  stage 3 a single flight rather than a cut — but it means bounds, fog, ground
+  and camera all have to span the pair: `COTTAGE.flightRadius` is a circle about
+  the _hive_ wide enough to hold the clearing, `WORLD.groundSize` has to reach
+  past it, `CAMERA.far` past the fog, and `COTTAGE_ENV` fogs much further out
+  than the meadow. Most things at the clearing are authored in the yard's own
+  frame and shifted: `cottage.matCentre`, `padCentres` and `doorway` are all
+  world space by the time they're handed out.
+- **The gate is not at the clearing.** It stands in the gap in the _meadow's_
+  hedge (`WORLD.laneGap`, which `facingCottage` in `render/geometry/world.ts`
+  also uses to step the hedge and treeline aside), a lane's length south of the
+  yard — so from level 1 you can see a shut gate at the edge of where you're
+  allowed, which is the point of it. It therefore hangs off the cottage group's
+  root rather than the yard, and `cottage.gate` is already world space with no
+  shift applied. `syncCottageGate` walls the meadow off at that z until level 4;
+  move the gate north with the yard and the player can fly the whole empty lane
+  in level 1.
 - **`rig.snap()` faces the world origin unless told otherwise.** That was fine
   when every scene was built around it; the cottage isn't, so `ctx.placeBee()`
   takes an optional yaw and level 4 passes one. A level that places the bee far

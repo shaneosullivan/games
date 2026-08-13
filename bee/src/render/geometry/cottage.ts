@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import {mergeGeometries} from "three/examples/jsm/utils/BufferGeometryUtils.js";
-import {COTTAGE, DANCE} from "../../config";
+import {COTTAGE, DANCE, WORLD} from "../../config";
 import type {Rng} from "../../core/rng";
 import {paint, solidToon, vertexToon} from "../materials";
 
@@ -46,9 +46,14 @@ export function createCottage(rng: Rng): CottageScene {
   const group = new THREE.Group();
   // The clearing stands at the north end of the meadow's world rather than in
   // a scene of its own, so the flight home is one continuous flight. Everything
-  // below is authored around a local origin at the house and shifted bodily;
-  // the vectors handed back are converted to world space at the end.
-  group.position.z = COTTAGE.yardOffsetZ;
+  // in the yard is authored around a local origin at the house and shifted
+  // bodily; the vectors handed back are converted to world space at the end.
+  //
+  // The gate is the exception — it stands at the other end of the lane
+  // entirely — so it hangs off the root in world coordinates instead.
+  const yard = new THREE.Group();
+  yard.position.z = COTTAGE.yardOffsetZ;
+  group.add(yard);
 
   // ---- clearing ----------------------------------------------------------
   // Mown grass, a shade lighter than the meadow's, laid just above it. It has
@@ -61,7 +66,7 @@ export function createCottage(rng: Rng): CottageScene {
   ground.rotation.x = -Math.PI / 2;
   ground.position.y = 0.02;
   ground.receiveShadow = true;
-  group.add(ground);
+  yard.add(ground);
 
   // A worn path from the mat to the door.
   const path = new THREE.Mesh(
@@ -71,10 +76,25 @@ export function createCottage(rng: Rng): CottageScene {
   path.rotation.x = -Math.PI / 2;
   path.position.set(0, 0.01, COTTAGE.matOffsetZ);
   path.scale.set(1.1, 1.25, 1);
-  group.add(path);
+  yard.add(path);
 
-  group.add(createHedge(rng));
-  const fence = createFence();
+  yard.add(createHedge(rng));
+
+  // ---- the gate ----------------------------------------------------------
+  //
+  // It stands in the gap in the *meadow's* hedge, not the clearing's, which is
+  // a lane's length further north. That is deliberate: from level 1 the player
+  // is looking at a shut gate at the edge of the world they're allowed in, so
+  // there is visibly somewhere to go later. The clearing's own hedge just
+  // leaves its gap open — nothing bars the way once you're up there.
+  //
+  // The meadow's hedge is a ring, so the ends of the gap are at
+  // (±sin(laneGap), -cos(laneGap)) * its radius. Sitting the straight fence on
+  // that chord is what makes it meet the hedge rather than float in front of
+  // it.
+  const gateRing = WORLD.radius + WORLD.hedgeOffset;
+  const gateZ = -Math.cos(WORLD.laneGap) * gateRing;
+  const fence = createFence(gateZ, Math.sin(WORLD.laneGap) * gateRing);
   group.add(fence.group);
 
   // ---- the house, at house scale -----------------------------------------
@@ -117,18 +137,18 @@ export function createCottage(rng: Rng): CottageScene {
   doorPivot.add(frame);
 
   house.add(doorPivot);
-  group.add(house);
+  yard.add(house);
 
   // ---- dance mat ---------------------------------------------------------
   const matCentre = new THREE.Vector3(0, 0, COTTAGE.matOffsetZ);
   const {mat, pads, padCentres, padColours} = createMat(matCentre);
-  group.add(mat);
+  yard.add(mat);
 
   let doorOpen = false;
 
   // Everything the level steers by is handed back in world space, so callers
   // never have to know the clearing is parked away from the origin.
-  const toWorld = (v: THREE.Vector3) => v.clone().add(group.position);
+  const toWorld = (v: THREE.Vector3) => v.clone().add(yard.position);
 
   return {
     group,
@@ -140,7 +160,8 @@ export function createCottage(rng: Rng): CottageScene {
     doorway: toWorld(
       new THREE.Vector3(0, 1.35, 2.0).multiplyScalar(COTTAGE.houseScale),
     ),
-    gate: toWorld(new THREE.Vector3(0, 3, COTTAGE.boundsRadius)),
+    // Already world space: the gate never moved with the yard.
+    gate: new THREE.Vector3(0, 3, gateZ),
     setDoorOpen(open) {
       doorOpen = open;
     },
@@ -288,14 +309,20 @@ function shortestAngle(from: number, to: number): number {
 }
 
 /**
- * A picket fence across the gap in the hedge, with a gate in the middle.
+ * A picket fence across the gap in the meadow's hedge, with a gate in it.
  *
  * It's the signpost for the whole of stage 3: the way home is through there,
- * and from over the mat you can see the hive glowing beyond it. It's shut until
+ * and from up the lane you can see the hive glowing beyond it. It's shut until
  * Caramel Cottage is unlocked, though — there's nothing up the lane before
  * then, and a gate is a kinder way to say so than an invisible wall.
+ *
+ * @param z where the run stands, on the meadow's northern boundary
+ * @param reach how far either side of the gateway the pickets run
  */
-function createFence(): {
+function createFence(
+  z: number,
+  reach: number,
+): {
   group: THREE.Group;
   setOpen(open: boolean): void;
   update(): void;
@@ -307,11 +334,7 @@ function createFence(): {
 
   const WOOD = 0xdcc39a;
   const WOOD_DARK = 0xb69466;
-  const z = COTTAGE.boundsRadius;
   const half = COTTAGE.gateHalfWidth;
-  // The hedge gap is an arc; the fence is a straight run filling it either side
-  // of the gateway.
-  const reach = Math.sin(COTTAGE.gateGap) * (COTTAGE.boundsRadius + 5);
 
   const picket = (x: number, height: number, color: number) => {
     const post = new THREE.BoxGeometry(0.55, height, 0.4);

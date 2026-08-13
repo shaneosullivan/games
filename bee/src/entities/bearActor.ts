@@ -160,7 +160,12 @@ export class BearActor {
 
     switch (this.phase) {
       case "waiting":
-        tmpTarget.copy(beePosition).setY(0);
+        // Lumber into shot, then pull up short. It is meant to arrive beside
+        // the bee during the reveal, not walk onto her and fill the frame —
+        // which is what it did once that shot was lengthened.
+        tmpTarget
+          .copy(distance < BEAR.ambushStandoff ? this.position : beePosition)
+          .setY(0);
         break;
 
       case "chasing":

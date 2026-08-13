@@ -47,10 +47,11 @@ export const HIVE_ENV: EnvironmentSettings = {
 export const COTTAGE_ENV: EnvironmentSettings = {
   background: 0xbfe0e8,
   fogColor: 0xe3ddc8,
-  // The clearing and the hive are ~90 units apart and both have to be legible
-  // from the other end, so this fog is much longer-throw than the meadow's.
-  fogNear: 90,
-  fogFar: 320,
+  // The clearing and the hive are 168 units apart and both have to be legible
+  // from the other end, so this fog is much longer-throw than the meadow's:
+  // it only starts past the length of the lane, and thins out well beyond it.
+  fogNear: 170,
+  fogFar: 420,
   hemiSky: 0xffeccf,
   hemiGround: 0x7a9c5a,
   hemiIntensity: 1.1,

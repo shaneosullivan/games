@@ -86,6 +86,8 @@ export class Game {
   private readonly beacon: THREE.Group;
   private readonly ctx: GameContext;
   private readonly flash: HTMLDivElement;
+  /** The wash a cutscene fades through; see setScreenFade. */
+  private readonly fade: HTMLDivElement;
   private readonly uiLayer: HTMLDivElement;
   private readonly cottage: CottageScene;
   private readonly inside: CottageInside;
@@ -175,6 +177,10 @@ export class Game {
     this.flash.className = "screen-flash";
     uiLayer.appendChild(this.flash);
 
+    this.fade = document.createElement("div");
+    this.fade.className = "screen-fade";
+    uiLayer.appendChild(this.fade);
+
     this.ctx = {
       scene: this.stage.scene,
       save: this.save,
@@ -191,6 +197,7 @@ export class Game {
       fireworks: this.fireworks,
       setObjectiveMarker: p => this.setObjectiveMarker(p),
       flashScreen: () => this.flashScreen(),
+      setScreenFade: a => this.setScreenFade(a),
       setEnvironment: name => this.setEnvironment(name),
       configureFlight: s => this.configureFlight(s),
       placeBee: (position, desiredHeight, yaw) =>
@@ -299,6 +306,9 @@ export class Game {
     this.wasp.reset();
     this.bear.reset();
     this.setSplit(false);
+    // A cutscene abandoned mid-wash — quitting to the menu from inside the
+    // cottage — would otherwise leave the next level behind a white screen.
+    this.setScreenFade(0);
     this.interior.group.add(this.babies.group);
     // Put the honey back where it belongs before any level starts.
     this.inside.group.add(this.inside.jar);
@@ -590,6 +600,11 @@ export class Game {
       this.save.flush();
       this.completeScreen.show();
     }
+  }
+
+  private setScreenFade(alpha: number): void {
+    const a = THREE.MathUtils.clamp(alpha, 0, 1);
+    this.fade.style.opacity = String(a);
   }
 
   private flashScreen(): void {

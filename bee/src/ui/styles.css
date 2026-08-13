@@ -447,6 +447,20 @@ body {
   }
 }
 
+/*
+ * A plain white wash a cutscene drives itself, frame by frame — unlike the
+ * flash above, which is a fire-and-forget animation. Level 4 closes it over
+ * the bee leaving the cottage and opens it again outside, so the scene swap
+ * underneath is never on screen.
+ */
+.screen-fade {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  background: #fff;
+}
+
 /* ---------- Overlays ---------- */
 
 .overlay {

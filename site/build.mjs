@@ -143,7 +143,10 @@ function titleCase(slug) {
 }
 
 function run(cmd, args, cwd) {
-  execFileSync(cmd, args, {cwd, stdio: "inherit"});
+  // On Windows npm is npm.cmd; execFileSync won't find the bare name. Naming
+  // the .cmd directly beats shell:true, which doesn't escape the arguments.
+  const exe = process.platform === "win32" ? `${cmd}.cmd` : cmd;
+  execFileSync(exe, args, {cwd, stdio: "inherit"});
 }
 
 function buildGame(game) {

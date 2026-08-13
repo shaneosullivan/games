@@ -27,6 +27,38 @@ const PAN_FROM = new THREE.Vector3(-42, 24, 16);
 const PAN_CONTROL = new THREE.Vector3(-14, 40, 54);
 const PAN_LOOK_FROM = new THREE.Vector3(0, 17, 0);
 
+/**
+ * Coming back out of the cottage with the honey.
+ *
+ * This used to be a straight cut: one frame in the room, the next hanging over
+ * the mat with a bear walking in. Now a white wash covers the change. It closes
+ * over the last of her flight into the doorway, the scenery swaps behind it,
+ * and it opens again on a wide shot of the front of the house with the bee
+ * coming out of the door, jar swinging under her. The shot then arcs in and
+ * lands exactly where the chase rig wants to sit, so handing control back is
+ * invisible — the same trick the establishing pan above plays.
+ */
+const LEAVE_TIME = 1.5;
+/** How much of the tail of that the wash takes to close over. */
+const LEAVE_FADE = 0.75;
+/** Seconds the wash takes to open again on the far side. */
+const EMERGE_FADE = 0.9;
+/** Her flight from the doorway out over the mat. */
+const EMERGE_FLY = 3.4;
+/** The whole shot. The tail is the bear finishing its walk into frame. */
+const EMERGE_TIME = 5.4;
+/**
+ * The wide shot, relative to the centre of the mat: out in the yard, off to
+ * one side and high enough to hold the roof, looking back at the door.
+ *
+ * It has to stand well back. The house is 36 units to the ridge and about as
+ * wide, so anything nearer than about 60 crops it — at 66 it sits in half the
+ * frame with the mat in the foreground, which is the shot.
+ */
+const EMERGE_FROM = new THREE.Vector3(-32, 22, 30);
+/** Pushes the arc up and around the front of the house rather than across it. */
+const EMERGE_CONTROL = new THREE.Vector3(-26, 30, 4);
+
 /** The clearing's offset from the world origin. */
 const YARD = new THREE.Vector3(0, 0, COTTAGE.yardOffsetZ);
 
@@ -93,8 +125,10 @@ export class CottageLevel implements Level {
   private hop: {from: THREE.Vector3; to: THREE.Vector3; t: number} | null =
     null;
   private readonly hover = new THREE.Vector3();
-  /** Where the follow rig will sit once the pan ends. */
+  /** Where the follow rig will sit once a scripted shot ends. */
   private readonly panTo = new THREE.Vector3();
+  /** Where in the room she was when she turned for the door. */
+  private readonly exitFrom = new THREE.Vector3();
 
   get controlsLocked(): boolean {
     // Stage 1 is tapped rather than flown; stage 2 hands flight back.
@@ -488,18 +522,30 @@ export class CottageLevel implements Level {
     }
     this.phase = "leaving";
     this.phaseTime = 0;
+    // From wherever in the room she happens to be. Lerping from a fixed point
+    // teleported her across the room on the first frame of the shot.
+    this.exitFrom.copy(ctx.bee.position);
     ctx.hud.setObjective("Home with it, then!");
   }
 
   // ---- stage 3: the bear ---------------------------------------------------
 
-  /** Out the door: shrink into the doorway from inside… */
+  /** Out the door: shrink into the doorway from inside, and wash to white… */
   private updateLeaving(ctx: GameContext): void {
-    const t = Math.min(1, this.phaseTime / 1.4);
+    const t = Math.min(1, this.phaseTime / LEAVE_TIME);
     ctx.bee.scripted = true;
     ctx.setFlightControls(false);
-    ctx.bee.position.lerpVectors(this.hover, ctx.inside.entryPosition, ease(t));
+    ctx.bee.position.lerpVectors(
+      this.exitFrom,
+      ctx.inside.entryPosition,
+      ease(t),
+    );
     ctx.bee.setScale(Math.max(0.001, 1 - t * t * 0.9));
+    // The wash closes over the tail of the shrink, so it is already opaque
+    // when beginEmerging swaps the room for the yard.
+    ctx.setScreenFade(
+      ease((this.phaseTime - (LEAVE_TIME - LEAVE_FADE)) / LEAVE_FADE),
+    );
     if (t < 1) {
       return;
     }
@@ -507,13 +553,15 @@ export class CottageLevel implements Level {
   }
 
   /**
-   * …and back out over the mat, where the bear is waiting.
+   * …and back out through the front door, where the bear is waiting.
    *
-   * The clearing sits at the north end of the meadow's world, so there is no
-   * cut here and none later: the camera pulls right back, the bear lumbers in
-   * from the left, and through the gate in the fence the hive is already
-   * glowing at the far end of the flight. Everything from here to the hive is
-   * one continuous shot.
+   * Set up entirely behind the white wash: by the time it opens the scenery,
+   * the bee, the jar and the bear are all already in place, and what the player
+   * sees is a held shot of the house rather than a swap. From here to the hive
+   * there is no cut at all — the clearing stands at the north end of the same
+   * world, so the camera pulls back, the bear lumbers in from the left, and
+   * through the gate in the fence the hive is glowing at the far end of the
+   * lane home.
    */
   private beginEmerging(ctx: GameContext): void {
     this.phase = "emerging";
@@ -528,24 +576,46 @@ export class CottageLevel implements Level {
       cameraHeight: CAMERA.height,
     });
 
-    // Back out over the mat she danced on — dark now, its job done.
+    // She ends the shot over the mat she danced on — dark now, its job done.
     this.mat?.reset();
     this.hover.copy(ctx.cottage.matCentre).setY(DANCE.hoverHeight + 2.5);
-    // Facing the gate and the meadow beyond it — the way home.
-    ctx.placeBee(this.hover, this.hover.y, 0);
+    // Where the shot has to land: the chase rig's resting place behind her.
+    // Facing the gate is yaw 0, which puts the camera at -Z of her, i.e.
+    // between her and the house — the sign here is the opposite of the
+    // establishing pan's, which faces the other way.
+    this.panTo
+      .copy(this.hover)
+      .add(
+        tmpB.set(
+          0,
+          CAMERA.height * COTTAGE.chaseZoom,
+          -CAMERA.distance * COTTAGE.chaseZoom,
+        ),
+      );
+
+    // Right back: a bear at this scale needs the room, and the gate and the
+    // lane beyond it have to be readable from the off. Set before placeBee,
+    // whose snap is what makes the new zoom take effect at once — the shot
+    // lands on a rest position computed at this zoom, so a rig still easing
+    // toward it would jump at the handover.
+    ctx.setCameraZoom(COTTAGE.chaseZoom);
+
+    // Start her in the doorway, at full size: she is coming out of the house,
+    // not fading up over the mat.
+    ctx.placeBee(ctx.cottage.doorway, ctx.cottage.doorway.y, 0);
     ctx.bee.object.visible = true;
     ctx.bee.setScale(1);
     ctx.bee.scripted = true;
     ctx.bee.setCrown(true);
     ctx.bee.setYaw(0); // facing the gate, and home
     ctx.setFlightControls(false);
-    // Right back: a bear at this scale needs the room, and the gate and the
-    // meadow beyond it have to be readable from the off.
-    ctx.setCameraZoom(COTTAGE.chaseZoom);
 
-    // The jar comes with her — it is the whole point of the trip.
+    // The jar comes with her — it is the whole point of the trip. Hung from
+    // her in the doorway so it is already swinging as she comes out.
     ctx.bringHoney();
-    ctx.honeyJar.pickUp(tmp.copy(this.hover).setY(this.hover.y - 0.35));
+    ctx.honeyJar.pickUp(
+      tmp.copy(ctx.cottage.doorway).setY(ctx.cottage.doorway.y - 0.35),
+    );
 
     // The hive is the destination and it says so, from this far off.
     ctx.hive.setProgress(1);
@@ -568,15 +638,48 @@ export class CottageLevel implements Level {
     ctx.audio.setThreat(0.4);
   }
 
-  /** Let it lumber into shot, then hand the controls back and run. */
+  /**
+   * The wash opens on the house, she flies out of the door, and the camera
+   * arcs in behind her while the bear lumbers into frame.
+   */
   private updateEmerging(dt: number, ctx: GameContext): void {
     ctx.bear.update(dt, ctx.bee.position);
-    // Hold station over the mat, bobbing, while it closes in.
-    ctx.bee.position.y = this.hover.y + Math.sin(this.phaseTime * 2.2) * 0.25;
+
+    // Out of the doorway and down to her station over the mat, then bobbing
+    // there while the bear closes in.
+    const flight = ease(this.phaseTime / EMERGE_FLY);
+    ctx.bee.position.lerpVectors(ctx.cottage.doorway, this.hover, flight);
+    ctx.bee.position.y += Math.sin(this.phaseTime * 2.2) * 0.25 * flight;
+
+    // The wash opens over the first of it, so the very first thing on screen
+    // is the door with her in it.
+    ctx.setScreenFade(1 - ease(this.phaseTime / EMERGE_FADE));
+
+    const u = ease(this.phaseTime / EMERGE_TIME);
+    const inv = 1 - u;
+    panEye
+      .copy(EMERGE_FROM)
+      .add(ctx.cottage.matCentre)
+      .multiplyScalar(inv * inv)
+      .addScaledVector(
+        tmp.copy(EMERGE_CONTROL).add(ctx.cottage.matCentre),
+        2 * inv * u,
+      )
+      .addScaledVector(this.panTo, u * u);
+    // Holds on the door while she comes out of it, then settles onto her.
+    panLook.lerpVectors(
+      ctx.cottage.doorway,
+      ctx.bee.position,
+      ease((this.phaseTime / EMERGE_TIME) * 1.6 - 0.35),
+    );
+    ctx.setCameraCinematic(panEye, panLook);
+
     // Long enough for the bear to walk into shot from off to the left.
-    if (this.phaseTime < 4) {
+    if (this.phaseTime < EMERGE_TIME) {
       return;
     }
+    ctx.setScreenFade(0);
+    ctx.setCameraCinematic(null);
     this.beginChase(ctx);
   }
 

@@ -50,6 +50,12 @@ export interface GameContext {
   setObjectiveMarker(position: THREE.Vector3 | null): void;
   /** Brief full-screen colour wash. */
   flashScreen(): void;
+  /**
+   * Hold the screen behind a white wash: 0 is clear, 1 is opaque. Unlike
+   * `flashScreen` this doesn't animate itself — the cutscene drives it, so it
+   * can cover a scene change of any length and open again when it's ready.
+   */
+  setScreenFade(alpha: number): void;
   /** Swap scenery, sky, fog and lighting. */
   setEnvironment(name: EnvironmentName): void;
   /** Re-bound the player and re-frame the camera for this level. */

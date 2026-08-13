@@ -19,6 +19,13 @@ export interface BearModel {
   animate(elapsed: number, speed01: number, rear: number, swat: number): void;
 }
 
+/**
+ * Which way the eyes look out of the head: forward, out to the side a little,
+ * and tilted up. Not normalised — only its direction matters, and the numbers
+ * read more clearly as a glance direction than as a unit vector.
+ */
+const EYE_DIR = {x: 0.42, y: 0.34, z: 0.88};
+
 const FUR = 0xc08753;
 const FUR_DARK = 0x9d6a3c;
 const MUZZLE = 0xecc79c;
@@ -76,10 +83,38 @@ export function createBear(): BearModel {
     ear.translate(sx * 0.44, 0.95, 1.72);
     push(ear, FUR_DARK);
 
-    // Eyes, small and mean.
-    const eye = new THREE.SphereGeometry(0.1, 8, 8);
-    eye.translate(sx * 0.28, 0.5, 2.32);
-    push(eye, 0x1a0f08);
+    // Eyes.
+    //
+    // They have to sit *on* the head, and the head is an ellipsoid: radii
+    // (0.72, 0.66, 0.76) about (0, 0.35, 1.85). A pair of small spheres placed
+    // by eye ended up inside it, which is why the bear had a blank face for so
+    // long. These are put on the surface along EYE_DIR at 94% of the radius,
+    // so most of each eye stands proud of the fur.
+    //
+    // Tilted up as well as forward: the chase camera looks down on the bear
+    // from above and behind, and eyes set level with the snout are hidden by
+    // its own brow from up there.
+    const surface = (k: number) =>
+      new THREE.Vector3(
+        sx * 0.72 * EYE_DIR.x * k,
+        0.35 + 0.662 * EYE_DIR.y * k,
+        1.85 + 0.756 * EYE_DIR.z * k,
+      );
+
+    const white = surface(0.94);
+    const eye = new THREE.SphereGeometry(0.2, 12, 10);
+    eye.translate(white.x, white.y, white.z);
+    push(eye, 0xfff6e8);
+
+    // The pupil stands further out along the same direction — coplanar with
+    // the white it would z-fight, and sunk into it, it would vanish.
+    const pupil = new THREE.SphereGeometry(0.11, 10, 8);
+    pupil.translate(
+      white.x + sx * EYE_DIR.x * 0.14,
+      white.y + EYE_DIR.y * 0.14,
+      white.z + EYE_DIR.z * 0.14,
+    );
+    push(pupil, 0x1a0f08);
   }
 
   // Hind legs get a pivot of their own at the hips.
