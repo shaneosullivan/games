@@ -173,10 +173,22 @@ export const POLLEN_LABEL: Record<PollenKind, string> = {
   orange: "Red Flower",
 };
 
+/*
+ * The swatch for each pollen: the HUD's counter dot, the puff of motes when
+ * you collect it, a baby's craving bubble, and the food cells in the larder
+ * wall. It stands for the flower, so it has to look like the flower does.
+ *
+ * That's why red isn't the petal's own 0xff8a3d. A material colour is what the
+ * flower would be under a flat white light; the toon ramp then shades it down
+ * across three bands, and the petals actually come out at a mean of 0xdd4814
+ * on screen — read off the canvas, not guessed. Shown flat on a HUD chip the
+ * material colour has none of that shading and reads peach, which is how the
+ * dot ended up looking orange beside a flower that plainly isn't.
+ */
 export const POLLEN_COLOR: Record<PollenKind, number> = {
   white: 0xfff3f6,
   yellow: 0xffd23f,
-  orange: 0xff8a3d,
+  orange: 0xe04517,
 };
 
 /** Level 2: the royal chamber inside the hive. */
