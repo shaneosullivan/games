@@ -1,4 +1,4 @@
-import * as THREE from 'three';
+import * as THREE from "three";
 
 /**
  * 3-band gradient ramp. MeshToonMaterial samples this instead of a smooth
@@ -23,11 +23,14 @@ export function toonRamp(): THREE.DataTexture {
 
 /** Toon material driven by per-vertex colour, so a whole merged prop is one draw call. */
 export function vertexToon(): THREE.MeshToonMaterial {
-  return new THREE.MeshToonMaterial({ vertexColors: true, gradientMap: toonRamp() });
+  return new THREE.MeshToonMaterial({
+    vertexColors: true,
+    gradientMap: toonRamp(),
+  });
 }
 
 export function solidToon(color: number): THREE.MeshToonMaterial {
-  return new THREE.MeshToonMaterial({ color, gradientMap: toonRamp() });
+  return new THREE.MeshToonMaterial({color, gradientMap: toonRamp()});
 }
 
 /**
@@ -36,7 +39,10 @@ export function solidToon(color: number): THREE.MeshToonMaterial {
  * (Cylinder, Sphere, Torus) and non-indexed (Icosahedron), and
  * mergeGeometries refuses to mix the two.
  */
-export function paint(source: THREE.BufferGeometry, color: number): THREE.BufferGeometry {
+export function paint(
+  source: THREE.BufferGeometry,
+  color: number,
+): THREE.BufferGeometry {
   const geo = source.index ? source.toNonIndexed() : source;
   const c = new THREE.Color(color).convertSRGBToLinear();
   const count = geo.attributes.position.count;
@@ -46,6 +52,6 @@ export function paint(source: THREE.BufferGeometry, color: number): THREE.Buffer
     arr[i * 3 + 1] = c.g;
     arr[i * 3 + 2] = c.b;
   }
-  geo.setAttribute('color', new THREE.BufferAttribute(arr, 3));
+  geo.setAttribute("color", new THREE.BufferAttribute(arr, 3));
   return geo;
 }

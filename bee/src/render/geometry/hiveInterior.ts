@@ -1,14 +1,14 @@
-import * as THREE from 'three';
-import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import * as THREE from "three";
+import {mergeGeometries} from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import {
   INTERIOR,
   INTERIOR_PALETTE as P,
   POLLEN_COLOR,
   POLLEN_KINDS,
   type PollenKind,
-} from '../../config';
-import type { Rng } from '../../core/rng';
-import { paint, solidToon, vertexToon } from '../materials';
+} from "../../config";
+import type {Rng} from "../../core/rng";
+import {paint, solidToon, vertexToon} from "../materials";
 
 export interface PollenStore {
   kind: PollenKind;
@@ -22,8 +22,8 @@ export interface HiveInterior {
   /** Centre of the royal dais, where the queen sits. */
   queenPosition: THREE.Vector3;
   /** Perch positions ringing the queen. */
-  babyPositions: THREE.Vector3[];
-  stores: PollenStore[];
+  babyPositions: Array<THREE.Vector3>;
+  stores: Array<PollenStore>;
   /** Where the player enters from, so level 2 can place the bee sensibly. */
   entryPosition: THREE.Vector3;
   update(elapsed: number): void;
@@ -44,13 +44,24 @@ export function createHiveInterior(rng: Rng): HiveInterior {
 
   // ---- shell -------------------------------------------------------------
   // Upper hemisphere, rendered from the inside.
-  const domeGeo = new THREE.SphereGeometry(R, 40, 24, 0, Math.PI * 2, 0, Math.PI / 2);
+  const domeGeo = new THREE.SphereGeometry(
+    R,
+    40,
+    24,
+    0,
+    Math.PI * 2,
+    0,
+    Math.PI / 2,
+  );
   const domeMat = solidToon(P.wax);
   domeMat.side = THREE.BackSide;
   const dome = new THREE.Mesh(domeGeo, domeMat);
   group.add(dome);
 
-  const floor = new THREE.Mesh(new THREE.CircleGeometry(R, 48), solidToon(P.floor));
+  const floor = new THREE.Mesh(
+    new THREE.CircleGeometry(R, 48),
+    solidToon(P.floor),
+  );
   floor.rotation.x = -Math.PI / 2;
   floor.receiveShadow = true;
   group.add(floor);
@@ -59,9 +70,13 @@ export function createHiveInterior(rng: Rng): HiveInterior {
   group.add(createDais());
 
   // ---- baby perches ------------------------------------------------------
-  const babyPositions: THREE.Vector3[] = [];
+  const babyPositions: Array<THREE.Vector3> = [];
   const perchGeo = new THREE.CylinderGeometry(0.85, 1.0, 0.4, 6);
-  const perches = new THREE.InstancedMesh(perchGeo, solidToon(P.dais), INTERIOR.babyRingRadius > 0 ? 16 : 0);
+  const perches = new THREE.InstancedMesh(
+    perchGeo,
+    solidToon(P.dais),
+    INTERIOR.babyRingRadius > 0 ? 16 : 0,
+  );
   const m = new THREE.Matrix4();
   const babyCount = 6;
   for (let i = 0; i < babyCount; i++) {
@@ -92,24 +107,33 @@ export function createHiveInterior(rng: Rng): HiveInterior {
   group.add(perches);
 
   // ---- pollen stores -----------------------------------------------------
-  const stores: PollenStore[] = [];
+  const stores: Array<PollenStore> = [];
   POLLEN_KINDS.forEach((kind, i) => {
     const a = (i / POLLEN_KINDS.length) * Math.PI * 2 - Math.PI / 2;
     const x = Math.cos(a) * INTERIOR.storeRingRadius;
     const z = Math.sin(a) * INTERIOR.storeRingRadius;
 
-    const pot = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.15, 1.6, 8), solidToon(P.waxDark));
+    const pot = new THREE.Mesh(
+      new THREE.CylinderGeometry(1.5, 1.15, 1.6, 8),
+      solidToon(P.waxDark),
+    );
     pot.position.set(x, 0.8, z);
     pot.castShadow = true;
     pot.receiveShadow = true;
     group.add(pot);
 
-    const rim = new THREE.Mesh(new THREE.TorusGeometry(1.5, 0.16, 6, 16), solidToon(P.dais));
+    const rim = new THREE.Mesh(
+      new THREE.TorusGeometry(1.5, 0.16, 6, 16),
+      solidToon(P.dais),
+    );
     rim.rotation.x = Math.PI / 2;
     rim.position.set(x, 1.6, z);
     group.add(rim);
 
-    const mound = new THREE.Mesh(new THREE.SphereGeometry(1.35, 16, 10), solidToon(POLLEN_COLOR[kind]));
+    const mound = new THREE.Mesh(
+      new THREE.SphereGeometry(1.35, 16, 10),
+      solidToon(POLLEN_COLOR[kind]),
+    );
     mound.scale.y = 0.5;
     mound.position.set(x, 1.62, z);
     group.add(mound);
@@ -156,7 +180,10 @@ function createWallCells(rng: Rng): THREE.InstancedMesh {
 
   const count = INTERIOR.wallCells;
   const mesh = new THREE.InstancedMesh(geo, vertexToon(), count);
-  mesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(count * 3), 3);
+  mesh.instanceColor = new THREE.InstancedBufferAttribute(
+    new Float32Array(count * 3),
+    3,
+  );
 
   const R = INTERIOR.domeRadius - 0.3;
   const dummy = new THREE.Object3D();
@@ -180,14 +207,16 @@ function createWallCells(rng: Rng): THREE.InstancedMesh {
     mesh.setColorAt(i, rng.next() < 0.62 ? full : empty);
   }
   mesh.instanceMatrix.needsUpdate = true;
-  if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+  if (mesh.instanceColor) {
+    mesh.instanceColor.needsUpdate = true;
+  }
   return mesh;
 }
 
 /** The queen's raised hexagonal dais. */
 function createDais(): THREE.Group {
   const g = new THREE.Group();
-  const parts: THREE.BufferGeometry[] = [];
+  const parts: Array<THREE.BufferGeometry> = [];
 
   const tiers: Array<[number, number, number, number]> = [
     // [radius, height, y, colour]
@@ -207,7 +236,9 @@ function createDais(): THREE.Group {
   parts.push(paint(cushion, 0xd94f7a));
 
   const merged = mergeGeometries(parts, false);
-  if (!merged) throw new Error('dais: geometry merge failed');
+  if (!merged) {
+    throw new Error("dais: geometry merge failed");
+  }
   merged.computeVertexNormals();
   const dais = new THREE.Mesh(merged, vertexToon());
   dais.castShadow = true;

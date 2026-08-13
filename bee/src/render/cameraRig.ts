@@ -1,6 +1,6 @@
-import * as THREE from 'three';
-import { CAMERA } from '../config';
-import type { BeeActor } from '../entities/beeActor';
+import * as THREE from "three";
+import {CAMERA} from "../config";
+import type {BeeActor} from "../entities/beeActor";
 
 const desired = new THREE.Vector3();
 const lookTarget = new THREE.Vector3();
@@ -8,8 +8,12 @@ const smoothedLook = new THREE.Vector3();
 
 function shortestAngle(from: number, to: number): number {
   let d = (to - from) % (Math.PI * 2);
-  if (d > Math.PI) d -= Math.PI * 2;
-  if (d < -Math.PI) d += Math.PI * 2;
+  if (d > Math.PI) {
+    d -= Math.PI * 2;
+  }
+  if (d < -Math.PI) {
+    d += Math.PI * 2;
+  }
   return d;
 }
 
@@ -44,7 +48,9 @@ export class CameraRig {
   /** `immediate` skips the ease — used when a level places the bee. */
   setZoom(z: number, immediate = false): void {
     this.zoomTarget = z;
-    if (immediate) this.zoom = z;
+    if (immediate) {
+      this.zoom = z;
+    }
   }
 
   /**
@@ -59,7 +65,9 @@ export class CameraRig {
       return;
     }
     this.cinematicEye = (this.cinematicEye ?? new THREE.Vector3()).copy(eye);
-    if (look) this.cinematicLook.copy(look);
+    if (look) {
+      this.cinematicLook.copy(look);
+    }
   }
 
   update(dt: number, bee: BeeActor): void {
@@ -78,7 +86,8 @@ export class CameraRig {
       const off = Math.abs(diff) - CAMERA.yawDeadzone;
       if (off > 0) {
         const rate =
-          Math.min(off * CAMERA.yawGain, CAMERA.yawMaxRate) * Math.min(1, planarSpeed / 4.5);
+          Math.min(off * CAMERA.yawGain, CAMERA.yawMaxRate) *
+          Math.min(1, planarSpeed / 4.5);
         // Never overshoot the heading in a single step.
         this.yaw += Math.sign(diff) * Math.min(rate * dt, Math.abs(diff));
       }
@@ -113,7 +122,10 @@ export class CameraRig {
    *   which stands off at the far end of the meadow, so levels that place the
    *   bee somewhere else say what they mean.
    */
-  snap(bee: BeeActor, yaw = Math.atan2(-bee.position.x, -bee.position.z)): void {
+  snap(
+    bee: BeeActor,
+    yaw = Math.atan2(-bee.position.x, -bee.position.z),
+  ): void {
     this.zoom = this.zoomTarget;
     this.yaw = yaw;
     this.camera.position.set(
@@ -121,7 +133,9 @@ export class CameraRig {
       bee.position.y + this.height * this.zoom,
       bee.position.z - Math.cos(this.yaw) * this.distance * this.zoom,
     );
-    smoothedLook.copy(bee.position).add(new THREE.Vector3(0, CAMERA.lookHeight, 0));
+    smoothedLook
+      .copy(bee.position)
+      .add(new THREE.Vector3(0, CAMERA.lookHeight, 0));
     this.camera.lookAt(smoothedLook);
   }
 }

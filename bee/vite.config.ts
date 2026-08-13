@@ -1,10 +1,10 @@
-import { defineConfig } from 'vite';
-import { viteSingleFile } from 'vite-plugin-singlefile';
+import {defineConfig} from "vite";
+import {viteSingleFile} from "vite-plugin-singlefile";
 
 export default defineConfig({
   // Relative asset URLs so the built file works from any sub-path, not just
   // the host root.
-  base: './',
+  base: "./",
 
   // Everything — JS, CSS, the manifest — ends up inlined in one index.html.
   plugins: [viteSingleFile()],
@@ -17,7 +17,7 @@ export default defineConfig({
   },
 
   build: {
-    target: 'es2022',
+    target: "es2022",
     // One file is the point here, so the "chunk is large" advice doesn't apply.
     chunkSizeWarningLimit: 2000,
     cssCodeSplit: false,

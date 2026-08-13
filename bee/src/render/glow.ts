@@ -1,4 +1,4 @@
-import * as THREE from 'three';
+import * as THREE from "three";
 
 const VERT = /* glsl */ `
   varying vec3 vNormalW;
@@ -79,9 +79,9 @@ export function createGlowBubble(opts: GlowOptions): GlowBubble {
 
   const material = new THREE.ShaderMaterial({
     uniforms: {
-      uColor: { value: new THREE.Color(0xffffff) },
-      uTime: { value: 0 },
-      uPulse: { value: 1 },
+      uColor: {value: new THREE.Color(0xffffff)},
+      uTime: {value: 0},
+      uPulse: {value: 1},
     },
     vertexShader: VERT,
     fragmentShader: FRAG,
@@ -91,7 +91,10 @@ export function createGlowBubble(opts: GlowOptions): GlowBubble {
     side: THREE.DoubleSide,
   });
 
-  const mesh = new THREE.Mesh(new THREE.IcosahedronGeometry(radius, 3), material);
+  const mesh = new THREE.Mesh(
+    new THREE.IcosahedronGeometry(radius, 3),
+    material,
+  );
   mesh.scale.y = squashY;
 
   return {

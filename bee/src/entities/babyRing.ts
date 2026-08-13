@@ -1,7 +1,13 @@
-import * as THREE from 'three';
-import { INTERIOR, LEVELS, POLLEN_COLOR, POLLEN_KINDS, type PollenKind } from '../config';
-import type { Rng } from '../core/rng';
-import { createBaby, type BabyModel } from '../render/geometry/bee';
+import * as THREE from "three";
+import {
+  INTERIOR,
+  LEVELS,
+  POLLEN_COLOR,
+  POLLEN_KINDS,
+  type PollenKind,
+} from "../config";
+import type {Rng} from "../core/rng";
+import {createBaby, type BabyModel} from "../render/geometry/bee";
 
 /** How the celebration flight is shaped, in seconds and world units. */
 const CELEBRATION = {
@@ -84,7 +90,7 @@ export interface FeedResult {
  */
 export class BabyRing {
   readonly group = new THREE.Group();
-  private readonly babies: Baby[] = [];
+  private readonly babies: Array<Baby> = [];
   private elapsed = 0;
 
   /** Progress on the baby currently being fed, for the HUD ring. */
@@ -106,7 +112,7 @@ export class BabyRing {
   private readonly mobPoint = new THREE.Vector3();
 
   constructor(
-    positions: readonly THREE.Vector3[],
+    positions: ReadonlyArray<THREE.Vector3>,
     private readonly rng: Rng,
   ) {
     positions.slice(0, LEVELS.babyCount).forEach((position, index) => {
@@ -116,7 +122,7 @@ export class BabyRing {
       model.group.rotation.y = Math.atan2(position.x, position.z);
       this.group.add(model.group);
 
-      const { bubble, ball } = createWantBubble();
+      const {bubble, ball} = createWantBubble();
       bubble.position.copy(position).add(new THREE.Vector3(0, 1.7, 0));
       bubble.visible = false;
       this.group.add(bubble);
@@ -172,16 +178,18 @@ export class BabyRing {
   }
 
   get grownCount(): number {
-    return this.babies.filter((b) => b.grown).length;
+    return this.babies.filter(b => b.grown).length;
   }
 
   get allGrown(): boolean {
-    return this.babies.every((b) => b.grown);
+    return this.babies.every(b => b.grown);
   }
 
   /** 0..1 progress on whichever baby is being fed right now. */
   get feedProgress(): number {
-    if (!this.feedTarget) return 0;
+    if (!this.feedTarget) {
+      return 0;
+    }
     return Math.min(1, this.feedTime / INTERIOR.feedSeconds);
   }
 
@@ -189,7 +197,11 @@ export class BabyRing {
    * @param carrying what the player is holding, or null
    * @returns a feed event on the frame a delivery lands
    */
-  update(dt: number, beePosition: THREE.Vector3, carrying: PollenKind | null): FeedResult | null {
+  update(
+    dt: number,
+    beePosition: THREE.Vector3,
+    carrying: PollenKind | null,
+  ): FeedResult | null {
     this.elapsed += dt;
 
     if (this.swarming) {
@@ -204,7 +216,9 @@ export class BabyRing {
     for (const baby of this.babies) {
       if (!baby.grown && baby.craving === null) {
         baby.contentFor -= dt;
-        if (baby.contentFor <= 0) baby.craving = this.pickCraving();
+        if (baby.contentFor <= 0) {
+          baby.craving = this.pickCraving();
+        }
       }
 
       const hungry = baby.craving !== null;
@@ -213,22 +227,30 @@ export class BabyRing {
         const mat = baby.bubbleBall.material as THREE.MeshBasicMaterial;
         mat.color.set(POLLEN_COLOR[baby.craving!]);
         baby.bubble.position.y =
-          baby.position.y + 1.7 + Math.sin(this.elapsed * 2.6 + baby.index) * 0.14;
+          baby.position.y +
+          1.7 +
+          Math.sin(this.elapsed * 2.6 + baby.index) * 0.14;
         baby.bubble.rotation.y = this.elapsed * 0.9;
       }
       baby.model.animate(this.elapsed + baby.index * 1.7, hungry ? 1 : 0.12);
     }
 
     // Feeding: hover near a baby that wants exactly what you're carrying.
-    const target = carrying ? this.nearestMatching(beePosition, carrying) : null;
+    const target = carrying
+      ? this.nearestMatching(beePosition, carrying)
+      : null;
     if (target !== this.feedTarget) {
       this.feedTarget = target;
       this.feedTime = 0;
     }
-    if (!this.feedTarget) return null;
+    if (!this.feedTarget) {
+      return null;
+    }
 
     this.feedTime += dt;
-    if (this.feedTime < INTERIOR.feedSeconds) return null;
+    if (this.feedTime < INTERIOR.feedSeconds) {
+      return null;
+    }
 
     const baby = this.feedTarget;
     const kind = baby.craving!;
@@ -257,10 +279,14 @@ export class BabyRing {
    * level is over, and a chamber full of flying bees is the reward.
    */
   beginCelebration(): void {
-    if (this.celebrating) return;
+    if (this.celebrating) {
+      return;
+    }
     this.celebrating = true;
     this.celebrateTime = 0;
-    for (const baby of this.babies) baby.bubble.visible = false;
+    for (const baby of this.babies) {
+      baby.bubble.visible = false;
+    }
   }
 
   private updateCelebration(dt: number): void {
@@ -268,16 +294,22 @@ export class BabyRing {
 
     for (const baby of this.babies) {
       // Each baby's own clock, so they peel off one after another.
-      const t = Math.max(0, this.celebrateTime - baby.index * CELEBRATION.stagger);
+      const t = Math.max(
+        0,
+        this.celebrateTime - baby.index * CELEBRATION.stagger,
+      );
       const lift = easeOutBack(Math.min(1, t / CELEBRATION.riseTime));
 
       const angle = baby.angle + t * CELEBRATION.orbitRate * lift;
       const radius =
-        INTERIOR.babyRingRadius + Math.sin(t * 1.5 + baby.index) * CELEBRATION.orbitWobble * lift;
+        INTERIOR.babyRingRadius +
+        Math.sin(t * 1.5 + baby.index) * CELEBRATION.orbitWobble * lift;
 
       baby.position.set(
         Math.cos(angle) * radius,
-        baby.home.y + lift * CELEBRATION.riseHeight + Math.sin(t * 3.1 + baby.index) * 0.35 * lift,
+        baby.home.y +
+          lift * CELEBRATION.riseHeight +
+          Math.sin(t * 3.1 + baby.index) * 0.35 * lift,
         Math.sin(angle) * radius,
       );
       baby.model.group.position.copy(baby.position);
@@ -286,7 +318,8 @@ export class BabyRing {
       // barrel-roll wobble and a nose-up tilt while they're still climbing.
       baby.model.group.rotation.y = -angle + Math.PI / 2;
       baby.model.group.rotation.z = Math.sin(t * 4.2 + baby.index) * 0.5 * lift;
-      baby.model.group.rotation.x = -Math.max(0, 1 - t / CELEBRATION.riseTime) * 0.5;
+      baby.model.group.rotation.x =
+        -Math.max(0, 1 - t / CELEBRATION.riseTime) * 0.5;
 
       // Wings flat out — they're working hard and delighted about it.
       baby.model.animate(this.elapsed + baby.index * 1.7, 1);
@@ -319,7 +352,8 @@ export class BabyRing {
       baby.model.group.position.copy(origin);
 
       // Spread the loop centres around the hive so nobody parks on the doorway.
-      const bearing = (i / this.babies.length) * Math.PI * 2 + this.rng.range(-0.4, 0.4);
+      const bearing =
+        (i / this.babies.length) * Math.PI * 2 + this.rng.range(-0.4, 0.4);
       const spread = this.rng.range(7, 14);
       baby.swarm = {
         centreX: origin.x + Math.cos(bearing) * spread,
@@ -349,18 +383,23 @@ export class BabyRing {
    */
   mobAround(point: THREE.Vector3 | null): void {
     this.mobbing = point !== null;
-    if (point) this.mobPoint.copy(point);
+    if (point) {
+      this.mobPoint.copy(point);
+    }
   }
 
   private updateSwarm(dt: number): void {
     this.swarmTime += dt;
     // Ease the whole cloud between wandering and mobbing rather than snapping,
     // so they visibly fly over to the bear and back off again afterwards.
-    this.mobBlend += ((this.mobbing ? 1 : 0) - this.mobBlend) * Math.min(1, 1.1 * dt);
+    this.mobBlend +=
+      ((this.mobbing ? 1 : 0) - this.mobBlend) * Math.min(1, 1.1 * dt);
 
     for (const baby of this.babies) {
       const p = baby.swarm;
-      if (!p) continue;
+      if (!p) {
+        continue;
+      }
 
       const t = Math.max(0, this.swarmTime - p.delay);
       // Burst out of the doorway, then settle onto the wandering loop.
@@ -380,7 +419,9 @@ export class BabyRing {
         const spin = t * (p.rateX + MOB.rate);
         tmpMob.set(
           this.mobPoint.x + Math.sin(spin + p.phaseX) * radius,
-          this.mobPoint.y + MOB.rise + Math.sin(t * (p.rateY + 1.4) + p.phaseY) * MOB.bob,
+          this.mobPoint.y +
+            MOB.rise +
+            Math.sin(t * (p.rateY + 1.4) + p.phaseY) * MOB.bob,
           this.mobPoint.z + Math.cos(spin * 1.27 + p.phaseZ) * radius,
         );
         tmpTarget.lerp(tmpMob, this.mobBlend);
@@ -407,14 +448,21 @@ export class BabyRing {
   }
 
   /** Where the beacon should point: the nearest baby wanting what you hold. */
-  guidanceTarget(from: THREE.Vector3, carrying: PollenKind | null): THREE.Vector3 | null {
-    const baby = carrying ? this.nearestMatching(from, carrying, Infinity) : this.nearestHungry(from);
-    return baby ? baby.position.clone().add(new THREE.Vector3(0, 0.9, 0)) : null;
+  guidanceTarget(
+    from: THREE.Vector3,
+    carrying: PollenKind | null,
+  ): THREE.Vector3 | null {
+    const baby = carrying
+      ? this.nearestMatching(from, carrying, Infinity)
+      : this.nearestHungry(from);
+    return baby
+      ? baby.position.clone().add(new THREE.Vector3(0, 0.9, 0))
+      : null;
   }
 
   /** What the hungry babies are asking for, for the HUD. */
-  cravings(): PollenKind[] {
-    return this.babies.flatMap((b) => (b.craving ? [b.craving] : []));
+  cravings(): Array<PollenKind> {
+    return this.babies.flatMap(b => (b.craving ? [b.craving] : []));
   }
 
   private pickCraving(): PollenKind {
@@ -429,7 +477,9 @@ export class BabyRing {
     let best: Baby | null = null;
     let bestDist = maxDistance * maxDistance;
     for (const baby of this.babies) {
-      if (baby.grown || baby.craving !== kind) continue;
+      if (baby.grown || baby.craving !== kind) {
+        continue;
+      }
       const d = baby.position.distanceToSquared(from);
       if (d < bestDist) {
         bestDist = d;
@@ -443,7 +493,9 @@ export class BabyRing {
     let best: Baby | null = null;
     let bestDist = Infinity;
     for (const baby of this.babies) {
-      if (baby.grown || !baby.craving) continue;
+      if (baby.grown || !baby.craving) {
+        continue;
+      }
       const d = baby.position.distanceToSquared(from);
       if (d < bestDist) {
         bestDist = d;
@@ -475,7 +527,7 @@ function easeOutBack(t: number): number {
  * which colour to fetch, so it's deliberately oversized and bright — it has to
  * be readable from the far wall of the dome, not just up close.
  */
-function createWantBubble(): { bubble: THREE.Group; ball: THREE.Mesh } {
+function createWantBubble(): {bubble: THREE.Group; ball: THREE.Mesh} {
   const bubble = new THREE.Group();
 
   const shell = new THREE.Mesh(
@@ -492,13 +544,17 @@ function createWantBubble(): { bubble: THREE.Group; ball: THREE.Mesh } {
   // The coloured pollen ball is unlit so the dim interior can't mute it.
   const ball = new THREE.Mesh(
     new THREE.SphereGeometry(0.38, 16, 12),
-    new THREE.MeshBasicMaterial({ color: 0xffffff }),
+    new THREE.MeshBasicMaterial({color: 0xffffff}),
   );
   bubble.add(ball);
 
   const ring = new THREE.Mesh(
     new THREE.TorusGeometry(0.66, 0.055, 6, 24),
-    new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.85 }),
+    new THREE.MeshBasicMaterial({
+      color: 0xffffff,
+      transparent: true,
+      opacity: 0.85,
+    }),
   );
   ring.rotation.x = Math.PI / 2;
   bubble.add(ring);
@@ -506,11 +562,15 @@ function createWantBubble(): { bubble: THREE.Group; ball: THREE.Mesh } {
   // A little stalk down to the baby, so it's obvious whose want it is.
   const stalk = new THREE.Mesh(
     new THREE.ConeGeometry(0.12, 0.34, 8),
-    new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.5 }),
+    new THREE.MeshBasicMaterial({
+      color: 0xffffff,
+      transparent: true,
+      opacity: 0.5,
+    }),
   );
   stalk.rotation.x = Math.PI;
   stalk.position.y = -0.72;
   bubble.add(stalk);
 
-  return { bubble, ball };
+  return {bubble, ball};
 }

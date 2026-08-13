@@ -1,8 +1,8 @@
-import * as THREE from 'three';
-import { POLLEN_KINDS, WORLD, type PollenKind } from '../config';
-import type { Rng } from '../core/rng';
-import { createFlowerGeometry } from '../render/geometry/flower';
-import { vertexToon } from '../render/materials';
+import * as THREE from "three";
+import {POLLEN_KINDS, WORLD, type PollenKind} from "../config";
+import type {Rng} from "../core/rng";
+import {createFlowerGeometry} from "../render/geometry/flower";
+import {vertexToon} from "../render/materials";
 
 interface Flower {
   kind: PollenKind;
@@ -33,7 +33,7 @@ const s = new THREE.Vector3();
  */
 export class FlowerField {
   readonly group = new THREE.Group();
-  private readonly flowers: Flower[] = [];
+  private readonly flowers: Array<Flower> = [];
   private readonly heads = new Map<PollenKind, THREE.InstancedMesh>();
 
   /** Progress toward harvesting whatever the bee is currently hovering over. */
@@ -61,7 +61,13 @@ export class FlowerField {
           const r = 6 + Math.sqrt(rng.next()) * (WORLD.radius - 8);
           x = Math.cos(a) * r;
           z = Math.sin(a) * r;
-          if (this.flowers.every((f) => f.position.distanceToSquared(v.set(x, 0, z)) > 9)) break;
+          if (
+            this.flowers.every(
+              f => f.position.distanceToSquared(v.set(x, 0, z)) > 9,
+            )
+          ) {
+            break;
+          }
         }
         // Deliberately oversized: at cruising altitude a life-size flower is
         // a few pixels, and the whole loop is "spot a flower, fly to it".
@@ -90,10 +96,15 @@ export class FlowerField {
   private writeHead(kind: PollenKind): void {
     const mesh = this.heads.get(kind)!;
     for (const f of this.flowers) {
-      if (f.kind !== kind) continue;
+      if (f.kind !== kind) {
+        continue;
+      }
       q.setFromEuler(new THREE.Euler(0, f.yaw, 0));
       // A ready flower gently pulses so it reads as harvestable from the air.
-      const pulse = f.bloom >= 0.999 ? 1 + Math.sin(performance.now() * 0.003 + f.index) * 0.04 : 1;
+      const pulse =
+        f.bloom >= 0.999
+          ? 1 + Math.sin(performance.now() * 0.003 + f.index) * 0.04
+          : 1;
       const size = f.scale * f.bloom * pulse;
       v.set(f.position.x, f.headY * (0.4 + 0.6 * f.bloom), f.position.z);
       m.compose(v, q, s.setScalar(Math.max(0.0001, size)));
@@ -108,9 +119,12 @@ export class FlowerField {
    */
   update(dt: number, beePosition: THREE.Vector3): HarvestEvent | null {
     for (const f of this.flowers) {
-      if (f.cooldown > 0) f.cooldown = Math.max(0, f.cooldown - dt);
+      if (f.cooldown > 0) {
+        f.cooldown = Math.max(0, f.cooldown - dt);
+      }
       const target = f.cooldown > 0 ? 0 : 1;
-      f.bloom += (target - f.bloom) * Math.min(1, dt * (target === 1 ? 2.4 : 9));
+      f.bloom +=
+        (target - f.bloom) * Math.min(1, dt * (target === 1 ? 2.4 : 9));
     }
 
     const nearest = this.nearestReady(beePosition);
@@ -135,13 +149,17 @@ export class FlowerField {
       }
     }
 
-    for (const kind of POLLEN_KINDS) this.writeHead(kind);
+    for (const kind of POLLEN_KINDS) {
+      this.writeHead(kind);
+    }
     return event;
   }
 
   /** 0..1 progress on the flower currently being gathered, for the HUD ring. */
   get harvestProgress(): number {
-    if (!this.hoverTarget) return 0;
+    if (!this.hoverTarget) {
+      return 0;
+    }
     return Math.min(1, this.hoverTime / WORLD.harvestSeconds);
   }
 
@@ -153,8 +171,12 @@ export class FlowerField {
     let best: Flower | null = null;
     let bestDist = WORLD.harvestRadius * WORLD.harvestRadius;
     for (const f of this.flowers) {
-      if (f.cooldown > 0 || f.bloom < 0.99) continue;
-      if (Math.abs(bee.y - f.headY) > WORLD.harvestHeight) continue;
+      if (f.cooldown > 0 || f.bloom < 0.99) {
+        continue;
+      }
+      if (Math.abs(bee.y - f.headY) > WORLD.harvestHeight) {
+        continue;
+      }
       const dx = bee.x - f.position.x;
       const dz = bee.z - f.position.z;
       const d = dx * dx + dz * dz;
@@ -171,13 +193,17 @@ export class FlowerField {
     let best: Flower | null = null;
     let bestDist = Infinity;
     for (const f of this.flowers) {
-      if (f.kind !== kind || f.cooldown > 0) continue;
+      if (f.kind !== kind || f.cooldown > 0) {
+        continue;
+      }
       const d = f.position.distanceToSquared(from);
       if (d < bestDist) {
         bestDist = d;
         best = f;
       }
     }
-    return best ? new THREE.Vector3(best.position.x, best.headY, best.position.z) : null;
+    return best
+      ? new THREE.Vector3(best.position.x, best.headY, best.position.z)
+      : null;
   }
 }

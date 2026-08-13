@@ -1,7 +1,7 @@
-import * as THREE from 'three';
-import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { FLIGHT, PALETTE } from '../../config';
-import { paint, solidToon, vertexToon } from '../materials';
+import * as THREE from "three";
+import {mergeGeometries} from "three/examples/jsm/utils/BufferGeometryUtils.js";
+import {FLIGHT, PALETTE} from "../../config";
+import {paint, solidToon, vertexToon} from "../materials";
 
 export interface BeeModel {
   group: THREE.Group;
@@ -22,16 +22,25 @@ function createCrown(): THREE.Group {
   const crown = new THREE.Group();
   const bandMat = solidToon(0xffe066);
 
-  const band = new THREE.Mesh(new THREE.CylinderGeometry(0.19, 0.21, 0.09, 10), bandMat);
+  const band = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.19, 0.21, 0.09, 10),
+    bandMat,
+  );
   crown.add(band);
 
   for (let i = 0; i < 5; i++) {
     const a = (i / 5) * Math.PI * 2;
-    const spike = new THREE.Mesh(new THREE.ConeGeometry(0.055, 0.16, 6), bandMat);
+    const spike = new THREE.Mesh(
+      new THREE.ConeGeometry(0.055, 0.16, 6),
+      bandMat,
+    );
     spike.position.set(Math.cos(a) * 0.17, 0.11, Math.sin(a) * 0.17);
     crown.add(spike);
 
-    const jewel = new THREE.Mesh(new THREE.SphereGeometry(0.035, 8, 6), solidToon(0xff5b8a));
+    const jewel = new THREE.Mesh(
+      new THREE.SphereGeometry(0.035, 8, 6),
+      solidToon(0xff5b8a),
+    );
     jewel.position.set(Math.cos(a) * 0.17, 0.2, Math.sin(a) * 0.17);
     crown.add(jewel);
   }
@@ -50,7 +59,7 @@ function createCrown(): THREE.Group {
  * Local space: +Z is forward, +Y is up.
  */
 export function createBee(): BeeModel {
-  const parts: THREE.BufferGeometry[] = [];
+  const parts: Array<THREE.BufferGeometry> = [];
 
   const add = (geo: THREE.BufferGeometry, color: number, m: THREE.Matrix4) => {
     geo.applyMatrix4(m);
@@ -64,9 +73,17 @@ export function createBee(): BeeModel {
     );
 
   // Thorax
-  add(new THREE.SphereGeometry(0.34, 18, 14), PALETTE.beeBody, at(0, 0, 0.02, 1, 0.92, 1.05));
+  add(
+    new THREE.SphereGeometry(0.34, 18, 14),
+    PALETTE.beeBody,
+    at(0, 0, 0.02, 1, 0.92, 1.05),
+  );
   // Fuzzy collar between thorax and head
-  add(new THREE.SphereGeometry(0.3, 16, 12), 0xfff0c2, at(0, 0.01, 0.22, 1, 0.9, 0.7));
+  add(
+    new THREE.SphereGeometry(0.3, 16, 12),
+    0xfff0c2,
+    at(0, 0.01, 0.22, 1, 0.9, 0.7),
+  );
 
   // Abdomen: three shrinking spheres give a tapered, segmented look cheaply
   const seg: Array<[number, number, number]> = [
@@ -75,7 +92,11 @@ export function createBee(): BeeModel {
     [-0.92, 0.22, -0.05],
   ];
   for (const [z, r, y] of seg) {
-    add(new THREE.SphereGeometry(r, 16, 12), PALETTE.beeBody, at(0, y, z, 1, 0.92, 1.1));
+    add(
+      new THREE.SphereGeometry(r, 16, 12),
+      PALETTE.beeBody,
+      at(0, y, z, 1, 0.92, 1.1),
+    );
   }
   // Stripes — a torus in the XY plane wraps the Z axis, which is exactly right.
   for (const [z, r] of [
@@ -83,18 +104,38 @@ export function createBee(): BeeModel {
     [-0.5, 0.33],
     [-0.79, 0.255],
   ] as const) {
-    add(new THREE.TorusGeometry(r, 0.075, 6, 18), PALETTE.beeStripe, at(0, 0, z, 1, 0.92, 1));
+    add(
+      new THREE.TorusGeometry(r, 0.075, 6, 18),
+      PALETTE.beeStripe,
+      at(0, 0, z, 1, 0.92, 1),
+    );
   }
   // Stinger
-  add(new THREE.ConeGeometry(0.07, 0.22, 8), PALETTE.beeStripe, at(0, -0.06, -1.14).multiply(
-    new THREE.Matrix4().makeRotationX(-Math.PI / 2),
-  ));
+  add(
+    new THREE.ConeGeometry(0.07, 0.22, 8),
+    PALETTE.beeStripe,
+    at(0, -0.06, -1.14).multiply(
+      new THREE.Matrix4().makeRotationX(-Math.PI / 2),
+    ),
+  );
 
   // Head + face
-  add(new THREE.SphereGeometry(0.27, 16, 12), PALETTE.beeHead, at(0, 0.03, 0.48, 1, 0.95, 0.92));
+  add(
+    new THREE.SphereGeometry(0.27, 16, 12),
+    PALETTE.beeHead,
+    at(0, 0.03, 0.48, 1, 0.95, 0.92),
+  );
   for (const sx of [-1, 1]) {
-    add(new THREE.SphereGeometry(0.1, 12, 10), 0xffffff, at(sx * 0.13, 0.08, 0.68, 1, 1.15, 0.8));
-    add(new THREE.SphereGeometry(0.05, 8, 8), 0x241a10, at(sx * 0.15, 0.08, 0.73, 1, 1.1, 0.7));
+    add(
+      new THREE.SphereGeometry(0.1, 12, 10),
+      0xffffff,
+      at(sx * 0.13, 0.08, 0.68, 1, 1.15, 0.8),
+    );
+    add(
+      new THREE.SphereGeometry(0.05, 8, 8),
+      0x241a10,
+      at(sx * 0.15, 0.08, 0.73, 1, 1.1, 0.7),
+    );
     // Antenna
     const ant = new THREE.CylinderGeometry(0.018, 0.018, 0.34, 6);
     const m = new THREE.Matrix4()
@@ -102,11 +143,17 @@ export function createBee(): BeeModel {
       .multiply(new THREE.Matrix4().makeRotationZ(sx * 0.5))
       .multiply(new THREE.Matrix4().makeRotationX(-0.5));
     add(ant, PALETTE.beeStripe, m);
-    add(new THREE.SphereGeometry(0.045, 8, 6), PALETTE.beeStripe, at(sx * 0.24, 0.46, 0.63));
+    add(
+      new THREE.SphereGeometry(0.045, 8, 6),
+      PALETTE.beeStripe,
+      at(sx * 0.24, 0.46, 0.63),
+    );
   }
 
   const bodyGeo = mergeGeometries(parts, false);
-  if (!bodyGeo) throw new Error('bee: geometry merge failed');
+  if (!bodyGeo) {
+    throw new Error("bee: geometry merge failed");
+  }
   bodyGeo.computeVertexNormals();
 
   const group = new THREE.Group();
@@ -126,7 +173,7 @@ export function createBee(): BeeModel {
   wingGeo.translate(0.52, 0, 0);
   wingGeo.rotateX(-Math.PI / 2);
 
-  const wings: THREE.Object3D[] = [];
+  const wings: Array<THREE.Object3D> = [];
   for (const sx of [-1, 1]) {
     const pivot = new THREE.Object3D();
     pivot.position.set(sx * 0.12, 0.26, 0.0);
@@ -156,7 +203,8 @@ export function createBee(): BeeModel {
         wings[i].rotation.y = dir * flap * 0.12;
       }
       // Nose down as it speeds up, and up when climbing (+x pitches down).
-      body.rotation.x = speed01 * 0.18 - climb01 * 0.4 + Math.sin(elapsed * 4.5) * 0.015;
+      body.rotation.x =
+        speed01 * 0.18 - climb01 * 0.4 + Math.sin(elapsed * 4.5) * 0.015;
     },
   };
 }
@@ -204,8 +252,9 @@ export interface BabyModel {
  * rounder than the adults so the ring around the queen reads as nursery.
  */
 export function createBaby(): BabyModel {
-  const parts: THREE.BufferGeometry[] = [];
-  const push = (geo: THREE.BufferGeometry, color: number) => parts.push(paint(geo, color));
+  const parts: Array<THREE.BufferGeometry> = [];
+  const push = (geo: THREE.BufferGeometry, color: number) =>
+    parts.push(paint(geo, color));
 
   // Segmented body
   for (const [z, r, c] of [
@@ -232,7 +281,9 @@ export function createBaby(): BabyModel {
   }
 
   const geo = mergeGeometries(parts, false);
-  if (!geo) throw new Error('baby: geometry merge failed');
+  if (!geo) {
+    throw new Error("baby: geometry merge failed");
+  }
   geo.computeVertexNormals();
 
   const group = new THREE.Group();
@@ -244,7 +295,7 @@ export function createBaby(): BabyModel {
   // they inherit the growth scaling for free. A torus lies in the XY plane,
   // which wraps the Z axis — the direction the body runs. Each radius is
   // matched to the body's girth where it sits.
-  const stripes: THREE.Mesh[] = [];
+  const stripes: Array<THREE.Mesh> = [];
   for (const [z, r] of [
     [-0.29, 0.288],
     [0.02, 0.302],
@@ -276,8 +327,8 @@ export function createBaby(): BabyModel {
   // pivot's scale, so anything rescaling a wing has to preserve it — a plain
   // setScalar() flips the left wing onto the right and the baby looks
   // one-winged.
-  const wings: THREE.Object3D[] = [];
-  const wingSigns: number[] = [];
+  const wings: Array<THREE.Object3D> = [];
+  const wingSigns: Array<number> = [];
   for (const sx of [-1, 1]) {
     const pivot = new THREE.Object3D();
     pivot.position.set(sx * 0.1, 0.2, -0.05);
@@ -299,9 +350,13 @@ export function createBaby(): BabyModel {
       const s = 0.92 + growth * 0.4;
       body.scale.setScalar(s);
       const w = 0.85 + growth * 0.5;
-      for (let i = 0; i < wings.length; i++) wings[i].scale.set(wingSigns[i] * w, w, w);
+      for (let i = 0; i < wings.length; i++) {
+        wings[i].scale.set(wingSigns[i] * w, w, w);
+      }
       // Fully grown, so it earns its stripes.
-      for (const stripe of stripes) stripe.visible = growth >= 1;
+      for (const stripe of stripes) {
+        stripe.visible = growth >= 1;
+      }
     },
     animate(elapsed, wiggle) {
       // Hungry babies rock side to side and flap; full ones just breathe.

@@ -14,26 +14,32 @@ export interface Land {
   x: number;
   y: number;
   /** Levels playable here, in order. Empty means nothing built yet. */
-  levels: readonly number[];
+  levels: ReadonlyArray<number>;
 }
 
 /**
  * Pins sit on each land's *terrain*, not its hand-lettered banner — a pin on
  * the banner hides the name the map already draws.
  */
-export const LANDS: readonly Land[] = [
-  { id: 'bears', name: "The Bear's Lair", x: 0.163, y: 0.196, levels: [] },
-  { id: 'mountain', name: 'The Mouldy Mountain', x: 0.717, y: 0.215, levels: [] },
-  { id: 'cottage', name: 'Caramel Cottage', x: 0.491, y: 0.355, levels: [4] },
-  { id: 'woods', name: 'The Windy Woods', x: 0.826, y: 0.304, levels: [] },
+export const LANDS: ReadonlyArray<Land> = [
+  {id: "bears", name: "The Bear's Lair", x: 0.163, y: 0.196, levels: []},
+  {id: "mountain", name: "The Mouldy Mountain", x: 0.717, y: 0.215, levels: []},
+  {id: "cottage", name: "Caramel Cottage", x: 0.491, y: 0.355, levels: [4]},
+  {id: "woods", name: "The Windy Woods", x: 0.826, y: 0.304, levels: []},
   // The Bee Tree is a landmark within the meadow, not somewhere you travel to,
   // so it gets no pin.
-  { id: 'meadow', name: 'The Mellow Meadow', x: 0.435, y: 0.544, levels: [1, 2, 3] },
-  { id: 'islands', name: 'Silent Islands', x: 0.826, y: 0.703, levels: [] },
-  { id: 'lake', name: 'The Lazy Lake', x: 0.761, y: 0.886, levels: [] },
+  {
+    id: "meadow",
+    name: "The Mellow Meadow",
+    x: 0.435,
+    y: 0.544,
+    levels: [1, 2, 3],
+  },
+  {id: "islands", name: "Silent Islands", x: 0.826, y: 0.703, levels: []},
+  {id: "lake", name: "The Lazy Lake", x: 0.761, y: 0.886, levels: []},
 ];
 
 /** Which land a level belongs to. */
 export function landForLevel(level: number): Land | undefined {
-  return LANDS.find((l) => l.levels.includes(level));
+  return LANDS.find(l => l.levels.includes(level));
 }

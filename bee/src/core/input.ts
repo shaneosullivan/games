@@ -39,21 +39,21 @@ export class Joystick {
   private readonly knob: HTMLDivElement;
 
   constructor(host: HTMLElement) {
-    this.root = document.createElement('div');
-    this.root.className = 'stick';
-    this.ring = document.createElement('div');
-    this.ring.className = 'stick-ring';
-    this.knob = document.createElement('div');
-    this.knob.className = 'stick-knob';
+    this.root = document.createElement("div");
+    this.root.className = "stick";
+    this.ring = document.createElement("div");
+    this.ring.className = "stick-ring";
+    this.knob = document.createElement("div");
+    this.knob.className = "stick-knob";
     this.root.append(this.ring, this.knob);
     host.appendChild(this.root);
 
-    window.addEventListener('pointerdown', this.onDown, { passive: false });
-    window.addEventListener('pointermove', this.onMove, { passive: false });
-    window.addEventListener('pointerup', this.onUp);
-    window.addEventListener('pointercancel', this.onUp);
-    window.addEventListener('keydown', this.onKey);
-    window.addEventListener('keyup', this.onKey);
+    window.addEventListener("pointerdown", this.onDown, {passive: false});
+    window.addEventListener("pointermove", this.onMove, {passive: false});
+    window.addEventListener("pointerup", this.onUp);
+    window.addEventListener("pointercancel", this.onUp);
+    window.addEventListener("keydown", this.onKey);
+    window.addEventListener("keyup", this.onKey);
   }
 
   /** Lower-left region of the screen owns the stick. */
@@ -62,21 +62,29 @@ export class Joystick {
   }
 
   private onDown = (e: PointerEvent): void => {
-    if (!this.enabled || this.pointerId !== null) return;
+    if (!this.enabled || this.pointerId !== null) {
+      return;
+    }
     // Ignore taps on HUD buttons.
-    if ((e.target as HTMLElement)?.closest?.('.ui-interactive')) return;
-    if (!this.inZone(e.clientX, e.clientY)) return;
+    if ((e.target as HTMLElement)?.closest?.(".ui-interactive")) {
+      return;
+    }
+    if (!this.inZone(e.clientX, e.clientY)) {
+      return;
+    }
     e.preventDefault();
     this.pointerId = e.pointerId;
     this.baseX = e.clientX;
     this.baseY = e.clientY;
     this.root.style.transform = `translate(${this.baseX}px, ${this.baseY}px)`;
-    this.root.classList.add('active');
+    this.root.classList.add("active");
     this.setKnob(0, 0);
   };
 
   private onMove = (e: PointerEvent): void => {
-    if (e.pointerId !== this.pointerId) return;
+    if (e.pointerId !== this.pointerId) {
+      return;
+    }
     e.preventDefault();
     let dx = e.clientX - this.baseX;
     let dy = e.clientY - this.baseY;
@@ -104,9 +112,11 @@ export class Joystick {
   };
 
   private onUp = (e: PointerEvent): void => {
-    if (e.pointerId !== this.pointerId) return;
+    if (e.pointerId !== this.pointerId) {
+      return;
+    }
     this.pointerId = null;
-    this.root.classList.remove('active');
+    this.root.classList.remove("active");
     this.setKnob(0, 0);
     this.x = this.y = this.magnitude = 0;
   };
@@ -116,21 +126,41 @@ export class Joystick {
   }
 
   private onKey = (e: KeyboardEvent): void => {
-    const down = e.type === 'keydown';
+    const down = e.type === "keydown";
     const k = e.key.toLowerCase();
-    if (!this.enabled) return;
-    if (!['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(k)) return;
-    if (down) this.keys.add(k);
-    else this.keys.delete(k);
+    if (!this.enabled) {
+      return;
+    }
+    if (
+      ![
+        "w",
+        "a",
+        "s",
+        "d",
+        "arrowup",
+        "arrowdown",
+        "arrowleft",
+        "arrowright",
+      ].includes(k)
+    ) {
+      return;
+    }
+    if (down) {
+      this.keys.add(k);
+    } else {
+      this.keys.delete(k);
+    }
 
     const kx =
-      (this.keys.has('d') || this.keys.has('arrowright') ? 1 : 0) -
-      (this.keys.has('a') || this.keys.has('arrowleft') ? 1 : 0);
+      (this.keys.has("d") || this.keys.has("arrowright") ? 1 : 0) -
+      (this.keys.has("a") || this.keys.has("arrowleft") ? 1 : 0);
     const ky =
-      (this.keys.has('s') || this.keys.has('arrowdown') ? 1 : 0) -
-      (this.keys.has('w') || this.keys.has('arrowup') ? 1 : 0);
+      (this.keys.has("s") || this.keys.has("arrowdown") ? 1 : 0) -
+      (this.keys.has("w") || this.keys.has("arrowup") ? 1 : 0);
 
-    if (this.pointerId !== null) return; // touch wins
+    if (this.pointerId !== null) {
+      return;
+    } // touch wins
     const mag = Math.hypot(kx, ky);
     if (mag === 0) {
       this.x = this.y = this.magnitude = 0;

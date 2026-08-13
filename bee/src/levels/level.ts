@@ -1,21 +1,21 @@
-import type * as THREE from 'three';
-import type { Audio } from '../core/audio';
-import type { Save } from '../core/save';
-import type { BabyRing } from '../entities/babyRing';
-import type { BeeActor } from '../entities/beeActor';
-import type { FlowerField, HarvestEvent } from '../entities/flowerField';
-import type { BearActor } from '../entities/bearActor';
-import type { WaspActor } from '../entities/waspActor';
-import type { ParticleBurst } from '../fx/particles';
-import type { HiveInterior } from '../render/geometry/hiveInterior';
-import type { HoneyJar } from '../entities/honeyJar';
-import type { CottageScene } from '../render/geometry/cottage';
-import type { CottageInside } from '../render/geometry/cottageInside';
-import type { HiveSite } from '../render/geometry/world';
-import type { Hud } from '../ui/hud';
+import type * as THREE from "three";
+import type {Audio} from "../core/audio";
+import type {Save} from "../core/save";
+import type {BabyRing} from "../entities/babyRing";
+import type {BeeActor} from "../entities/beeActor";
+import type {FlowerField, HarvestEvent} from "../entities/flowerField";
+import type {BearActor} from "../entities/bearActor";
+import type {WaspActor} from "../entities/waspActor";
+import type {ParticleBurst} from "../fx/particles";
+import type {HiveInterior} from "../render/geometry/hiveInterior";
+import type {HoneyJar} from "../entities/honeyJar";
+import type {CottageScene} from "../render/geometry/cottage";
+import type {CottageInside} from "../render/geometry/cottageInside";
+import type {HiveSite} from "../render/geometry/world";
+import type {Hud} from "../ui/hud";
 
 /** Which set of scenery is on screen. */
-export type EnvironmentName = 'meadow' | 'hive' | 'cottage' | 'inside';
+export type EnvironmentName = "meadow" | "hive" | "cottage" | "inside";
 
 /** Playable volume and camera framing, which differ per level. */
 export interface FlightSettings {
@@ -87,7 +87,7 @@ export interface GameContext {
    * Consume this frame's screen tap, if any, and return the first of
    * `objects` under it. Null when nothing was tapped.
    */
-  pickTap(objects: readonly THREE.Object3D[]): THREE.Object3D | null;
+  pickTap(objects: ReadonlyArray<THREE.Object3D>): THREE.Object3D | null;
   /**
    * Turn the brood loose in the meadow, pouring out of `origin`. Moves the ring
    * out of the hive interior so it renders outdoors.

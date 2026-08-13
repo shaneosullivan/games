@@ -67,7 +67,7 @@ export const WORLD = {
   /** Playable radius; the bee is softly pushed back inside. */
   radius: 52,
   groundSize: 320,
-  flowerCount: { white: 22, yellow: 22, orange: 22 },
+  flowerCount: {white: 22, yellow: 22, orange: 22},
   /** Seconds before a harvested flower blooms again. */
   regrowSeconds: 18,
   /** Horizontal distance at which a flower can be harvested. */
@@ -78,14 +78,18 @@ export const WORLD = {
   harvestSeconds: 0.55,
 } as const;
 
-export type PollenKind = 'white' | 'yellow' | 'orange';
+export type PollenKind = "white" | "yellow" | "orange";
 
-export const POLLEN_KINDS: readonly PollenKind[] = ['white', 'yellow', 'orange'] as const;
+export const POLLEN_KINDS: ReadonlyArray<PollenKind> = [
+  "white",
+  "yellow",
+  "orange",
+] as const;
 
 export const POLLEN_LABEL: Record<PollenKind, string> = {
-  white: 'White Rose',
-  yellow: 'Yellow Flower',
-  orange: 'Orange Flower',
+  white: "White Rose",
+  yellow: "Yellow Flower",
+  orange: "Orange Flower",
 };
 
 export const POLLEN_COLOR: Record<PollenKind, number> = {
@@ -398,7 +402,10 @@ export const PUZZLE = {
 
 export const LEVELS = {
   /** Level 1: found the hive by gathering this much of each pollen. */
-  foundingQuota: { white: 10, yellow: 10, orange: 10 } satisfies Record<PollenKind, number>,
+  foundingQuota: {white: 10, yellow: 10, orange: 10} satisfies Record<
+    PollenKind,
+    number
+  >,
   /** Level 2: how many baby bees ring the queen. */
   babyCount: 6,
   /** Level 2: feeds each baby needs before it grows up. */

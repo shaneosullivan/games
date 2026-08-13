@@ -1,4 +1,4 @@
-import { SIM } from '../config';
+import {SIM} from "../config";
 
 type UpdateFn = (dt: number) => void;
 type RenderFn = (alpha: number, dt: number) => void;
@@ -22,7 +22,9 @@ export class GameLoop {
   ) {}
 
   start(): void {
-    if (this.running) return;
+    if (this.running) {
+      return;
+    }
     this.running = true;
     this.last = performance.now();
     this.raf = requestAnimationFrame(this.tick);
@@ -34,13 +36,19 @@ export class GameLoop {
   }
 
   private tick = (now: number): void => {
-    if (!this.running) return;
+    if (!this.running) {
+      return;
+    }
     this.raf = requestAnimationFrame(this.tick);
 
     let frame = (now - this.last) / 1000;
     this.last = now;
-    if (frame > SIM.maxFrame) frame = SIM.maxFrame;
-    if (frame > 0) this.fps += (1 / frame - this.fps) * 0.08;
+    if (frame > SIM.maxFrame) {
+      frame = SIM.maxFrame;
+    }
+    if (frame > 0) {
+      this.fps += (1 / frame - this.fps) * 0.08;
+    }
 
     this.accumulator += frame;
     let steps = 0;

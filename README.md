@@ -15,8 +15,8 @@ thing deploys as a folder.
 
 ## The games
 
-| Game | What it is |
-|---|---|
+| Game                             | What it is                                                                                                                              |
+| -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
 | [**Bee a Queen**](bee/README.md) | Fly a bee, found a hive, feed the brood, see off a wasp, and get the honey home past a bear. Four levels. Built for a child on an iPad. |
 
 The gallery also links out to native apps on the App Store (Mazers, Super
@@ -38,11 +38,24 @@ npm --prefix site run serve      # preview it at http://localhost:4173
 
 `site/dist` is gitignored, so this is meant to run in CI. On Vercel:
 
-| Field | Value |
-|---|---|
-| Build Command | `node site/build.mjs` |
-| Output Directory | `site/dist` |
-| Install Command | *(leave empty — the build installs each game's own dependencies)* |
+| Field            | Value                                                             |
+| ---------------- | ----------------------------------------------------------------- |
+| Build Command    | `node site/build.mjs`                                             |
+| Output Directory | `site/dist`                                                       |
+| Install Command  | _(leave empty — the build installs each game's own dependencies)_ |
+
+## Formatting and lint
+
+Prettier and ESLint are configured once at the root and cover every project:
+
+```bash
+npm install        # once
+npm run format     # prettier --write .
+npm run lint       # eslint .
+```
+
+The settings are copied from the syncawesome repo, so code moves between the
+two without reformatting.
 
 ## Working on one game
 

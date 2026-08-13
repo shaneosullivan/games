@@ -1,10 +1,10 @@
-import * as THREE from 'three';
-import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { INSIDE } from '../../config';
-import bearPictureUrl from '../../assets/bearPicture.jpg';
-import bearFamilyUrl from '../../assets/bearFamily.jpg';
-import { createGlowBubble, type GlowBubble } from '../glow';
-import { paint, solidToon, vertexToon } from '../materials';
+import * as THREE from "three";
+import {mergeGeometries} from "three/examples/jsm/utils/BufferGeometryUtils.js";
+import {INSIDE} from "../../config";
+import bearPictureUrl from "../../assets/bearPicture.jpg";
+import bearFamilyUrl from "../../assets/bearFamily.jpg";
+import {createGlowBubble, type GlowBubble} from "../glow";
+import {paint, solidToon, vertexToon} from "../materials";
 
 export interface CottageInside {
   group: THREE.Group;
@@ -32,8 +32,9 @@ export function createCottageInside(): CottageInside {
   const R = INSIDE.roomSize / 2;
 
   // ---- shell -------------------------------------------------------------
-  const parts: THREE.BufferGeometry[] = [];
-  const push = (geo: THREE.BufferGeometry, color: number) => parts.push(paint(geo, color));
+  const parts: Array<THREE.BufferGeometry> = [];
+  const push = (geo: THREE.BufferGeometry, color: number) =>
+    parts.push(paint(geo, color));
 
   const floor = new THREE.BoxGeometry(INSIDE.roomSize, 0.4, INSIDE.roomSize);
   floor.translate(0, -0.2, 0);
@@ -81,7 +82,9 @@ export function createCottageInside(): CottageInside {
   }
 
   const merged = mergeGeometries(parts, false);
-  if (!merged) throw new Error('cottage inside: geometry merge failed');
+  if (!merged) {
+    throw new Error("cottage inside: geometry merge failed");
+  }
   merged.computeVertexNormals();
   const shell = new THREE.Mesh(merged, vertexToon());
   shell.receiveShadow = true;
@@ -89,7 +92,11 @@ export function createCottageInside(): CottageInside {
 
   // Back wall, above the counter — the first thing you see on the way in.
   group.add(
-    createWallPicture(bearPictureUrl, 5.6, new THREE.Vector3(0, INSIDE.pictureHeight, -R + 0.32)),
+    createWallPicture(
+      bearPictureUrl,
+      5.6,
+      new THREE.Vector3(0, INSIDE.pictureHeight, -R + 0.32),
+    ),
   );
   // Left-hand wall as you face the honey, so it's in view on the way over.
   group.add(
@@ -107,7 +114,11 @@ export function createCottageInside(): CottageInside {
   group.add(lamp);
 
   // ---- the honey jar -----------------------------------------------------
-  const jarRest = new THREE.Vector3(0, INSIDE.counterHeight + 0.2 + INSIDE.jarHeight / 2, counterZ);
+  const jarRest = new THREE.Vector3(
+    0,
+    INSIDE.counterHeight + 0.2 + INSIDE.jarHeight / 2,
+    counterZ,
+  );
   const jar = createHoneyJar();
   jar.position.copy(jarRest);
   group.add(jar);
@@ -182,7 +193,7 @@ function createWallPicture(
 
   const picture = new THREE.Mesh(
     new THREE.PlaneGeometry(width, height),
-    new THREE.MeshBasicMaterial({ map: texture, color: 0xd8d2c6 }),
+    new THREE.MeshBasicMaterial({map: texture, color: 0xd8d2c6}),
   );
   picture.position.z = 0.13;
   g.add(picture);
@@ -194,8 +205,9 @@ function createWallPicture(
 function createHoneyJar(): THREE.Group {
   const g = new THREE.Group();
   const h = INSIDE.jarHeight;
-  const parts: THREE.BufferGeometry[] = [];
-  const push = (geo: THREE.BufferGeometry, color: number) => parts.push(paint(geo, color));
+  const parts: Array<THREE.BufferGeometry> = [];
+  const push = (geo: THREE.BufferGeometry, color: number) =>
+    parts.push(paint(geo, color));
 
   // Honey body — the jar is mostly full, so this is the bulk of it.
   const body = new THREE.CylinderGeometry(h * 0.42, h * 0.36, h * 0.82, 16);
@@ -213,12 +225,21 @@ function createHoneyJar(): THREE.Group {
   push(cork, 0xc9a26a);
 
   // Label.
-  const label = new THREE.CylinderGeometry(h * 0.425, h * 0.4, h * 0.34, 16, 1, true);
+  const label = new THREE.CylinderGeometry(
+    h * 0.425,
+    h * 0.4,
+    h * 0.34,
+    16,
+    1,
+    true,
+  );
   label.translate(0, -h * 0.08, 0);
   push(label, 0xfff6e8);
 
   const merged = mergeGeometries(parts, false);
-  if (!merged) throw new Error('honey jar: geometry merge failed');
+  if (!merged) {
+    throw new Error("honey jar: geometry merge failed");
+  }
   merged.computeVertexNormals();
   const mesh = new THREE.Mesh(merged, vertexToon());
   mesh.castShadow = true;

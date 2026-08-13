@@ -1,8 +1,8 @@
-import * as THREE from 'three';
-import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { PALETTE, WORLD } from '../../config';
-import { paint, solidToon, vertexToon } from '../materials';
-import type { Rng } from '../../core/rng';
+import * as THREE from "three";
+import {mergeGeometries} from "three/examples/jsm/utils/BufferGeometryUtils.js";
+import {PALETTE, WORLD} from "../../config";
+import {paint, solidToon, vertexToon} from "../materials";
+import type {Rng} from "../../core/rng";
 
 /** Ground plane, grass tufts, boundary hedge and background trees. */
 export function createMeadow(rng: Rng): THREE.Group {
@@ -28,7 +28,9 @@ export function createMeadow(rng: Rng): THREE.Group {
     const s = rng.range(3, 9);
     m.compose(
       new THREE.Vector3(Math.cos(a) * r, 0.012, Math.sin(a) * r),
-      new THREE.Quaternion().setFromEuler(new THREE.Euler(-Math.PI / 2, 0, rng.range(0, 6.28))),
+      new THREE.Quaternion().setFromEuler(
+        new THREE.Euler(-Math.PI / 2, 0, rng.range(0, 6.28)),
+      ),
       new THREE.Vector3(s, s * rng.range(0.6, 1.2), 1),
     );
     patches.setMatrixAt(i, m);
@@ -36,7 +38,7 @@ export function createMeadow(rng: Rng): THREE.Group {
   group.add(patches);
 
   // Grass tufts — three blades merged, then instanced.
-  const bladeParts: THREE.BufferGeometry[] = [];
+  const bladeParts: Array<THREE.BufferGeometry> = [];
   for (const [x, z, h, tilt] of [
     [0, 0, 0.5, 0.0],
     [0.09, 0.05, 0.36, 0.3],
@@ -58,7 +60,9 @@ export function createMeadow(rng: Rng): THREE.Group {
     const s = rng.range(0.7, 1.5);
     m.compose(
       new THREE.Vector3(Math.cos(a) * r, 0, Math.sin(a) * r),
-      new THREE.Quaternion().setFromEuler(new THREE.Euler(0, rng.range(0, 6.28), 0)),
+      new THREE.Quaternion().setFromEuler(
+        new THREE.Euler(0, rng.range(0, 6.28), 0),
+      ),
       new THREE.Vector3(s, s, s),
     );
     tufts.setMatrixAt(i, m);
@@ -83,7 +87,9 @@ export function createMeadow(rng: Rng): THREE.Group {
     const s = rng.range(1.6, 3.1);
     m.compose(
       new THREE.Vector3(Math.cos(a) * r, s * 0.35, Math.sin(a) * r),
-      new THREE.Quaternion().setFromEuler(new THREE.Euler(rng.range(0, 1), rng.range(0, 6.28), 0)),
+      new THREE.Quaternion().setFromEuler(
+        new THREE.Euler(rng.range(0, 1), rng.range(0, 6.28), 0),
+      ),
       new THREE.Vector3(s, s * 0.8, s),
     );
     bushes.setMatrixAt(i, m);
@@ -104,14 +110,18 @@ export function createMeadow(rng: Rng): THREE.Group {
  */
 function facingCottage(a: number): boolean {
   let d = (a + Math.PI / 2) % (Math.PI * 2);
-  if (d > Math.PI) d -= Math.PI * 2;
-  if (d < -Math.PI) d += Math.PI * 2;
+  if (d > Math.PI) {
+    d -= Math.PI * 2;
+  }
+  if (d < -Math.PI) {
+    d += Math.PI * 2;
+  }
   return Math.abs(d) < 0.6;
 }
 
 function createTrees(rng: Rng): THREE.Group {
   const g = new THREE.Group();
-  const parts: THREE.BufferGeometry[] = [];
+  const parts: Array<THREE.BufferGeometry> = [];
   const trunk = new THREE.CylinderGeometry(0.42, 0.62, 4.4, 7);
   trunk.translate(0, 2.2, 0);
   parts.push(paint(trunk, 0x8b6244));
@@ -142,7 +152,9 @@ function createTrees(rng: Rng): THREE.Group {
     const s = rng.range(0.85, 1.5);
     m.compose(
       new THREE.Vector3(Math.cos(a) * r, 0, Math.sin(a) * r),
-      new THREE.Quaternion().setFromEuler(new THREE.Euler(0, rng.range(0, 6.28), 0)),
+      new THREE.Quaternion().setFromEuler(
+        new THREE.Euler(0, rng.range(0, 6.28), 0),
+      ),
       new THREE.Vector3(s, s, s),
     );
     trees.setMatrixAt(i, m);
@@ -183,7 +195,7 @@ export function createHiveSite(position: THREE.Vector3): HiveSite {
   // underside at the hive's own offset (x = 1.8) sits at
   // 9.8 - 0.8 * sqrt(4.3^2 - 1.8^2) = 6.7, comfortably above the top of a
   // finished hive at about y = 5.
-  const treeParts: THREE.BufferGeometry[] = [];
+  const treeParts: Array<THREE.BufferGeometry> = [];
   const pushTree = (geo: THREE.BufferGeometry, color: number) =>
     treeParts.push(paint(geo, color));
 
@@ -235,7 +247,9 @@ export function createHiveSite(position: THREE.Vector3): HiveSite {
   }
 
   const treeGeo = mergeGeometries(treeParts, false);
-  if (!treeGeo) throw new Error('bee tree: geometry merge failed');
+  if (!treeGeo) {
+    throw new Error("bee tree: geometry merge failed");
+  }
   treeGeo.computeVertexNormals();
   const tree = new THREE.Mesh(treeGeo, vertexToon());
   tree.castShadow = true;
@@ -247,11 +261,14 @@ export function createHiveSite(position: THREE.Vector3): HiveSite {
   hive.position.set(1.8, 4.35, 0);
   group.add(hive);
 
-  const layers: THREE.Mesh[] = [];
+  const layers: Array<THREE.Mesh> = [];
   const shades = [0xe0a934, 0xebbc4d, 0xf5cf68, 0xfadd8a];
   for (let i = 0; i < 4; i++) {
     const r = 1.15 - i * 0.2;
-    const mesh = new THREE.Mesh(new THREE.SphereGeometry(r, 16, 10), solidToon(shades[i]));
+    const mesh = new THREE.Mesh(
+      new THREE.SphereGeometry(r, 16, 10),
+      solidToon(shades[i]),
+    );
     mesh.scale.y = 0.55;
     mesh.position.y = -i * 0.55;
     mesh.castShadow = true;
@@ -260,12 +277,18 @@ export function createHiveSite(position: THREE.Vector3): HiveSite {
   }
 
   // The doorway. Widened once the hive is done so it reads as flyable-into.
-  const entrance = new THREE.Mesh(new THREE.CircleGeometry(0.34, 14), solidToon(0x3b2810));
+  const entrance = new THREE.Mesh(
+    new THREE.CircleGeometry(0.34, 14),
+    solidToon(0x3b2810),
+  );
   entrance.position.set(0, -0.7, 0.94);
   hive.add(entrance);
 
   // Landing lip under the door, so the entrance reads as a real opening.
-  const lip = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.36, 0.12, 12), solidToon(0xd9a133));
+  const lip = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.42, 0.36, 0.12, 12),
+    solidToon(0xd9a133),
+  );
   lip.position.set(0, -0.95, 0.86);
   hive.add(lip);
 
@@ -303,7 +326,9 @@ export function createHiveSite(position: THREE.Vector3): HiveSite {
       glow.visible = on;
     },
     updateGlow(elapsed) {
-      if (!glow.visible) return;
+      if (!glow.visible) {
+        return;
+      }
       updateHiveGlow(glow, elapsed);
     },
   };
@@ -360,9 +385,9 @@ function createHiveGlow(): THREE.Group {
 
   const mat = new THREE.ShaderMaterial({
     uniforms: {
-      uColor: { value: new THREE.Color(0x9fe8ff) },
-      uTime: { value: 0 },
-      uPulse: { value: 1 },
+      uColor: {value: new THREE.Color(0x9fe8ff)},
+      uTime: {value: 0},
+      uPulse: {value: 1},
     },
     vertexShader: FORCE_FIELD_VERT,
     fragmentShader: FORCE_FIELD_FRAG,
@@ -375,7 +400,7 @@ function createHiveGlow(): THREE.Group {
   const bubble = new THREE.Mesh(new THREE.IcosahedronGeometry(2.05, 3), mat);
   bubble.scale.y = 0.88;
   bubble.position.y = -0.7;
-  bubble.name = 'bubble';
+  bubble.name = "bubble";
   g.add(bubble);
 
   const light = new THREE.PointLight(0xffffff, 3.5, 13, 2);
@@ -402,7 +427,9 @@ function updateHiveGlow(glow: THREE.Group, elapsed: number): void {
       child.intensity = 2.2 + breath * 2.6;
       continue;
     }
-    if (!(child instanceof THREE.Mesh)) continue;
+    if (!(child instanceof THREE.Mesh)) {
+      continue;
+    }
 
     const mat = child.material as THREE.ShaderMaterial;
     mat.uniforms.uColor.value.copy(glowColor);

@@ -1,18 +1,23 @@
-import * as THREE from 'three';
-import { BEAR } from '../config';
-import { createBear } from '../render/geometry/bear';
+import * as THREE from "three";
+import {BEAR} from "../config";
+import {createBear} from "../render/geometry/bear";
 
-export type BearPhase = 'gone' | 'waiting' | 'chasing' | 'recovering' | 'distracted' | 'fleeing';
+export type BearPhase =
+  "gone" | "waiting" | "chasing" | "recovering" | "distracted" | "fleeing";
 
-export type BearEvent = 'swiped' | 'departed';
+export type BearEvent = "swiped" | "departed";
 
 const tmpTarget = new THREE.Vector3();
 const tmpDir = new THREE.Vector3();
 
 function shortestAngle(from: number, to: number): number {
   let d = (to - from) % (Math.PI * 2);
-  if (d > Math.PI) d -= Math.PI * 2;
-  if (d < -Math.PI) d += Math.PI * 2;
+  if (d > Math.PI) {
+    d -= Math.PI * 2;
+  }
+  if (d < -Math.PI) {
+    d += Math.PI * 2;
+  }
   return d;
 }
 
@@ -31,7 +36,7 @@ export class BearActor {
   readonly position = new THREE.Vector3();
   readonly velocity = new THREE.Vector3();
 
-  phase: BearPhase = 'gone';
+  phase: BearPhase = "gone";
 
   private readonly model = createBear();
   private readonly prevPosition = new THREE.Vector3();
@@ -70,7 +75,7 @@ export class BearActor {
     this.prevYaw = this.yaw;
     this.heading = this.yaw;
     this.aim.copy(lookAt);
-    this.phase = 'waiting';
+    this.phase = "waiting";
     this.phaseTime = 0;
     this.rear = 0;
     this.swat = 0;
@@ -79,8 +84,10 @@ export class BearActor {
 
   /** Start the chase. */
   pursue(): void {
-    if (this.phase === 'gone') return;
-    this.phase = 'chasing';
+    if (this.phase === "gone") {
+      return;
+    }
+    this.phase = "chasing";
     this.phaseTime = 0;
   }
 
@@ -92,34 +99,51 @@ export class BearActor {
    * @param standoff how far from `from` to end up
    */
   distract(from?: THREE.Vector3, standoff = 0): void {
-    if (this.phase === 'gone') return;
-    this.phase = 'distracted';
+    if (this.phase === "gone") {
+      return;
+    }
+    this.phase = "distracted";
     this.phaseTime = 0;
     this.anchor.copy(this.position);
 
     if (from && standoff > 0) {
       tmpDir.copy(this.position).sub(from).setY(0);
       // Dead on top of it: any direction will do, so pick the one it's facing.
-      if (tmpDir.lengthSq() < 0.01) tmpDir.set(Math.sin(this.yaw), 0, Math.cos(this.yaw));
-      this.anchor.copy(from).addScaledVector(tmpDir.normalize(), standoff).setY(0);
+      if (tmpDir.lengthSq() < 0.01) {
+        tmpDir.set(Math.sin(this.yaw), 0, Math.cos(this.yaw));
+      }
+      this.anchor
+        .copy(from)
+        .addScaledVector(tmpDir.normalize(), standoff)
+        .setY(0);
     }
   }
 
   /** Frightened off. */
   flee(away: THREE.Vector3): void {
-    if (this.phase === 'gone') return;
-    this.phase = 'fleeing';
+    if (this.phase === "gone") {
+      return;
+    }
+    this.phase = "fleeing";
     this.phaseTime = 0;
-    this.aim.copy(this.position).sub(away).setY(0).normalize().multiplyScalar(120).add(this.position);
+    this.aim
+      .copy(this.position)
+      .sub(away)
+      .setY(0)
+      .normalize()
+      .multiplyScalar(120)
+      .add(this.position);
   }
 
   reset(): void {
-    this.phase = 'gone';
+    this.phase = "gone";
     this.object.visible = false;
   }
 
   update(dt: number, beePosition: THREE.Vector3): BearEvent | null {
-    if (this.phase === 'gone') return null;
+    if (this.phase === "gone") {
+      return null;
+    }
 
     this.prevPosition.copy(this.position);
     this.prevYaw = this.yaw;
@@ -130,46 +154,46 @@ export class BearActor {
     const distance = this.position.distanceTo(beePosition);
 
     // Rearing and swatting only happen when the babies are teasing it.
-    const wantRear = this.phase === 'distracted' ? 1 : 0;
+    const wantRear = this.phase === "distracted" ? 1 : 0;
     this.rear += (wantRear - this.rear) * Math.min(1, 3 * dt);
     this.swat += (wantRear - this.swat) * Math.min(1, 2.2 * dt);
 
     switch (this.phase) {
-      case 'waiting':
+      case "waiting":
         tmpTarget.copy(beePosition).setY(0);
         break;
 
-      case 'chasing':
+      case "chasing":
         // Chase a lagged copy of the bee, so it commits to where she was.
         this.aim.lerp(beePosition, 1 - Math.exp(-dt / BEAR.reactionLag));
         tmpTarget.copy(this.aim).setY(0);
         if (distance < BEAR.swipeRadius) {
-          this.phase = 'recovering';
+          this.phase = "recovering";
           this.phaseTime = 0;
-          event = 'swiped';
+          event = "swiped";
         }
         break;
 
-      case 'recovering':
+      case "recovering":
         // Winded: coast, then take up the chase again.
         tmpTarget.copy(this.position);
         if (this.phaseTime >= BEAR.recoverSeconds) {
-          this.phase = 'chasing';
+          this.phase = "chasing";
           this.phaseTime = 0;
           this.aim.copy(beePosition);
         }
         break;
 
-      case 'distracted':
+      case "distracted":
         tmpTarget.copy(this.anchor);
         break;
 
-      case 'fleeing':
+      case "fleeing":
         tmpTarget.copy(this.aim).setY(0);
         if (this.phaseTime >= BEAR.fleeSeconds) {
-          this.phase = 'gone';
+          this.phase = "gone";
           this.object.visible = false;
-          event = 'departed';
+          event = "departed";
         }
         break;
     }
@@ -183,24 +207,32 @@ export class BearActor {
     tmpDir.copy(target).sub(this.position).setY(0);
     const distance = tmpDir.length();
 
-    const chasing = this.phase === 'chasing' || this.phase === 'fleeing';
+    const chasing = this.phase === "chasing" || this.phase === "fleeing";
     const turnRate = chasing ? BEAR.chaseTurnRate : BEAR.turnRate;
 
     if (distance > 0.001) {
       const desired = Math.atan2(tmpDir.x, tmpDir.z);
       const swing = shortestAngle(this.heading, desired);
-      this.heading += THREE.MathUtils.clamp(swing, -turnRate * dt, turnRate * dt);
+      this.heading += THREE.MathUtils.clamp(
+        swing,
+        -turnRate * dt,
+        turnRate * dt,
+      );
     }
 
     // Winded, it plants. Distracted, it backs away to its standoff and *then*
     // plants — the speed taper below brings it to a stop on arrival.
-    const wants = this.phase === 'recovering' ? 0 : 1;
+    const wants = this.phase === "recovering" ? 0 : 1;
     const speed = BEAR.speed * wants * Math.min(1, distance / 3);
 
-    tmpDir.set(Math.sin(this.heading), 0, Math.cos(this.heading)).multiplyScalar(speed);
+    tmpDir
+      .set(Math.sin(this.heading), 0, Math.cos(this.heading))
+      .multiplyScalar(speed);
     tmpDir.sub(this.velocity);
     const maxChange = BEAR.accel * dt;
-    if (tmpDir.length() > maxChange) tmpDir.setLength(maxChange);
+    if (tmpDir.length() > maxChange) {
+      tmpDir.setLength(maxChange);
+    }
     this.velocity.add(tmpDir);
 
     this.position.addScaledVector(this.velocity, dt);
@@ -223,13 +255,16 @@ export class BearActor {
     this.model.head.getWorldPosition(out);
     // Report it in the same space as `position` — i.e. the parent group's —
     // so it can be compared with anything else living in the meadow.
-    if (this.object.parent) this.object.parent.worldToLocal(out);
+    if (this.object.parent) {
+      this.object.parent.worldToLocal(out);
+    }
     return out;
   }
 
   render(alpha: number): void {
     this.object.position.lerpVectors(this.prevPosition, this.position, alpha);
-    this.object.rotation.y = this.prevYaw + shortestAngle(this.prevYaw, this.yaw) * alpha;
+    this.object.rotation.y =
+      this.prevYaw + shortestAngle(this.prevYaw, this.yaw) * alpha;
     this.model.animate(this.elapsed, this.speed01, this.rear, this.swat);
   }
 }

@@ -1,7 +1,7 @@
-import * as THREE from 'three';
-import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { BEAR } from '../../config';
-import { paint, solidToon, vertexToon } from '../materials';
+import * as THREE from "three";
+import {mergeGeometries} from "three/examples/jsm/utils/BufferGeometryUtils.js";
+import {BEAR} from "../../config";
+import {paint, solidToon, vertexToon} from "../materials";
 
 export interface BearModel {
   group: THREE.Group;
@@ -39,8 +39,9 @@ export function createBear(): BearModel {
   torso.position.set(0, 1.35, -0.5);
   group.add(torso);
 
-  const parts: THREE.BufferGeometry[] = [];
-  const push = (geo: THREE.BufferGeometry, color: number) => parts.push(paint(geo, color));
+  const parts: Array<THREE.BufferGeometry> = [];
+  const push = (geo: THREE.BufferGeometry, color: number) =>
+    parts.push(paint(geo, color));
 
   // Barrel body, running along +Z.
   const body = new THREE.SphereGeometry(1.15, 18, 14);
@@ -91,7 +92,7 @@ export function createBear(): BearModel {
   haunches.position.copy(torso.position);
   group.add(haunches);
 
-  const thighParts: THREE.BufferGeometry[] = [];
+  const thighParts: Array<THREE.BufferGeometry> = [];
   for (const sx of [-1, 1]) {
     const thigh = new THREE.SphereGeometry(0.46, 12, 10);
     thigh.scale(1, 1.15, 1);
@@ -99,7 +100,9 @@ export function createBear(): BearModel {
     thighParts.push(paint(thigh, FUR_DARK));
   }
   const thighGeo = mergeGeometries(thighParts, false);
-  if (!thighGeo) throw new Error('bear: haunch merge failed');
+  if (!thighGeo) {
+    throw new Error("bear: haunch merge failed");
+  }
   thighGeo.computeVertexNormals();
   const haunchMesh = new THREE.Mesh(thighGeo, vertexToon());
   haunchMesh.castShadow = true;
@@ -111,7 +114,9 @@ export function createBear(): BearModel {
   torso.add(headAnchor);
 
   const merged = mergeGeometries(parts, false);
-  if (!merged) throw new Error('bear: geometry merge failed');
+  if (!merged) {
+    throw new Error("bear: geometry merge failed");
+  }
   merged.computeVertexNormals();
   const bodyMesh = new THREE.Mesh(merged, vertexToon());
   bodyMesh.castShadow = true;
@@ -119,7 +124,7 @@ export function createBear(): BearModel {
 
   // Front legs swing from the shoulders, so they can paddle when it runs and
   // swipe when it rears.
-  const arms: THREE.Object3D[] = [];
+  const arms: Array<THREE.Object3D> = [];
   const armMat = solidToon(FUR_DARK);
   const armGeo = new THREE.CapsuleGeometry(0.34, 1.0, 4, 10);
   armGeo.translate(0, -0.6, 0);
@@ -139,7 +144,7 @@ export function createBear(): BearModel {
   }
 
   // Back feet stay on the ground when it rears, so they hang off the root.
-  const feet: THREE.Object3D[] = [];
+  const feet: Array<THREE.Object3D> = [];
   for (const sx of [-1, 1]) {
     const foot = new THREE.Mesh(new THREE.SphereGeometry(0.44, 12, 10), armMat);
     foot.scale.set(1, 0.7, 1.35);
@@ -172,7 +177,8 @@ export function createBear(): BearModel {
       }
       for (let i = 0; i < feet.length; i++) {
         const dir = i === 0 ? -1 : 1;
-        feet[i].position.z = -1.0 + gait * dir * 0.5 * (1 - rear) * (0.3 + speed01);
+        feet[i].position.z =
+          -1.0 + gait * dir * 0.5 * (1 - rear) * (0.3 + speed01);
       }
     },
   };

@@ -26,6 +26,10 @@ with a `build` script, so adding one is dropping a folder in.
 ## Commands
 
 ```bash
+npm install                      # once, at the root: prettier + eslint for the whole repo
+npm run format                   # prettier --write .
+npm run lint                     # eslint .  (--fix with npm run lint:fix)
+
 npm --prefix bee run dev         # dev server on :5173, hot reload
 npm --prefix bee run typecheck   # tsc --noEmit
 npm --prefix bee run build       # typechecks, then one self-contained dist/index.html
@@ -34,6 +38,13 @@ npm --prefix site run build      # every game, then the gallery, into site/dist
 npm --prefix site run build:site # gallery only — fast, for styling
 npm --prefix site run serve      # preview site/dist on :4173
 ```
+
+Formatting and lint rules are copied from the syncawesome repo so code moves
+between the two unchanged: double quotes, no bracket spacing, no parens on
+single-arg arrows, trailing commas, 80 columns, braces on every `if`, and
+`Array<T>` over `T[]`. Run `npm run format` before committing — the configs are
+`.prettierrc.cjs` and `eslint.config.js` at the root, and they cover every
+project in the repo.
 
 Always typecheck before saying a change is done; `npm run build` does it for
 you. There is no test suite — verification is done by driving the real game (see
@@ -92,11 +103,14 @@ not — from devtools they're ordinary properties:
 
 ```js
 const g = window.game;
-g.loop.stop();            // take over the clock
-g.running = true;         // update() no-ops unless this is set
+g.loop.stop(); // take over the clock
+g.running = true; // update() no-ops unless this is set
 g.switchLevel(4);
-document.querySelectorAll('.overlay').forEach(o => o.classList.add('hidden'));
-for (let i = 0; i < 600; i++) { g.update(1/60); g.render(1, 1/60); }
+document.querySelectorAll(".overlay").forEach(o => o.classList.add("hidden"));
+for (let i = 0; i < 600; i++) {
+  g.update(1 / 60);
+  g.render(1, 1 / 60);
+}
 ```
 
 - Feed `g.stick` directly to autopilot a chase; call a level's phase methods
@@ -112,8 +126,8 @@ When testing the **built site**, the service worker will serve you the previous
 build. Purge it or you'll debug a page that no longer exists:
 
 ```js
-chofter.reset()      // defined by every page: unregisters the worker, clears caches, reloads
-chofter.diagnose()   // build, viewport measurements, caches, workers — for a device with no devtools
+chofter.reset(); // defined by every page: unregisters the worker, clears caches, reloads
+chofter.diagnose(); // build, viewport measurements, caches, workers — for a device with no devtools
 ```
 
 ## Deploying

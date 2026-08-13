@@ -1,6 +1,6 @@
-import * as THREE from 'three';
-import { INSIDE } from '../config';
-import { solidToon } from '../render/materials';
+import * as THREE from "three";
+import {INSIDE} from "../config";
+import {solidToon} from "../render/materials";
 
 const anchor = new THREE.Vector3();
 const offset = new THREE.Vector3();
@@ -38,7 +38,9 @@ export class HoneyJar {
 
   /** Take the jar off the counter. `from` is the bee's belly. */
   pickUp(from: THREE.Vector3): void {
-    if (this.carried) return;
+    if (this.carried) {
+      return;
+    }
     this.carried = true;
     this.position.copy(this.jar.getWorldPosition(new THREE.Vector3()));
     this.velocity.set(0, 0, 0);
@@ -49,7 +51,9 @@ export class HoneyJar {
 
   /** @param beeBelly the point the rope hangs from. */
   update(dt: number, beeBelly: THREE.Vector3): void {
-    if (!this.carried) return;
+    if (!this.carried) {
+      return;
+    }
     anchor.copy(beeBelly);
 
     // Free fall, damped.

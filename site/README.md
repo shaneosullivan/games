@@ -72,7 +72,7 @@ every cache and reloads, which is the part that matters: without the cache
 purge the service worker would hand back the very page you're trying to
 replace.
 
-The service worker deliberately does *not* intercept `version.json` — a cached
+The service worker deliberately does _not_ intercept `version.json` — a cached
 update-check can never notice an update. Keep it that way if you touch
 `renderServiceWorker`.
 
@@ -81,10 +81,10 @@ update-check can never notice an update. Keep it that way if you touch
 Every page defines `window.chofter`:
 
 ```js
-chofter.build        // the build stamp this copy is running
-chofter.diagnose()   // build, URL, standalone?, every viewport measurement, caches, workers
-chofter.update()     // take a pending update now — purge the caches and reload
-chofter.reset()      // unregister the worker, bin every cache, reload past the HTTP cache
+chofter.build; // the build stamp this copy is running
+chofter.diagnose(); // build, URL, standalone?, every viewport measurement, caches, workers
+chofter.update(); // take a pending update now — purge the caches and reload
+chofter.reset(); // unregister the worker, bin every cache, reload past the HTTP cache
 ```
 
 `diagnose()` is there because the interesting bugs are all on a device with no
@@ -92,7 +92,7 @@ devtools of its own — it returns the numbers worth pasting back.
 
 Service workers and caches are per-origin, so running it in an ordinary browser
 tab also fixes the copy installed on the home screen — no reinstall. It's the
-hammer for a build old enough that its *own* update path is broken; the banner
+hammer for a build old enough that its _own_ update path is broken; the banner
 is the polite version and doesn't touch the worker.
 
 Two rules the update path learned the hard way:
@@ -113,11 +113,11 @@ one and check the other.
 
 Other scripts:
 
-| Command | What it does |
-|---|---|
-| `npm --prefix site run build` | Build all games, then the gallery |
+| Command                            | What it does                                 |
+| ---------------------------------- | -------------------------------------------- |
+| `npm --prefix site run build`      | Build all games, then the gallery            |
 | `npm --prefix site run build:site` | Gallery only — fast, for tweaking the design |
-| `npm --prefix site run serve` | Preview `site/dist` at http://localhost:4173 |
+| `npm --prefix site run serve`      | Preview `site/dist` at http://localhost:4173 |
 
 ## Games that aren't in this repo
 
@@ -158,7 +158,7 @@ script that writes to `dist/`. Then:
   `description`. To override either, add a `game.json`:
 
   ```json
-  { "title": "Bee", "description": "Fly a bee, found a hive." }
+  {"title": "Bee", "description": "Fly a bee, found a hive."}
   ```
 
 **Build your game with relative asset URLs.** Games are served from a sub-path

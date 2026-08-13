@@ -32,10 +32,20 @@ body {
   padding: 0 clamp(16px, 4vw, 40px) 64px;
   background: var(--bg);
   color: var(--ink);
-  font-family: 'Avenir Next', 'Nunito', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  font-family:
+    "Avenir Next",
+    "Nunito",
+    -apple-system,
+    BlinkMacSystemFont,
+    system-ui,
+    sans-serif;
   /* A faint honeycomb wash, drawn with gradients so there's no image to load. */
   background-image:
-    radial-gradient(circle at 15% 10%, rgba(247, 179, 43, 0.16), transparent 45%),
+    radial-gradient(
+      circle at 15% 10%,
+      rgba(247, 179, 43, 0.16),
+      transparent 45%
+    ),
     radial-gradient(circle at 85% 0%, rgba(247, 179, 43, 0.1), transparent 40%);
   background-repeat: no-repeat;
 }

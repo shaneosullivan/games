@@ -1,5 +1,5 @@
-import { PUZZLE } from '../config';
-import { bearPuzzleUrl } from '../assets/bearPuzzle';
+import {PUZZLE} from "../config";
+import {bearPuzzleUrl} from "../assets/bearPuzzle";
 
 /** The picture is 3x3; eight of those nine cells hold a piece of it. */
 const SIZE = 3;
@@ -16,9 +16,15 @@ const HOLE = -1;
  * picture any smaller.
  */
 const CELLS: ReadonlyArray<readonly [number, number]> = [
-  [0, 0], [1, 0], [2, 0],
-  [0, 1], [1, 1], [2, 1],
-  [0, 2], [1, 2], [2, 2],
+  [0, 0],
+  [1, 0],
+  [2, 0],
+  [0, 1],
+  [1, 1],
+  [2, 1],
+  [0, 2],
+  [1, 2],
+  [2, 2],
   [1, 3],
 ];
 const SLOTS = CELLS.length;
@@ -52,39 +58,43 @@ export function createSlidePuzzle(
   onSolved: () => void,
   imageUrl: string = bearPuzzleUrl,
 ): SlidePuzzle {
-  const root = document.createElement('div');
-  root.className = 'puzzle ui-interactive hidden';
+  const root = document.createElement("div");
+  root.className = "puzzle ui-interactive hidden";
 
-  const title = document.createElement('div');
-  title.className = 'puzzle-title';
-  title.textContent = 'Fix the picture!';
+  const title = document.createElement("div");
+  title.className = "puzzle-title";
+  title.textContent = "Fix the picture!";
 
-  const board = document.createElement('div');
-  board.className = 'puzzle-board';
+  const board = document.createElement("div");
+  board.className = "puzzle-board";
 
-  const hint = document.createElement('div');
-  hint.className = 'puzzle-hint';
-  hint.textContent = 'Slide the tiles into a gap';
+  const hint = document.createElement("div");
+  hint.className = "puzzle-hint";
+  hint.textContent = "Slide the tiles into a gap";
 
   root.append(title, board, hint);
   host.appendChild(root);
 
   /** order[slot] = the piece of the picture sitting there, or HOLE. */
-  let order: number[] = solvedOrder();
+  let order: Array<number> = solvedOrder();
   let solved = false;
-  const cells: HTMLDivElement[] = [];
+  const cells: Array<HTMLDivElement> = [];
 
   for (let i = 0; i < SLOTS; i++) {
-    const cell = document.createElement('div');
-    cell.className = 'puzzle-tile';
+    const cell = document.createElement("div");
+    cell.className = "puzzle-tile";
     // The hanging gap is outside the picture's grid, so it needs placing.
-    if (i === SLOTS - 1) cell.classList.add('puzzle-spare');
-    cell.addEventListener('click', () => {
+    if (i === SLOTS - 1) {
+      cell.classList.add("puzzle-spare");
+    }
+    cell.addEventListener("click", () => {
       // A drag ends with a click on the same cell; the slide already happened.
-      if (dragged) return;
+      if (dragged) {
+        return;
+      }
       tryMove(i);
     });
-    cell.addEventListener('pointerdown', (e) => beginDrag(i, e));
+    cell.addEventListener("pointerdown", e => beginDrag(i, e));
     board.appendChild(cell);
     cells.push(cell);
   }
@@ -114,7 +124,7 @@ export function createSlidePuzzle(
     pointerId: number;
     startX: number;
     startY: number;
-    options: Candidate[];
+    options: Array<Candidate>;
   }
   let drag: Drag | null = null;
   /** Set when a drag has moved the tile, to swallow the click that follows. */
@@ -122,23 +132,36 @@ export function createSlidePuzzle(
 
   function beginDrag(slot: number, e: PointerEvent): void {
     dragged = false;
-    if (solved || order[slot] === HOLE) return;
+    if (solved || order[slot] === HOLE) {
+      return;
+    }
 
     const cell = cells[slot];
-    const options = holesBeside(slot).map((hole) => ({
+    const options = holesBeside(slot).map(hole => ({
       spanX: cells[hole].offsetLeft - cell.offsetLeft,
       spanY: cells[hole].offsetTop - cell.offsetTop,
     }));
-    if (!options.length) return;
+    if (!options.length) {
+      return;
+    }
 
-    drag = { slot, pointerId: e.pointerId, startX: e.clientX, startY: e.clientY, options };
+    drag = {
+      slot,
+      pointerId: e.pointerId,
+      startX: e.clientX,
+      startY: e.clientY,
+      options,
+    };
     cell.setPointerCapture(e.pointerId);
-    cell.style.transition = 'none';
-    cell.style.zIndex = '2';
+    cell.style.transition = "none";
+    cell.style.zIndex = "2";
   }
 
   /** The gap this drag is heading for, and how far along it has got. */
-  function dragTowards(e: PointerEvent, d: Drag): { option: Candidate; t: number } {
+  function dragTowards(
+    e: PointerEvent,
+    d: Drag,
+  ): {option: Candidate; t: number} {
     const dx = e.clientX - d.startX;
     const dy = e.clientY - d.startY;
     let best = d.options[0];
@@ -155,35 +178,45 @@ export function createSlidePuzzle(
         best = option;
       }
     }
-    return { option: best, t: Math.max(0, Math.min(1, bestT)) };
+    return {option: best, t: Math.max(0, Math.min(1, bestT))};
   }
 
-  board.addEventListener('pointermove', (e) => {
-    if (!drag || e.pointerId !== drag.pointerId) return;
+  board.addEventListener("pointermove", e => {
+    if (!drag || e.pointerId !== drag.pointerId) {
+      return;
+    }
     // Any real movement counts as a drag, including away from the gap — that's
     // a deliberate "no", and the click that follows shouldn't move it anyway.
-    if (Math.abs(e.clientX - drag.startX) + Math.abs(e.clientY - drag.startY) > 6) {
+    if (
+      Math.abs(e.clientX - drag.startX) + Math.abs(e.clientY - drag.startY) >
+      6
+    ) {
       dragged = true;
     }
-    const { option, t } = dragTowards(e, drag);
-    cells[drag.slot].style.transform = `translate(${option.spanX * t}px, ${option.spanY * t}px)`;
+    const {option, t} = dragTowards(e, drag);
+    cells[drag.slot].style.transform =
+      `translate(${option.spanX * t}px, ${option.spanY * t}px)`;
   });
 
   const endDrag = (e: PointerEvent): void => {
-    if (!drag || e.pointerId !== drag.pointerId) return;
-    const { slot } = drag;
-    const { option, t } = dragTowards(e, drag);
+    if (!drag || e.pointerId !== drag.pointerId) {
+      return;
+    }
+    const {slot} = drag;
+    const {option, t} = dragTowards(e, drag);
     const cell = cells[slot];
     // Clearing the transform first lets the tile spring back on its own
     // transition when the drag falls short; on a commit the redraw beats it.
-    cell.style.transform = '';
-    cell.style.transition = '';
-    cell.style.zIndex = '';
+    cell.style.transform = "";
+    cell.style.transition = "";
+    cell.style.zIndex = "";
     drag = null;
-    if (t >= COMMIT) slide(slot, holeAt(slot, option));
+    if (t >= COMMIT) {
+      slide(slot, holeAt(slot, option));
+    }
   };
-  board.addEventListener('pointerup', endDrag);
-  board.addEventListener('pointercancel', endDrag);
+  board.addEventListener("pointerup", endDrag);
+  board.addEventListener("pointercancel", endDrag);
 
   function draw(): void {
     for (let slot = 0; slot < SLOTS; slot++) {
@@ -193,11 +226,11 @@ export function createSlidePuzzle(
       // picture. The hanging gap is outside it and stays empty.
       const show = piece === HOLE && solved && slot === CORNER ? CORNER : piece;
       if (show === HOLE) {
-        cell.classList.add('blank');
-        cell.style.backgroundImage = '';
+        cell.classList.add("blank");
+        cell.style.backgroundImage = "";
         continue;
       }
-      cell.classList.remove('blank');
+      cell.classList.remove("blank");
       cell.style.backgroundImage = `url("${imageUrl}")`;
       // The background is SIZE times the tile's size, so each step across is
       // 1/(SIZE-1) of the extra width — a percentage offset, not pixels, which
@@ -209,26 +242,30 @@ export function createSlidePuzzle(
   }
 
   /** Slots sharing an edge with this one. */
-  const neighbours = (slot: number): number[] => {
+  const neighbours = (slot: number): Array<number> => {
     const [col, row] = CELLS[slot];
-    const out: number[] = [];
+    const out: Array<number> = [];
     for (let other = 0; other < SLOTS; other++) {
-      if (other === slot) continue;
+      if (other === slot) {
+        continue;
+      }
       const [c, r] = CELLS[other];
-      if (Math.abs(c - col) + Math.abs(r - row) === 1) out.push(other);
+      if (Math.abs(c - col) + Math.abs(r - row) === 1) {
+        out.push(other);
+      }
     }
     return out;
   };
 
-  const holesBeside = (slot: number): number[] =>
-    neighbours(slot).filter((n) => order[n] === HOLE);
+  const holesBeside = (slot: number): Array<number> =>
+    neighbours(slot).filter(n => order[n] === HOLE);
 
   /** Which of the gaps beside `slot` a drag's span vector points at. */
   function holeAt(slot: number, option: Candidate): number {
     const cell = cells[slot];
     return (
       holesBeside(slot).find(
-        (hole) =>
+        hole =>
           cells[hole].offsetLeft - cell.offsetLeft === option.spanX &&
           cells[hole].offsetTop - cell.offsetTop === option.spanY,
       ) ?? -1
@@ -236,7 +273,9 @@ export function createSlidePuzzle(
   }
 
   function slide(slot: number, hole: number): void {
-    if (solved || hole < 0 || order[slot] === HOLE) return;
+    if (solved || hole < 0 || order[slot] === HOLE) {
+      return;
+    }
     [order[hole], order[slot]] = [order[slot], order[hole]];
     draw();
     checkSolved();
@@ -250,39 +289,51 @@ export function createSlidePuzzle(
   function checkSolved(): void {
     // Only the picture's own pieces matter; that they're all home forces the
     // two gaps to be in the corner and the hanging slot anyway.
-    for (let piece = 0; piece < PIECES; piece++) if (order[piece] !== piece) return;
+    for (let piece = 0; piece < PIECES; piece++) {
+      if (order[piece] !== piece) {
+        return;
+      }
+    }
     solved = true;
-    root.classList.add('solved');
-    hint.textContent = 'You did it!';
+    root.classList.add("solved");
+    hint.textContent = "You did it!";
     draw(); // fills the last tile back in, completing the picture
     onSolved();
   }
 
-  function solvedOrder(): number[] {
-    return Array.from({ length: SLOTS }, (_, i) => (i < PIECES ? i : HOLE));
+  function solvedOrder(): Array<number> {
+    return Array.from({length: SLOTS}, (_, i) => (i < PIECES ? i : HOLE));
   }
 
   /** Walk a gap around at random, picking either one each step. */
   function shuffle(moves: number = PUZZLE.scrambleMoves): void {
     solved = false;
-    root.classList.remove('solved');
+    root.classList.remove("solved");
     order = solvedOrder();
 
     let previous = -1;
     for (let i = 0; i < moves; i++) {
-      const holes = order.flatMap((piece, slot) => (piece === HOLE ? [slot] : []));
+      const holes = order.flatMap((piece, slot) =>
+        piece === HOLE ? [slot] : [],
+      );
       const hole = holes[Math.floor(Math.random() * holes.length)];
       // Never undo the step just taken, or the walk marks time.
-      const options = neighbours(hole).filter((n) => n !== previous && order[n] !== HOLE);
-      if (!options.length) continue;
+      const options = neighbours(hole).filter(
+        n => n !== previous && order[n] !== HOLE,
+      );
+      if (!options.length) {
+        continue;
+      }
       const next = options[Math.floor(Math.random() * options.length)];
       [order[hole], order[next]] = [order[next], order[hole]];
       previous = hole;
     }
 
     // A shuffle that happens to land solved would end the stage instantly.
-    if (order.every((piece, slot) => piece === HOLE || piece === slot)) shuffle(moves);
-    hint.textContent = 'Slide the tiles into a gap';
+    if (order.every((piece, slot) => piece === HOLE || piece === slot)) {
+      shuffle(moves);
+    }
+    hint.textContent = "Slide the tiles into a gap";
     draw();
   }
 
@@ -290,10 +341,10 @@ export function createSlidePuzzle(
     root,
     show(moves) {
       shuffle(moves);
-      root.classList.remove('hidden');
+      root.classList.remove("hidden");
     },
     hide() {
-      root.classList.add('hidden');
+      root.classList.add("hidden");
     },
     get solved() {
       return solved;
@@ -303,15 +354,23 @@ export function createSlidePuzzle(
 
 /** Rainbow confetti burst over the puzzle when it's solved. */
 export function burstRainbow(host: HTMLElement): void {
-  const colours = ['#ff3b6b', '#ff9f1c', '#ffe14d', '#4ade80', '#38bdf8', '#a78bfa', '#f472b6'];
+  const colours = [
+    "#ff3b6b",
+    "#ff9f1c",
+    "#ffe14d",
+    "#4ade80",
+    "#38bdf8",
+    "#a78bfa",
+    "#f472b6",
+  ];
   for (let i = 0; i < 44; i++) {
-    const dot = document.createElement('i');
-    dot.className = 'confetti';
+    const dot = document.createElement("i");
+    dot.className = "confetti";
     dot.style.background = colours[i % colours.length];
     dot.style.left = `${10 + Math.random() * 80}%`;
     dot.style.top = `${20 + Math.random() * 50}%`;
-    dot.style.setProperty('--dx', `${(Math.random() - 0.5) * 260}px`);
-    dot.style.setProperty('--dy', `${-120 - Math.random() * 220}px`);
+    dot.style.setProperty("--dx", `${(Math.random() - 0.5) * 260}px`);
+    dot.style.setProperty("--dy", `${-120 - Math.random() * 220}px`);
     dot.style.animationDelay = `${Math.random() * 0.25}s`;
     host.appendChild(dot);
     setTimeout(() => dot.remove(), 1800);

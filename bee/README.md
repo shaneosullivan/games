@@ -45,17 +45,17 @@ touchscreen.
 
 ## What's built
 
-| Phase | Status |
-|---|---|
-| 0 — Scaffold, PWA, fullscreen iPad | done |
-| 1 — Flight model, floating joystick, chase camera | done |
-| 2 — Procedural bee, three flower types, meadow, toon look | done |
-| 3 — Pollen collection, HUD, codename, save, Level 1 complete | done |
-| 3b — Altitude control, hive force field, fly-in + fireworks | done |
-| 4 — Level 2: the Royal Chamber (queen, babies, feeding) | done |
-| 5 — Level 3: Wasp at the Hive | done |
-| 6 — Level 4: Caramel Cottage (dance mat, then inside) | done |
-| 7 — Wall-clock day system | not started |
+| Phase                                                        | Status      |
+| ------------------------------------------------------------ | ----------- |
+| 0 — Scaffold, PWA, fullscreen iPad                           | done        |
+| 1 — Flight model, floating joystick, chase camera            | done        |
+| 2 — Procedural bee, three flower types, meadow, toon look    | done        |
+| 3 — Pollen collection, HUD, codename, save, Level 1 complete | done        |
+| 3b — Altitude control, hive force field, fly-in + fireworks  | done        |
+| 4 — Level 2: the Royal Chamber (queen, babies, feeding)      | done        |
+| 5 — Level 3: Wasp at the Hive                                | done        |
+| 6 — Level 4: Caramel Cottage (dance mat, then inside)        | done        |
+| 7 — Wall-clock day system                                    | not started |
 
 ## Levels
 
@@ -69,7 +69,6 @@ one level shows those levels beside the map.
 Your current level is preselected, so plain "Continue" resumes. Choosing a level
 you've already completed replays it from the start (level 1 resets its flower
 counts), and your furthest unlock is kept either way.
-
 
 **1 — Sunny Meadow.** Gather 10 each of white rose, yellow flower and orange
 flower. The hive on the branch grows with every collection. When it's whole it
@@ -215,7 +214,7 @@ Things worth knowing before changing anything:
   construction; a mat built while a pad was still lit adopted the lit colour as
   its base and that pad glowed for the rest of the level. `cottage.padColours`
   states them instead.
-- **Anything the Game owns must also be *ticked* by whichever level is using
+- **Anything the Game owns must also be _ticked_ by whichever level is using
   it.** Level 3 releases the brood into the meadow but originally never called
   `babies.update()`, so they hung motionless outside the hive. That tick has to
   sit above the phase early-returns.
@@ -263,7 +262,7 @@ Things worth knowing before changing anything:
   `COTTAGE.yardOffsetZ` with a fence and gate at its mouth, and both are drawn
   together. That's what makes stage 3 a single flight rather than a cut — but it
   means bounds, fog and camera all have to span the pair: `COTTAGE.flightRadius`
-  is a circle about the *hive* wide enough to hold the clearing, `COTTAGE_ENV`
+  is a circle about the _hive_ wide enough to hold the clearing, `COTTAGE_ENV`
   fogs much further out than the meadow, and the meadow's boundary hedge and
   treeline leave a gap on that side (`facingCottage` in
   `render/geometry/world.ts`). Anything placed at the clearing works in world
@@ -276,7 +275,7 @@ Things worth knowing before changing anything:
 - **iOS keeps a strip of an installed app for itself.** On an iPad the layout
   viewport comes back 20pt shorter than the screen — measured on the device:
   1080x790 against a 1080x810 landscape screen — and that strip under the home
-  indicator is painted with the *page* background, not ours to draw in. So
+  indicator is painted with the _page_ background, not ours to draw in. So
   `setEnvironment` keeps `document.body.style.background` in step with the
   scene's sky, which is what stops it reading as a gap. Sizing the app can't
   help; it already fills every pixel the viewport has.
@@ -288,7 +287,7 @@ Things worth knowing before changing anything:
   and the renderer re-measures whenever it changes.
 - **Coplanar faces z-fight.** The cottage's doorway recess and its door both
   used to end exactly on the wall's front face (z = 2.1 in house units), which
-  showed up as brown lines flickering across the door. Anything laid *on* a
+  showed up as brown lines flickering across the door. Anything laid _on_ a
   surface here — recesses, sills, panes, the mat — has to stand a little proud
   of it, and the comments say by how much.
 - **A deployed build tells itself when it's stale.** `core/updates.ts` polls
@@ -303,16 +302,16 @@ Things worth knowing before changing anything:
   the player and re-frames the camera. Every level must call both in `enter()`,
   including level 1 — otherwise going back would inherit the other's settings.
 - **The dome is much wider than the play area** (radius 34 vs bounds 15). At the
-  edge of the bounds it's the *camera*, sitting behind and above the bee, that
+  edge of the bounds it's the _camera_, sitting behind and above the bee, that
   would punch through the shell. If you widen `INTERIOR.boundsRadius`, raise
   `maxHeight` or pull the camera back, check `sqrt((bounds + cameraDistance)^2 +
-  (maxHeight + cameraHeight)^2)` still clears `domeRadius` — pulling the rig
+(maxHeight + cameraHeight)^2)` still clears `domeRadius` — pulling the rig
   back to 9.6 for the feeding levels is exactly what forced 30 up to 34.
 - **A model's `animate()` must not write to the group the caller positioned.**
   The queen's bob originally set `group.position.y` directly, which silently
   dragged her from her dais down to the floor. Bobs and sways belong on an
   inner group.
-- **The wasp's speed and `loseRadius` are coupled.** It is now slightly *faster*
+- **The wasp's speed and `loseRadius` are coupled.** It is now slightly _faster_
   than the bee (`WASP.speed` 10.2 vs `FLIGHT.maxSpeed` 9.5) and escapes by
   cornering badly instead — at the original 7.2 a straight-line flee outran its
   interest in about eleven seconds and the 30-second chase could never be held
@@ -326,7 +325,7 @@ Things worth knowing before changing anything:
   Neither works alone: frame deltas drift off the track within a few bars, and
   the audio clock is wrong in both directions — it keeps running while the game
   is paused or backgrounded (come back to find the whole round expired), and it
-  *stops* if the context is suspended (which would stall the level forever). See
+  _stops_ if the context is suspended (which would stall the level forever). See
   `updateDance` in `levels/level4Cottage.ts`; a large divergence re-anchors the
   music, never the game.
 - **Indoor rooms are sized around the camera, not the bee.** The chase rig sits

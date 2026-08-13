@@ -30,26 +30,36 @@ export function fitViewport(root: HTMLElement, onResize: () => void): void {
     // scrolls, so it can only ever be too small: taking the maximum is safe,
     // and overflow is hidden anyway.
     const doc = document.documentElement;
-    const width = Math.max(Math.round(vv?.width ?? 0), doc.clientWidth, window.innerWidth);
-    const height = Math.max(Math.round(vv?.height ?? 0), doc.clientHeight, window.innerHeight);
+    const width = Math.max(
+      Math.round(vv?.width ?? 0),
+      doc.clientWidth,
+      window.innerWidth,
+    );
+    const height = Math.max(
+      Math.round(vv?.height ?? 0),
+      doc.clientHeight,
+      window.innerHeight,
+    );
 
-    root.style.top = '0px';
-    root.style.left = '0px';
+    root.style.top = "0px";
+    root.style.left = "0px";
     root.style.width = `${width}px`;
     root.style.height = `${height}px`;
 
-    if (width === lastW && height === lastH) return;
+    if (width === lastW && height === lastH) {
+      return;
+    }
     lastW = width;
     lastH = height;
     onResize();
   };
 
   apply();
-  window.addEventListener('resize', apply);
+  window.addEventListener("resize", apply);
   // iOS finishes its launch animation after load, and the viewport it settles
   // on is often not the one the first layout saw.
-  window.addEventListener('orientationchange', () => setTimeout(apply, 120));
-  window.addEventListener('pageshow', apply);
-  vv?.addEventListener('resize', apply);
-  vv?.addEventListener('scroll', apply);
+  window.addEventListener("orientationchange", () => setTimeout(apply, 120));
+  window.addEventListener("pageshow", apply);
+  vv?.addEventListener("resize", apply);
+  vv?.addEventListener("scroll", apply);
 }

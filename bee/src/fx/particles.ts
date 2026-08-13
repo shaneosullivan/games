@@ -1,8 +1,8 @@
-import * as THREE from 'three';
+import * as THREE from "three";
 
 export interface BurstOptions {
   /** One colour, or a palette sampled per particle. */
-  color: number | readonly number[];
+  color: number | ReadonlyArray<number>;
   count?: number;
   /** Outward launch speed. */
   speed?: number;
@@ -24,27 +24,31 @@ export interface BurstOptions {
 export class ParticleBurst {
   readonly mesh: THREE.InstancedMesh;
 
-  private readonly pos: THREE.Vector3[] = [];
-  private readonly vel: THREE.Vector3[] = [];
-  private readonly colors: THREE.Color[] = [];
-  private readonly life: number[] = [];
-  private readonly ttl: number[] = [];
-  private readonly gravity: number[] = [];
-  private readonly size: number[] = [];
+  private readonly pos: Array<THREE.Vector3> = [];
+  private readonly vel: Array<THREE.Vector3> = [];
+  private readonly colors: Array<THREE.Color> = [];
+  private readonly life: Array<number> = [];
+  private readonly ttl: Array<number> = [];
+  private readonly gravity: Array<number> = [];
+  private readonly size: Array<number> = [];
   private cursor = 0;
 
   private readonly m = new THREE.Matrix4();
   private readonly q = new THREE.Quaternion();
   private readonly s = new THREE.Vector3();
 
-  constructor(private readonly max: number, radius = 0.09, additive = false) {
+  constructor(
+    private readonly max: number,
+    radius = 0.09,
+    additive = false,
+  ) {
     const geo = new THREE.IcosahedronGeometry(radius, 0);
     // `vertexColors: true` makes the shader read a `color` attribute. Without
     // one it reads black, and per-instance colour never gets a chance to
     // multiply in — the particles render invisibly (fatally so when additive).
     // A flat white attribute makes instanceColor the only thing that matters.
     const white = new Float32Array(geo.attributes.position.count * 3).fill(1);
-    geo.setAttribute('color', new THREE.BufferAttribute(white, 3));
+    geo.setAttribute("color", new THREE.BufferAttribute(white, 3));
 
     const mat = new THREE.MeshBasicMaterial({
       vertexColors: true,
@@ -53,7 +57,10 @@ export class ParticleBurst {
       blending: additive ? THREE.AdditiveBlending : THREE.NormalBlending,
     });
     this.mesh = new THREE.InstancedMesh(geo, mat, max);
-    this.mesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(max * 3), 3);
+    this.mesh.instanceColor = new THREE.InstancedBufferAttribute(
+      new Float32Array(max * 3),
+      3,
+    );
     this.mesh.frustumCulled = false;
 
     for (let i = 0; i < max; i++) {
@@ -88,7 +95,9 @@ export class ParticleBurst {
       size = 1,
       spherical = 0,
     } = opts;
-    const palette = Array.isArray(color) ? (color as readonly number[]) : [color as number];
+    const palette = Array.isArray(color)
+      ? (color as ReadonlyArray<number>)
+      : [color as number];
 
     for (let n = 0; n < count; n++) {
       const i = this.cursor;
@@ -117,7 +126,9 @@ export class ParticleBurst {
 
   update(dt: number): void {
     for (let i = 0; i < this.max; i++) {
-      if (this.life[i] <= 0) continue;
+      if (this.life[i] <= 0) {
+        continue;
+      }
       this.life[i] -= dt;
       this.vel[i].y -= this.gravity[i] * dt;
       this.vel[i].multiplyScalar(1 - 1.4 * dt);
@@ -136,7 +147,9 @@ export class ParticleBurst {
       }
     }
     this.mesh.instanceMatrix.needsUpdate = true;
-    if (this.mesh.instanceColor) this.mesh.instanceColor.needsUpdate = true;
+    if (this.mesh.instanceColor) {
+      this.mesh.instanceColor.needsUpdate = true;
+    }
   }
 }
 

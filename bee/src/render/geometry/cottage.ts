@@ -1,15 +1,15 @@
-import * as THREE from 'three';
-import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { COTTAGE, DANCE } from '../../config';
-import type { Rng } from '../../core/rng';
-import { paint, solidToon, vertexToon } from '../materials';
+import * as THREE from "three";
+import {mergeGeometries} from "three/examples/jsm/utils/BufferGeometryUtils.js";
+import {COTTAGE, DANCE} from "../../config";
+import type {Rng} from "../../core/rng";
+import {paint, solidToon, vertexToon} from "../materials";
 
 export interface CottageScene {
   group: THREE.Group;
   /** Centre of the mat, on the ground. */
   matCentre: THREE.Vector3;
   /** The nine pads, index 4 being the centre. */
-  pads: THREE.Mesh[];
+  pads: Array<THREE.Mesh>;
   /**
    * What colour each pad is at rest.
    *
@@ -17,9 +17,9 @@ export interface CottageScene {
    * lights them, so anything reading the material to learn the resting colour
    * can adopt a lit one and leave that pad glowing for good.
    */
-  padColours: readonly number[];
+  padColours: ReadonlyArray<number>;
   /** World centres of each pad. */
-  padCentres: THREE.Vector3[];
+  padCentres: Array<THREE.Vector3>;
   /** Swing the door open once the dance is passed. */
   setDoorOpen(open: boolean): void;
   /** Swing the gate to the meadow. Shut until the cottage is unlocked. */
@@ -64,7 +64,10 @@ export function createCottage(rng: Rng): CottageScene {
   group.add(ground);
 
   // A worn path from the mat to the door.
-  const path = new THREE.Mesh(new THREE.CircleGeometry(4.2, 24), solidToon(0xd8bb84));
+  const path = new THREE.Mesh(
+    new THREE.CircleGeometry(4.2, 24),
+    solidToon(0xd8bb84),
+  );
   path.rotation.x = -Math.PI / 2;
   path.position.set(0, 0.01, COTTAGE.matOffsetZ);
   path.scale.set(1.1, 1.25, 1);
@@ -87,14 +90,20 @@ export function createCottage(rng: Rng): CottageScene {
   const doorPivot = new THREE.Object3D();
   // Hinge on the left edge of the doorway.
   doorPivot.position.set(-0.95, 0, 2.02);
-  const door = new THREE.Mesh(new THREE.BoxGeometry(1.9, 2.7, 0.16), solidToon(0x7b4a22));
+  const door = new THREE.Mesh(
+    new THREE.BoxGeometry(1.9, 2.7, 0.16),
+    solidToon(0x7b4a22),
+  );
   // Clear of the recess's front face (z = 2.12) for the same reason — the door
   // used to end exactly on it.
   door.position.set(0.95, 1.35, 0.26);
   door.castShadow = true;
   doorPivot.add(door);
 
-  const knob = new THREE.Mesh(new THREE.SphereGeometry(0.12, 10, 8), solidToon(0xffd75e));
+  const knob = new THREE.Mesh(
+    new THREE.SphereGeometry(0.12, 10, 8),
+    solidToon(0xffd75e),
+  );
   // Proud of the door's own front face, which is at z = 0.34 in this frame.
   knob.position.set(1.68, 1.35, 0.42);
   doorPivot.add(knob);
@@ -112,7 +121,7 @@ export function createCottage(rng: Rng): CottageScene {
 
   // ---- dance mat ---------------------------------------------------------
   const matCentre = new THREE.Vector3(0, 0, COTTAGE.matOffsetZ);
-  const { mat, pads, padCentres, padColours } = createMat(matCentre);
+  const {mat, pads, padCentres, padColours} = createMat(matCentre);
   group.add(mat);
 
   let doorOpen = false;
@@ -128,7 +137,9 @@ export function createCottage(rng: Rng): CottageScene {
     padColours,
     padCentres: padCentres.map(toWorld),
     // Doorway centre in world units: (0, 1.35, 2.02) at house scale.
-    doorway: toWorld(new THREE.Vector3(0, 1.35, 2.0).multiplyScalar(COTTAGE.houseScale)),
+    doorway: toWorld(
+      new THREE.Vector3(0, 1.35, 2.0).multiplyScalar(COTTAGE.houseScale),
+    ),
     gate: toWorld(new THREE.Vector3(0, 3, COTTAGE.boundsRadius)),
     setDoorOpen(open) {
       doorOpen = open;
@@ -140,7 +151,9 @@ export function createCottage(rng: Rng): CottageScene {
       // Swing the door open, and let it settle with a little overshoot.
       const target = doorOpen ? -1.9 : 0;
       doorPivot.rotation.y += (target - doorPivot.rotation.y) * 0.06;
-      if (doorOpen) doorPivot.rotation.y += Math.sin(elapsed * 3) * 0.004;
+      if (doorOpen) {
+        doorPivot.rotation.y += Math.sin(elapsed * 3) * 0.004;
+      }
       fence.update();
     },
   };
@@ -149,8 +162,9 @@ export function createCottage(rng: Rng): CottageScene {
 /** The gingerbread house itself. */
 function createHouse(): THREE.Group {
   const g = new THREE.Group();
-  const parts: THREE.BufferGeometry[] = [];
-  const push = (geo: THREE.BufferGeometry, color: number) => parts.push(paint(geo, color));
+  const parts: Array<THREE.BufferGeometry> = [];
+  const push = (geo: THREE.BufferGeometry, color: number) =>
+    parts.push(paint(geo, color));
 
   // Walls
   const walls = new THREE.BoxGeometry(7.2, 4.4, 6.2);
@@ -181,7 +195,10 @@ function createHouse(): THREE.Group {
   tri.lineTo(0, 2.16);
   tri.closePath();
   for (const z of [2.09, -4.39]) {
-    const gable = new THREE.ExtrudeGeometry(tri, { depth: 0.2, bevelEnabled: false });
+    const gable = new THREE.ExtrudeGeometry(tri, {
+      depth: 0.2,
+      bevelEnabled: false,
+    });
     gable.translate(0, 4.4, z);
     push(gable, GINGER_DARK);
   }
@@ -212,7 +229,9 @@ function createHouse(): THREE.Group {
   push(chimney, GINGER_DARK);
 
   const merged = mergeGeometries(parts, false);
-  if (!merged) throw new Error('cottage: geometry merge failed');
+  if (!merged) {
+    throw new Error("cottage: geometry merge failed");
+  }
   merged.computeVertexNormals();
   const house = new THREE.Mesh(merged, vertexToon());
   house.castShadow = true;
@@ -221,8 +240,15 @@ function createHouse(): THREE.Group {
 
   // Gumdrops pressed into the front wall — instanced, one draw call.
   const sweetGeo = new THREE.SphereGeometry(0.22, 10, 8);
-  const sweets = new THREE.InstancedMesh(paint(sweetGeo, 0xffffff), vertexToon(), 18);
-  sweets.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(18 * 3), 3);
+  const sweets = new THREE.InstancedMesh(
+    paint(sweetGeo, 0xffffff),
+    vertexToon(),
+    18,
+  );
+  sweets.instanceColor = new THREE.InstancedBufferAttribute(
+    new Float32Array(18 * 3),
+    3,
+  );
   const colours = [0xff5b8a, 0x5ecfff, 0x9be36b, 0xffd75e, 0xc98bff];
   const m = new THREE.Matrix4();
   const c = new THREE.Color();
@@ -234,11 +260,16 @@ function createHouse(): THREE.Group {
     const z = 2.08;
     m.makeTranslation(x, y + (i < 9 ? 0 : 0), z);
     sweets.setMatrixAt(i, m);
-    sweets.setColorAt(i, c.set(colours[i % colours.length]).convertSRGBToLinear());
+    sweets.setColorAt(
+      i,
+      c.set(colours[i % colours.length]).convertSRGBToLinear(),
+    );
     void t;
   }
   sweets.instanceMatrix.needsUpdate = true;
-  if (sweets.instanceColor) sweets.instanceColor.needsUpdate = true;
+  if (sweets.instanceColor) {
+    sweets.instanceColor.needsUpdate = true;
+  }
   g.add(sweets);
 
   return g;
@@ -247,8 +278,12 @@ function createHouse(): THREE.Group {
 /** Signed difference between two angles, in (-PI, PI]. */
 function shortestAngle(from: number, to: number): number {
   let d = (to - from) % (Math.PI * 2);
-  if (d > Math.PI) d -= Math.PI * 2;
-  if (d < -Math.PI) d += Math.PI * 2;
+  if (d > Math.PI) {
+    d -= Math.PI * 2;
+  }
+  if (d < -Math.PI) {
+    d += Math.PI * 2;
+  }
   return d;
 }
 
@@ -260,10 +295,15 @@ function shortestAngle(from: number, to: number): number {
  * Caramel Cottage is unlocked, though — there's nothing up the lane before
  * then, and a gate is a kinder way to say so than an invisible wall.
  */
-function createFence(): { group: THREE.Group; setOpen(open: boolean): void; update(): void } {
+function createFence(): {
+  group: THREE.Group;
+  setOpen(open: boolean): void;
+  update(): void;
+} {
   const g = new THREE.Group();
-  const parts: THREE.BufferGeometry[] = [];
-  const push = (geo: THREE.BufferGeometry, color: number) => parts.push(paint(geo, color));
+  const parts: Array<THREE.BufferGeometry> = [];
+  const push = (geo: THREE.BufferGeometry, color: number) =>
+    parts.push(paint(geo, color));
 
   const WOOD = 0xdcc39a;
   const WOOD_DARK = 0xb69466;
@@ -285,7 +325,9 @@ function createFence(): { group: THREE.Group; setOpen(open: boolean): void; upda
   };
 
   for (const side of [-1, 1]) {
-    for (let x = half + 1.4; x <= reach; x += 1.7) picket(side * x, 3.2, WOOD);
+    for (let x = half + 1.4; x <= reach; x += 1.7) {
+      picket(side * x, 3.2, WOOD);
+    }
     // Two rails tying the pickets together.
     for (const y of [1.1, 2.4]) {
       const run = reach - half;
@@ -303,7 +345,9 @@ function createFence(): { group: THREE.Group; setOpen(open: boolean): void; upda
   }
 
   const merged = mergeGeometries(parts, false);
-  if (!merged) throw new Error('cottage fence: geometry merge failed');
+  if (!merged) {
+    throw new Error("cottage fence: geometry merge failed");
+  }
   merged.computeVertexNormals();
   const mesh = new THREE.Mesh(merged, vertexToon());
   mesh.castShadow = true;
@@ -311,7 +355,7 @@ function createFence(): { group: THREE.Group; setOpen(open: boolean): void; upda
 
   // The two gate leaves, hinged on the gateposts. Shut, they meet in the
   // middle; open, they swing back against the fence.
-  const hinges: THREE.Object3D[] = [];
+  const hinges: Array<THREE.Object3D> = [];
   for (const side of [-1, 1]) {
     const hinge = new THREE.Object3D();
     hinge.position.set(side * half, 0, z);
@@ -319,12 +363,18 @@ function createFence(): { group: THREE.Group; setOpen(open: boolean): void; upda
     hinge.rotation.y = Math.PI;
     // Wide enough that the pair meet in the middle when shut — a gap between
     // them is an invitation to try to fly through it.
-    const leaf = new THREE.Mesh(new THREE.BoxGeometry(4.4, 2.9, 0.22), solidToon(WOOD));
+    const leaf = new THREE.Mesh(
+      new THREE.BoxGeometry(4.4, 2.9, 0.22),
+      solidToon(WOOD),
+    );
     leaf.position.set(side * 2.2, 1.55, 0);
     leaf.castShadow = true;
     hinge.add(leaf);
     for (const y of [0.9, 2.2]) {
-      const bar = new THREE.Mesh(new THREE.BoxGeometry(4.5, 0.3, 0.3), solidToon(WOOD_DARK));
+      const bar = new THREE.Mesh(
+        new THREE.BoxGeometry(4.5, 0.3, 0.3),
+        solidToon(WOOD_DARK),
+      );
       bar.position.set(side * 2.2, y, 0.12);
       hinge.add(bar);
     }
@@ -374,7 +424,9 @@ function createHedge(rng: Rng): THREE.InstancedMesh {
     const s = rng.range(1.8, 3.4);
     m.compose(
       new THREE.Vector3(Math.cos(a) * r, s * 0.35, Math.sin(a) * r),
-      new THREE.Quaternion().setFromEuler(new THREE.Euler(rng.range(0, 1), rng.range(0, 6.28), 0)),
+      new THREE.Quaternion().setFromEuler(
+        new THREE.Euler(rng.range(0, 1), rng.range(0, 6.28), 0),
+      ),
       new THREE.Vector3(s, s * 0.8, s),
     );
     bushes.setMatrixAt(i, m);
@@ -390,9 +442,9 @@ function createHedge(rng: Rng): THREE.InstancedMesh {
  */
 function createMat(centre: THREE.Vector3): {
   mat: THREE.Group;
-  pads: THREE.Mesh[];
-  padCentres: THREE.Vector3[];
-  padColours: number[];
+  pads: Array<THREE.Mesh>;
+  padCentres: Array<THREE.Vector3>;
+  padColours: Array<number>;
 } {
   const mat = new THREE.Group();
   mat.position.copy(centre);
@@ -408,10 +460,14 @@ function createMat(centre: THREE.Vector3): {
   board.receiveShadow = true;
   mat.add(board);
 
-  const pads: THREE.Mesh[] = [];
-  const padCentres: THREE.Vector3[] = [];
-  const padColours: number[] = [];
-  const padGeo = new THREE.BoxGeometry(DANCE.padSize, DANCE.padHeight, DANCE.padSize);
+  const pads: Array<THREE.Mesh> = [];
+  const padCentres: Array<THREE.Vector3> = [];
+  const padColours: Array<number> = [];
+  const padGeo = new THREE.BoxGeometry(
+    DANCE.padSize,
+    DANCE.padHeight,
+    DANCE.padSize,
+  );
 
   for (let row = 0; row < 3; row++) {
     for (let col = 0; col < 3; col++) {
@@ -440,5 +496,5 @@ function createMat(centre: THREE.Vector3): {
     }
   }
 
-  return { mat, pads, padCentres, padColours };
+  return {mat, pads, padCentres, padColours};
 }

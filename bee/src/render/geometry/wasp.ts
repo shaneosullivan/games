@@ -1,7 +1,7 @@
-import * as THREE from 'three';
-import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { WASP } from '../../config';
-import { paint, solidToon, vertexToon } from '../materials';
+import * as THREE from "three";
+import {mergeGeometries} from "three/examples/jsm/utils/BufferGeometryUtils.js";
+import {WASP} from "../../config";
+import {paint, solidToon, vertexToon} from "../materials";
 
 export interface WaspModel {
   group: THREE.Group;
@@ -19,7 +19,7 @@ const ACID = 0xf2e14c;
  * when it's a speck across the meadow.
  */
 export function createWasp(): WaspModel {
-  const parts: THREE.BufferGeometry[] = [];
+  const parts: Array<THREE.BufferGeometry> = [];
   const add = (geo: THREE.BufferGeometry, color: number, m: THREE.Matrix4) => {
     geo.applyMatrix4(m);
     parts.push(paint(geo, color));
@@ -32,34 +32,74 @@ export function createWasp(): WaspModel {
     );
 
   // Thorax — boxier than the bee's.
-  add(new THREE.SphereGeometry(0.32, 14, 10), BLACK, at(0, 0, 0.05, 1, 0.82, 1.15));
-  add(new THREE.SphereGeometry(0.3, 12, 8), ACID, at(0, 0.02, -0.16, 0.92, 0.72, 0.5));
+  add(
+    new THREE.SphereGeometry(0.32, 14, 10),
+    BLACK,
+    at(0, 0, 0.05, 1, 0.82, 1.15),
+  );
+  add(
+    new THREE.SphereGeometry(0.3, 12, 8),
+    ACID,
+    at(0, 0.02, -0.16, 0.92, 0.72, 0.5),
+  );
 
   // The wasp waist: a thin stalk, the silhouette's signature.
-  add(new THREE.CylinderGeometry(0.07, 0.09, 0.3, 8), BLACK, at(0, -0.02, -0.42).multiply(
-    new THREE.Matrix4().makeRotationX(Math.PI / 2),
-  ));
+  add(
+    new THREE.CylinderGeometry(0.07, 0.09, 0.3, 8),
+    BLACK,
+    at(0, -0.02, -0.42).multiply(
+      new THREE.Matrix4().makeRotationX(Math.PI / 2),
+    ),
+  );
 
   // Abdomen — a tapered teardrop with hard stripes.
-  add(new THREE.SphereGeometry(0.3, 14, 10), ACID, at(0, -0.03, -0.74, 0.92, 0.86, 1.25));
-  add(new THREE.SphereGeometry(0.22, 12, 8), ACID, at(0, -0.05, -1.08, 0.9, 0.84, 1.2));
+  add(
+    new THREE.SphereGeometry(0.3, 14, 10),
+    ACID,
+    at(0, -0.03, -0.74, 0.92, 0.86, 1.25),
+  );
+  add(
+    new THREE.SphereGeometry(0.22, 12, 8),
+    ACID,
+    at(0, -0.05, -1.08, 0.9, 0.84, 1.2),
+  );
   for (const [z, r] of [
     [-0.56, 0.295],
     [-0.83, 0.275],
     [-1.06, 0.205],
   ] as const) {
-    add(new THREE.TorusGeometry(r, 0.075, 6, 16), BLACK, at(0, -0.03, z, 1, 0.88, 1));
+    add(
+      new THREE.TorusGeometry(r, 0.075, 6, 16),
+      BLACK,
+      at(0, -0.03, z, 1, 0.88, 1),
+    );
   }
   // A long, obvious sting.
-  add(new THREE.ConeGeometry(0.065, 0.34, 8), BLACK, at(0, -0.07, -1.42).multiply(
-    new THREE.Matrix4().makeRotationX(-Math.PI / 2),
-  ));
+  add(
+    new THREE.ConeGeometry(0.065, 0.34, 8),
+    BLACK,
+    at(0, -0.07, -1.42).multiply(
+      new THREE.Matrix4().makeRotationX(-Math.PI / 2),
+    ),
+  );
 
   // Head: wider than it is tall, with big red eyes.
-  add(new THREE.SphereGeometry(0.26, 14, 10), BLACK, at(0, 0.02, 0.44, 1.15, 0.85, 0.85));
+  add(
+    new THREE.SphereGeometry(0.26, 14, 10),
+    BLACK,
+    at(0, 0.02, 0.44, 1.15, 0.85, 0.85),
+  );
   for (const sx of [-1, 1]) {
-    add(new THREE.SphereGeometry(0.115, 10, 8), 0xd4322a, at(sx * 0.16, 0.05, 0.58, 1, 1.2, 0.85));
-    add(new THREE.SphereGeometry(0.05, 8, 6), 0x3a0f0c, at(sx * 0.18, 0.05, 0.65, 1, 1.1, 0.8));
+    add(
+      new THREE.SphereGeometry(0.115, 10, 8),
+      0xd4322a,
+      at(sx * 0.16, 0.05, 0.58, 1, 1.2, 0.85),
+    );
+    add(
+      new THREE.SphereGeometry(0.05, 8, 6),
+      0x3a0f0c,
+      at(sx * 0.18, 0.05, 0.65, 1, 1.1, 0.8),
+    );
 
     // Antennae swept back, not curious like the bee's.
     const ant = new THREE.CylinderGeometry(0.016, 0.016, 0.36, 6);
@@ -73,12 +113,16 @@ export function createWasp(): WaspModel {
     add(
       new THREE.ConeGeometry(0.045, 0.16, 6),
       0x4a3a1c,
-      at(sx * 0.09, -0.09, 0.62).multiply(new THREE.Matrix4().makeRotationX(-Math.PI / 2)),
+      at(sx * 0.09, -0.09, 0.62).multiply(
+        new THREE.Matrix4().makeRotationX(-Math.PI / 2),
+      ),
     );
   }
 
   const bodyGeo = mergeGeometries(parts, false);
-  if (!bodyGeo) throw new Error('wasp: geometry merge failed');
+  if (!bodyGeo) {
+    throw new Error("wasp: geometry merge failed");
+  }
   bodyGeo.computeVertexNormals();
 
   const group = new THREE.Group();
@@ -101,8 +145,8 @@ export function createWasp(): WaspModel {
   wingGeo.rotateX(-Math.PI / 2);
   wingGeo.rotateY(0.28); // sweep
 
-  const wings: THREE.Object3D[] = [];
-  const wingSigns: number[] = [];
+  const wings: Array<THREE.Object3D> = [];
+  const wingSigns: Array<number> = [];
   for (const sx of [-1, 1]) {
     const pivot = new THREE.Object3D();
     pivot.position.set(sx * 0.1, 0.2, -0.02);

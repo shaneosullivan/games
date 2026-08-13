@@ -1,7 +1,7 @@
-import * as THREE from 'three';
-import { FLIGHT, WORLD } from '../config';
-import type { StickInput } from '../core/input';
-import { createBee } from '../render/geometry/bee';
+import * as THREE from "three";
+import {FLIGHT, WORLD} from "../config";
+import type {StickInput} from "../core/input";
+import {createBee} from "../render/geometry/bee";
 
 const tmpForward = new THREE.Vector3();
 const tmpRight = new THREE.Vector3();
@@ -10,8 +10,12 @@ const tmpDelta = new THREE.Vector3();
 
 function shortestAngle(from: number, to: number): number {
   let d = (to - from) % (Math.PI * 2);
-  if (d > Math.PI) d -= Math.PI * 2;
-  if (d < -Math.PI) d += Math.PI * 2;
+  if (d > Math.PI) {
+    d -= Math.PI * 2;
+  }
+  if (d < -Math.PI) {
+    d += Math.PI * 2;
+  }
   return d;
 }
 
@@ -102,7 +106,9 @@ export class BeeActor {
    */
   knockBackFrom(from: THREE.Vector3, speed: number, seconds: number): void {
     this.velocity.copy(this.position).sub(from).setY(0);
-    if (this.velocity.lengthSq() < 0.0001) this.velocity.set(1, 0, 0);
+    if (this.velocity.lengthSq() < 0.0001) {
+      this.velocity.set(1, 0, 0);
+    }
     this.velocity.setLength(speed);
     this.stunTime = seconds;
   }
@@ -174,7 +180,9 @@ export class BeeActor {
     tmpDelta.copy(tmpDesired).sub(this.velocity);
     tmpDelta.y = 0;
     const maxChange = rate * dt;
-    if (tmpDelta.length() > maxChange) tmpDelta.setLength(maxChange);
+    if (tmpDelta.length() > maxChange) {
+      tmpDelta.setLength(maxChange);
+    }
     this.velocity.add(tmpDelta);
 
     this.position.addScaledVector(this.velocity, dt);
@@ -207,27 +215,40 @@ export class BeeActor {
     this.climbRate = dt > 0 ? move / dt : 0;
 
     this.bobPhase += dt * FLIGHT.bobRate * (1 + this.speed01);
-    this.position.y = this.baseHeight + Math.sin(this.bobPhase) * FLIGHT.bobAmplitude;
+    this.position.y =
+      this.baseHeight + Math.sin(this.bobPhase) * FLIGHT.bobAmplitude;
 
     // Face the direction of travel.
     const planarSpeed = Math.hypot(this.velocity.x, this.velocity.z);
     if (planarSpeed > 0.35) {
       const target = Math.atan2(this.velocity.x, this.velocity.z);
-      this.yaw += shortestAngle(this.yaw, target) * Math.min(1, FLIGHT.yawLerp * dt);
+      this.yaw +=
+        shortestAngle(this.yaw, target) * Math.min(1, FLIGHT.yawLerp * dt);
     }
 
     // Bank into turns: roll proportional to how much velocity is turning.
-    const turn = shortestAngle(this.yaw, Math.atan2(this.velocity.x, this.velocity.z));
-    const targetRoll = THREE.MathUtils.clamp(-turn * 2.2, -FLIGHT.maxBank, FLIGHT.maxBank) * this.speed01;
+    const turn = shortestAngle(
+      this.yaw,
+      Math.atan2(this.velocity.x, this.velocity.z),
+    );
+    const targetRoll =
+      THREE.MathUtils.clamp(-turn * 2.2, -FLIGHT.maxBank, FLIGHT.maxBank) *
+      this.speed01;
     this.roll += (targetRoll - this.roll) * Math.min(1, FLIGHT.bankLerp * dt);
   }
 
   /** Called once per rendered frame with the sub-step interpolation factor. */
   render(alpha: number): void {
     this.object.position.lerpVectors(this.prevPosition, this.position, alpha);
-    this.object.rotation.y = this.prevYaw + shortestAngle(this.prevYaw, this.yaw) * alpha;
-    this.object.rotation.z = this.prevRoll + (this.roll - this.prevRoll) * alpha;
-    this.model.animate(this.elapsed, this.speed01, this.climbRate / FLIGHT.climbSpeed);
+    this.object.rotation.y =
+      this.prevYaw + shortestAngle(this.prevYaw, this.yaw) * alpha;
+    this.object.rotation.z =
+      this.prevRoll + (this.roll - this.prevRoll) * alpha;
+    this.model.animate(
+      this.elapsed,
+      this.speed01,
+      this.climbRate / FLIGHT.climbSpeed,
+    );
   }
 
   /** Current altitude excluding the bob, for the slider's ghost marker. */

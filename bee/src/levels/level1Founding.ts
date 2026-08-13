@@ -1,4 +1,4 @@
-import * as THREE from 'three';
+import * as THREE from "three";
 import {
   CAMERA,
   FLIGHT,
@@ -8,11 +8,11 @@ import {
   POLLEN_LABEL,
   WORLD,
   type PollenKind,
-} from '../config';
-import type { HarvestEvent } from '../entities/flowerField';
-import { FIREWORK_PALETTE } from '../fx/particles';
-import { HiveEntry, ENTRY_RADIUS } from './hiveEntry';
-import type { GameContext, Level } from './level';
+} from "../config";
+import type {HarvestEvent} from "../entities/flowerField";
+import {FIREWORK_PALETTE} from "../fx/particles";
+import {HiveEntry, ENTRY_RADIUS} from "./hiveEntry";
+import type {GameContext, Level} from "./level";
 
 const QUOTA = LEVELS.foundingQuota;
 const TOTAL = QUOTA.white + QUOTA.yellow + QUOTA.orange;
@@ -21,9 +21,11 @@ const TOTAL = QUOTA.white + QUOTA.yellow + QUOTA.orange;
 const CELEBRATION_TIME = 2.4;
 
 /** Golds and pinks picked to match the crown's band and jewels. */
-const CROWN_SPARKLE = [0xffe066, 0xffd23f, 0xfff3c4, 0xff5b8a, 0xffb347] as const;
+const CROWN_SPARKLE = [
+  0xffe066, 0xffd23f, 0xfff3c4, 0xff5b8a, 0xffb347,
+] as const;
 
-type Phase = 'gathering' | 'ready' | 'entering' | 'celebrating' | 'done';
+type Phase = "gathering" | "ready" | "entering" | "celebrating" | "done";
 
 const tmpA = new THREE.Vector3();
 
@@ -40,30 +42,30 @@ const tmpA = new THREE.Vector3();
  * doorway, which shrinks her inside and sets off fireworks.
  */
 export class FoundingLevel implements Level {
-  readonly name = 'Sunny Meadow';
-  readonly completionTitle = 'The hive is built!';
+  readonly name = "Sunny Meadow";
+  readonly completionTitle = "The hive is built!";
   readonly completionBody =
-    'Your hive is founded. Next you become a worker bee and start filling the comb with honey hexagons.';
+    "Your hive is founded. Next you become a worker bee and start filling the comb with honey hexagons.";
 
   complete = false;
 
-  private phase: Phase = 'gathering';
+  private phase: Phase = "gathering";
   private phaseTime = 0;
   private readonly entry = new HiveEntry();
   private nextFirework = 0;
 
   /** Cycles the beacon between kinds still needed, so it never nags about one. */
   private beaconTimer = 0;
-  private beaconKind: PollenKind = 'white';
+  private beaconKind: PollenKind = "white";
   private streak = 0;
   private streakTimer = 0;
 
   get controlsLocked(): boolean {
-    return this.phase === 'entering' || this.phase === 'celebrating';
+    return this.phase === "entering" || this.phase === "celebrating";
   }
 
   enter(ctx: GameContext): void {
-    ctx.setEnvironment('meadow');
+    ctx.setEnvironment("meadow");
     ctx.configureFlight({
       boundsRadius: WORLD.radius,
       minHeight: FLIGHT.minHeight,
@@ -77,7 +79,7 @@ export class FoundingLevel implements Level {
 
     ctx.hud.setBanner(this.name);
     ctx.hud.setCounters(
-      POLLEN_KINDS.map((kind) => ({
+      POLLEN_KINDS.map(kind => ({
         key: kind,
         label: POLLEN_LABEL[kind],
         color: POLLEN_COLOR[kind],
@@ -91,7 +93,7 @@ export class FoundingLevel implements Level {
 
     // Resuming a save where the quota was already met: hive lit, doorway open,
     // but the level still wants the player to fly in.
-    this.phase = p >= 1 ? 'ready' : 'gathering';
+    this.phase = p >= 1 ? "ready" : "gathering";
     this.complete = false;
     ctx.hive.setGlow(p >= 1);
     ctx.bee.scripted = false;
@@ -105,33 +107,39 @@ export class FoundingLevel implements Level {
 
   update(dt: number, ctx: GameContext, harvest: HarvestEvent | null): void {
     switch (this.phase) {
-      case 'gathering':
-        if (harvest) this.onHarvest(ctx, harvest);
+      case "gathering":
+        if (harvest) {
+          this.onHarvest(ctx, harvest);
+        }
         this.updateBeacon(dt, ctx);
         break;
 
-      case 'ready':
+      case "ready":
         // Beacon points at the door now, not at flowers.
-        ctx.setObjectiveMarker(tmpA.copy(ctx.hive.entrance).setY(ctx.hive.entrance.y + 1.4));
+        ctx.setObjectiveMarker(
+          tmpA.copy(ctx.hive.entrance).setY(ctx.hive.entrance.y + 1.4),
+        );
         if (ctx.bee.position.distanceTo(ctx.hive.entrance) < ENTRY_RADIUS) {
           this.beginEntry(ctx);
         }
         break;
 
-      case 'entering':
+      case "entering":
         this.updateEntry(dt, ctx);
         break;
 
-      case 'celebrating':
+      case "celebrating":
         this.updateCelebration(dt, ctx);
         break;
 
-      case 'done':
+      case "done":
         break;
     }
 
     this.streakTimer -= dt;
-    if (this.streakTimer <= 0) this.streak = 0;
+    if (this.streakTimer <= 0) {
+      this.streak = 0;
+    }
   }
 
   // ---- gathering ----------------------------------------------------------
@@ -140,27 +148,29 @@ export class FoundingLevel implements Level {
     this.beaconTimer -= dt;
     if (this.beaconTimer <= 0) {
       this.beaconTimer = 4;
-      const needed = POLLEN_KINDS.filter((k) => this.got(ctx, k) < QUOTA[k]);
+      const needed = POLLEN_KINDS.filter(k => this.got(ctx, k) < QUOTA[k]);
       if (needed.length > 0) {
         const i = (needed.indexOf(this.beaconKind) + 1) % needed.length;
         this.beaconKind = needed[i];
       }
     }
     if (this.got(ctx, this.beaconKind) < QUOTA[this.beaconKind]) {
-      ctx.setObjectiveMarker(ctx.flowers.nearestOfKind(this.beaconKind, ctx.bee.position));
+      ctx.setObjectiveMarker(
+        ctx.flowers.nearestOfKind(this.beaconKind, ctx.bee.position),
+      );
     } else {
       ctx.setObjectiveMarker(null);
     }
   }
 
   private onHarvest(ctx: GameContext, harvest: HarvestEvent): void {
-    const { kind, position } = harvest;
+    const {kind, position} = harvest;
     const already = this.got(ctx, kind);
 
-    ctx.puff.burst(position, { color: POLLEN_COLOR[kind], count: 16 });
+    ctx.puff.burst(position, {color: POLLEN_COLOR[kind], count: 16});
 
     // Over-quota flowers still bank pollen for level 2, they just don't count here.
-    ctx.save.mutate((d) => {
+    ctx.save.mutate(d => {
       d.pollen[kind] += 1;
       d.gathered[kind] += 1;
     });
@@ -192,16 +202,19 @@ export class FoundingLevel implements Level {
 
   /** Quota met: the hive is whole, lights up, and the queen gets her crown. */
   private onHiveFinished(ctx: GameContext): void {
-    this.phase = 'ready';
+    this.phase = "ready";
     ctx.hive.setProgress(1);
     ctx.hive.setGlow(true);
     ctx.audio.quotaComplete();
-    ctx.puff.burst(tmpA.copy(ctx.hive.entrance).setY(ctx.hive.entrance.y + 0.6), {
-      color: FIREWORK_PALETTE,
-      count: 26,
-      speed: 2.4,
-      ttl: 1.1,
-    });
+    ctx.puff.burst(
+      tmpA.copy(ctx.hive.entrance).setY(ctx.hive.entrance.y + 0.6),
+      {
+        color: FIREWORK_PALETTE,
+        count: 26,
+        speed: 2.4,
+        ttl: 1.1,
+      },
+    );
 
     // She's founded a hive — she's a queen now, and wears it.
     ctx.bee.setCrown(true);
@@ -243,21 +256,23 @@ export class FoundingLevel implements Level {
   // ---- flying into the hive ----------------------------------------------
 
   private beginEntry(ctx: GameContext): void {
-    this.phase = 'entering';
+    this.phase = "entering";
     this.entry.begin(ctx);
     // The glow advertises an enterable doorway; she's already going in.
     ctx.hive.setGlow(false);
-    ctx.hud.setObjective('Welcome home!');
+    ctx.hud.setObjective("Welcome home!");
   }
 
   private updateEntry(dt: number, ctx: GameContext): void {
-    if (this.entry.update(dt, ctx)) this.beginCelebration(ctx);
+    if (this.entry.update(dt, ctx)) {
+      this.beginCelebration(ctx);
+    }
   }
 
   // ---- fireworks ----------------------------------------------------------
 
   private beginCelebration(ctx: GameContext): void {
-    this.phase = 'celebrating';
+    this.phase = "celebrating";
     this.phaseTime = 0;
     this.nextFirework = 0;
     ctx.bee.object.visible = false;
@@ -279,9 +294,9 @@ export class FoundingLevel implements Level {
       // Back out on the doorstep. Dismissing the card hands over to level 2.
       this.entry.restore(ctx);
 
-      this.phase = 'done';
+      this.phase = "done";
       this.complete = true;
-      ctx.save.mutate((d) => {
+      ctx.save.mutate(d => {
         d.level = 2;
       });
       this.refreshObjective(ctx);
@@ -315,8 +330,10 @@ export class FoundingLevel implements Level {
    * there and approaching it does nothing.
    */
   resumeAfterCompletion(ctx: GameContext): void {
-    if (this.phase !== 'done') return;
-    this.phase = 'ready';
+    if (this.phase !== "done") {
+      return;
+    }
+    this.phase = "ready";
     this.complete = false;
     ctx.hive.setGlow(true);
     ctx.bee.scripted = false;
@@ -329,22 +346,22 @@ export class FoundingLevel implements Level {
   // ---- shared -------------------------------------------------------------
 
   private refreshObjective(ctx: GameContext): void {
-    if (this.phase === 'ready') {
-      ctx.hud.setObjective('Fly into your new hive!');
+    if (this.phase === "ready") {
+      ctx.hud.setObjective("Fly into your new hive!");
       return;
     }
-    if (this.phase === 'done') {
-      ctx.hud.setObjective('Hive complete');
+    if (this.phase === "done") {
+      ctx.hud.setObjective("Hive complete");
       return;
     }
-    const outstanding = POLLEN_KINDS.filter((k) => this.got(ctx, k) < QUOTA[k]);
+    const outstanding = POLLEN_KINDS.filter(k => this.got(ctx, k) < QUOTA[k]);
     if (outstanding.length === 0) {
-      ctx.hud.setObjective('Fly into your new hive!');
+      ctx.hud.setObjective("Fly into your new hive!");
       return;
     }
     const remaining = outstanding
-      .map((k) => `${QUOTA[k] - this.got(ctx, k)} ${POLLEN_LABEL[k]}`)
-      .join(' · ');
+      .map(k => `${QUOTA[k] - this.got(ctx, k)} ${POLLEN_LABEL[k]}`)
+      .join(" · ");
     ctx.hud.setObjective(`Gather ${remaining}`);
   }
 
@@ -354,7 +371,9 @@ export class FoundingLevel implements Level {
 
   private progress(ctx: GameContext): number {
     let sum = 0;
-    for (const kind of POLLEN_KINDS) sum += Math.min(this.got(ctx, kind), QUOTA[kind]);
+    for (const kind of POLLEN_KINDS) {
+      sum += Math.min(this.got(ctx, kind), QUOTA[kind]);
+    }
     return THREE.MathUtils.clamp(sum / TOTAL, 0, 1);
   }
 }

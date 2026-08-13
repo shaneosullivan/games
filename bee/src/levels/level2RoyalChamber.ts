@@ -1,20 +1,20 @@
-import * as THREE from 'three';
+import * as THREE from "three";
 import {
   INTERIOR,
   LEVELS,
   POLLEN_COLOR,
   POLLEN_LABEL,
   type PollenKind,
-} from '../config';
-import type { PollenStore } from '../render/geometry/hiveInterior';
-import { FIREWORK_PALETTE } from '../fx/particles';
-import type { GameContext, Level } from './level';
+} from "../config";
+import type {PollenStore} from "../render/geometry/hiveInterior";
+import {FIREWORK_PALETTE} from "../fx/particles";
+import type {GameContext, Level} from "./level";
 
 const TOTAL_BABIES = LEVELS.babyCount;
 /** Long enough for all six to leave their perches and get properly airborne. */
 const CELEBRATION_TIME = 4.2;
 
-type Phase = 'feeding' | 'celebrating' | 'done';
+type Phase = "feeding" | "celebrating" | "done";
 
 const tmp = new THREE.Vector3();
 const FIREWORK_LIFT = new THREE.Vector3(0, 0.9, 0);
@@ -32,13 +32,13 @@ const FIREWORK_LIFT = new THREE.Vector3(0, 0.9, 0);
  * beacon exactly one thing to point at.
  */
 export class RoyalChamberLevel implements Level {
-  readonly name = 'The Royal Chamber';
-  readonly completionTitle = 'The brood is grown!';
+  readonly name = "The Royal Chamber";
+  readonly completionTitle = "The brood is grown!";
   readonly completionBody =
-    'Every baby bee has grown up strong, and the whole hive is flying. Wonderful work.';
+    "Every baby bee has grown up strong, and the whole hive is flying. Wonderful work.";
 
   complete = false;
-  private phase: Phase = 'feeding';
+  private phase: Phase = "feeding";
   private phaseTime = 0;
   private elapsed = 0;
   private nextFirework = 0;
@@ -51,14 +51,14 @@ export class RoyalChamberLevel implements Level {
   private loadTarget: PollenStore | null = null;
   private loadTime = 0;
   /** Last objective string state, so we only touch the DOM when it changes. */
-  private objectiveKey = '';
+  private objectiveKey = "";
 
   get controlsLocked(): boolean {
-    return this.phase === 'celebrating';
+    return this.phase === "celebrating";
   }
 
   enter(ctx: GameContext): void {
-    ctx.setEnvironment('hive');
+    ctx.setEnvironment("hive");
     ctx.configureFlight({
       boundsRadius: INTERIOR.boundsRadius,
       minHeight: INTERIOR.minHeight,
@@ -75,14 +75,14 @@ export class RoyalChamberLevel implements Level {
     ctx.hud.setBanner(this.name);
     ctx.hud.setCounters([
       {
-        key: 'grown',
-        label: 'Grown up',
+        key: "grown",
+        label: "Grown up",
         color: 0xffd23f,
         value: ctx.babies.grownCount,
         target: TOTAL_BABIES,
       },
     ]);
-    this.phase = ctx.babies.allGrown ? 'done' : 'feeding';
+    this.phase = ctx.babies.allGrown ? "done" : "feeding";
     this.complete = false;
     this.carrying = null;
     ctx.hud.setCarrying(null);
@@ -93,11 +93,11 @@ export class RoyalChamberLevel implements Level {
     this.elapsed += dt;
     ctx.interior.update(this.elapsed);
 
-    if (this.phase === 'celebrating') {
+    if (this.phase === "celebrating") {
       this.updateCelebration(dt, ctx);
       return;
     }
-    if (this.phase === 'done') {
+    if (this.phase === "done") {
       ctx.babies.update(dt, ctx.bee.position, null);
       return;
     }
@@ -106,10 +106,14 @@ export class RoyalChamberLevel implements Level {
     this.updateLoading(dt, ctx);
 
     const fed = ctx.babies.update(dt, ctx.bee.position, this.carrying);
-    if (fed) this.onFed(ctx, fed.position, fed.kind, fed.grewUp);
+    if (fed) {
+      this.onFed(ctx, fed.position, fed.kind, fed.grewUp);
+    }
     // That last feed may have kicked off the celebration; if so, everything
     // below would immediately undo the HUD it just set up.
-    if (this.phase !== 'feeding') return;
+    if (this.phase !== "feeding") {
+      return;
+    }
 
     // Dwell meter shows whichever action is in progress.
     const dwell = this.carrying
@@ -123,7 +127,7 @@ export class RoyalChamberLevel implements Level {
 
     // Babies get hungry on their own clocks, so the objective has to track
     // what's wanted rather than only refreshing on pickups and feeds.
-    const key = `${this.carrying ?? '-'}|${this.wantedElsewhere(ctx) ?? '-'}`;
+    const key = `${this.carrying ?? "-"}|${this.wantedElsewhere(ctx) ?? "-"}`;
     if (key !== this.objectiveKey) {
       this.objectiveKey = key;
       this.refreshObjective(ctx);
@@ -137,33 +141,47 @@ export class RoyalChamberLevel implements Level {
       this.loadTarget = near;
       this.loadTime = 0;
     }
-    if (!this.loadTarget) return;
+    if (!this.loadTarget) {
+      return;
+    }
 
     // Already holding this colour? Nothing to do.
-    if (this.carrying === this.loadTarget.kind) return;
+    if (this.carrying === this.loadTarget.kind) {
+      return;
+    }
 
     this.loadTime += dt;
-    if (this.loadTime < INTERIOR.pickupSeconds) return;
+    if (this.loadTime < INTERIOR.pickupSeconds) {
+      return;
+    }
 
     this.carrying = this.loadTarget.kind;
     this.loadTime = 0;
     ctx.hud.setCarrying(this.carrying, POLLEN_LABEL[this.carrying]);
     ctx.audio.collect(1);
-    ctx.puff.burst(tmp.copy(this.loadTarget.position).setY(this.loadTarget.position.y + 0.2), {
-      color: POLLEN_COLOR[this.carrying],
-      count: 14,
-    });
+    ctx.puff.burst(
+      tmp.copy(this.loadTarget.position).setY(this.loadTarget.position.y + 0.2),
+      {
+        color: POLLEN_COLOR[this.carrying],
+        count: 14,
+      },
+    );
     this.refreshObjective(ctx);
   }
 
-  private onFed(ctx: GameContext, at: THREE.Vector3, kind: PollenKind, grewUp: boolean): void {
+  private onFed(
+    ctx: GameContext,
+    at: THREE.Vector3,
+    kind: PollenKind,
+    grewUp: boolean,
+  ): void {
     this.carrying = null;
     ctx.hud.setCarrying(null);
-    ctx.puff.burst(at, { color: POLLEN_COLOR[kind], count: 18, speed: 2.0 });
-    ctx.hud.setCount('grown', ctx.babies.grownCount, TOTAL_BABIES, grewUp);
+    ctx.puff.burst(at, {color: POLLEN_COLOR[kind], count: 18, speed: 2.0});
+    ctx.hud.setCount("grown", ctx.babies.grownCount, TOTAL_BABIES, grewUp);
 
     // Spend the pollen the queen gathered in level 1, so the stores feel real.
-    ctx.save.mutate((d) => {
+    ctx.save.mutate(d => {
       d.pollen[kind] = Math.max(0, d.pollen[kind] - 1);
     });
 
@@ -182,19 +200,22 @@ export class RoyalChamberLevel implements Level {
       ctx.audio.collect(2);
     }
 
-    if (ctx.babies.allGrown) this.beginCelebration(ctx);
-    else this.refreshObjective(ctx);
+    if (ctx.babies.allGrown) {
+      this.beginCelebration(ctx);
+    } else {
+      this.refreshObjective(ctx);
+    }
   }
 
   private beginCelebration(ctx: GameContext): void {
-    this.phase = 'celebrating';
+    this.phase = "celebrating";
     this.phaseTime = 0;
     this.nextFirework = 0;
     this.fireworkIndex = 0;
     this.carrying = null;
     ctx.hud.setCarrying(null);
     ctx.hud.setHarvest(0);
-    ctx.hud.setObjective('Everybody up!');
+    ctx.hud.setObjective("Everybody up!");
     ctx.setObjectiveMarker(null);
     ctx.audio.levelComplete();
     ctx.flashScreen();
@@ -212,7 +233,9 @@ export class RoyalChamberLevel implements Level {
       // Alternate between bursting on a rising baby and somewhere overhead, so
       // the fireworks read as being *for* them rather than just decoration.
       if (this.fireworkIndex % 2 === 0) {
-        tmp.copy(ctx.babies.positionOf(this.fireworkIndex >> 1)).add(FIREWORK_LIFT);
+        tmp
+          .copy(ctx.babies.positionOf(this.fireworkIndex >> 1))
+          .add(FIREWORK_LIFT);
       } else {
         const a = this.phaseTime * 3.1 + Math.random() * Math.PI * 2;
         const r = 3 + Math.random() * 7;
@@ -231,9 +254,9 @@ export class RoyalChamberLevel implements Level {
     }
 
     if (this.phaseTime >= CELEBRATION_TIME) {
-      this.phase = 'done';
+      this.phase = "done";
       this.complete = true;
-      ctx.save.mutate((d) => {
+      ctx.save.mutate(d => {
         d.level = 3;
       });
       this.refreshObjective(ctx);
@@ -265,9 +288,13 @@ export class RoyalChamberLevel implements Level {
   /** The colour the most babies are asking for right now. */
   private wantedElsewhere(ctx: GameContext): PollenKind | null {
     const cravings = ctx.babies.cravings();
-    if (cravings.length === 0) return null;
+    if (cravings.length === 0) {
+      return null;
+    }
     const tally = new Map<PollenKind, number>();
-    for (const k of cravings) tally.set(k, (tally.get(k) ?? 0) + 1);
+    for (const k of cravings) {
+      tally.set(k, (tally.get(k) ?? 0) + 1);
+    }
     let best: PollenKind | null = null;
     let bestN = 0;
     for (const [k, n] of tally) {
@@ -279,9 +306,14 @@ export class RoyalChamberLevel implements Level {
     return best;
   }
 
-  private storeFor(ctx: GameContext, kind: PollenKind | null): PollenStore | null {
-    if (!kind) return null;
-    return ctx.interior.stores.find((s) => s.kind === kind) ?? null;
+  private storeFor(
+    ctx: GameContext,
+    kind: PollenKind | null,
+  ): PollenStore | null {
+    if (!kind) {
+      return null;
+    }
+    return ctx.interior.stores.find(s => s.kind === kind) ?? null;
   }
 
   private nearestStore(ctx: GameContext): PollenStore | null {
@@ -298,27 +330,31 @@ export class RoyalChamberLevel implements Level {
   }
 
   private refreshObjective(ctx: GameContext): void {
-    if (this.phase === 'done') {
-      ctx.hud.setObjective('The whole brood is grown!');
+    if (this.phase === "done") {
+      ctx.hud.setObjective("The whole brood is grown!");
       return;
     }
     if (this.carrying) {
-      ctx.hud.setObjective(`Take the ${POLLEN_LABEL[this.carrying]} pollen to a hungry baby`);
+      ctx.hud.setObjective(
+        `Take the ${POLLEN_LABEL[this.carrying]} pollen to a hungry baby`,
+      );
       return;
     }
     const wanted = this.wantedElsewhere(ctx);
     ctx.hud.setObjective(
       wanted
         ? `A baby wants ${POLLEN_LABEL[wanted]} — collect some from the stores`
-        : 'The babies are full for now',
+        : "The babies are full for now",
     );
   }
 
   resumeAfterCompletion(ctx: GameContext): void {
-    if (this.phase !== 'done') return;
+    if (this.phase !== "done") {
+      return;
+    }
     // Nothing left to feed, so just hand the chamber back for free flight.
     this.complete = false;
-    ctx.hud.setObjective('Fly around your hive');
+    ctx.hud.setObjective("Fly around your hive");
     ctx.setObjectiveMarker(null);
     ctx.bee.bounds.radius = INTERIOR.boundsRadius;
     ctx.bee.desiredHeight = Math.min(ctx.bee.desiredHeight, INTERIOR.maxHeight);

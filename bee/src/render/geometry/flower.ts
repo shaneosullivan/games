@@ -1,7 +1,7 @@
-import * as THREE from 'three';
-import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { PALETTE, type PollenKind } from '../../config';
-import { paint } from '../materials';
+import * as THREE from "three";
+import {mergeGeometries} from "three/examples/jsm/utils/BufferGeometryUtils.js";
+import {PALETTE, type PollenKind} from "../../config";
+import {paint} from "../materials";
 
 export interface FlowerGeometry {
   /** Stem + leaves. Always visible. */
@@ -12,15 +12,17 @@ export interface FlowerGeometry {
   headHeight: number;
 }
 
-function merge(parts: THREE.BufferGeometry[]): THREE.BufferGeometry {
+function merge(parts: Array<THREE.BufferGeometry>): THREE.BufferGeometry {
   const geo = mergeGeometries(parts, false);
-  if (!geo) throw new Error('flower: geometry merge failed');
+  if (!geo) {
+    throw new Error("flower: geometry merge failed");
+  }
   geo.computeVertexNormals();
   return geo;
 }
 
 function stemAndLeaves(height: number): THREE.BufferGeometry {
-  const parts: THREE.BufferGeometry[] = [];
+  const parts: Array<THREE.BufferGeometry> = [];
   const stem = new THREE.CylinderGeometry(0.035, 0.055, height, 6);
   stem.translate(0, height / 2, 0);
   parts.push(paint(stem, PALETTE.stem));
@@ -41,8 +43,12 @@ function stemAndLeaves(height: number): THREE.BufferGeometry {
 }
 
 /** Daisy-like: a ring of flat rounded petals around a domed centre. */
-function flatPetalHead(petalColor: number, centreColor: number, count: number): THREE.BufferGeometry {
-  const parts: THREE.BufferGeometry[] = [];
+function flatPetalHead(
+  petalColor: number,
+  centreColor: number,
+  count: number,
+): THREE.BufferGeometry {
+  const parts: Array<THREE.BufferGeometry> = [];
   for (let i = 0; i < count; i++) {
     const a = (i / count) * Math.PI * 2;
     const petal = new THREE.SphereGeometry(0.2, 8, 6);
@@ -61,7 +67,7 @@ function flatPetalHead(petalColor: number, centreColor: number, count: number): 
 
 /** Rose: three shrinking, rising rings of cupped petals. */
 function roseHead(petalColor: number): THREE.BufferGeometry {
-  const parts: THREE.BufferGeometry[] = [];
+  const parts: Array<THREE.BufferGeometry> = [];
   const rings: Array<[number, number, number, number]> = [
     // [petals, radius, height, tilt]
     [7, 0.3, 0.0, 0.5],
@@ -89,7 +95,7 @@ function roseHead(petalColor: number): THREE.BufferGeometry {
 
 /** Tulip-ish cup of upright pointed petals. */
 function cupHead(petalColor: number): THREE.BufferGeometry {
-  const parts: THREE.BufferGeometry[] = [];
+  const parts: Array<THREE.BufferGeometry> = [];
   const count = 6;
   for (let i = 0; i < count; i++) {
     const a = (i / count) * Math.PI * 2;
@@ -110,20 +116,20 @@ function cupHead(petalColor: number): THREE.BufferGeometry {
 
 export function createFlowerGeometry(kind: PollenKind): FlowerGeometry {
   switch (kind) {
-    case 'white': {
+    case "white": {
       const h = 1.05;
       const head = roseHead(0xfff3f6);
-      return { stem: stemAndLeaves(h), head, headHeight: h };
+      return {stem: stemAndLeaves(h), head, headHeight: h};
     }
-    case 'yellow': {
+    case "yellow": {
       const h = 0.82;
       const head = flatPetalHead(0xffd23f, 0x8a5a12, 8);
-      return { stem: stemAndLeaves(h), head, headHeight: h };
+      return {stem: stemAndLeaves(h), head, headHeight: h};
     }
-    case 'orange': {
+    case "orange": {
       const h = 0.95;
       const head = cupHead(0xff8a3d);
-      return { stem: stemAndLeaves(h), head, headHeight: h };
+      return {stem: stemAndLeaves(h), head, headHeight: h};
     }
   }
 }

@@ -1,6 +1,6 @@
-import type { PollenKind } from '../config';
+import type {PollenKind} from "../config";
 
-const KEY = 'bee.save.v1';
+const KEY = "bee.save.v1";
 
 export interface SaveData {
   version: 1;
@@ -22,11 +22,11 @@ export interface SaveData {
 function blank(): SaveData {
   return {
     version: 1,
-    codename: '',
+    codename: "",
     level: 1,
     maxLevel: 1,
-    pollen: { white: 0, yellow: 0, orange: 0 },
-    gathered: { white: 0, yellow: 0, orange: 0 },
+    pollen: {white: 0, yellow: 0, orange: 0},
+    gathered: {white: 0, yellow: 0, orange: 0},
     updatedAt: Date.now(),
   };
 }
@@ -34,22 +34,28 @@ function blank(): SaveData {
 function read(): SaveData {
   try {
     const raw = localStorage.getItem(KEY);
-    if (!raw) return blank();
+    if (!raw) {
+      return blank();
+    }
     const parsed = JSON.parse(raw) as Partial<SaveData>;
-    if (parsed.version !== 1) return blank();
+    if (parsed.version !== 1) {
+      return blank();
+    }
     const base = blank();
     const merged = {
       ...base,
       ...parsed,
-      pollen: { ...base.pollen, ...parsed.pollen },
-      gathered: { ...base.gathered, ...parsed.gathered },
+      pollen: {...base.pollen, ...parsed.pollen},
+      gathered: {...base.gathered, ...parsed.gathered},
     };
     // Saves written before the level picker existed have no maxLevel; the
     // level they were on is the best evidence of how far they got.
     merged.maxLevel = Math.max(1, parsed.maxLevel ?? 1, merged.level);
     // Never trust the stored codename to be a string — a bad write would
     // otherwise surface as "[object Object]" in the name field.
-    if (typeof merged.codename !== 'string') merged.codename = '';
+    if (typeof merged.codename !== "string") {
+      merged.codename = "";
+    }
     return merged;
   } catch {
     return blank();
@@ -67,10 +73,12 @@ export class Save {
 
   constructor() {
     const flush = () => this.flush();
-    document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'hidden') flush();
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "hidden") {
+        flush();
+      }
     });
-    window.addEventListener('pagehide', flush);
+    window.addEventListener("pagehide", flush);
   }
 
   /** Mutate then persist. */
@@ -89,7 +97,9 @@ export class Save {
   }
 
   private schedule(): void {
-    if (this.pending) return;
+    if (this.pending) {
+      return;
+    }
     this.pending = window.setTimeout(() => this.flush(), 400);
   }
 

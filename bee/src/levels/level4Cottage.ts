@@ -1,10 +1,10 @@
-import * as THREE from 'three';
-import { BEAR, CAMERA, COTTAGE, DANCE, FLIGHT, INSIDE } from '../config';
-import { DanceMat } from '../entities/danceMat';
-import type { Music } from '../core/music';
-import { Rng } from '../core/rng';
-import { FIREWORK_PALETTE } from '../fx/particles';
-import type { GameContext, Level } from './level';
+import * as THREE from "three";
+import {BEAR, CAMERA, COTTAGE, DANCE, FLIGHT, INSIDE} from "../config";
+import {DanceMat} from "../entities/danceMat";
+import type {Music} from "../core/music";
+import {Rng} from "../core/rng";
+import {FIREWORK_PALETTE} from "../fx/particles";
+import type {GameContext, Level} from "./level";
 
 const CELEBRATION_TIME = 2.8;
 /** Where the bee waits between hops, above the centre pad. */
@@ -31,22 +31,22 @@ const PAN_LOOK_FROM = new THREE.Vector3(0, 17, 0);
 const YARD = new THREE.Vector3(0, 0, COTTAGE.yardOffsetZ);
 
 type Phase =
-  | 'establishing'
-  | 'arriving'
-  | 'dancing'
-  | 'opening'
-  | 'entering'
-  | 'inside'
-  | 'carrying'
-  | 'leaving'
-  | 'emerging'
-  | 'chased'
-  | 'delivering'
-  | 'distracting'
-  | 'puzzling'
-  | 'scaring'
-  | 'celebrating'
-  | 'done';
+  | "establishing"
+  | "arriving"
+  | "dancing"
+  | "opening"
+  | "entering"
+  | "inside"
+  | "carrying"
+  | "leaving"
+  | "emerging"
+  | "chased"
+  | "delivering"
+  | "distracting"
+  | "puzzling"
+  | "scaring"
+  | "celebrating"
+  | "done";
 
 const tmp = new THREE.Vector3();
 const tmpB = new THREE.Vector3();
@@ -67,14 +67,14 @@ const panLook = new THREE.Vector3();
  * falls back to its own clock and simply runs silent.
  */
 export class CottageLevel implements Level {
-  readonly name = 'Caramel Cottage';
-  readonly completionTitle = 'The hive is safe!';
+  readonly name = "Caramel Cottage";
+  readonly completionTitle = "The hive is safe!";
   readonly completionBody =
-    'You danced the door open, carried the honey home, and sent that bear packing. Some day for a small bee.';
+    "You danced the door open, carried the honey home, and sent that bear packing. Some day for a small bee.";
 
   complete = false;
 
-  private phase: Phase = 'arriving';
+  private phase: Phase = "arriving";
   private phaseTime = 0;
   /** Seconds of fallback musical time when there's no audio context. */
   private silentTime = 0;
@@ -90,14 +90,19 @@ export class CottageLevel implements Level {
   private rounds = 0;
 
   /** The hop out to a tapped pad and back. */
-  private hop: { from: THREE.Vector3; to: THREE.Vector3; t: number } | null = null;
+  private hop: {from: THREE.Vector3; to: THREE.Vector3; t: number} | null =
+    null;
   private readonly hover = new THREE.Vector3();
   /** Where the follow rig will sit once the pan ends. */
   private readonly panTo = new THREE.Vector3();
 
   get controlsLocked(): boolean {
     // Stage 1 is tapped rather than flown; stage 2 hands flight back.
-    return this.phase !== 'inside' && this.phase !== 'carrying' && this.phase !== 'chased';
+    return (
+      this.phase !== "inside" &&
+      this.phase !== "carrying" &&
+      this.phase !== "chased"
+    );
   }
 
   /**
@@ -113,7 +118,7 @@ export class CottageLevel implements Level {
   }
 
   enter(ctx: GameContext): void {
-    ctx.setEnvironment('cottage');
+    ctx.setEnvironment("cottage");
     ctx.configureFlight({
       // Bounds are a circle about the world origin — which is the hive, not the
       // cottage. It has to be wide enough to hold the clearing off at the north
@@ -155,9 +160,9 @@ export class CottageLevel implements Level {
     ctx.hud.setBanner(this.name);
     ctx.hud.setCarrying(null);
     ctx.hud.setHarvest(0);
-    ctx.hud.setObjective('Caramel Cottage…');
+    ctx.hud.setObjective("Caramel Cottage…");
 
-    this.phase = 'establishing';
+    this.phase = "establishing";
     this.phaseTime = 0;
     this.silentTime = 0;
     this.rounds = 0;
@@ -170,7 +175,13 @@ export class CottageLevel implements Level {
     this.music = null;
 
     ctx.hud.setCounters([
-      { key: 'dance', label: 'Steps', color: 0xffd75e, value: 0, target: DanceMat.totalPads },
+      {
+        key: "dance",
+        label: "Steps",
+        color: 0xffd75e,
+        value: 0,
+        target: DanceMat.totalPads,
+      },
     ]);
   }
 
@@ -179,60 +190,62 @@ export class CottageLevel implements Level {
     this.updateHop(dt, ctx);
     // Once the brood is out it flies itself, in every phase from here on —
     // without this they simply hang in the hive doorway where they hatched.
-    if (this.babiesOut) ctx.babies.update(dt, ctx.bee.position, null);
+    if (this.babiesOut) {
+      ctx.babies.update(dt, ctx.bee.position, null);
+    }
 
     switch (this.phase) {
-      case 'establishing':
+      case "establishing":
         this.updateEstablishing(ctx);
         break;
-      case 'arriving':
+      case "arriving":
         this.updateArrival(ctx);
         break;
-      case 'dancing':
+      case "dancing":
         this.updateDance(dt, ctx);
         break;
-      case 'opening':
+      case "opening":
         // Let the door swing before she goes in.
         if (this.phaseTime > 1.4) {
-          this.phase = 'entering';
+          this.phase = "entering";
           this.phaseTime = 0;
-          ctx.hud.setObjective('In you go!');
+          ctx.hud.setObjective("In you go!");
         }
         break;
-      case 'entering':
+      case "entering":
         this.updateEntering(ctx);
         break;
-      case 'inside':
+      case "inside":
         this.updateInside(ctx);
         break;
-      case 'carrying':
+      case "carrying":
         this.updateCarrying(ctx);
         break;
-      case 'leaving':
+      case "leaving":
         this.updateLeaving(ctx);
         break;
-      case 'emerging':
+      case "emerging":
         this.updateEmerging(dt, ctx);
         break;
-      case 'chased':
+      case "chased":
         this.updateChase(dt, ctx);
         break;
-      case 'delivering':
+      case "delivering":
         this.updateDelivering(dt, ctx);
         break;
-      case 'distracting':
+      case "distracting":
         this.updateDistracting(dt, ctx);
         break;
-      case 'puzzling':
+      case "puzzling":
         this.updatePuzzling(dt, ctx);
         break;
-      case 'scaring':
+      case "scaring":
         this.updateScaring(dt, ctx);
         break;
-      case 'celebrating':
+      case "celebrating":
         this.updateCelebration(dt, ctx);
         break;
-      case 'done':
+      case "done":
         break;
     }
   }
@@ -259,12 +272,14 @@ export class CottageLevel implements Level {
     );
     ctx.setCameraCinematic(panEye, panLook);
 
-    if (t < 1) return;
+    if (t < 1) {
+      return;
+    }
 
     ctx.setCameraCinematic(null);
-    this.phase = 'arriving';
+    this.phase = "arriving";
     this.phaseTime = 0;
-    ctx.hud.setObjective('The door is locked… what is that mat for?');
+    ctx.hud.setObjective("The door is locked… what is that mat for?");
   }
 
   /** Fly in and settle over the centre pad, then start the music. */
@@ -275,9 +290,11 @@ export class CottageLevel implements Level {
       this.hover,
       ease(t),
     );
-    if (t < 1) return;
+    if (t < 1) {
+      return;
+    }
 
-    this.phase = 'dancing';
+    this.phase = "dancing";
     this.phaseTime = 0;
     this.beginRound(ctx);
   }
@@ -298,12 +315,14 @@ export class CottageLevel implements Level {
     this.music = ctx.audio.createMusic(DANCE.bpm);
     this.music?.start();
 
-    ctx.hud.setCount('dance', 0, DanceMat.totalPads);
-    ctx.hud.setObjective('Tap each square as it lights up!');
+    ctx.hud.setCount("dance", 0, DanceMat.totalPads);
+    ctx.hud.setObjective("Tap each square as it lights up!");
   }
 
   private updateDance(dt: number, ctx: GameContext): void {
-    if (!this.mat) return;
+    if (!this.mat) {
+      return;
+    }
     this.silentTime += dt;
 
     // Musical position.
@@ -335,32 +354,37 @@ export class CottageLevel implements Level {
     const hitObject = ctx.pickTap(ctx.cottage.pads);
     if (hitObject) {
       const pad = ctx.cottage.pads.indexOf(hitObject as THREE.Mesh);
-      if (pad >= 0 && this.mat.tap(pad)) this.startHop(ctx, pad);
+      if (pad >= 0 && this.mat.tap(pad)) {
+        this.startHop(ctx, pad);
+      }
     }
 
     for (const event of this.mat.events.splice(0)) {
       switch (event.type) {
-        case 'lit':
+        case "lit":
           ctx.audio.collect(0);
           break;
-        case 'hit':
+        case "hit":
           ctx.audio.collect(3);
-          ctx.puff.burst(tmp.copy(ctx.cottage.padCentres[event.pad]).setY(0.5), {
-            color: [0xffe066, 0xfff3c4, 0x9be36b],
-            count: 12,
-            speed: 1.8,
-            ttl: 0.6,
-            spherical: 1,
-          });
-          ctx.hud.setCount('dance', this.mat.hits, this.mat.total, true);
+          ctx.puff.burst(
+            tmp.copy(ctx.cottage.padCentres[event.pad]).setY(0.5),
+            {
+              color: [0xffe066, 0xfff3c4, 0x9be36b],
+              count: 12,
+              speed: 1.8,
+              ttl: 0.6,
+              spherical: 1,
+            },
+          );
+          ctx.hud.setCount("dance", this.mat.hits, this.mat.total, true);
           break;
-        case 'miss':
-          ctx.hud.setCount('dance', this.mat.hits, this.mat.total);
+        case "miss":
+          ctx.hud.setCount("dance", this.mat.hits, this.mat.total);
           break;
-        case 'stepUp':
-          ctx.hud.setObjective('Two at a time now!');
+        case "stepUp":
+          ctx.hud.setObjective("Two at a time now!");
           break;
-        case 'finished':
+        case "finished":
           this.onRoundFinished(ctx, event.passed);
           break;
       }
@@ -376,18 +400,18 @@ export class CottageLevel implements Level {
       // No failing in this game — just go again, with a fresh pattern.
       const scored = this.mat ? Math.round(this.mat.ratio * 100) : 0;
       ctx.hud.setObjective(`${scored}% — so close! Let's try that again`);
-      this.phase = 'arriving';
+      this.phase = "arriving";
       // Skip the fly-in; she's already on the mat.
       this.phaseTime = 1.8;
       return;
     }
 
-    this.phase = 'opening';
+    this.phase = "opening";
     this.phaseTime = 0;
     ctx.cottage.setDoorOpen(true);
     ctx.audio.levelComplete();
     ctx.flashScreen();
-    ctx.hud.setObjective('The lock springs open!');
+    ctx.hud.setObjective("The lock springs open!");
   }
 
   /** Fly through the doorway once it's open, then cut to the room inside. */
@@ -395,7 +419,9 @@ export class CottageLevel implements Level {
     const t = Math.min(1, this.phaseTime / 1.6);
     ctx.bee.position.lerpVectors(this.hover, ctx.cottage.doorway, ease(t));
     ctx.bee.setScale(Math.max(0.001, 1 - t * t * 0.9));
-    if (t < 1) return;
+    if (t < 1) {
+      return;
+    }
 
     this.beginInside(ctx);
   }
@@ -404,10 +430,10 @@ export class CottageLevel implements Level {
 
   /** Hand control back and let the player fly the room. */
   private beginInside(ctx: GameContext): void {
-    this.phase = 'inside';
+    this.phase = "inside";
     this.phaseTime = 0;
 
-    ctx.setEnvironment('inside');
+    ctx.setEnvironment("inside");
     ctx.configureFlight({
       boundsRadius: INSIDE.boundsRadius,
       minHeight: INSIDE.minHeight,
@@ -424,15 +450,21 @@ export class CottageLevel implements Level {
     ctx.setFlightControls(true);
 
     ctx.hud.setCounters([]);
-    ctx.hud.setObjective('Honey! Fly over and pick up the jar');
-    ctx.setObjectiveMarker(tmp.copy(ctx.inside.jarRest).setY(ctx.inside.jarRest.y + 1.2));
+    ctx.hud.setObjective("Honey! Fly over and pick up the jar");
+    ctx.setObjectiveMarker(
+      tmp.copy(ctx.inside.jarRest).setY(ctx.inside.jarRest.y + 1.2),
+    );
   }
 
   private updateInside(ctx: GameContext): void {
     const jarPos = ctx.inside.jar.getWorldPosition(tmp);
-    if (ctx.bee.position.distanceTo(jarPos) > INSIDE.pickupRadius) return;
+    if (ctx.bee.position.distanceTo(jarPos) > INSIDE.pickupRadius) {
+      return;
+    }
 
-    ctx.honeyJar.pickUp(tmpB.copy(ctx.bee.position).setY(ctx.bee.position.y - 0.35));
+    ctx.honeyJar.pickUp(
+      tmpB.copy(ctx.bee.position).setY(ctx.bee.position.y - 0.35),
+    );
     // The field was there to say "come and get this"; it has done its job.
     ctx.inside.glow.mesh.visible = false;
     ctx.audio.quotaComplete();
@@ -444,17 +476,19 @@ export class CottageLevel implements Level {
       spherical: 1,
     });
     ctx.setObjectiveMarker(null);
-    ctx.hud.setObjective('Got it! Mind how you swing it');
-    this.phase = 'carrying';
+    ctx.hud.setObjective("Got it! Mind how you swing it");
+    this.phase = "carrying";
     this.phaseTime = 0;
   }
 
   /** A moment to enjoy flying with it, then head for the door. */
   private updateCarrying(ctx: GameContext): void {
-    if (this.phaseTime < 4) return;
-    this.phase = 'leaving';
+    if (this.phaseTime < 4) {
+      return;
+    }
+    this.phase = "leaving";
     this.phaseTime = 0;
-    ctx.hud.setObjective('Home with it, then!');
+    ctx.hud.setObjective("Home with it, then!");
   }
 
   // ---- stage 3: the bear ---------------------------------------------------
@@ -466,7 +500,9 @@ export class CottageLevel implements Level {
     ctx.setFlightControls(false);
     ctx.bee.position.lerpVectors(this.hover, ctx.inside.entryPosition, ease(t));
     ctx.bee.setScale(Math.max(0.001, 1 - t * t * 0.9));
-    if (t < 1) return;
+    if (t < 1) {
+      return;
+    }
     this.beginEmerging(ctx);
   }
 
@@ -480,10 +516,10 @@ export class CottageLevel implements Level {
    * one continuous shot.
    */
   private beginEmerging(ctx: GameContext): void {
-    this.phase = 'emerging';
+    this.phase = "emerging";
     this.phaseTime = 0;
 
-    ctx.setEnvironment('cottage');
+    ctx.setEnvironment("cottage");
     ctx.configureFlight({
       boundsRadius: COTTAGE.flightRadius,
       minHeight: FLIGHT.minHeight,
@@ -514,17 +550,21 @@ export class CottageLevel implements Level {
     // The hive is the destination and it says so, from this far off.
     ctx.hive.setProgress(1);
     ctx.hive.setGlow(true);
-    ctx.setObjectiveMarker(tmp.copy(ctx.hive.entrance).setY(ctx.hive.entrance.y + 1.4));
+    ctx.setObjectiveMarker(
+      tmp.copy(ctx.hive.entrance).setY(ctx.hive.entrance.y + 1.4),
+    );
 
     // In from the left of shot. The camera looks down +Z, which puts +X on the
     // left — the sign here is not the one you'd guess.
     ctx.bear.spawn(
-      tmp.copy(ctx.cottage.matCentre).add(tmpB.set(BEAR.ambushOffset * 3, 0, -3)),
+      tmp
+        .copy(ctx.cottage.matCentre)
+        .add(tmpB.set(BEAR.ambushOffset * 3, 0, -3)),
       this.hover,
     );
 
     ctx.hud.setCounters([]);
-    ctx.hud.setObjective('A bear!');
+    ctx.hud.setObjective("A bear!");
     ctx.audio.setThreat(0.4);
   }
 
@@ -534,7 +574,9 @@ export class CottageLevel implements Level {
     // Hold station over the mat, bobbing, while it closes in.
     ctx.bee.position.y = this.hover.y + Math.sin(this.phaseTime * 2.2) * 0.25;
     // Long enough for the bear to walk into shot from off to the left.
-    if (this.phaseTime < 4) return;
+    if (this.phaseTime < 4) {
+      return;
+    }
     this.beginChase(ctx);
   }
 
@@ -543,26 +585,32 @@ export class CottageLevel implements Level {
    * to lumber around, and the hive is a long way off.
    */
   private beginChase(ctx: GameContext): void {
-    this.phase = 'chased';
+    this.phase = "chased";
     this.phaseTime = 0;
 
     ctx.bee.scripted = false;
     ctx.setFlightControls(true);
     ctx.bear.pursue();
 
-    ctx.hud.setObjective('Through the gate — get the honey home to the hive!');
+    ctx.hud.setObjective("Through the gate — get the honey home to the hive!");
   }
 
   private updateChase(dt: number, ctx: GameContext): void {
     const event = ctx.bear.update(dt, ctx.bee.position);
-    if (event === 'swiped') {
-      ctx.bee.knockBackFrom(ctx.bear.position, BEAR.knockbackSpeed, BEAR.stunSeconds);
+    if (event === "swiped") {
+      ctx.bee.knockBackFrom(
+        ctx.bear.position,
+        BEAR.knockbackSpeed,
+        BEAR.stunSeconds,
+      );
       ctx.audio.sting();
       ctx.flashScreen();
     }
 
     const distance = ctx.bear.position.distanceTo(ctx.bee.position);
-    ctx.audio.setThreat(THREE.MathUtils.clamp(1 - (distance - BEAR.swipeRadius) / 20, 0.2, 1));
+    ctx.audio.setThreat(
+      THREE.MathUtils.clamp(1 - (distance - BEAR.swipeRadius) / 20, 0.2, 1),
+    );
 
     if (ctx.bee.position.distanceTo(ctx.hive.entrance) < BEAR.deliverRadius) {
       this.beginDelivery(ctx);
@@ -571,7 +619,7 @@ export class CottageLevel implements Level {
 
   /** Drop the honey into the hive. */
   private beginDelivery(ctx: GameContext): void {
-    this.phase = 'delivering';
+    this.phase = "delivering";
     this.phaseTime = 0;
     ctx.bee.scripted = true;
     ctx.setFlightControls(false);
@@ -586,21 +634,26 @@ export class CottageLevel implements Level {
       ttl: 1.0,
       spherical: 1,
     });
-    ctx.hud.setObjective('Honey delivered!');
+    ctx.hud.setObjective("Honey delivered!");
     ctx.setObjectiveMarker(null);
   }
 
   private updateDelivering(dt: number, ctx: GameContext): void {
     ctx.bear.update(dt, ctx.bee.position);
     // Hold station by the hive door while the honey goes in.
-    ctx.bee.position.lerp(tmp.copy(ctx.hive.entrance).add(tmpB.set(0, 0.6, 3)), 0.06);
-    if (this.phaseTime < 1.6) return;
+    ctx.bee.position.lerp(
+      tmp.copy(ctx.hive.entrance).add(tmpB.set(0, 0.6, 3)),
+      0.06,
+    );
+    if (this.phaseTime < 1.6) {
+      return;
+    }
     this.beginDistraction(ctx);
   }
 
   /** The brood pours out and mobs the bear, which rears up and swipes at air. */
   private beginDistraction(ctx: GameContext): void {
-    this.phase = 'distracting';
+    this.phase = "distracting";
     this.phaseTime = 0;
     ctx.releaseBabies(ctx.hive.entrance);
     this.babiesOut = true;
@@ -609,7 +662,9 @@ export class CottageLevel implements Level {
     this.orbit = 0.5;
     ctx.bear.distract(ctx.hive.position, BEAR.distractStandoff);
     ctx.audio.setThreat(0.25);
-    ctx.hud.setObjective('The babies are teasing it — quick, while it is busy!');
+    ctx.hud.setObjective(
+      "The babies are teasing it — quick, while it is busy!",
+    );
   }
 
   private updateDistracting(dt: number, ctx: GameContext): void {
@@ -617,13 +672,18 @@ export class CottageLevel implements Level {
     this.mobBear(ctx);
     this.orbitBear(dt, ctx);
     // Park the bee safely to one side to watch.
-    ctx.bee.position.lerp(tmp.copy(ctx.hive.entrance).add(tmpB.set(6, 2.5, 7)), 0.04);
-    if (this.phaseTime < 2.4) return;
+    ctx.bee.position.lerp(
+      tmp.copy(ctx.hive.entrance).add(tmpB.set(6, 2.5, 7)),
+      0.04,
+    );
+    if (this.phaseTime < 2.4) {
+      return;
+    }
 
-    this.phase = 'puzzling';
+    this.phase = "puzzling";
     this.phaseTime = 0;
     ctx.showPuzzle(true);
-    ctx.hud.setObjective('Fix the scary picture to frighten it off!');
+    ctx.hud.setObjective("Fix the scary picture to frighten it off!");
   }
 
   /**
@@ -652,7 +712,9 @@ export class CottageLevel implements Level {
    */
   private orbitBear(dt: number, ctx: GameContext, towardHive = 0.5): void {
     this.orbit += dt * BEAR.orbitRate;
-    const centre = tmpOrbit.copy(ctx.bear.position).lerp(ctx.hive.position, towardHive);
+    const centre = tmpOrbit
+      .copy(ctx.bear.position)
+      .lerp(ctx.hive.position, towardHive);
     ctx.setCameraCinematic(
       tmp.set(
         centre.x + Math.sin(this.orbit) * BEAR.orbitRadius,
@@ -671,8 +733,10 @@ export class CottageLevel implements Level {
 
   /** Called by the Game when the sliding puzzle is completed. */
   onPuzzleSolved(ctx: GameContext): void {
-    if (this.phase !== 'puzzling') return;
-    this.phase = 'scaring';
+    if (this.phase !== "puzzling") {
+      return;
+    }
+    this.phase = "scaring";
     this.phaseTime = 0;
     ctx.celebratePuzzle();
     // Job done — they drift back to their own loops round the hive rather
@@ -681,23 +745,27 @@ export class CottageLevel implements Level {
     ctx.bear.flee(ctx.hive.position);
     ctx.audio.setThreat(0);
     ctx.audio.levelComplete();
-    ctx.hud.setObjective('It is running away!');
+    ctx.hud.setObjective("It is running away!");
   }
 
   private updateScaring(dt: number, ctx: GameContext): void {
     const event = ctx.bear.update(dt, ctx.bee.position);
     // Keep circling as it turns tail, and let go of the camera once it's away.
     this.orbitBear(dt, ctx, 1);
-    if (this.phaseTime < 1.2) return;
+    if (this.phaseTime < 1.2) {
+      return;
+    }
     ctx.showPuzzle(false);
-    if (event !== 'departed' && this.phaseTime < BEAR.fleeSeconds) return;
+    if (event !== "departed" && this.phaseTime < BEAR.fleeSeconds) {
+      return;
+    }
 
     ctx.setCameraCinematic(null);
-    this.phase = 'celebrating';
+    this.phase = "celebrating";
     this.phaseTime = 0;
     this.nextFirework = 0;
     ctx.flashScreen();
-    ctx.hud.setObjective('The hive is safe, and full of honey!');
+    ctx.hud.setObjective("The hive is safe, and full of honey!");
   }
 
   private updateCelebration(dt: number, ctx: GameContext): void {
@@ -723,9 +791,9 @@ export class CottageLevel implements Level {
       ctx.bee.object.visible = true;
       ctx.bee.setScale(1);
       ctx.bee.position.copy(this.hover);
-      this.phase = 'done';
+      this.phase = "done";
       this.complete = true;
-      ctx.save.mutate((d) => {
+      ctx.save.mutate(d => {
         d.level = 5;
       });
     }
@@ -743,7 +811,9 @@ export class CottageLevel implements Level {
   }
 
   private updateHop(dt: number, ctx: GameContext): void {
-    if (this.phase !== 'dancing') return;
+    if (this.phase !== "dancing") {
+      return;
+    }
     if (!this.hop) {
       ctx.bee.position.copy(this.hover);
       return;
@@ -763,13 +833,17 @@ export class CottageLevel implements Level {
 
     // Face the pad on the way out.
     tmp.copy(this.hop.to).sub(this.hop.from);
-    if (tmp.lengthSq() > 1e-4) ctx.bee.setYaw(Math.atan2(tmp.x, tmp.z));
+    if (tmp.lengthSq() > 1e-4) {
+      ctx.bee.setYaw(Math.atan2(tmp.x, tmp.z));
+    }
   }
 
   resumeAfterCompletion(ctx: GameContext): void {
-    if (this.phase !== 'done') return;
+    if (this.phase !== "done") {
+      return;
+    }
     this.complete = false;
-    ctx.hud.setObjective('Have a look around');
+    ctx.hud.setObjective("Have a look around");
     ctx.setFlightControls(true);
     ctx.bee.scripted = false;
   }

@@ -1,11 +1,13 @@
-import './ui/styles.css';
-import { fitViewport } from './core/fitViewport';
-import { lockZoom } from './core/lockZoom';
-import { watchForUpdates } from './core/updates';
-import { Game } from './game';
+import "./ui/styles.css";
+import {fitViewport} from "./core/fitViewport";
+import {lockZoom} from "./core/lockZoom";
+import {watchForUpdates} from "./core/updates";
+import {Game} from "./game";
 
-const app = document.getElementById('app');
-if (!app) throw new Error('#app missing');
+const app = document.getElementById("app");
+if (!app) {
+  throw new Error("#app missing");
+}
 
 lockZoom();
 

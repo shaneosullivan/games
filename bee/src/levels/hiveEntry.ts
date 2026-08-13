@@ -1,5 +1,5 @@
-import * as THREE from 'three';
-import type { GameContext } from './level';
+import * as THREE from "three";
+import type {GameContext} from "./level";
 
 /** How close the bee must get to the doorway before it's drawn inside. */
 export const ENTRY_RADIUS = 3.4;
@@ -52,11 +52,17 @@ export class HiveEntry {
 
   /** @returns true on the frame the bee vanishes inside. */
   update(dt: number, ctx: GameContext): boolean {
-    if (!this.running) return false;
+    if (!this.running) {
+      return false;
+    }
     this.time += dt;
 
     if (this.time < APPROACH_TIME) {
-      ctx.bee.position.lerpVectors(this.start, this.approach, ease(this.time / APPROACH_TIME));
+      ctx.bee.position.lerpVectors(
+        this.start,
+        this.approach,
+        ease(this.time / APPROACH_TIME),
+      );
       ctx.bee.setScale(1);
       return false;
     }
@@ -68,7 +74,9 @@ export class HiveEntry {
     // Shrink into the hole; the last stretch drops away fast.
     ctx.bee.setScale(Math.max(0.001, 1 - u * u * 0.995));
 
-    if (u < 1) return false;
+    if (u < 1) {
+      return false;
+    }
 
     this.running = false;
     ctx.bee.object.visible = false;

@@ -1,5 +1,5 @@
-import mapUrl from '../assets/levelmap.jpg';
-import { LANDS, landForLevel, type Land } from '../levels/lands';
+import mapUrl from "../assets/levelmap.jpg";
+import {LANDS, landForLevel, type Land} from "../levels/lands";
 
 /** Full-screen modal cards: codename entry and level-complete. */
 
@@ -11,16 +11,19 @@ export interface Overlay {
   setText(title: string, body: string): void;
 }
 
-function makeOverlay(host: HTMLElement): { root: HTMLDivElement; card: HTMLDivElement } {
-  const root = document.createElement('div');
+function makeOverlay(host: HTMLElement): {
+  root: HTMLDivElement;
+  card: HTMLDivElement;
+} {
+  const root = document.createElement("div");
   // `ui-interactive` keeps the floating thumbstick from planting itself when
   // you drag on a modal.
-  root.className = 'overlay ui-interactive hidden';
-  const card = document.createElement('div');
-  card.className = 'card';
+  root.className = "overlay ui-interactive hidden";
+  const card = document.createElement("div");
+  card.className = "card";
   root.appendChild(card);
   host.appendChild(root);
-  return { root, card };
+  return {root, card};
 }
 
 /**
@@ -33,23 +36,25 @@ function makeOverlay(host: HTMLElement): { root: HTMLDivElement; card: HTMLDivEl
  */
 function trackVisualViewport(root: HTMLDivElement): () => void {
   const vv = window.visualViewport;
-  if (!vv) return () => {};
+  if (!vv) {
+    return () => {};
+  }
 
   const apply = () => {
     root.style.top = `${vv.offsetTop}px`;
-    root.style.bottom = 'auto';
+    root.style.bottom = "auto";
     root.style.height = `${vv.height}px`;
   };
-  vv.addEventListener('resize', apply);
-  vv.addEventListener('scroll', apply);
+  vv.addEventListener("resize", apply);
+  vv.addEventListener("scroll", apply);
   apply();
 
   return () => {
-    vv.removeEventListener('resize', apply);
-    vv.removeEventListener('scroll', apply);
-    root.style.top = '';
-    root.style.bottom = '';
-    root.style.height = '';
+    vv.removeEventListener("resize", apply);
+    vv.removeEventListener("scroll", apply);
+    root.style.top = "";
+    root.style.bottom = "";
+    root.style.height = "";
   };
 }
 
@@ -61,10 +66,12 @@ function trackVisualViewport(root: HTMLDivElement): () => void {
  * "ROSIE".
  */
 function sanitizeCodename(raw: unknown): string {
-  if (typeof raw !== 'string') return '';
+  if (typeof raw !== "string") {
+    return "";
+  }
   return raw
-    .replace(/[^\p{L}\p{N} '\-!?.]/gu, '')
-    .replace(/\s+/g, ' ')
+    .replace(/[^\p{L}\p{N} '\-!?.]/gu, "")
+    .replace(/\s+/g, " ")
     .trimStart()
     .slice(0, 14);
 }
@@ -79,7 +86,7 @@ export interface LevelChoice {
 export interface CodenameOptions {
   existing: string;
   /** Every level that exists, whether or not it's unlocked yet. */
-  levels: readonly LevelChoice[];
+  levels: ReadonlyArray<LevelChoice>;
   /** Highest level the player has reached; anything above it stays locked. */
   unlocked: number;
   /** Which level is selected when the card opens. */
@@ -88,38 +95,41 @@ export interface CodenameOptions {
   onReset: () => void;
 }
 
-export function createCodenameScreen(host: HTMLElement, opts: CodenameOptions): Overlay {
-  const { levels, unlocked, selected, onStart, onReset } = opts;
+export function createCodenameScreen(
+  host: HTMLElement,
+  opts: CodenameOptions,
+): Overlay {
+  const {levels, unlocked, selected, onStart, onReset} = opts;
   const existing = sanitizeCodename(opts.existing);
-  const { root, card } = makeOverlay(host);
+  const {root, card} = makeOverlay(host);
 
-  const h1 = document.createElement('h1');
-  h1.textContent = existing ? `Welcome back` : 'Bee a Queen';
-  const p = document.createElement('p');
+  const h1 = document.createElement("h1");
+  h1.textContent = existing ? `Welcome back` : "Bee a Queen";
+  const p = document.createElement("p");
   p.textContent = existing
     ? levels.length > 1
-      ? 'Pick where you want to fly.'
-      : 'Ready to get back to the meadow?'
-    : 'Every queen needs a code name. Choose yours.';
+      ? "Pick where you want to fly."
+      : "Ready to get back to the meadow?"
+    : "Every queen needs a code name. Choose yours.";
 
-  const input = document.createElement('input');
-  input.type = 'text';
+  const input = document.createElement("input");
+  input.type = "text";
   input.maxLength = 14;
   input.spellcheck = false;
-  input.placeholder = 'CODE NAME';
+  input.placeholder = "CODE NAME";
   input.value = existing;
   // Talk iOS out of offering AutoFill / Passwords on what is just a nickname.
   // `name` matters as much as `autocomplete` — Safari sniffs it.
-  input.name = 'codename';
-  input.autocomplete = 'off';
-  input.setAttribute('autocorrect', 'off');
-  input.setAttribute('autocapitalize', 'characters');
-  input.setAttribute('enterkeyhint', 'go');
-  input.setAttribute('data-1p-ignore', '');
-  input.setAttribute('data-lpignore', 'true');
+  input.name = "codename";
+  input.autocomplete = "off";
+  input.setAttribute("autocorrect", "off");
+  input.setAttribute("autocapitalize", "characters");
+  input.setAttribute("enterkeyhint", "go");
+  input.setAttribute("data-1p-ignore", "");
+  input.setAttribute("data-lpignore", "true");
 
-  const start = document.createElement('button');
-  start.textContent = existing ? 'Continue' : 'Start';
+  const start = document.createElement("button");
+  start.textContent = existing ? "Continue" : "Start";
 
   const sync = () => {
     // Clean as they type, so autofilled junk never survives to the save.
@@ -131,17 +141,20 @@ export function createCodenameScreen(host: HTMLElement, opts: CodenameOptions): 
     }
     start.disabled = cleaned.trim().length === 0;
   };
-  input.addEventListener('input', sync);
-  input.addEventListener('change', sync);
-  input.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' && !start.disabled) {
+  input.addEventListener("input", sync);
+  input.addEventListener("change", sync);
+  input.addEventListener("keydown", e => {
+    if (e.key === "Enter" && !start.disabled) {
       input.blur(); // drop the keyboard before the card goes away
       start.click();
     }
   });
   // Focusing raises the keyboard; make sure the field ends up in view.
-  input.addEventListener('focus', () => {
-    setTimeout(() => input.scrollIntoView({ block: 'center', behavior: 'smooth' }), 250);
+  input.addEventListener("focus", () => {
+    setTimeout(
+      () => input.scrollIntoView({block: "center", behavior: "smooth"}),
+      250,
+    );
   });
   sync();
 
@@ -152,82 +165,92 @@ export function createCodenameScreen(host: HTMLElement, opts: CodenameOptions): 
   // lands with nothing built yet are marked as still to come.
 
   let chosen = selected;
-  const picker = document.createElement('div');
-  picker.className = 'levels';
+  const picker = document.createElement("div");
+  picker.className = "levels";
 
   const hasMap = levels.length > 1;
-  const side = document.createElement('div');
-  side.className = 'picker-side';
+  const side = document.createElement("div");
+  side.className = "picker-side";
 
   if (hasMap) {
-    card.classList.add('card-wide');
+    card.classList.add("card-wide");
 
-    const heading = document.createElement('div');
-    heading.className = 'levels-heading';
-    heading.textContent = 'Where to?';
+    const heading = document.createElement("div");
+    heading.className = "levels-heading";
+    heading.textContent = "Where to?";
 
-    const mapWrap = document.createElement('div');
-    mapWrap.className = 'map';
-    const img = document.createElement('img');
-    img.className = 'map-img';
+    const mapWrap = document.createElement("div");
+    mapWrap.className = "map";
+    const img = document.createElement("img");
+    img.className = "map-img";
     img.src = mapUrl;
-    img.alt = 'Map of the bee lands';
+    img.alt = "Map of the bee lands";
     mapWrap.appendChild(img);
 
-    const landName = document.createElement('div');
-    landName.className = 'land-name';
+    const landName = document.createElement("div");
+    landName.className = "land-name";
 
-    const hint = document.createElement('div');
-    hint.className = 'land-hint';
+    const hint = document.createElement("div");
+    hint.className = "land-hint";
 
-    const row = document.createElement('div');
-    row.className = 'levels-row';
+    const row = document.createElement("div");
+    row.className = "levels-row";
 
     const pins = new Map<string, HTMLButtonElement>();
-    const chips: HTMLButtonElement[] = [];
+    const chips: Array<HTMLButtonElement> = [];
 
     const levelsOf = (land: Land) =>
-      land.levels.map((n) => levels.find((l) => l.number === n)).filter((l) => l !== undefined);
+      land.levels
+        .map(n => levels.find(l => l.number === n))
+        .filter(l => l !== undefined);
 
     /** Redraw the chips and highlight for whichever land is now current. */
     const selectLand = (land: Land, level?: number) => {
-      const playable = levelsOf(land).filter((l) => l.number <= unlocked);
-      if (playable.length === 0) return;
+      const playable = levelsOf(land).filter(l => l.number <= unlocked);
+      if (playable.length === 0) {
+        return;
+      }
       chosen = level ?? playable[0].number;
 
-      for (const [id, pin] of pins) pin.classList.toggle('selected', id === land.id);
+      for (const [id, pin] of pins) {
+        pin.classList.toggle("selected", id === land.id);
+      }
       landName.textContent = land.name;
-      hint.textContent = '';
+      hint.textContent = "";
 
       row.replaceChildren();
       chips.length = 0;
       // A single-level land needs no chips — the pin said it all.
-      if (playable.length < 2) return;
+      if (playable.length < 2) {
+        return;
+      }
 
       for (const choice of playable) {
-        const chip = document.createElement('button');
-        chip.className = 'level-chip';
-        chip.type = 'button';
+        const chip = document.createElement("button");
+        chip.className = "level-chip";
+        chip.type = "button";
 
-        const num = document.createElement('span');
-        num.className = 'level-chip-num';
+        const num = document.createElement("span");
+        num.className = "level-chip-num";
         num.textContent = String(choice.number);
 
-        const text = document.createElement('span');
-        text.className = 'level-chip-text';
+        const text = document.createElement("span");
+        text.className = "level-chip-text";
         text.textContent = choice.name;
         if (choice.note) {
-          const note = document.createElement('em');
+          const note = document.createElement("em");
           note.textContent = choice.note;
           text.appendChild(note);
         }
 
         chip.append(num, text);
-        chip.addEventListener('click', () => {
+        chip.addEventListener("click", () => {
           chosen = choice.number;
-          for (const c of chips) c.classList.toggle('selected', c === chip);
+          for (const c of chips) {
+            c.classList.toggle("selected", c === chip);
+          }
         });
-        chip.classList.toggle('selected', choice.number === chosen);
+        chip.classList.toggle("selected", choice.number === chosen);
         chips.push(chip);
         row.appendChild(chip);
       }
@@ -235,22 +258,22 @@ export function createCodenameScreen(host: HTMLElement, opts: CodenameOptions): 
 
     for (const land of LANDS) {
       const built = levelsOf(land);
-      const open = built.some((l) => l.number <= unlocked);
+      const open = built.some(l => l.number <= unlocked);
 
-      const pin = document.createElement('button');
-      pin.type = 'button';
-      pin.className = `map-pin ${open ? 'open' : built.length ? 'locked' : 'soon'}`;
+      const pin = document.createElement("button");
+      pin.type = "button";
+      pin.className = `map-pin ${open ? "open" : built.length ? "locked" : "soon"}`;
       pin.style.left = `${land.x * 100}%`;
       pin.style.top = `${land.y * 100}%`;
       pin.title = open ? land.name : `${land.name} — locked`;
-      pin.setAttribute('aria-label', pin.title);
-      pin.textContent = open ? '🐝' : '🔒';
+      pin.setAttribute("aria-label", pin.title);
+      pin.textContent = open ? "🐝" : "🔒";
       if (open) {
-        pin.addEventListener('click', () => selectLand(land));
+        pin.addEventListener("click", () => selectLand(land));
       } else {
         // Locked pins report themselves in their own line — overwriting the
         // land name would leave it contradicting the level list underneath.
-        pin.addEventListener('click', () => {
+        pin.addEventListener("click", () => {
           hint.textContent = built.length
             ? `🔒 ${land.name} — finish the levels before it to open this`
             : `🔒 ${land.name} — coming soon`;
@@ -261,38 +284,48 @@ export function createCodenameScreen(host: HTMLElement, opts: CodenameOptions): 
     }
 
     // Map on the left, everything you choose or type on the right.
-    const split = document.createElement('div');
-    split.className = 'picker-split';
+    const split = document.createElement("div");
+    split.className = "picker-split";
     side.append(heading, landName, hint, row);
     split.append(mapWrap, side);
     picker.append(split);
 
     const startLand = landForLevel(chosen) ?? landForLevel(1);
-    if (startLand) selectLand(startLand, chosen);
+    if (startLand) {
+      selectLand(startLand, chosen);
+    }
   }
 
-  start.addEventListener('click', () => {
+  start.addEventListener("click", () => {
     const name = sanitizeCodename(input.value).trim();
-    if (!name) return;
+    if (!name) {
+      return;
+    }
     onStart(name, chosen);
   });
 
-  const reset = document.createElement('button');
-  reset.className = 'ghost';
-  reset.textContent = 'Start a new hive (erases progress)';
-  reset.addEventListener('click', () => {
-    if (confirm('Erase your hive and start over?')) onReset();
+  const reset = document.createElement("button");
+  reset.className = "ghost";
+  reset.textContent = "Start a new hive (erases progress)";
+  reset.addEventListener("click", () => {
+    if (confirm("Erase your hive and start over?")) {
+      onReset();
+    }
   });
 
   if (hasMap) {
     // The right-hand column carries the name field and the buttons too, so the
     // map gets the full height of the card beside it.
     side.append(input, start);
-    if (existing) side.append(reset);
+    if (existing) {
+      side.append(reset);
+    }
     card.append(h1, p, picker);
   } else {
     card.append(h1, p, input, start);
-    if (existing) card.append(reset);
+    if (existing) {
+      card.append(reset);
+    }
   }
 
   let untrack: (() => void) | null = null;
@@ -300,13 +333,15 @@ export function createCodenameScreen(host: HTMLElement, opts: CodenameOptions): 
   return {
     root,
     show() {
-      root.classList.remove('hidden');
+      root.classList.remove("hidden");
       untrack ??= trackVisualViewport(root);
       // Don't autofocus on iPad — it yanks the software keyboard up over the game.
-      if (!('ontouchstart' in window)) setTimeout(() => input.focus(), 60);
+      if (!("ontouchstart" in window)) {
+        setTimeout(() => input.focus(), 60);
+      }
     },
     hide() {
-      root.classList.add('hidden');
+      root.classList.add("hidden");
       input.blur();
       untrack?.();
       untrack = null;
@@ -325,19 +360,19 @@ export function createMessageScreen(
   buttonLabel: string,
   onContinue: () => void,
 ): Overlay {
-  const { root, card } = makeOverlay(host);
-  const h1 = document.createElement('h1');
+  const {root, card} = makeOverlay(host);
+  const h1 = document.createElement("h1");
   h1.textContent = title;
-  const p = document.createElement('p');
+  const p = document.createElement("p");
   p.textContent = body;
-  const btn = document.createElement('button');
+  const btn = document.createElement("button");
   btn.textContent = buttonLabel;
-  btn.addEventListener('click', onContinue);
+  btn.addEventListener("click", onContinue);
   card.append(h1, p, btn);
   return {
     root,
-    show: () => root.classList.remove('hidden'),
-    hide: () => root.classList.add('hidden'),
+    show: () => root.classList.remove("hidden"),
+    hide: () => root.classList.add("hidden"),
     setText(nextTitle, nextBody) {
       h1.textContent = nextTitle;
       p.textContent = nextBody;

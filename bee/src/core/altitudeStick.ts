@@ -1,4 +1,4 @@
-import { FLIGHT } from '../config';
+import {FLIGHT} from "../config";
 
 /**
  * Vertical altitude control in the bottom-right corner. Unlike the movement
@@ -27,35 +27,40 @@ export class AltitudeStick {
   constructor(host: HTMLElement, initialHeight: number) {
     this.value = this.to01(initialHeight);
 
-    const root = document.createElement('div');
-    root.className = 'alt ui-interactive';
+    const root = document.createElement("div");
+    root.className = "alt ui-interactive";
 
-    const track = document.createElement('div');
-    track.className = 'alt-track';
+    const track = document.createElement("div");
+    track.className = "alt-track";
 
-    this.fill = document.createElement('div');
-    this.fill.className = 'alt-fill';
+    this.fill = document.createElement("div");
+    this.fill.className = "alt-fill";
 
-    this.rail = document.createElement('div');
-    this.rail.className = 'alt-rail';
+    this.rail = document.createElement("div");
+    this.rail.className = "alt-rail";
 
-    this.current = document.createElement('div');
-    this.current.className = 'alt-current';
+    this.current = document.createElement("div");
+    this.current.className = "alt-current";
 
-    this.knob = document.createElement('div');
-    this.knob.className = 'alt-knob';
+    this.knob = document.createElement("div");
+    this.knob.className = "alt-knob";
 
     this.rail.append(this.current, this.knob);
     track.append(this.fill);
-    root.append(track, this.rail, label('alt-cap alt-cap-top', '▲'), label('alt-cap alt-cap-bottom', '▼'));
+    root.append(
+      track,
+      this.rail,
+      label("alt-cap alt-cap-top", "▲"),
+      label("alt-cap alt-cap-bottom", "▼"),
+    );
     host.appendChild(root);
 
-    root.addEventListener('pointerdown', this.onDown, { passive: false });
-    window.addEventListener('pointermove', this.onMove, { passive: false });
-    window.addEventListener('pointerup', this.onUp);
-    window.addEventListener('pointercancel', this.onUp);
-    window.addEventListener('keydown', this.onKey);
-    window.addEventListener('keyup', this.onKey);
+    root.addEventListener("pointerdown", this.onDown, {passive: false});
+    window.addEventListener("pointermove", this.onMove, {passive: false});
+    window.addEventListener("pointerup", this.onUp);
+    window.addEventListener("pointercancel", this.onUp);
+    window.addEventListener("keydown", this.onKey);
+    window.addEventListener("keyup", this.onKey);
 
     this.draw();
   }
@@ -94,43 +99,53 @@ export class AltitudeStick {
 
   private setFromClientY(clientY: number): void {
     const r = this.rail.getBoundingClientRect();
-    if (r.height <= 0) return;
+    if (r.height <= 0) {
+      return;
+    }
     const t = (clientY - r.top) / r.height;
     this.value = clamp01(1 - t);
     this.draw();
   }
 
   private onDown = (e: PointerEvent): void => {
-    if (this.pointerId !== null) return;
+    if (this.pointerId !== null) {
+      return;
+    }
     e.preventDefault();
     e.stopPropagation();
     this.pointerId = e.pointerId;
-    this.knob.classList.add('active');
+    this.knob.classList.add("active");
     this.setFromClientY(e.clientY);
   };
 
   private onMove = (e: PointerEvent): void => {
-    if (e.pointerId !== this.pointerId) return;
+    if (e.pointerId !== this.pointerId) {
+      return;
+    }
     e.preventDefault();
     this.setFromClientY(e.clientY);
   };
 
   private onUp = (e: PointerEvent): void => {
-    if (e.pointerId !== this.pointerId) return;
+    if (e.pointerId !== this.pointerId) {
+      return;
+    }
     this.pointerId = null;
-    this.knob.classList.remove('active');
+    this.knob.classList.remove("active");
   };
 
   /** Q / E nudge the target on a laptop, matching the thumbstick's WASD. */
   private onKey = (e: KeyboardEvent): void => {
     const k = e.key.toLowerCase();
-    if (k !== 'q' && k !== 'e') return;
-    if (e.type === 'keyup') {
+    if (k !== "q" && k !== "e") {
+      return;
+    }
+    if (e.type === "keyup") {
       this.keys.delete(k);
       return;
     }
     this.keys.add(k);
-    this.value = clamp01(this.value + (k === 'e' ? 0.06 : -0.06));
+    this.value = clamp01(this.value + (k === "e" ? 0.06 : -0.06));
     this.draw();
   };
 
@@ -146,7 +161,7 @@ function clamp01(v: number): number {
 }
 
 function label(className: string, text: string): HTMLDivElement {
-  const d = document.createElement('div');
+  const d = document.createElement("div");
   d.className = className;
   d.textContent = text;
   return d;

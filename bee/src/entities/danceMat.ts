@@ -1,14 +1,14 @@
-import * as THREE from 'three';
-import { DANCE } from '../config';
-import type { Rng } from '../core/rng';
+import * as THREE from "three";
+import {DANCE} from "../config";
+import type {Rng} from "../core/rng";
 
 export type DanceEvent =
-  | { type: 'lit'; pad: number }
-  | { type: 'hit'; pad: number }
-  | { type: 'miss'; pad: number }
+  | {type: "lit"; pad: number}
+  | {type: "hit"; pad: number}
+  | {type: "miss"; pad: number}
   /** The first cue of the round that lights two pads instead of one. */
-  | { type: 'stepUp' }
-  | { type: 'finished'; passed: boolean };
+  | {type: "stepUp"}
+  | {type: "finished"; passed: boolean};
 
 /** Pads 0..8 in reading order; 4 is the centre the bee waits on. */
 const CENTRE = 4;
@@ -53,17 +53,17 @@ interface Prompt {
  */
 export class DanceMat {
   /** Events since the last drain. */
-  readonly events: DanceEvent[] = [];
+  readonly events: Array<DanceEvent> = [];
 
   hits = 0;
   attempts = 0;
 
-  private readonly prompts: Prompt[] = [];
+  private readonly prompts: Array<Prompt> = [];
   private finished = false;
 
   /** Pads currently flashing a hit/miss colour, with seconds remaining. */
   private readonly flashes = new Map<number, number>();
-  private readonly baseColours: THREE.Color[] = [];
+  private readonly baseColours: Array<THREE.Color> = [];
 
   /**
    * @param colours each pad's resting colour, from the scene that built them.
@@ -72,11 +72,13 @@ export class DanceMat {
    *   take the lit colour for its resting one and leave that pad on for good.
    */
   constructor(
-    private readonly pads: THREE.Mesh[],
-    colours: readonly number[],
+    private readonly pads: Array<THREE.Mesh>,
+    colours: ReadonlyArray<number>,
     rng: Rng,
   ) {
-    for (const colour of colours) this.baseColours.push(new THREE.Color(colour));
+    for (const colour of colours) {
+      this.baseColours.push(new THREE.Color(colour));
+    }
     // Whatever the last round left behind is not this round's business.
     this.reset();
 
@@ -84,7 +86,7 @@ export class DanceMat {
     // asked for twice in a row — a repeat reads as a dropped beat rather than
     // a new one — and with pairs that means avoiding *both* of the last cue's
     // pads, since the previous pair's window can still be open.
-    let recent: number[] = [];
+    let recent: Array<number> = [];
     for (let cue = 0; cue < DANCE.cues; cue++) {
       const beat = DANCE.countInBeats + cue * DANCE.beatsPerCue;
       const window = DANCE.beatsPerCue * DANCE.litFraction;
@@ -149,32 +151,48 @@ export class DanceMat {
       }
     }
 
-    if (this.finished) return;
+    if (this.finished) {
+      return;
+    }
 
     for (const prompt of this.prompts) {
-      if (prompt.resolved) continue;
+      if (prompt.resolved) {
+        continue;
+      }
 
       if (!prompt.lit) {
-        if (beats < prompt.litBeat) break; // the list is in time order
+        if (beats < prompt.litBeat) {
+          break;
+        } // the list is in time order
         prompt.lit = true;
         this.paint(prompt.pad, LIT);
-        if (prompt.stepUp) this.events.push({ type: 'stepUp' });
-        this.events.push({ type: 'lit', pad: prompt.pad });
+        if (prompt.stepUp) {
+          this.events.push({type: "stepUp"});
+        }
+        this.events.push({type: "lit", pad: prompt.pad});
         continue;
       }
 
       // Window expired without a tap.
-      if (beats > prompt.endBeat) this.resolve(prompt, false);
+      if (beats > prompt.endBeat) {
+        this.resolve(prompt, false);
+      }
     }
   }
 
   /** @returns true if this pad is one of the ones being asked for. */
   tap(pad: number): boolean {
-    if (this.finished || pad === CENTRE) return false;
+    if (this.finished || pad === CENTRE) {
+      return false;
+    }
     // Oldest first, so tapping a pad that's somehow been asked for twice
     // answers the prompt that's about to run out.
-    const prompt = this.prompts.find((p) => p.lit && !p.resolved && p.pad === pad);
-    if (!prompt) return false;
+    const prompt = this.prompts.find(
+      p => p.lit && !p.resolved && p.pad === pad,
+    );
+    if (!prompt) {
+      return false;
+    }
     this.resolve(prompt, true);
     return true;
   }
@@ -182,21 +200,25 @@ export class DanceMat {
   private resolve(prompt: Prompt, hit: boolean): void {
     prompt.resolved = true;
     this.attempts++;
-    if (hit) this.hits++;
+    if (hit) {
+      this.hits++;
+    }
 
     this.paint(prompt.pad, hit ? HIT : MISS);
     this.flashes.set(prompt.pad, 0.28);
-    this.events.push({ type: hit ? 'hit' : 'miss', pad: prompt.pad });
+    this.events.push({type: hit ? "hit" : "miss", pad: prompt.pad});
 
     if (this.attempts >= this.prompts.length) {
       this.finished = true;
-      this.events.push({ type: 'finished', passed: this.passed });
+      this.events.push({type: "finished", passed: this.passed});
     }
   }
 
   /** Put every pad back to its resting colour. */
   reset(): void {
-    for (let i = 0; i < this.pads.length; i++) this.paint(i, this.baseColours[i]);
+    for (let i = 0; i < this.pads.length; i++) {
+      this.paint(i, this.baseColours[i]);
+    }
     this.flashes.clear();
   }
 
@@ -209,7 +231,7 @@ export class DanceMat {
 }
 
 /** An outer pad that isn't one of the ones still in play. */
-function pick(rng: Rng, avoid: readonly number[]): number {
-  const options = OUTER.filter((p) => !avoid.includes(p));
+function pick(rng: Rng, avoid: ReadonlyArray<number>): number {
+  const options = OUTER.filter(p => !avoid.includes(p));
   return options[rng.int(0, options.length)];
 }

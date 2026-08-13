@@ -1,4 +1,4 @@
-import { Music } from './music';
+import {Music} from "./music";
 
 /**
  * Tiny WebAudio synth — no asset files, no loading. iOS requires the context
@@ -30,7 +30,9 @@ export class Audio {
       return;
     }
     const Ctor = window.AudioContext ?? (window as any).webkitAudioContext;
-    if (!Ctor) return;
+    if (!Ctor) {
+      return;
+    }
     this.ctx = new Ctor();
     this.master = this.ctx.createGain();
     this.master.gain.value = 0.5;
@@ -45,7 +47,9 @@ export class Audio {
    */
   createMusic(bpm: number): Music | null {
     this.stopMusic();
-    if (!this.ctx || !this.master) return null;
+    if (!this.ctx || !this.master) {
+      return null;
+    }
     void this.ctx.resume();
     this.music = new Music(this.ctx, this.master, bpm);
     return this.music;
@@ -64,19 +68,23 @@ export class Audio {
 
   setMuted(m: boolean): void {
     this.muted = m;
-    if (this.master) this.master.gain.value = m ? 0 : 0.5;
+    if (this.master) {
+      this.master.gain.value = m ? 0 : 0.5;
+    }
   }
 
   /** Wing hum, its pitch and volume driven by flight speed (0..1). */
   private startHum(): void {
-    if (!this.ctx || !this.master) return;
+    if (!this.ctx || !this.master) {
+      return;
+    }
     const osc = this.ctx.createOscillator();
     const gain = this.ctx.createGain();
-    osc.type = 'sawtooth';
+    osc.type = "sawtooth";
     osc.frequency.value = 90;
     gain.gain.value = 0;
     const filter = this.ctx.createBiquadFilter();
-    filter.type = 'lowpass';
+    filter.type = "lowpass";
     filter.frequency.value = 320;
     osc.connect(filter).connect(gain).connect(this.master);
     osc.start();
@@ -89,15 +97,17 @@ export class Audio {
    * swells as it closes in. `t` is 0 (far/absent) to 1 (right on top of you).
    */
   setThreat(t: number): void {
-    if (!this.ctx || !this.master) return;
+    if (!this.ctx || !this.master) {
+      return;
+    }
     if (!this.threatOsc) {
       const osc = this.ctx.createOscillator();
       const gain = this.ctx.createGain();
       const filter = this.ctx.createBiquadFilter();
-      osc.type = 'square';
+      osc.type = "square";
       osc.frequency.value = 52;
       osc.detune.value = 18;
-      filter.type = 'lowpass';
+      filter.type = "lowpass";
       filter.frequency.value = 210;
       gain.gain.value = 0;
       osc.connect(filter).connect(gain).connect(this.master);
@@ -112,19 +122,29 @@ export class Audio {
 
   /** Nasty little zap when the wasp connects. */
   sting(): void {
-    this.blip(220, 0, 0.18, 0.3, 'square');
-    this.blip(140, 0.05, 0.3, 0.24, 'sawtooth');
+    this.blip(220, 0, 0.18, 0.3, "square");
+    this.blip(140, 0.05, 0.3, 0.24, "sawtooth");
   }
 
   setFlightIntensity(t: number): void {
-    if (!this.ctx || !this.humOsc || !this.humGain) return;
+    if (!this.ctx || !this.humOsc || !this.humGain) {
+      return;
+    }
     const now = this.ctx.currentTime;
     this.humOsc.frequency.setTargetAtTime(88 + t * 46, now, 0.08);
     this.humGain.gain.setTargetAtTime(0.035 + t * 0.05, now, 0.12);
   }
 
-  private blip(freq: number, at: number, dur: number, gain: number, type: OscillatorType = 'triangle'): void {
-    if (!this.ctx || !this.master) return;
+  private blip(
+    freq: number,
+    at: number,
+    dur: number,
+    gain: number,
+    type: OscillatorType = "triangle",
+  ): void {
+    if (!this.ctx || !this.master) {
+      return;
+    }
     const t = this.ctx.currentTime + at;
     const osc = this.ctx.createOscillator();
     const g = this.ctx.createGain();
@@ -143,11 +163,13 @@ export class Audio {
     const scale = [523.25, 587.33, 659.25, 783.99, 880.0, 1046.5];
     const f = scale[Math.min(step, scale.length - 1)];
     this.blip(f, 0, 0.22, 0.28);
-    this.blip(f * 2, 0.02, 0.14, 0.1, 'sine');
+    this.blip(f * 2, 0.02, 0.14, 0.1, "sine");
   }
 
   quotaComplete(): void {
-    [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => this.blip(f, i * 0.09, 0.42, 0.26));
+    [523.25, 659.25, 783.99, 1046.5].forEach((f, i) =>
+      this.blip(f, i * 0.09, 0.42, 0.26),
+    );
   }
 
   levelComplete(): void {
