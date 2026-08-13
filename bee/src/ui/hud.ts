@@ -100,15 +100,20 @@ export class Hud {
       }
     });
 
-    this.root.append(
-      this.topLeft,
-      this.banner,
-      this.objective,
-      svg,
-      this.carry,
-      buttons,
-      this.perf,
-    );
+    // The top strip is one grid — counters, title, buttons — rather than four
+    // things each absolutely positioned and hoping not to meet. They used to
+    // overlap on a phone: the counters ran to x=223 and the centred banner
+    // started at x=98. Laid out as columns they cannot collide at any width,
+    // whatever a level calls itself.
+    const top = el("div", "hud-top");
+    const topRight = el("div", "hud-topright");
+    topRight.append(this.perf, buttons);
+    // Banner and objective are their own grid items rather than one stacked
+    // column, so a phone can put the title up beside the buttons and leave the
+    // objective its own full-width line underneath.
+    top.append(this.topLeft, this.banner, this.objective, topRight);
+
+    this.root.append(top, svg, this.carry);
     host.appendChild(this.root);
   }
 

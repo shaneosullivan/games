@@ -77,26 +77,117 @@ body {
   pointer-events: none;
   color: #fff;
   text-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+  /* So the top strip can lay itself out against the width it actually has,
+     which the puzzle split changes without touching the viewport. */
+  container-type: inline-size;
 }
 
 .ui-interactive {
   pointer-events: auto;
 }
 
-.hud-topleft {
+/*
+ * The top strip: counters left, title and objective centre, buttons right.
+ *
+ * A grid, not four absolutely-positioned things — see the note in ui/hud.ts.
+ * The middle column takes what's left, so a long level name or a long
+ * objective wraps inside its own column rather than growing across its
+ * neighbours. Nothing here can overlap at any width.
+ */
+.hud-top {
   position: absolute;
   top: calc(var(--safe-t) + 14px);
   left: calc(var(--safe-l) + 16px);
+  right: calc(var(--safe-r) + 16px);
+  display: grid;
+  /* Equal side columns, so the title stays centred on the *screen* rather than
+     in the gap between the counters and the buttons — those differ in width by
+     about 100px, which is enough to look like a mistake. The counters and the
+     buttons span both rows; the title and the objective take one each. */
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  grid-template-areas:
+    "left banner    right"
+    "left objective right";
+  align-items: start;
+  justify-items: center;
+  column-gap: 12px;
+  row-gap: 6px;
+}
+
+/*
+ * On a phone there is no width to share three ways, so the strip folds: the
+ * title moves up alongside the buttons — a row that was going to exist anyway,
+ * so it costs no height — and the objective and counters take a line each
+ * under it. Vertical space is the scarce thing on a phone; this spends one
+ * row rather than three on the same content.
+ *
+ * The breakpoint only decides which arrangement reads better, never whether
+ * things collide, so it doesn't have to be exact. It's asked of two different
+ * things. The viewport query is the one that works everywhere. The container
+ * query is the truthful one: the puzzle split cuts the HUD to 56% of the
+ * screen (`.split .hud`) without the viewport changing. Where containers
+ * aren't supported the media query still covers the phone, and the wide layout
+ * is only cramped in the split, never broken.
+ */
+@media (max-width: 860px) {
+  .hud-top {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "banner    right"
+      "objective objective"
+      "left      left";
+    row-gap: 8px;
+  }
+  /* Title and buttons share the top row; centre them on each other so the
+     48px buttons don't sit low against the shorter pill. */
+  .hud-banner,
+  .hud-topright {
+    align-self: center;
+  }
+}
+
+@container (max-width: 860px) {
+  .hud-top {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "banner    right"
+      "objective objective"
+      "left      left";
+    row-gap: 8px;
+  }
+  /* Title and buttons share the top row; centre them on each other so the
+     48px buttons don't sit low against the shorter pill. */
+  .hud-banner,
+  .hud-topright {
+    align-self: center;
+  }
+}
+
+/* `justify-self` matters in the stacked layout, where these are full-width
+   rows and would otherwise be centred by the grid's `justify-items`. */
+.hud-topleft {
+  grid-area: left;
+  justify-self: start;
   display: flex;
   flex-direction: column;
   gap: 8px;
+  min-width: 0;
+}
+
+.hud-topright {
+  grid-area: right;
+  justify-self: end;
+  /* The perf readout hangs off this, so its box is exactly the buttons —
+     which is what lets them line up with the title. */
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
 }
 
 .hud-banner {
-  position: absolute;
-  top: calc(var(--safe-t) + 16px);
-  left: 50%;
-  transform: translateX(-50%);
+  grid-area: banner;
+  max-width: 100%;
   background: var(--panel);
   border: 1px solid var(--stroke);
   border-radius: 999px;
@@ -104,22 +195,23 @@ body {
   font-size: 17px;
   font-weight: 700;
   letter-spacing: 0.4px;
+  text-align: center;
   backdrop-filter: blur(8px);
-  white-space: nowrap;
 }
 
 .hud-objective {
-  position: absolute;
-  top: calc(var(--safe-t) + 58px);
-  left: 50%;
-  transform: translateX(-50%);
+  grid-area: objective;
+  max-width: 100%;
   font-size: 14px;
   font-weight: 600;
   opacity: 0.9;
   background: rgba(0, 0, 0, 0.22);
   border-radius: 999px;
   padding: 4px 16px;
-  white-space: nowrap;
+  text-align: center;
+  /* Long on a phone — "A baby wants Red Flower, fetch it from the glowing
+     wall" is wider than the screen — so it wraps rather than running off it. */
+  text-wrap: balance;
 }
 
 .pollen {
@@ -198,11 +290,8 @@ body {
   transition: stroke-dashoffset 60ms linear;
 }
 
-/* Buttons — top right, clear of the altitude slider */
+/* Buttons — top right of the strip, clear of the altitude slider */
 .hud-buttons {
-  position: absolute;
-  right: calc(var(--safe-r) + 18px);
-  top: calc(var(--safe-t) + 42px);
   display: flex;
   gap: 10px;
 }
@@ -225,14 +314,20 @@ body {
   transform: scale(0.93);
 }
 
+/* Hangs under the buttons, out of the flow. It's a dev readout and an
+   invisible tap target when off, so it must neither add height to the column —
+   that would stop the buttons lining up with the title — nor sit on top of the
+   buttons, where it would swallow taps meant for the menu. */
 .hud-perf {
   position: absolute;
-  right: calc(var(--safe-r) + 18px);
-  top: calc(var(--safe-t) + 14px);
+  top: calc(100% + 6px);
+  right: 0;
   font-size: 12px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   opacity: 0.65;
+  text-align: right;
+  white-space: nowrap;
 }
 
 /* ---------- Joystick ---------- */

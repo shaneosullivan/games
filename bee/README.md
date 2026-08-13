@@ -70,7 +70,7 @@ Your current level is preselected, so plain "Continue" resumes. Choosing a level
 you've already completed replays it from the start (level 1 resets its flower
 counts), and your furthest unlock is kept either way.
 
-**1 — Sunny Meadow.** Gather 10 each of white rose, yellow flower and orange
+**1 — Sunny Meadow.** Gather 10 each of white rose, yellow flower and red
 flower. The hive on the branch grows with every collection. When it's whole it
 lights up, your bee is crowned queen with a burst of sparkles, and you fly in
 through the door to finish.
@@ -240,6 +240,28 @@ Things worth knowing before changing anything:
   comes on with the `ready`/`returning` phases and goes off the moment the
   entry cutscene starts. Both meadow levels end with the shared `HiveEntry`
   cutscene in `levels/hiveEntry.ts`.
+- **The top of the HUD is one grid, not four absolute positions.** The
+  counters, the level banner, the objective and the buttons each used to be
+  pinned to a corner and hope not to meet; on a phone the counters ran to x=223
+  and the centred banner started at x=98, so they sat on top of each other, and
+  the objective ran off the screen entirely. `.hud-top` lays them out as grid
+  areas, which can't overlap at any width or for any length of text — and the
+  text mattered: the width at which they collided depended on what the level
+  was called and what it was asking you to do, so no fixed breakpoint would
+  have been right. Under 860px it folds — the title moves up beside the
+  buttons, which costs no height because that row exists anyway, and the
+  objective and counters take a line each under it. Vertical space is the
+  scarce thing on a phone, and that is worth 71px of it.
+- **That breakpoint is asked of two different things.** `@media` works
+  everywhere; `@container` is the truthful one, because the puzzle split cuts
+  the HUD to 56% of the screen (`.split .hud`) without the viewport changing.
+  Both set the same rules, so where containers aren't supported the phone is
+  still covered and only the split is cramped — never broken.
+- **`.hud-perf` hangs off the button column rather than sitting in it.** It's a
+  dev readout and an invisible tap target when it's off. In the flow it added
+  its height to the column, which stopped the buttons lining up with the title;
+  overlapping the buttons instead, it would have swallowed taps meant for the
+  menu.
 - **Overlays size themselves to `visualViewport`.** The iPad keyboard doesn't
   shrink the layout viewport, so a centred card stays put and the keys cover the
   codename field. `trackVisualViewport` in `ui/overlays.ts` pins the overlay to
