@@ -21,15 +21,20 @@ export function fitViewport(root: HTMLElement, onResize: () => void): void {
   let lastH = 0;
 
   const apply = (): void => {
-    const width = Math.round(vv?.width ?? window.innerWidth);
-    const height = Math.round(vv?.height ?? window.innerHeight);
-    // The keyboard shrinks the visual viewport and offsets it; the game itself
-    // has no text fields, so following that is exactly right here.
-    const top = Math.round(vv?.offsetTop ?? 0);
-    const left = Math.round(vv?.offsetLeft ?? 0);
+    // The *largest* of the three, not the visual viewport alone.
+    //
+    // On an installed iPad app the visual viewport comes back a status bar
+    // shorter than the screen, and sizing to it left a strip of bare page
+    // background along the bottom — the very bug this was added to fix. None of
+    // the three is right on its own, but the game has no text fields and never
+    // scrolls, so it can only ever be too small: taking the maximum is safe,
+    // and overflow is hidden anyway.
+    const doc = document.documentElement;
+    const width = Math.max(Math.round(vv?.width ?? 0), doc.clientWidth, window.innerWidth);
+    const height = Math.max(Math.round(vv?.height ?? 0), doc.clientHeight, window.innerHeight);
 
-    root.style.top = `${top}px`;
-    root.style.left = `${left}px`;
+    root.style.top = '0px';
+    root.style.left = '0px';
     root.style.width = `${width}px`;
     root.style.height = `${height}px`;
 
