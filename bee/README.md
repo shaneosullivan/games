@@ -273,6 +273,13 @@ Things worth knowing before changing anything:
   when every scene was built around it; the cottage isn't, so `ctx.placeBee()`
   takes an optional yaw and level 4 passes one. A level that places the bee far
   from the origin and skips it will find the camera pointing at the hive.
+- **iOS keeps a strip of an installed app for itself.** On an iPad the layout
+  viewport comes back 20pt shorter than the screen — measured on the device:
+  1080x790 against a 1080x810 landscape screen — and that strip under the home
+  indicator is painted with the *page* background, not ours to draw in. So
+  `setEnvironment` keeps `document.body.style.background` in step with the
+  scene's sky, which is what stops it reading as a gap. Sizing the app can't
+  help; it already fills every pixel the viewport has.
 - **`core/fitViewport.ts` sizes the app in pixels, not CSS.** In an installed
   iPad app `position: fixed; inset: 0` isn't reliably "the screen" — the page
   can be laid out against a viewport a status bar taller than what's on show,

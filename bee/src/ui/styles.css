@@ -20,6 +20,9 @@ body {
   padding: 0;
   height: 100%;
   overflow: hidden;
+  /* The meadow sky, until the stage says otherwise — see setEnvironment in
+     render/stage.ts, which keeps this in step with whatever scene is up. It's
+     what iOS paints the home-indicator strip of an installed app with. */
   background: #8fd0e8;
   overscroll-behavior: none;
   /* Stop Safari from scrolling / zooming / selecting under our fingers.

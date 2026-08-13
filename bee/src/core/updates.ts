@@ -28,7 +28,7 @@ interface Version {
 export function watchForUpdates(host: HTMLElement): void {
   // Available in every build, including this one's dev server: when a copy is
   // wedged on an old version, the console is the only way in.
-  installResetHelper();
+  const api = installConsoleApi();
   if (!import.meta.env.PROD) return;
 
   let current: string | null = null;
@@ -37,6 +37,7 @@ export function watchForUpdates(host: HTMLElement): void {
   const banner = createBanner(host, () => {
     void applyUpdate();
   });
+  api.update = applyUpdate;
 
   const read = async (): Promise<string | null> => {
     try {
@@ -45,7 +46,9 @@ export function watchForUpdates(host: HTMLElement): void {
       const response = await fetch(VERSION_URL, { cache: 'no-store' });
       if (!response.ok) return null;
       const data = (await response.json()) as Version;
-      return typeof data.build === 'string' ? data.build : null;
+      if (typeof data.build !== 'string') return null;
+      api.build = data.build;
+      return data.build;
     } catch {
       // Offline, or no version.json at all. Either way there's nothing to say.
       return null;
@@ -102,27 +105,69 @@ async function purgeCaches(): Promise<string[]> {
   return names;
 }
 
+/** What `window.chofter` offers from the console. */
+interface ChofterApi {
+  /** Build stamp this copy is running, once version.json has been read. */
+  build: string | null;
+  /** Take a pending update now: purge the caches and reload. */
+  update(): Promise<void>;
+  /** The big hammer — see below. */
+  reset(): Promise<void>;
+  /** Everything worth knowing when something looks wrong. */
+  diagnose(): Promise<Record<string, unknown>>;
+}
+
 /**
- * `chofterReset()` — the big hammer, from the console.
+ * `window.chofter` — the console handle.
  *
- * The banner is the polite path: purge the caches and reload. This is for when
- * a copy is wedged on a build old enough that its own update path is broken,
- * which no amount of waiting will fix. It also unregisters the service worker
- * (a live one serves its cache straight back, so purging alone isn't enough)
- * and reloads with a cache-buster, since Safari's own HTTP cache may still be
- * holding the page.
+ * `reset()` is the hammer: a copy can be wedged on a build old enough that its
+ * own update path is broken, which no amount of waiting will fix. It
+ * unregisters the service worker (a live one serves its cache straight back, so
+ * purging alone isn't enough) and reloads with a cache-buster, since Safari's
+ * own HTTP cache may still be holding the page. Workers and caches are
+ * per-origin, so running it in a browser tab fixes the installed app too.
  *
- * Service workers and caches are per-origin, so running this in a browser tab
- * fixes the installed app too.
+ * `diagnose()` exists because the interesting bugs here are all on a device
+ * with no devtools of its own — it reports the numbers worth pasting back.
  */
-function installResetHelper(): void {
-  (window as unknown as Record<string, unknown>).chofterReset = async (): Promise<void> => {
-    const regs = (await navigator.serviceWorker?.getRegistrations?.()) ?? [];
-    await Promise.all(regs.map((r) => r.unregister()));
-    const names = await purgeCaches();
-    console.log(`chofterReset: ${regs.length} worker(s) unregistered, caches cleared:`, names);
-    window.location.replace(`${window.location.pathname}?fresh=${Date.now()}`);
+function installConsoleApi(): ChofterApi {
+  const api: ChofterApi = {
+    build: null,
+    update: async () => {
+      window.location.reload();
+    },
+    reset: async () => {
+      const regs = (await navigator.serviceWorker?.getRegistrations?.()) ?? [];
+      await Promise.all(regs.map((r) => r.unregister()));
+      const names = await purgeCaches();
+      console.log(`chofter.reset: ${regs.length} worker(s) unregistered, caches cleared:`, names);
+      window.location.replace(`${window.location.pathname}?fresh=${Date.now()}`);
+    },
+    diagnose: async () => {
+      const doc = document.documentElement;
+      const vv = window.visualViewport;
+      const app = document.getElementById('app')?.getBoundingClientRect();
+      return {
+        build: api.build,
+        url: window.location.href,
+        standalone:
+          (navigator as unknown as { standalone?: boolean }).standalone ??
+          window.matchMedia('(display-mode: standalone)').matches,
+        // The viewport question: which of these disagree, and by how much.
+        visualViewport: vv ? [Math.round(vv.width), Math.round(vv.height)] : null,
+        documentElement: [doc.clientWidth, doc.clientHeight],
+        inner: [window.innerWidth, window.innerHeight],
+        screen: [window.screen.width, window.screen.height],
+        app: app ? [Math.round(app.width), Math.round(app.height)] : null,
+        safeArea: getComputedStyle(doc).getPropertyValue('--safe-b').trim(),
+        caches: 'caches' in window ? await caches.keys() : [],
+        workers: ((await navigator.serviceWorker?.getRegistrations?.()) ?? []).length,
+      };
+    },
   };
+
+  (window as unknown as Record<string, unknown>).chofter = api;
+  return api;
 }
 
 function createBanner(host: HTMLElement, onTake: () => void): { show(): void } {

@@ -4,11 +4,14 @@
     <meta charset="UTF-8" />
     <title>Bee a Queen</title>
 
-    <!-- viewport-fit=cover + no user scaling: required for true fullscreen touch games on iPad -->
-    <meta
-      name="viewport"
-      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover"
-    />
+    <!--
+      viewport-fit=cover is what asks iOS for the whole screen in an installed
+      app, safe areas included. Deliberately nothing else: iOS has ignored
+      user-scalable and the scale locks since iOS 10 — core/lockZoom.ts is what
+      actually stops zooming — and this now matches the gallery's meta exactly,
+      which is the page that gets installed.
+    -->
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 
     <!-- Add to Home Screen -> runs without Safari chrome -->
     <meta name="apple-mobile-web-app-capable" content="yes" />

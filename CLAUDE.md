@@ -112,7 +112,8 @@ When testing the **built site**, the service worker will serve you the previous
 build. Purge it or you'll debug a page that no longer exists:
 
 ```js
-chofterReset()   // defined by every page: unregisters the worker, clears caches, reloads
+chofter.reset()      // defined by every page: unregisters the worker, clears caches, reloads
+chofter.diagnose()   // build, viewport measurements, caches, workers — for a device with no devtools
 ```
 
 ## Deploying

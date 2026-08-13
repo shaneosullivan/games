@@ -151,6 +151,11 @@ export function createStage(host: HTMLElement): Stage {
 
   function setEnvironment(env: EnvironmentSettings): void {
     (scene.background as THREE.Color).set(env.background);
+    // iOS paints the bits of an installed app it won't give us — the strip
+    // under the home indicator — with the *page* background, and it will not
+    // hand that strip over however the viewport is sized. Keeping the page
+    // colour in step with the sky is what makes it stop reading as a gap.
+    document.body.style.background = `#${new THREE.Color(env.background).getHexString()}`;
     fog.color.set(env.fogColor);
     fog.near = env.fogNear;
     fog.far = env.fogFar;

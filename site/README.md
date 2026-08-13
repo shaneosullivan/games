@@ -78,13 +78,17 @@ update-check can never notice an update. Keep it that way if you touch
 
 ### Unwedging a copy by hand
 
-Every page defines `chofterReset()` on `window`. Run it from the console on the
-site's own origin and it unregisters the service worker, deletes every cache,
-and reloads past the HTTP cache with a fresh query string:
+Every page defines `window.chofter`:
 
 ```js
-chofterReset()
+chofter.build        // the build stamp this copy is running
+chofter.diagnose()   // build, URL, standalone?, every viewport measurement, caches, workers
+chofter.update()     // take a pending update now — purge the caches and reload
+chofter.reset()      // unregister the worker, bin every cache, reload past the HTTP cache
 ```
+
+`diagnose()` is there because the interesting bugs are all on a device with no
+devtools of its own — it returns the numbers worth pasting back.
 
 Service workers and caches are per-origin, so running it in an ordinary browser
 tab also fixes the copy installed on the home screen — no reinstall. It's the

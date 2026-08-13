@@ -382,20 +382,45 @@ self.addEventListener('fetch', (event) => {
  * gallery stays two files with no build step of its own.
  */
 const UPDATE_WATCH = `      (function () {
-        // The big hammer, for a copy wedged on a build whose own update path is
-        // broken: unregister the worker (a live one serves its cache straight
-        // back), bin every cache, and reload past Safari's HTTP cache too.
-        // Both are per-origin, so running this here fixes the installed app.
-        window.chofterReset = function () {
-          return navigator.serviceWorker.getRegistrations()
-            .then(function (regs) { return Promise.all(regs.map(function (r) { return r.unregister(); })); })
-            .then(function () { return caches.keys(); })
-            .then(function (names) {
-              console.log('chofterReset: caches cleared:', names);
-              return Promise.all(names.map(function (n) { return caches.delete(n); }));
-            })
-            .then(function () { location.replace(location.pathname + '?fresh=' + Date.now()); });
+        // window.chofter — the console handle. Mirrors bee/src/core/updates.ts;
+        // change one and change the other.
+        //
+        // reset() is the hammer, for a copy wedged on a build whose own update
+        // path is broken: unregister the worker (a live one serves its cache
+        // straight back), bin every cache, and reload past Safari's HTTP cache
+        // too. Both are per-origin, so running it here fixes the installed app.
+        var api = {
+          build: null,
+          update: function () { location.reload(); },
+          reset: function () {
+            return navigator.serviceWorker.getRegistrations()
+              .then(function (regs) { return Promise.all(regs.map(function (r) { return r.unregister(); })); })
+              .then(function () { return caches.keys(); })
+              .then(function (names) {
+                console.log('chofter.reset: caches cleared:', names);
+                return Promise.all(names.map(function (n) { return caches.delete(n); }));
+              })
+              .then(function () { location.replace(location.pathname + '?fresh=' + Date.now()); });
+          },
+          diagnose: function () {
+            var doc = document.documentElement;
+            var vv = window.visualViewport;
+            return Promise.all([caches.keys(), navigator.serviceWorker.getRegistrations()])
+              .then(function (r) {
+                return {
+                  build: api.build,
+                  url: location.href,
+                  standalone: navigator.standalone || matchMedia('(display-mode: standalone)').matches,
+                  visualViewport: vv ? [Math.round(vv.width), Math.round(vv.height)] : null,
+                  documentElement: [doc.clientWidth, doc.clientHeight],
+                  inner: [innerWidth, innerHeight],
+                  screen: [screen.width, screen.height],
+                  caches: r[0], workers: r[1].length,
+                };
+              });
+          },
         };
+        window.chofter = api;
 
         var banner = document.querySelector('.update-banner');
         if (!banner) return;
@@ -405,7 +430,11 @@ const UPDATE_WATCH = `      (function () {
         function read() {
           return fetch('${VERSION_FILE}', { cache: 'no-store' })
             .then(function (r) { return r.ok ? r.json() : null; })
-            .then(function (d) { return d && typeof d.build === 'string' ? d.build : null; })
+            .then(function (d) {
+              if (!d || typeof d.build !== 'string') return null;
+              api.build = d.build;
+              return d.build;
+            })
             .catch(function () { return null; });
         }
 
