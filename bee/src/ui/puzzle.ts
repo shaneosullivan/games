@@ -1,10 +1,29 @@
 import { PUZZLE } from '../config';
 import { bearPuzzleUrl } from '../assets/bearPuzzle';
 
+/** The picture is 3x3; eight of those nine cells hold a piece of it. */
 const SIZE = 3;
-const TILES = SIZE * SIZE;
-/** The blank always starts (and finishes) in the bottom-right. */
-const BLANK = TILES - 1;
+const PIECES = SIZE * SIZE - 1;
+/** A slot with nothing in it. Both gaps are the same — they have no identity. */
+const HOLE = -1;
+
+/**
+ * The board, as (column, row) per slot.
+ *
+ * Slots 0-8 are the picture's own grid. Slot 9 is the extra gap that hangs
+ * below the middle of the bottom row — a second place to slide into, which is
+ * what makes this markedly easier than the plain 8-puzzle without making the
+ * picture any smaller.
+ */
+const CELLS: ReadonlyArray<readonly [number, number]> = [
+  [0, 0], [1, 0], [2, 0],
+  [0, 1], [1, 1], [2, 1],
+  [0, 2], [1, 2], [2, 2],
+  [1, 3],
+];
+const SLOTS = CELLS.length;
+/** Where the picture's missing corner sits once everything is home. */
+const CORNER = SIZE * SIZE - 1;
 
 export interface SlidePuzzle {
   root: HTMLDivElement;
@@ -15,18 +34,18 @@ export interface SlidePuzzle {
 }
 
 /**
- * A 3x3 sliding-tile puzzle of the bear.
+ * A sliding-tile puzzle of the bear: a 3x3 picture with two gaps to slide into.
  *
  * Tiles are one background image offset per tile, so there's a single image to
- * load and no slicing. Shuffling is done by walking the blank around with
- * random legal moves rather than permuting the array — a random permutation of
- * a sliding puzzle is unsolvable half the time, and an unsolvable puzzle in a
- * game for a child is unforgivable.
+ * load and no slicing. Shuffling is done by walking a gap around with random
+ * legal moves rather than permuting the array — a random permutation of a
+ * one-gap sliding puzzle is unsolvable half the time, and an unsolvable puzzle
+ * in a game for a child is unforgivable. (With two gaps every arrangement is
+ * reachable, but the random walk also keeps a lid on how hard it gets, which is
+ * worth having on its own.)
  *
- * Nine tiles rather than sixteen: at 4x4 it was a real 15-puzzle, which is a
- * long sit for a child who just wants the bear to go away. `SIZE` and the
- * board's `grid-template-columns` / `background-size` in styles.css have to
- * agree — change one and change the others.
+ * `CELLS` here and the board's `grid-template-columns` / `background-size` in
+ * styles.css have to agree — change one and change the others.
  */
 export function createSlidePuzzle(
   host: HTMLElement,
@@ -45,19 +64,21 @@ export function createSlidePuzzle(
 
   const hint = document.createElement('div');
   hint.className = 'puzzle-hint';
-  hint.textContent = 'Slide the tiles next to the gap';
+  hint.textContent = 'Slide the tiles into a gap';
 
   root.append(title, board, hint);
   host.appendChild(root);
 
-  /** order[slot] = which piece of the picture is sitting in that slot. */
-  let order: number[] = Array.from({ length: TILES }, (_, i) => i);
+  /** order[slot] = the piece of the picture sitting there, or HOLE. */
+  let order: number[] = solvedOrder();
   let solved = false;
   const cells: HTMLDivElement[] = [];
 
-  for (let i = 0; i < TILES; i++) {
+  for (let i = 0; i < SLOTS; i++) {
     const cell = document.createElement('div');
     cell.className = 'puzzle-tile';
+    // The hanging gap is outside the picture's grid, so it needs placing.
+    if (i === SLOTS - 1) cell.classList.add('puzzle-spare');
     cell.addEventListener('click', () => {
       // A drag ends with a click on the same cell; the slide already happened.
       if (dragged) return;
@@ -70,24 +91,30 @@ export function createSlidePuzzle(
 
   // ---- dragging ------------------------------------------------------------
   //
-  // Tapping a tile next to the gap moves it, but a sliding puzzle should slide:
-  // a tile follows your finger toward the gap and drops into it once it's more
-  // than a third of the way there, otherwise it springs back.
+  // Tapping a tile beside a gap moves it, but a sliding puzzle should slide: a
+  // tile follows your finger toward the gap and drops in once it's more than a
+  // third of the way there, otherwise it springs back.
   //
   // The travel is measured from the two cells' own offsets rather than a
   // computed tile size, so it stays exact whatever the board's gap or scale is.
+  //
+  // A tile can be beside *both* gaps, so a drag carries every candidate and
+  // picks whichever one the finger is actually heading for.
 
   /** How far along the gap you must drag before it counts as a move. */
   const COMMIT = 0.34;
 
+  interface Candidate {
+    /** Pixels from this tile to that gap; one of the two is always zero. */
+    spanX: number;
+    spanY: number;
+  }
   interface Drag {
     slot: number;
     pointerId: number;
     startX: number;
     startY: number;
-    /** Pixels from this tile to the gap; one of the two is always zero. */
-    spanX: number;
-    spanY: number;
+    options: Candidate[];
   }
   let drag: Drag | null = null;
   /** Set when a drag has moved the tile, to swallow the click that follows. */
@@ -95,33 +122,40 @@ export function createSlidePuzzle(
 
   function beginDrag(slot: number, e: PointerEvent): void {
     dragged = false;
-    if (solved) return;
-
-    const blankSlot = order.indexOf(BLANK);
-    // Only a tile that could move at all can be dragged, and only toward the
-    // gap — which is the single direction it can go.
-    if (!neighbours(blankSlot).includes(slot)) return;
+    if (solved || order[slot] === HOLE) return;
 
     const cell = cells[slot];
-    const gap = cells[blankSlot];
-    drag = {
-      slot,
-      pointerId: e.pointerId,
-      startX: e.clientX,
-      startY: e.clientY,
-      spanX: gap.offsetLeft - cell.offsetLeft,
-      spanY: gap.offsetTop - cell.offsetTop,
-    };
+    const options = holesBeside(slot).map((hole) => ({
+      spanX: cells[hole].offsetLeft - cell.offsetLeft,
+      spanY: cells[hole].offsetTop - cell.offsetTop,
+    }));
+    if (!options.length) return;
+
+    drag = { slot, pointerId: e.pointerId, startX: e.clientX, startY: e.clientY, options };
     cell.setPointerCapture(e.pointerId);
     cell.style.transition = 'none';
     cell.style.zIndex = '2';
   }
 
-  /** 0..1 of the way to the gap, ignoring any drag across the other axis. */
-  function dragProgress(e: PointerEvent, d: Drag): number {
-    const along = d.spanX !== 0 ? e.clientX - d.startX : e.clientY - d.startY;
-    const span = d.spanX !== 0 ? d.spanX : d.spanY;
-    return Math.max(0, Math.min(1, along / span));
+  /** The gap this drag is heading for, and how far along it has got. */
+  function dragTowards(e: PointerEvent, d: Drag): { option: Candidate; t: number } {
+    const dx = e.clientX - d.startX;
+    const dy = e.clientY - d.startY;
+    let best = d.options[0];
+    let bestT = -Infinity;
+    for (const option of d.options) {
+      const along = option.spanX !== 0 ? dx : dy;
+      const span = option.spanX !== 0 ? option.spanX : option.spanY;
+      // Negative means the finger is going the other way; the closest match
+      // wins, so a wrong-way drag still resolves to the gap behind it and
+      // simply doesn't travel.
+      const t = along / span;
+      if (t > bestT) {
+        bestT = t;
+        best = option;
+      }
+    }
+    return { option: best, t: Math.max(0, Math.min(1, bestT)) };
   }
 
   board.addEventListener('pointermove', (e) => {
@@ -131,14 +165,14 @@ export function createSlidePuzzle(
     if (Math.abs(e.clientX - drag.startX) + Math.abs(e.clientY - drag.startY) > 6) {
       dragged = true;
     }
-    const t = dragProgress(e, drag);
-    cells[drag.slot].style.transform = `translate(${drag.spanX * t}px, ${drag.spanY * t}px)`;
+    const { option, t } = dragTowards(e, drag);
+    cells[drag.slot].style.transform = `translate(${option.spanX * t}px, ${option.spanY * t}px)`;
   });
 
   const endDrag = (e: PointerEvent): void => {
     if (!drag || e.pointerId !== drag.pointerId) return;
     const { slot } = drag;
-    const commit = dragProgress(e, drag) >= COMMIT;
+    const { option, t } = dragTowards(e, drag);
     const cell = cells[slot];
     // Clearing the transform first lets the tile spring back on its own
     // transition when the drag falls short; on a commit the redraw beats it.
@@ -146,16 +180,19 @@ export function createSlidePuzzle(
     cell.style.transition = '';
     cell.style.zIndex = '';
     drag = null;
-    if (commit) tryMove(slot);
+    if (t >= COMMIT) slide(slot, holeAt(slot, option));
   };
   board.addEventListener('pointerup', endDrag);
   board.addEventListener('pointercancel', endDrag);
 
   function draw(): void {
-    for (let slot = 0; slot < TILES; slot++) {
+    for (let slot = 0; slot < SLOTS; slot++) {
       const piece = order[slot];
       const cell = cells[slot];
-      if (piece === BLANK && !solved) {
+      // Once it's solved the missing corner is filled back in, completing the
+      // picture. The hanging gap is outside it and stays empty.
+      const show = piece === HOLE && solved && slot === CORNER ? CORNER : piece;
+      if (show === HOLE) {
         cell.classList.add('blank');
         cell.style.backgroundImage = '';
         continue;
@@ -165,34 +202,55 @@ export function createSlidePuzzle(
       // The background is SIZE times the tile's size, so each step across is
       // 1/(SIZE-1) of the extra width — a percentage offset, not pixels, which
       // is what lets the board resize freely.
-      const col = piece % SIZE;
-      const row = Math.floor(piece / SIZE);
+      const col = show % SIZE;
+      const row = Math.floor(show / SIZE);
       cell.style.backgroundPosition = `${(col * 100) / (SIZE - 1)}% ${(row * 100) / (SIZE - 1)}%`;
     }
   }
 
+  /** Slots sharing an edge with this one. */
   const neighbours = (slot: number): number[] => {
-    const col = slot % SIZE;
-    const row = Math.floor(slot / SIZE);
+    const [col, row] = CELLS[slot];
     const out: number[] = [];
-    if (col > 0) out.push(slot - 1);
-    if (col < SIZE - 1) out.push(slot + 1);
-    if (row > 0) out.push(slot - SIZE);
-    if (row < SIZE - 1) out.push(slot + SIZE);
+    for (let other = 0; other < SLOTS; other++) {
+      if (other === slot) continue;
+      const [c, r] = CELLS[other];
+      if (Math.abs(c - col) + Math.abs(r - row) === 1) out.push(other);
+    }
     return out;
   };
 
-  function tryMove(slot: number): void {
-    if (solved) return;
-    const blankSlot = order.indexOf(BLANK);
-    if (!neighbours(blankSlot).includes(slot)) return;
-    [order[blankSlot], order[slot]] = [order[slot], order[blankSlot]];
+  const holesBeside = (slot: number): number[] =>
+    neighbours(slot).filter((n) => order[n] === HOLE);
+
+  /** Which of the gaps beside `slot` a drag's span vector points at. */
+  function holeAt(slot: number, option: Candidate): number {
+    const cell = cells[slot];
+    return (
+      holesBeside(slot).find(
+        (hole) =>
+          cells[hole].offsetLeft - cell.offsetLeft === option.spanX &&
+          cells[hole].offsetTop - cell.offsetTop === option.spanY,
+      ) ?? -1
+    );
+  }
+
+  function slide(slot: number, hole: number): void {
+    if (solved || hole < 0 || order[slot] === HOLE) return;
+    [order[hole], order[slot]] = [order[slot], order[hole]];
     draw();
     checkSolved();
   }
 
+  /** A tap: slide into whichever gap is beside this tile. */
+  function tryMove(slot: number): void {
+    slide(slot, holesBeside(slot)[0] ?? -1);
+  }
+
   function checkSolved(): void {
-    if (order.some((piece, slot) => piece !== slot)) return;
+    // Only the picture's own pieces matter; that they're all home forces the
+    // two gaps to be in the corner and the hanging slot anyway.
+    for (let piece = 0; piece < PIECES; piece++) if (order[piece] !== piece) return;
     solved = true;
     root.classList.add('solved');
     hint.textContent = 'You did it!';
@@ -200,23 +258,31 @@ export function createSlidePuzzle(
     onSolved();
   }
 
-  /** Walk the blank around at random. Always solvable, by construction. */
+  function solvedOrder(): number[] {
+    return Array.from({ length: SLOTS }, (_, i) => (i < PIECES ? i : HOLE));
+  }
+
+  /** Walk a gap around at random, picking either one each step. */
   function shuffle(moves: number = PUZZLE.scrambleMoves): void {
     solved = false;
     root.classList.remove('solved');
-    order = Array.from({ length: TILES }, (_, i) => i);
-    let blankSlot = BLANK;
+    order = solvedOrder();
+
     let previous = -1;
     for (let i = 0; i < moves; i++) {
-      const options = neighbours(blankSlot).filter((n) => n !== previous);
+      const holes = order.flatMap((piece, slot) => (piece === HOLE ? [slot] : []));
+      const hole = holes[Math.floor(Math.random() * holes.length)];
+      // Never undo the step just taken, or the walk marks time.
+      const options = neighbours(hole).filter((n) => n !== previous && order[n] !== HOLE);
+      if (!options.length) continue;
       const next = options[Math.floor(Math.random() * options.length)];
-      [order[blankSlot], order[next]] = [order[next], order[blankSlot]];
-      previous = blankSlot;
-      blankSlot = next;
+      [order[hole], order[next]] = [order[next], order[hole]];
+      previous = hole;
     }
+
     // A shuffle that happens to land solved would end the stage instantly.
-    if (order.every((piece, slot) => piece === slot)) shuffle(moves);
-    hint.textContent = 'Slide the tiles next to the gap';
+    if (order.every((piece, slot) => piece === HOLE || piece === slot)) shuffle(moves);
+    hint.textContent = 'Slide the tiles into a gap';
     draw();
   }
 

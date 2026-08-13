@@ -822,15 +822,39 @@ body {
 
 .puzzle-board {
   display: grid;
-  /* 3x3 — see SIZE in ui/puzzle.ts; the two have to agree. */
+  /* 3x3 picture, plus a fourth row holding only the spare gap.
+     See CELLS in ui/puzzle.ts; the two have to agree. */
   grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(4, 1fr);
   gap: 3px;
-  /* Square, and as big as the shorter axis of the panel allows. */
-  width: min(100%, 62vh);
-  aspect-ratio: 1;
+  /* Tiles stay square, so the board is a row taller than it is wide. */
+  width: min(100%, 46vh);
+  aspect-ratio: 3 / 4;
   padding: 3px;
+  position: relative;
+}
+
+/*
+ * The backing plate covers the picture only, not the fourth row — otherwise
+ * the empty space either side of the spare gap reads as two more cells you
+ * could slide into. The bottom row is a quarter of the height.
+ */
+.puzzle-board::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 25% 0;
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.1);
+}
+
+.puzzle-tile {
+  position: relative;
+}
+
+/* The extra gap hangs under the middle of the bottom row. */
+.puzzle-spare {
+  grid-column: 2;
+  grid-row: 4;
 }
 
 .puzzle-tile {
@@ -851,7 +875,7 @@ body {
   cursor: default;
 }
 
-.puzzle.solved .puzzle-board {
+.puzzle.solved .puzzle-board::before {
   background: rgba(255, 225, 77, 0.7);
 }
 
@@ -904,7 +928,7 @@ body {
     bottom: 55%;
   }
   .puzzle-board {
-    width: min(100%, 40vh);
+    width: min(100%, 30vh);
   }
 }
 

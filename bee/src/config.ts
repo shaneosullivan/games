@@ -380,10 +380,10 @@ export const PUZZLE = {
    * backtracks over itself, so the state ends up no further away than the
    * count and usually nearer.
    *
-   * Measured against a full breadth-first search of the 8-puzzle: 12 steps
-   * lands 6-12 optimal moves from finished, which is a puzzle a child can see
-   * their way through. The board's own ceiling is 31, and 30 steps very nearly
-   * reaches it — so this number matters much more than it looks.
+   * Measured against a full breadth-first search of the board: 12 steps lands
+   * a median of 7 optimal moves from finished (2-12 across 40 shuffles), which
+   * is a puzzle a child can see their way through. The second gap did most of
+   * that work — the same 12 steps on the one-gap 3x3 sat at a median of 12.
    */
   scrambleMoves: 12,
 } as const;

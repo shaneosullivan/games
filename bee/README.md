@@ -118,7 +118,8 @@ your tail. It's faster than you but corners badly,
 same as the wasp, so turning is what saves you. Drop the honey into the hive and
 the brood pours out to mob the bear; it rears up on its hind legs and swipes at
 them (never connecting). While it's busy the screen splits — bear and bees on
-the left, a 3x3 sliding puzzle of a scary bear on the right. The bear gives
+the left, a sliding puzzle of a scary bear on the right — a 3x3 picture with
+two gaps to slide into, the second hanging below the middle of the bottom row. The bear gives
 ground to the swarm first — it delivers you to the hive doorstep, and at its
 size that means standing on top of the hive and hiding it — and the camera
 circles the pair of them slowly for as long as it's up on its hind legs. Finish the picture
