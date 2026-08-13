@@ -3,6 +3,7 @@ import {mergeGeometries} from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import {INSIDE} from "../../config";
 import bearPictureUrl from "../../assets/bearPicture.jpg";
 import bearFamilyUrl from "../../assets/bearFamily.jpg";
+import {createFlowerGeometry} from "./flower";
 import {createGlowBubble, type GlowBubble} from "../glow";
 import {paint, solidToon, vertexToon} from "../materials";
 
@@ -81,6 +82,20 @@ export function createCottageInside(): CottageInside {
     push(leg, WOOD_DARK);
   }
 
+  // ---- table and chairs under the left-hand picture ----------------------
+  //
+  // Dressing, not furniture you can bump into: the bee is bounded to a circle
+  // of INSIDE.boundsRadius (10.5) about the middle of the room, so anything
+  // out here against the wall is scenery she can look at and never reach.
+  //
+  // Set at the same z as the picture above it, and far enough off the wall
+  // (inner face x = -R + 0.3) that the table top doesn't disappear into it.
+  const tableX = -R + 2.5;
+  const tableZ = -2;
+  for (const geo of parlourParts(tableX, tableZ)) {
+    parts.push(geo);
+  }
+
   const merged = mergeGeometries(parts, false);
   if (!merged) {
     throw new Error("cottage inside: geometry merge failed");
@@ -146,6 +161,97 @@ export function createCottageInside(): CottageInside {
       jar.getWorldPosition(glow.mesh.position);
     },
   };
+}
+
+/**
+ * A little round table with a chair either side and a flower on top, for the
+ * wall under the family picture.
+ *
+ * Sized against the counter, which is the room's yardstick at 3.0 high: a
+ * table two thirds of that, and chairs whose seats come to a little over a
+ * third. Everything is authored about the origin and shifted to (x, z) at the
+ * end, so the arithmetic only has to make sense in one place.
+ *
+ * Returns painted geometries to be merged into the room's single mesh rather
+ * than a group of its own — it never moves, and the room is one draw call.
+ */
+function parlourParts(x: number, z: number): Array<THREE.BufferGeometry> {
+  const parts: Array<THREE.BufferGeometry> = [];
+  const push = (geo: THREE.BufferGeometry, color: number) =>
+    parts.push(paint(geo, color));
+
+  const TOP_R = 1.7;
+  const TOP_Y = 2.0;
+
+  // ---- the table ---------------------------------------------------------
+  const top = new THREE.CylinderGeometry(TOP_R, TOP_R, 0.22, 20);
+  top.translate(0, TOP_Y, 0);
+  push(top, WOOD);
+
+  // A single turned pedestal on a disc foot, rather than four legs — it reads
+  // more clearly at a glance from across a dim room.
+  const stem = new THREE.CylinderGeometry(0.26, 0.34, TOP_Y - 0.11, 12);
+  stem.translate(0, (TOP_Y - 0.11) / 2, 0);
+  push(stem, WOOD_DARK);
+
+  const foot = new THREE.CylinderGeometry(0.8, 0.9, 0.18, 16);
+  foot.translate(0, 0.09, 0);
+  push(foot, WOOD_DARK);
+
+  // ---- a chair either side ----------------------------------------------
+  // Pulled up to the table along z, backs outward, so from the doorway you're
+  // looking at the pair of them side on.
+  const SEAT_Y = 1.15;
+  for (const sz of [-1, 1]) {
+    const cz = sz * 2.7;
+
+    const seat = new THREE.BoxGeometry(1.25, 0.18, 1.25);
+    seat.translate(0, SEAT_Y, cz);
+    push(seat, WOOD);
+
+    for (const lx of [-0.48, 0.48]) {
+      for (const lz of [-0.48, 0.48]) {
+        const leg = new THREE.BoxGeometry(0.16, SEAT_Y, 0.16);
+        leg.translate(lx, SEAT_Y / 2, cz + lz);
+        push(leg, WOOD_DARK);
+      }
+    }
+
+    // Back panel on the side away from the table, with a rail across the top.
+    const back = new THREE.BoxGeometry(1.25, 1.15, 0.14);
+    back.translate(0, SEAT_Y + 0.66, cz + sz * 0.55);
+    push(back, WOOD);
+
+    const rail = new THREE.CylinderGeometry(0.11, 0.11, 1.25, 8);
+    rail.rotateZ(Math.PI / 2);
+    rail.translate(0, SEAT_Y + 1.24, cz + sz * 0.55);
+    push(rail, WOOD_DARK);
+  }
+
+  // ---- a flower in a pot on the table -----------------------------------
+  const pot = new THREE.CylinderGeometry(0.3, 0.22, 0.44, 12);
+  pot.translate(0, TOP_Y + 0.33, 0);
+  push(pot, 0xc96f4a);
+
+  // The meadow's own yellow flower, shrunk to posy size. Yellow because the
+  // room is lamplit and dim, and it is the one that still reads in here.
+  const flower = createFlowerGeometry("yellow");
+  const POSY = 0.85;
+  const potRim = TOP_Y + 0.55;
+  parts.push(
+    flower.stem.clone().scale(POSY, POSY, POSY).translate(0, potRim, 0),
+  );
+  parts.push(
+    flower.head
+      .clone()
+      .scale(POSY, POSY, POSY)
+      .translate(0, potRim + flower.headHeight * POSY, 0),
+  );
+
+  for (const geo of parts) {
+    geo.translate(x, 0, z);
+  }
+  return parts;
 }
 
 /**

@@ -20,6 +20,12 @@ const VERSION_URL = "version.json";
 const POLL_MS = 60_000;
 /** How long to wait for the caches to clear before reloading regardless. */
 const PURGE_TIMEOUT_MS = 1500;
+/**
+ * The one cache an update leaves alone: the site's images, named by content
+ * hash and so never stale. Defined by site/build.mjs, which is also what
+ * writes the service worker that fills it.
+ */
+const ASSET_CACHE = "chofter-assets";
 
 interface Version {
   build?: string;
@@ -111,12 +117,19 @@ async function applyUpdate(): Promise<void> {
   done();
 }
 
-/** Bin every cache, so the reload can't be served the page we're replacing. */
+/**
+ * Bin the caches, so the reload can't be served the page we're replacing.
+ *
+ * All but one: the site keeps its pictures in a cache of their own, keyed by a
+ * content hash in each filename. Those bytes can't go stale — a picture that
+ * has actually changed comes back under a different name — so binning them
+ * would only mean downloading the same images again on every deploy.
+ */
 async function purgeCaches(): Promise<Array<string>> {
   if (!("caches" in window)) {
     return [];
   }
-  const names = await caches.keys();
+  const names = (await caches.keys()).filter(name => name !== ASSET_CACHE);
   await Promise.all(names.map(name => caches.delete(name)));
   return names;
 }

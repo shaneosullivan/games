@@ -14,7 +14,8 @@
  *   node build.mjs --skip-games just regenerate the gallery (fast, for styling)
  */
 
-import {execFileSync} from "node:child_process";
+import {execSync} from "node:child_process";
+import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import {fileURLToPath} from "node:url";
@@ -62,6 +63,46 @@ const BUILD_ID = new Date().toISOString().replace(/[-:T]/g, "").slice(0, 14);
  * sub-path it's served from.
  */
 const VERSION_FILE = "version.json";
+
+/**
+ * Where images live once they're cached, and how one is recognised.
+ *
+ * Pictures are the heavy part of this site and almost never the part that
+ * changes, so they are kept out of the per-build cache entirely: a deploy bins
+ * the versioned cache and leaves this one alone. What makes that safe is the
+ * content hash in the filename — `levelmap-BC1XfPIG.jpg` is a promise that
+ * this name will only ever hold those bytes, so an edited picture arrives
+ * under a new name and is fetched once, and an untouched one is never fetched
+ * again. Vite hashes a game's own assets; `stampAsset` below does the same for
+ * the gallery's.
+ *
+ * The extension list is what keeps the rule honest: only media is treated as
+ * immutable, so nothing else that happens to carry a dash and eight
+ * characters can wander into a cache that is never cleared.
+ */
+const ASSET_CACHE_NAME = "chofter-assets";
+const ASSET_CACHE_JS = `const ASSET_CACHE = '${ASSET_CACHE_NAME}';
+const IMMUTABLE = /-[A-Za-z0-9_-]{8}\\.(?:jpe?g|png|gif|webp|avif|svg|woff2?|mp3|ogg|wav)$/i;
+const isImmutable = (pathname) => IMMUTABLE.test(pathname);`;
+
+/**
+ * Copy a file into the build under a content-hashed name, and return that
+ * name. Same bytes in, same name out — which is exactly what makes the URL
+ * safe to cache forever, and what changes it the moment the picture does.
+ */
+function stampAsset(src, outDir) {
+  const bytes = fs.readFileSync(src);
+  const hash = crypto
+    .createHash("sha256")
+    .update(bytes)
+    .digest("base64url")
+    .slice(0, 8);
+  const ext = path.extname(src);
+  const name = `${path.basename(src, ext)}-${hash}${ext}`;
+  fs.mkdirSync(outDir, {recursive: true});
+  fs.writeFileSync(path.join(outDir, name), bytes);
+  return name;
+}
 
 /**
  * Games that aren't in this repo because they aren't web games at all.
@@ -142,11 +183,16 @@ function titleCase(slug) {
     .trim();
 }
 
-function run(cmd, args, cwd) {
-  // On Windows npm is npm.cmd; execFileSync won't find the bare name. Naming
-  // the .cmd directly beats shell:true, which doesn't escape the arguments.
-  const exe = process.platform === "win32" ? `${cmd}.cmd` : cmd;
-  execFileSync(exe, args, {cwd, stdio: "inherit"});
+/**
+ * Run a command line in `cwd`.
+ *
+ * Through a shell, which on Windows is the only way to reach npm at all: it is
+ * npm.cmd there, execFileSync won't find the bare name, and naming the .cmd
+ * outright fails with EINVAL — Node refuses to spawn a batch file directly.
+ * Every command here is a fixed literal, so there is nothing to escape.
+ */
+function run(command, cwd) {
+  execSync(command, {cwd, stdio: "inherit"});
 }
 
 function buildGame(game) {
@@ -158,10 +204,10 @@ function buildGame(game) {
   }
   if (!fs.existsSync(path.join(game.dir, "node_modules"))) {
     console.log(`  · ${game.name}: installing dependencies`);
-    run("npm", ["install", "--no-audit", "--no-fund"], game.dir);
+    run("npm install --no-audit --no-fund", game.dir);
   }
   console.log(`  · ${game.name}: building`);
-  run("npm", ["run", "build"], game.dir);
+  run("npm run build", game.dir);
 }
 
 /** Copy the game's whole dist so multi-file games work too, not just bee. */
@@ -173,7 +219,9 @@ function stageGame(game) {
   fs.mkdirSync(target, {recursive: true});
   fs.cpSync(dist, target, {recursive: true});
 
-  if (game.card) fs.cpSync(game.card, path.join(target, "card.png"));
+  // Content-hashed like the game's own images, so a card that hasn't been
+  // redrawn isn't downloaded again on the next deploy.
+  game.cardFile = game.card ? stampAsset(game.card, target) : null;
   return true;
 }
 
@@ -253,8 +301,8 @@ function hueFor(name) {
 
 function renderCard(game) {
   const href = `games/${game.name}/index.html`;
-  const art = game.card
-    ? `<img class="card-art" src="games/${game.name}/card.png" alt="" loading="lazy" width="640" height="400">`
+  const art = game.cardFile
+    ? `<img class="card-art" src="games/${game.name}/${game.cardFile}" alt="" loading="lazy" width="640" height="400">`
     : `<div class="card-art card-art-blank" style="--hue:${hueFor(game.name)}"><span>${escapeHtml(
         game.title.charAt(0),
       )}</span></div>`;
@@ -357,29 +405,48 @@ function renderInstallHead({title, manifest, up = ""}) {
  * each, so caching one on first play is both cheap and exactly right; the
  * revalidate half is what lets a rebuilt game replace it next time.
  */
-function renderServiceWorker(shell) {
+function renderServiceWorker(shell, assets) {
   return `/* Generated by site/build.mjs — do not edit. */
 const CACHE = 'chofter-${BUILD_ID}';
+${ASSET_CACHE_JS}
 const SHELL = ${JSON.stringify(shell, null, 2)};
+const ASSETS = ${JSON.stringify(assets, null, 2)};
 
 // Cached one at a time rather than with addAll, which is all-or-nothing: a
 // single URL that 404s or redirects fails the whole install, the worker is torn
 // down, and the console fills with "Cannot load" and "context closed".
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches
-      .open(CACHE)
-      .then((cache) => Promise.allSettled(SHELL.map((url) => cache.add(url))))
-      .then(() => self.skipWaiting()),
+    Promise.all([
+      caches
+        .open(CACHE)
+        .then((cache) => Promise.allSettled(SHELL.map((url) => cache.add(url)))),
+      // Pictures we already hold are the same pictures — the name says so — so
+      // a new build only downloads the ones that have actually changed.
+      caches.open(ASSET_CACHE).then((cache) =>
+        Promise.allSettled(
+          ASSETS.map((url) =>
+            cache.match(url).then((hit) => (hit ? null : cache.add(url))),
+          ),
+        ),
+      ),
+    ]).then(() => self.skipWaiting()),
   );
 });
 
-// A new build means a new cache name; bin every older one.
+// A new build means a new cache name; bin every older one — except the
+// immutable assets, which are keyed by content and belong to no build.
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches
       .keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
+      .then((keys) =>
+        Promise.all(
+          keys
+            .filter((k) => k !== CACHE && k !== ASSET_CACHE)
+            .map((k) => caches.delete(k)),
+        ),
+      )
       .then(() => self.clients.claim()),
   );
 });
@@ -392,6 +459,23 @@ self.addEventListener('fetch', (event) => {
   if (url.origin !== self.location.origin) return;
   // The update check has to see the network or it can never notice a deploy.
   if (url.pathname.endsWith('/${VERSION_FILE}')) return;
+
+  // Content-hashed: the bytes behind this URL can never change, so serve it
+  // from the permanent cache and don't go to the network at all. A picture
+  // that has actually been edited arrives under a new name and is fetched
+  // once; the old one is simply never asked for again.
+  if (isImmutable(url.pathname)) {
+    event.respondWith(
+      caches.open(ASSET_CACHE).then(async (cache) => {
+        const hit = await cache.match(request);
+        if (hit) return hit;
+        const response = await fetch(request);
+        if (response.ok) cache.put(request, response.clone());
+        return response;
+      }),
+    );
+    return;
+  }
 
   event.respondWith(
     caches.open(CACHE).then(async (cache) => {
@@ -508,8 +592,14 @@ const UPDATE_WATCH = `      (function () {
           var done = function () { if (!reloaded) { reloaded = true; location.reload(); } };
           setTimeout(done, 1500);
           if (!window.caches) return done();
+          // Everything but the pictures: they're content-addressed, so the
+          // new build either wants the very same file or asks for a new name.
           caches.keys()
-            .then(function (names) { return Promise.all(names.map(function (n) { return caches.delete(n); })); })
+            .then(function (names) {
+              return Promise.all(names
+                .filter(function (n) { return n !== '${ASSET_CACHE_NAME}'; })
+                .map(function (n) { return caches.delete(n); }));
+            })
             .then(done, done);
         });
 
@@ -533,7 +623,7 @@ const SW_REGISTER = `      if ('serviceWorker' in navigator) {
 function renderAppCard(app) {
   return `      <li class="app-card">
         <a href="https://apps.apple.com/app/id${app.id}">
-          <img src="apps/${app.icon}" alt="" loading="lazy" width="128" height="128">
+          <img src="apps/${app.iconFile}" alt="" loading="lazy" width="128" height="128">
           <div>
             <h3>${escapeHtml(app.name)}</h3>
             <span>On the App Store</span>
@@ -542,7 +632,7 @@ function renderAppCard(app) {
       </li>`;
 }
 
-function renderPage(games) {
+function renderPage(games, logoFile) {
   const cards = games.map(renderCard).join("\n");
   const empty = `      <li class="empty">No games built yet. Add a folder with its own build, then run this again.</li>`;
 
@@ -562,7 +652,7 @@ ${SW_REGISTER}
   <body>
     <header class="hero">
       <div class="hero-title">
-        <img class="hero-logo" src="logo.png" alt="Chofter" width="320" height="118">
+        <img class="hero-logo" src="${logoFile}" alt="Chofter" width="320" height="118">
         <h1>Games</h1>
       </div>
       <p>Little games, made for fun. Best on a tablet.</p>
@@ -625,17 +715,32 @@ for (const game of games) {
   }
 }
 
-fs.writeFileSync(path.join(OUT_DIR, "index.html"), renderPage(staged));
-fs.cpSync(path.join(SITE_DIR, "styles.css"), path.join(OUT_DIR, "styles.css"));
-fs.cpSync(
+// ---- the gallery's own images ---------------------------------------------
+//
+// Stamped before the page is rendered, because the page has to link to the
+// stamped names. Everything here is content-addressed and cached for good; see
+// ASSET_CACHE_NAME.
+const logoFile = stampAsset(
   path.join(SITE_DIR, "assets", "chofter-logo-640.png"),
-  path.join(OUT_DIR, "logo.png"),
+  OUT_DIR,
 );
+for (const app of APP_STORE) {
+  app.iconFile = stampAsset(path.join(APPS_SRC, app.icon), APPS_OUT);
+}
+
+fs.writeFileSync(
+  path.join(OUT_DIR, "index.html"),
+  renderPage(staged, logoFile),
+);
+fs.cpSync(path.join(SITE_DIR, "styles.css"), path.join(OUT_DIR, "styles.css"));
 
 // ---- installable bits -----------------------------------------------------
 
+// The PWA icons are the exception: they're install-time identity, read from
+// the manifest by the operating system rather than the page, and a home-screen
+// icon whose URL moves every deploy is a liability. They stay on stable names
+// in the versioned cache.
 fs.cpSync(ICONS_SRC, ICONS_OUT, {recursive: true});
-fs.cpSync(APPS_SRC, APPS_OUT, {recursive: true});
 fs.writeFileSync(
   path.join(OUT_DIR, "manifest.webmanifest"),
   renderManifest({
@@ -649,18 +754,27 @@ fs.writeFileSync(
 // left to the runtime cache — a game you've played is a game you can replay.
 fs.writeFileSync(
   path.join(OUT_DIR, "sw.js"),
-  renderServiceWorker([
-    // Not './' — a bare directory URL is the one entry that can redirect, and a
-    // redirected response can't be put in a cache.
-    "./index.html",
-    "./styles.css",
-    "./manifest.webmanifest",
-    "./icons/icon-192.png",
-    "./icons/apple-touch-icon.png",
-    ...staged
-      .map(g => `./games/${g.name}/card.png`)
-      .filter((_, i) => staged[i].card),
-  ]),
+  renderServiceWorker(
+    [
+      // Not './' — a bare directory URL is the one entry that can redirect, and
+      // a redirected response can't be put in a cache.
+      "./index.html",
+      "./styles.css",
+      "./manifest.webmanifest",
+      "./icons/icon-192.png",
+      "./icons/apple-touch-icon.png",
+    ],
+    // The gallery's pictures. Precached like the shell so the first offline
+    // open still has its artwork, but into the cache that survives a deploy
+    // and only for the ones not already there.
+    [
+      `./${logoFile}`,
+      ...APP_STORE.map(a => `./apps/${a.iconFile}`),
+      ...staged
+        .filter(g => g.cardFile)
+        .map(g => `./games/${g.name}/${g.cardFile}`),
+    ],
+  ),
 );
 
 // Each game gets its own manifest too, so adding a game straight to the home

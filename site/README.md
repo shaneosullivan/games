@@ -17,10 +17,14 @@ site/dist/
   styles.css
   manifest.webmanifest
   sw.js               offline cache
+  chofter-logo-<hash>.png
   icons/              the Chofter mark, at every size the install needs
+  apps/               App Store icons, content-hashed
   games/
     bee/
       index.html      the game
+      card-<hash>.png
+      <asset>-<hash>.jpg  the game's own pictures, emitted by its build
       manifest.webmanifest
       card.png
       version.json
@@ -76,15 +80,38 @@ The service worker precaches the gallery and stale-while-revalidates everything
 else on the origin, so a game you've played once keeps working with no network.
 Its cache name carries the build timestamp, so each deploy replaces the old one.
 
+## Images are cached forever, on purpose
+
+Pictures are most of what this site weighs and almost never what changes, so
+they don't live in the per-build cache at all. Every image gets a content hash
+in its filename — Vite does it for a game's own assets, `stampAsset` does it
+for the gallery's cards, logo and App Store icons — and anything named that way
+is kept in `chofter-assets`, a cache with no build stamp on it that a deploy
+never bins. `vercel.json` serves the same URLs with `max-age=31536000,
+immutable`, so a returning browser doesn't even ask.
+
+The hash is what makes that safe rather than reckless: the name is a promise
+about the bytes. Redraw a card and it is staged as `card-<newhash>.png`, the
+page links to the new name, and the old file is simply never requested again —
+the cache-bust is the URL. Nothing has to be expired, and nothing that hasn't
+changed is downloaded twice.
+
+Two consequences worth keeping in mind if you touch it. The immutable rule is
+matched on the filename (a dash, eight hash characters, a media extension), so
+don't hand-name a file that way unless you mean it. And the PWA icons under
+`icons/` deliberately stay on stable names: they're install-time identity read
+from the manifest by the operating system, not by the page, and a home-screen
+icon whose URL moves every deploy is a liability.
+
 ## Telling a running app it's out of date
 
 Every build writes `version.json` — at the root and next to each game — holding
 the same build stamp. The gallery and every game read it once a minute (and whenever the
 app is brought back to the foreground), and if the stamp has changed since the
 copy it first saw, they offer "A new version is ready". Taking the offer deletes
-every cache and reloads, which is the part that matters: without the cache
+the caches and reloads, which is the part that matters: without the cache
 purge the service worker would hand back the very page you're trying to
-replace.
+replace. `chofter-assets` is the exception — see above.
 
 The service worker deliberately does _not_ intercept `version.json` — a cached
 update-check can never notice an update. Keep it that way if you touch

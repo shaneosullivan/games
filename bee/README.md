@@ -140,9 +140,17 @@ unsolvable half the time.
 npm --prefix bee run build
 ```
 
-Produces **one self-contained file**, `dist/index.html` (~536 kB, 140 kB
-gzipped). JS, CSS and the web app manifest are all inlined — a full page load is
-a single HTTP request, with no `assets/` directory to deploy alongside it.
+Produces `dist/index.html` (~660 kB, 178 kB gzipped) with the pictures beside
+it. JS, CSS and the web app manifest are all inlined, so the code is one HTTP
+request; the images are not, because base64 in the HTML meant re-downloading
+185 kB of unchanged jpgs on every deploy. They come out under content-hashed
+names — `levelmap-BC1XfPIG.jpg` — which is what lets them be cached for a year
+and left alone by a new build. Deploy the whole `dist/`, not just the HTML.
+
+Vite writes those URLs relative to the chunk that imports them, and that chunk
+ends up inlined in the HTML, so `build.assetsDir` is `""`: the images have to
+be siblings of `index.html` or the built game looks for them one level too
+high.
 
 It still needs to be served over HTTP; opening it via `file://` won't work,
 because `<script type="module">` is blocked on that scheme. Any static host will
@@ -303,9 +311,11 @@ Things worth knowing before changing anything:
   of it, and the comments say by how much.
 - **A deployed build tells itself when it's stale.** `core/updates.ts` polls
   the `version.json` the site build writes next to the game, and offers a
-  reload when the stamp changes. It clears every cache before reloading —
+  reload when the stamp changes. It clears the caches before reloading —
   a plain reload would be served the same stale page by the service worker.
-  Development has no `version.json`, so it's a no-op there.
+  All but one: `chofter-assets` holds the content-hashed images and is left
+  alone, because those bytes can't go stale. Development has no
+  `version.json`, so it's a no-op there.
 - **All environments live in the scene at once** and are toggled with
   `.visible` (`meadowGroup` vs `interior.group`) rather than added and removed.
   They're small, and it makes level switching instant. `ctx.setEnvironment()`
