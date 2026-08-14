@@ -1,3 +1,4 @@
+import {controlLog, pointerNote} from "./controlLog";
 /**
  * Turn left / turn right, bottom right, for the maze.
  *
@@ -11,8 +12,26 @@
  * she flies at one height under the canopy the whole way.
  */
 export class TurnButtons {
+  /** Held from the console, bypassing the buttons. See `force`. */
+  private forced: number | null = null;
+
+  /**
+   * Turn without touching the screen: -1, 1, or null to hand it back.
+   *
+   * This is how you tell a dead button from a control the game isn't reading —
+   * if `force(1)` turns her and pressing the button doesn't, the fault is in
+   * the button, not in the flight model.
+   */
+  force(dir: number | null): void {
+    this.forced = dir;
+    this.sync();
+  }
+
   /** -1 turning left, +1 turning right, 0 when nothing is held. */
   turn = 0;
+
+  /** The buttons themselves, so a console helper can press the real thing. */
+  readonly buttons: {left: HTMLButtonElement; right: HTMLButtonElement};
 
   private readonly root: HTMLDivElement;
   /** Which button each active pointer is on, so two thumbs can't fight. */
@@ -23,14 +42,17 @@ export class TurnButtons {
     this.root = document.createElement("div");
     this.root.className = "turnpad ui-interactive hidden";
 
-    this.root.append(
-      this.button("◀", -1, "Turn left"),
-      this.button("▶", 1, "Turn right"),
-    );
+    const left = this.button("◀", -1, "Turn left");
+    const right = this.button("▶", 1, "Turn right");
+    this.buttons = {left, right};
+    this.root.append(left, right);
     host.appendChild(this.root);
 
+    // A/D and the arrows, so the maze is playable on a laptop — the rest of
+    // the game already takes WASD through the thumbstick, and this level's
+    // thumbstick only does forward and back.
     window.addEventListener("keydown", e => {
-      if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+      if (TURN_KEYS.has(e.key)) {
         this.keys.add(e.key);
         this.sync();
       }
@@ -44,8 +66,14 @@ export class TurnButtons {
     // than on the button, so it arrives whether or not the press was captured.
     for (const type of ["pointerup", "pointercancel"]) {
       window.addEventListener(type, e => {
-        this.held.delete((e as PointerEvent).pointerId);
+        const had = this.held.delete((e as PointerEvent).pointerId);
         this.sync();
+        if (had) {
+          controlLog(`turn ${type}`, {
+            ...pointerNote(e as PointerEvent),
+            turn: this.turn,
+          });
+        }
       });
     }
     // Belt and braces for iOS, where a captured pointer's `pointerup` can go
@@ -53,8 +81,12 @@ export class TurnButtons {
     for (const type of ["touchend", "touchcancel"]) {
       window.addEventListener(type, e => {
         if ((e as TouchEvent).touches.length === 0) {
+          const had = this.held.size > 0;
           this.held.clear();
           this.sync();
+          if (had) {
+            controlLog(`turn released by ${type}`, {turn: this.turn});
+          }
         }
       });
     }
@@ -86,10 +118,15 @@ export class TurnButtons {
         // the worst way for a control to fail.
         this.held.set(e.pointerId, dir);
         this.sync();
+        controlLog(`turn down ${dir > 0 ? "right" : "left"}`, {
+          ...pointerNote(e),
+          turn: this.turn,
+        });
         try {
           b.setPointerCapture(e.pointerId);
-        } catch {
+        } catch (err) {
           // Without capture the window-level pointerup below still ends it.
+          controlLog("turn capture refused", String(err));
         }
       },
       {passive: false},
@@ -99,16 +136,24 @@ export class TurnButtons {
 
   /** Both held cancel out, which is the least surprising thing to do. */
   private sync(): void {
+    if (this.forced !== null) {
+      this.turn = this.forced;
+      return;
+    }
     let turn = 0;
     for (const dir of this.held.values()) {
       turn += dir;
     }
-    if (this.keys.has("ArrowLeft")) {
+    if (LEFT_KEYS.some(k => this.keys.has(k))) {
       turn -= 1;
     }
-    if (this.keys.has("ArrowRight")) {
+    if (RIGHT_KEYS.some(k => this.keys.has(k))) {
       turn += 1;
     }
     this.turn = Math.max(-1, Math.min(1, turn));
   }
 }
+
+const LEFT_KEYS = ["ArrowLeft", "a", "A"];
+const RIGHT_KEYS = ["ArrowRight", "d", "D"];
+const TURN_KEYS = new Set([...LEFT_KEYS, ...RIGHT_KEYS]);

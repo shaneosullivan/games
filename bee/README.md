@@ -165,7 +165,8 @@ at the meadow's pace the level is mostly waiting to cross a cell.
 
 **This level steers differently.** Two vertical controls, one each side: a
 throttle on the left that is forward and back only, and a pair of held buttons
-on the right that turn her on the spot. The floating thumbstick reads a whole
+on the right that turn her on the spot. On a laptop, W/S and up/down drive her,
+A/D and left/right turn her. The floating thumbstick reads a whole
 circle of directions, which is exactly what a corridor doesn't want — the
 camera is often part-way round a corner, so "the way the stick points" stops
 meaning anything. The camera sits low and behind, and
@@ -612,6 +613,24 @@ session-killer.
 codename, so you can get straight to whichever one you're working on. Dev
 builds only — it writes to the same save a player uses, and a link shouldn't be
 able to do that to a child's progress.
+
+`chofter.controls` is the maze's controls, from the console of a device that
+hasn't got one worth the name — it ships in every build, because `window.game`
+is dev-only and these controls have now failed twice on an iPad while working
+on everything else.
+
+```js
+chofter.logControls = true; // narrate every press and release
+chofter.controls.state(); // steering, turn, throttle, what's on screen
+chofter.controls.turn(1, 1000); // turn right for a second, bypassing the button
+chofter.controls.throttle(1, 1000); // drive, bypassing the track
+chofter.controls.tap("right"); // press the real button, through the DOM
+chofter.controls.at(x, y); // what is actually on top at that point
+```
+
+The point of the pairing: if `turn()` moves her and `tap()` doesn't, the fault
+is in the button rather than in the flight model, and `at()` says whether
+anything is sitting on top of it.
 
 - Tap the top-right corner (or press `` ` ``) to toggle the FPS / draw-call readout.
 - In dev builds, `window.game` is the live `Game` instance — handy for poking at

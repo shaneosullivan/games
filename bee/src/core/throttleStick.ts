@@ -1,3 +1,4 @@
+import {controlLog, pointerNote} from "./controlLog";
 /**
  * Forward and back, as a vertical track on the left, for the maze.
  *
@@ -12,6 +13,15 @@
  * you leave the knob; this is a throttle, and letting go has to mean stop.
  */
 export class ThrottleStick {
+  /** Held from the console, bypassing the track. See `force`. */
+  private forced: number | null = null;
+
+  /** Drive without touching the screen; null hands it back to the finger. */
+  force(value: number | null): void {
+    this.forced = value;
+    this.sync();
+  }
+
   /**
    * -1 full astern to +1 full ahead, eased toward whatever the finger is
    * asking for.
@@ -67,9 +77,10 @@ export class ThrottleStick {
     // is the throttle, whatever became of its pointerup.
     for (const type of ["touchend", "touchcancel"]) {
       window.addEventListener(type, e => {
-        if ((e as TouchEvent).touches.length === 0) {
+        if ((e as TouchEvent).touches.length === 0 && this.pointerId !== null) {
           this.pointerId = null;
           this.sync();
+          controlLog(`throttle released by ${type}`, {target: this.target});
         }
       });
     }
@@ -117,6 +128,7 @@ export class ThrottleStick {
   private readonly onDown = (e: PointerEvent): void => {
     e.preventDefault();
     this.pointerId = e.pointerId;
+    controlLog("throttle down", pointerNote(e));
     // Read the finger before reaching for capture: `setPointerCapture` throws
     // NotFoundError for a pointer the element can't claim, and anything after
     // it in this handler would never run — a control that silently does
@@ -124,9 +136,11 @@ export class ThrottleStick {
     this.track(e);
     try {
       this.root.setPointerCapture(e.pointerId);
-    } catch {
+    } catch (err) {
       // The window-level pointermove/up handlers cover it either way.
+      controlLog("throttle capture refused", String(err));
     }
+    controlLog("throttle target", this.target);
   };
 
   private readonly onMove = (e: PointerEvent): void => {
@@ -142,6 +156,7 @@ export class ThrottleStick {
     }
     this.pointerId = null;
     this.sync();
+    controlLog("throttle up", {...pointerNote(e), target: this.target});
   };
 
   /** Where along the rail the finger is, as -1..1 with up positive. */
@@ -158,6 +173,10 @@ export class ThrottleStick {
   }
 
   private sync(): void {
+    if (this.forced !== null) {
+      this.target = this.forced;
+      return;
+    }
     if (this.pointerId !== null) {
       return;
     }

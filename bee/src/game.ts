@@ -286,6 +286,8 @@ export class Game {
       );
     });
 
+    this.installControlsApi();
+
     // ?unlock=1 opens every level, for getting straight to the one you're
     // working on. Before buildOverlays, so the menu is built already unlocked.
     // Dev only: it writes to the same save the player uses, and it is not
@@ -307,6 +309,84 @@ export class Game {
     if (import.meta.env.DEV) {
       (window as unknown as Record<string, unknown>).game = this;
     }
+  }
+
+  /**
+   * Hang the maze's controls off `window.chofter`, in every build.
+   *
+   * `window.game` is dev-only, and the controls have now failed twice on an
+   * iPad while working on everything else — so the one place they can be
+   * prodded from is the console handle that ships. See `core/updates.ts`.
+   */
+  private installControlsApi(): void {
+    const chofter = (
+      window as unknown as {
+        chofter?: {controls?: unknown; logControls?: boolean};
+      }
+    ).chofter;
+    if (!chofter) {
+      return;
+    }
+    const hold = <T>(
+      set: (v: T) => void,
+      value: T,
+      clear: T,
+      ms?: number,
+    ): void => {
+      set(value);
+      if (ms) {
+        setTimeout(() => set(clear), ms);
+      }
+    };
+    chofter.controls = {
+      state: () => ({
+        level: this.levelNumber,
+        levelName: this.level.name,
+        steering: this.bee.steering,
+        controlsLocked: this.level.controlsLocked,
+        running: this.running,
+        turn: this.turnButtons.turn,
+        throttle: Number(this.throttle.value.toFixed(2)),
+        turnPadOnScreen: !document
+          .querySelector(".turnpad")
+          ?.classList.contains("hidden"),
+        throttleOnScreen:
+          document.querySelector<HTMLElement>(".throttle")?.style.display !==
+          "none",
+        beeHeadingDeg: Math.round((this.bee.heading * 180) / Math.PI),
+        bee: this.bee.position.toArray().map(n => Number(n.toFixed(1))),
+      }),
+      // `forced` bypasses the buttons entirely, which is how you tell a dead
+      // button apart from a control the game isn't reading.
+      turn: (dir: number, ms?: number) =>
+        hold(v => this.turnButtons.force(v), dir, null, ms ?? 600),
+      throttle: (value: number, ms?: number) =>
+        hold(v => this.throttle.force(v), value, null, ms ?? 600),
+      tap: (which: "left" | "right", ms = 400) => {
+        const btn = this.turnButtons.buttons[which];
+        const r = btn.getBoundingClientRect();
+        const at = {
+          clientX: r.left + r.width / 2,
+          clientY: r.top + r.height / 2,
+        };
+        const opts = {
+          bubbles: true,
+          cancelable: true,
+          pointerId: 999,
+          pointerType: "touch",
+          isPrimary: true,
+          ...at,
+        };
+        btn.dispatchEvent(new PointerEvent("pointerdown", opts));
+        setTimeout(() => {
+          btn.dispatchEvent(new PointerEvent("pointerup", opts));
+        }, ms);
+      },
+      at: (x: number, y: number) => {
+        const el = document.elementFromPoint(x, y);
+        return el ? `${el.tagName}.${el.className}` : "nothing";
+      },
+    };
   }
 
   /** Re-measure the canvas. Called when the visible viewport changes. */

@@ -147,6 +147,32 @@ interface ChofterApi {
    * clipboard, and returned as the string to paste.
    */
   diagnose(): Promise<string>;
+  /**
+   * The maze's controls, for poking at from a device with no devtools of its
+   * own. Filled in by the Game; absent until a level that has them is running.
+   * See `core/turnButtons.ts`.
+   */
+  controls?: ControlsApi;
+  /** Log every press and release of the maze controls. Off by default. */
+  logControls: boolean;
+}
+
+/** What `chofter.controls` offers. Everything here is safe to call twice. */
+export interface ControlsApi {
+  /** What the controls think is happening right now. */
+  state(): Record<string, unknown>;
+  /** Turn her: -1 left, 1 right, 0 stop. Optionally for `ms` and then stop. */
+  turn(dir: number, ms?: number): void;
+  /** Drive her: 1 ahead, -1 astern, 0 stop. Optionally for `ms`. */
+  throttle(value: number, ms?: number): void;
+  /**
+   * Send a real press and release through the actual button, so the DOM path
+   * is tested rather than bypassed — which is the whole question when a
+   * control works on a desktop and not on a tablet.
+   */
+  tap(which: "left" | "right", ms?: number): void;
+  /** What is on top at a point on screen, for when a tap seems to go nowhere. */
+  at(x: number, y: number): string;
 }
 
 /**
@@ -165,6 +191,7 @@ interface ChofterApi {
 function installConsoleApi(): ChofterApi {
   const api: ChofterApi = {
     build: null,
+    logControls: false,
     update: async () => {
       window.location.reload();
     },
