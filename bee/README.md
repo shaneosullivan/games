@@ -83,7 +83,8 @@ them are coloured for their pollen and pulsing inside a glowing border. You're
 a worker now — fly up to a glowing hexagon and it comes away with you, swinging
 under the bee on a rope; carry it to a baby whose floating bubble asks for that
 colour and the baby rears up on end like a chick, mouth to the sky, and the
-hexagon flies out of your hands into it. The food is scattered up the wall as
+hexagon flies out of your hands into it. Being over a baby is enough — you
+never have to drop down to one. The food is scattered up the wall as
 well as around it, so half the job is climbing to the right one. An emptied
 cell goes dark and fills again a few seconds later, so the wall can't run out.
 Carrying the wrong colour is never a dead end: fly right up to a cell holding a
@@ -542,6 +543,13 @@ Things worth knowing before changing anything:
   the maze's falling leaves and the scent trail, all of which rendered black
   until given a flat white attribute. `whiten()` in `render/geometry/maze.ts`
   does it; `fx/particles.ts` has its own copy and the note that explains why.
+- **Reach in the chamber is a cylinder, not a sphere.** Feeding used a single
+  3D distance of 2.5 against babies perched at 2.3, so at any sensible cruising
+  height you were out of range of a baby directly beneath you and every feed
+  needed a descent first. `INTERIOR.feedRadius` is now measured across the
+  floor with `feedHeight` allowed on top — the same split the meadow uses to
+  harvest a flower — and the height covers the whole flyable column, so there
+  is no dead band near the ceiling.
 - **A model's `animate()` must not write to the group the caller positioned.**
   The queen's bob originally set `group.position.y` directly, which silently
   dragged her from her dais down to the floor. Bobs and sways belong on an

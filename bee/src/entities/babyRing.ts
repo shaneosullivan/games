@@ -234,8 +234,12 @@ export class BabyRing {
       const begging =
         hungry &&
         carrying === baby.craving &&
-        baby.position.distanceToSquared(beePosition) <
-          INTERIOR.noticeRadius * INTERIOR.noticeRadius;
+        inReach(
+          baby.position,
+          beePosition,
+          INTERIOR.noticeRadius,
+          INTERIOR.noticeHeight,
+        );
       baby.rear += ((begging ? 1 : 0) - baby.rear) * Math.min(1, 7 * dt);
 
       // The lift is applied here rather than in the model: animate() must not
@@ -478,7 +482,7 @@ export class BabyRing {
     carrying: PollenKind | null,
   ): THREE.Vector3 | null {
     const baby = carrying
-      ? this.nearestMatching(from, carrying, Infinity)
+      ? this.nearestMatching(from, carrying, Infinity, Infinity)
       : this.nearestHungry(from);
     return baby
       ? baby.position.clone().add(new THREE.Vector3(0, 0.9, 0))
@@ -494,18 +498,30 @@ export class BabyRing {
     return POLLEN_KINDS[this.rng.int(0, POLLEN_KINDS.length)];
   }
 
+  /**
+   * The nearest baby craving `kind` that she can actually reach.
+   *
+   * Reach is a cylinder, not a sphere: `radius` across the floor and `height`
+   * up. Ranked on the horizontal distance alone, so of two babies she is
+   * equally near she gets the one she is more nearly over, whatever altitude
+   * she happens to be at.
+   */
   private nearestMatching(
     from: THREE.Vector3,
     kind: PollenKind,
-    maxDistance: number = INTERIOR.feedRadius,
+    radius: number = INTERIOR.feedRadius,
+    height: number = INTERIOR.feedHeight,
   ): Baby | null {
     let best: Baby | null = null;
-    let bestDist = maxDistance * maxDistance;
+    let bestDist = radius * radius;
     for (const baby of this.babies) {
       if (baby.grown || baby.craving !== kind) {
         continue;
       }
-      const d = baby.position.distanceToSquared(from);
+      if (!inReach(baby.position, from, radius, height)) {
+        continue;
+      }
+      const d = flatDistanceSq(baby.position, from);
       if (d < bestDist) {
         bestDist = d;
         best = baby;
@@ -532,6 +548,24 @@ export class BabyRing {
 }
 
 const tmpTarget = new THREE.Vector3();
+
+/** Distance across the floor, ignoring how high above her the bee is. */
+function flatDistanceSq(a: THREE.Vector3, b: THREE.Vector3): number {
+  return (a.x - b.x) ** 2 + (a.z - b.z) ** 2;
+}
+
+/** Inside a cylinder about the baby: `radius` across, `height` up or down. */
+function inReach(
+  baby: THREE.Vector3,
+  bee: THREE.Vector3,
+  radius: number,
+  height: number,
+): boolean {
+  return (
+    flatDistanceSq(baby, bee) < radius * radius &&
+    Math.abs(bee.y - baby.y) < height
+  );
+}
 const tmpMob = new THREE.Vector3();
 const tmpDelta = new THREE.Vector3();
 

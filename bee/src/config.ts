@@ -246,14 +246,32 @@ export const INTERIOR = {
   babyRingRadius: 4.8,
   babyHeight: 2.3,
   queenHeight: 2.5,
-  /** How close to a baby counts as delivering, and how long the hand-over takes. */
-  feedRadius: 2.5,
+  /**
+   * How close to a baby counts as delivering, and how long the hand-over takes.
+   *
+   * Measured across the floor, with `feedHeight` allowed on top of it — the
+   * same split the meadow uses to harvest a flower. A single 3D distance meant
+   * hovering over a baby at any sensible cruising height was out of range
+   * however well lined up you were, so every feed needed a descent first: the
+   * babies perch at 2.3 and the reach was 2.5, so at 5 up you were already too
+   * far away to touch one directly underneath you.
+   */
+  feedRadius: 3,
+  /**
+   * The whole flyable column and then some: babies perch at 2.3 and the
+   * ceiling is 11, so 8.7 is the most she can ever be above one. Anything less
+   * than that leaves a dead band at the top of the room where being directly
+   * over a baby doesn't count, which is exactly the surprise this replaced.
+   */
+  feedHeight: 9.5,
   feedSeconds: 0.5,
   /**
    * How close the bee has to be for a baby to rear up at her — comfortably
    * further than feedRadius, so the beg comes first and the feed answers it.
+   * Split the same way, or they would only notice her once she came down.
    */
-  noticeRadius: 5.5,
+  noticeRadius: 6,
+  noticeHeight: 10,
   /** How far a fully reared baby lifts off its perch as it stretches up. */
   rearLift: 0.35,
   /** Seconds a fed baby stays content before wanting its next meal. */
