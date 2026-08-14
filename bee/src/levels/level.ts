@@ -29,6 +29,12 @@ export interface FlightSettings {
    */
   steering?: "camera" | "tank";
   /**
+   * Multiplier on the bee's top speed and acceleration. Omit for the game's
+   * usual pace; the maze flies faster because its corridors are long and
+   * straight.
+   */
+  speedScale?: number;
+  /**
    * Distance from the centre the bee may not exceed, rounding off the corner
    * where `boundsRadius` meets `maxHeight`. Set it for a level played inside a
    * dome; omit it and only the disc and the ceiling apply.

@@ -147,7 +147,9 @@ entered, so it cannot be learned. The walls are hedge and tree together — tall
 green bushes filling in between bare trunks, with a red autumn canopy overhead
 and leaves coming down on the breeze that leans them. The corridors are fifteen
 units wide and leafy; the hedge tops sit just above the camera, so you catch a
-suggestion of the next lane but never a look into it.
+suggestion of the next lane but never a look into it. She flies faster in here
+than anywhere else — the corridors are long and taken in a straight line, and
+at the meadow's pace the level is mostly waiting to cross a cell.
 
 **This level steers differently.** The thumbstick is forward and back only, and
 a pair of held buttons in the altitude slider's corner turn her on the spot —

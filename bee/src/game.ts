@@ -464,6 +464,7 @@ export class Game {
 
   private configureFlight(s: FlightSettings): void {
     this.bee.steering = s.steering ?? "camera";
+    this.bee.speedScale = s.speedScale ?? 1;
     // A level either flies or it turns, so the two controls swap places. The
     // maze has nothing to do with altitude — she holds one height throughout.
     const tank = this.bee.steering === "tank";

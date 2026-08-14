@@ -92,6 +92,7 @@ export class MazeLevel implements Level {
       // so "the way the stick points" stops meaning anything useful. Turning
       // on the spot always does.
       steering: "tank",
+      speedScale: MAZE.speedScale,
       minHeight: MAZE.minHeight,
       maxHeight: MAZE.maxHeight,
       cameraDistance: MAZE.cameraDistance,

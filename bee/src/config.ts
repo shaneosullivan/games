@@ -495,6 +495,14 @@ export const MAZE = {
    */
   cameraDistance: 8,
   cameraHeight: 3.2,
+  /**
+   * How much faster she flies in here than anywhere else.
+   *
+   * The corridors are eighteen units long and taken in a straight line, so at
+   * the meadow's 9.5 the level is mostly waiting for her to cross a cell. This
+   * puts it at 16.2, which turns a 70-second optimal route into about 45.
+   */
+  speedScale: 1.7,
   /** Well outside the maze: the corridor clamp is the real boundary. */
   boundsRadius: 140,
 

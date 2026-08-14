@@ -77,6 +77,16 @@ export class BeeActor {
    */
   steering: "camera" | "tank" = "camera";
 
+  /**
+   * Multiplier on top speed and on how hard she accelerates, per level.
+   *
+   * The maze turns it up: its corridors are eighteen units long and you fly
+   * them in a straight line, so at the meadow's pace the level is mostly
+   * waiting. Acceleration scales with it or she would spend the whole of a
+   * corridor getting up to speed.
+   */
+  speedScale = 1;
+
   /** Altitude the player has asked for, via the right-hand slider. */
   desiredHeight: number = FLIGHT.hoverHeight;
   /** Altitude actually reached so far; chases `desiredHeight` at climbSpeed. */
@@ -103,7 +113,12 @@ export class BeeActor {
 
   /** 0..1 fraction of top speed. */
   get speed01(): number {
-    return Math.min(1, this.velocity.length() / FLIGHT.maxSpeed);
+    return Math.min(1, this.velocity.length() / this.topSpeed);
+  }
+
+  /** What this level lets her do, flat out. */
+  private get topSpeed(): number {
+    return FLIGHT.maxSpeed * this.speedScale;
   }
 
   /**
@@ -209,7 +224,7 @@ export class BeeActor {
       tmpDesired
         .copy(tmpForward)
         .multiplyScalar(stunned ? 0 : -stick.y)
-        .multiplyScalar(FLIGHT.maxSpeed);
+        .multiplyScalar(this.topSpeed);
     } else {
       // Camera-space basis on the horizontal plane. The camera sits behind
       // `cameraYaw`, so "into the screen" is that yaw's forward vector, and
@@ -221,11 +236,13 @@ export class BeeActor {
         .copy(tmpForward)
         .multiplyScalar(stunned ? 0 : -stick.y)
         .addScaledVector(tmpRight, stunned ? 0 : stick.x)
-        .multiplyScalar(FLIGHT.maxSpeed);
+        .multiplyScalar(this.topSpeed);
     }
 
     // Accelerate toward the desired velocity; coast to a stop when released.
-    const rate = !stunned && stick.magnitude > 0 ? FLIGHT.accel : FLIGHT.drag;
+    const rate =
+      (!stunned && stick.magnitude > 0 ? FLIGHT.accel : FLIGHT.drag) *
+      this.speedScale;
     tmpDelta.copy(tmpDesired).sub(this.velocity);
     tmpDelta.y = 0;
     const maxChange = rate * dt;
