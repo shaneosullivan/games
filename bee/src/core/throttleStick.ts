@@ -63,6 +63,16 @@ export class ThrottleStick {
     window.addEventListener("pointermove", this.onMove, {passive: false});
     window.addEventListener("pointerup", this.onUp);
     window.addEventListener("pointercancel", this.onUp);
+    // Same iOS safety net as the turn buttons: if the last finger is gone, so
+    // is the throttle, whatever became of its pointerup.
+    for (const type of ["touchend", "touchcancel"]) {
+      window.addEventListener(type, e => {
+        if ((e as TouchEvent).touches.length === 0) {
+          this.pointerId = null;
+          this.sync();
+        }
+      });
+    }
 
     window.addEventListener("keydown", e => {
       if (KEYS.has(e.key)) {
@@ -107,8 +117,16 @@ export class ThrottleStick {
   private readonly onDown = (e: PointerEvent): void => {
     e.preventDefault();
     this.pointerId = e.pointerId;
-    this.root.setPointerCapture(e.pointerId);
+    // Read the finger before reaching for capture: `setPointerCapture` throws
+    // NotFoundError for a pointer the element can't claim, and anything after
+    // it in this handler would never run — a control that silently does
+    // nothing. Capture only makes dragging off the track keep working.
     this.track(e);
+    try {
+      this.root.setPointerCapture(e.pointerId);
+    } catch {
+      // The window-level pointermove/up handlers cover it either way.
+    }
   };
 
   private readonly onMove = (e: PointerEvent): void => {

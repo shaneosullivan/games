@@ -40,11 +40,22 @@ export class TurnButtons {
       this.sync();
     });
     // A pointer released anywhere — dragged off the button, or off the screen
-    // entirely — has to stop the turn, or she spins forever.
+    // entirely — has to stop the turn, or she spins forever. On window rather
+    // than on the button, so it arrives whether or not the press was captured.
     for (const type of ["pointerup", "pointercancel"]) {
       window.addEventListener(type, e => {
         this.held.delete((e as PointerEvent).pointerId);
         this.sync();
+      });
+    }
+    // Belt and braces for iOS, where a captured pointer's `pointerup` can go
+    // missing: when the last finger leaves the glass, nothing is held.
+    for (const type of ["touchend", "touchcancel"]) {
+      window.addEventListener(type, e => {
+        if ((e as TouchEvent).touches.length === 0) {
+          this.held.clear();
+          this.sync();
+        }
       });
     }
   }
@@ -67,11 +78,19 @@ export class TurnButtons {
       "pointerdown",
       e => {
         e.preventDefault();
-        // Capture, so sliding a thumb off the button keeps the turn going
-        // rather than stopping it half way round a corner.
-        b.setPointerCapture(e.pointerId);
+        // Register the press *first*. Capture is a nicety — it keeps the turn
+        // going if a thumb slides off the button — and `setPointerCapture`
+        // throws NotFoundError whenever the pointer isn't one the element can
+        // claim. Doing it before this line meant any such throw killed the
+        // handler on its way past and the button did nothing at all, which is
+        // the worst way for a control to fail.
         this.held.set(e.pointerId, dir);
         this.sync();
+        try {
+          b.setPointerCapture(e.pointerId);
+        } catch {
+          // Without capture the window-level pointerup below still ends it.
+        }
       },
       {passive: false},
     );

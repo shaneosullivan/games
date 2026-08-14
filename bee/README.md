@@ -318,6 +318,15 @@ Things worth knowing before changing anything:
   which is what put `[object Object]`-shaped junk in it.
 - **Audio is a WebAudio synth**, no files. It must be unlocked inside a real
   touch handler — that's what the Start button on the codename screen is for.
+- **Never touch state after `setPointerCapture`.** It throws `NotFoundError`
+  for any pointer the element can't claim, and Safari is far readier to do so
+  than Chrome — on an iPad it left the maze's turn buttons completely dead,
+  because the capture call sat _above_ the line that recorded the press and
+  took the whole handler with it. Capture is a nicety, so it goes last and in a
+  try/catch: register the press first, and the window-level `pointerup` ends it
+  whether or not capture was granted. There is a `touchend` fallback for the
+  same reason — a captured pointer's `pointerup` can go missing on iOS, and
+  when the last finger leaves the glass nothing should still be held.
 - **Zoom is locked** in `core/lockZoom.ts`. iOS Safari has ignored
   `user-scalable=no` since iOS 10, so the viewport meta alone does nothing;
   it takes six separate listeners (gesture events, multi-touch touchstart,
