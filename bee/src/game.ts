@@ -362,31 +362,9 @@ export class Game {
         hold(v => this.turnButtons.force(v), dir, null, ms ?? 600),
       throttle: (value: number, ms?: number) =>
         hold(v => this.throttle.force(v), value, null, ms ?? 600),
-      tap: (which?: "left" | "right" | Element | null, ms = 400) => {
-        const btn = this.resolveTurnButton(which);
-        if (!btn) {
-          console.log(
-            'chofter.controls.tap: expected "left", "right", a button element, or nothing.',
-          );
-          return;
-        }
-        const r = btn.getBoundingClientRect();
-        const at = {
-          clientX: r.left + r.width / 2,
-          clientY: r.top + r.height / 2,
-        };
-        const opts = {
-          bubbles: true,
-          cancelable: true,
-          pointerId: 999,
-          pointerType: "touch",
-          isPrimary: true,
-          ...at,
-        };
-        btn.dispatchEvent(new PointerEvent("pointerdown", opts));
-        setTimeout(() => {
-          btn.dispatchEvent(new PointerEvent("pointerup", opts));
-        }, ms);
+      tap: {
+        left: (ms?: number) => this.pressTurnButton("left", ms),
+        right: (ms?: number) => this.pressTurnButton("right", ms),
       },
       at: (x: number, y: number) => {
         const el = document.elementFromPoint(x, y);
@@ -399,7 +377,7 @@ export class Game {
             "chofter.controls.state()     steering, turn, throttle, what's on screen",
             "chofter.controls.turn(1)     turn right, bypassing the buttons (-1 left, 0 stop)",
             "chofter.controls.throttle(1) drive, bypassing the track",
-            'chofter.controls.tap("left") press the real button, through the DOM',
+            "chofter.controls.tap.left()  press the real button, through the DOM",
             "chofter.controls.at(x, y)    what is actually on top at a point",
             "",
             "If turn() moves her and tap() does not, the button is at fault.",
@@ -410,34 +388,28 @@ export class Game {
   }
 
   /**
-   * What the console meant by "that button".
+   * Press a turn button for real, through the DOM.
    *
-   * Deliberately forgiving: this gets typed on a tablet, one-handed, into a
-   * console with no autocomplete, and `$0` from the inspector is the most
-   * natural thing to reach for. Anything unrecognised returns null so the
-   * caller can say so, rather than throwing "undefined is not an object" and
-   * leaving you wondering whether it was the button or the helper that broke.
+   * The point of it is to tell a dead button apart from a control the game
+   * isn't reading: if `chofter.controls.turn(1)` moves her and this doesn't,
+   * the fault is between the finger and the handler.
    */
-  private resolveTurnButton(
-    which?: "left" | "right" | Element | null,
-  ): HTMLButtonElement | null {
-    const {left, right} = this.turnButtons.buttons;
-    if (which instanceof Element) {
-      return which === left || which === right
-        ? (which as HTMLButtonElement)
-        : (which.closest(".turn-btn") as HTMLButtonElement | null);
-    }
-    if (which === undefined || which === null) {
-      return right;
-    }
-    const word = String(which).trim().toLowerCase();
-    if (word.startsWith("l") || word === "◀") {
-      return left;
-    }
-    if (word.startsWith("r") || word === "▶") {
-      return right;
-    }
-    return null;
+  private pressTurnButton(which: "left" | "right", ms = 400): void {
+    const btn = this.turnButtons.buttons[which];
+    const r = btn.getBoundingClientRect();
+    const opts = {
+      bubbles: true,
+      cancelable: true,
+      pointerId: 999,
+      pointerType: "touch",
+      isPrimary: true,
+      clientX: r.left + r.width / 2,
+      clientY: r.top + r.height / 2,
+    };
+    btn.dispatchEvent(new PointerEvent("pointerdown", opts));
+    setTimeout(() => {
+      btn.dispatchEvent(new PointerEvent("pointerup", opts));
+    }, ms);
   }
 
   /** Re-measure the canvas. Called when the visible viewport changes. */

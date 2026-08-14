@@ -170,10 +170,15 @@ export interface ControlsApi {
    * is tested rather than bypassed — which is the whole question when a
    * control works on a desktop and not on a tablet.
    *
-   * Takes "left" or "right", the button element itself (`$0` straight out of
-   * the inspector), or nothing at all, which taps the right-hand one.
+   * A pair of functions rather than one that takes a side: there is nothing to
+   * get wrong, and nothing to remember, which is what you want from something
+   * typed one-handed into a tablet console.
    */
-  tap(which?: "left" | "right" | Element | null, ms?: number): void;
+  tap: {
+    /** Press and hold the left button for `ms`, then release it. */
+    left(ms?: number): void;
+    right(ms?: number): void;
+  };
   /** What is on top at a point on screen, for when a tap seems to go nowhere. */
   at(x: number, y: number): string;
   /** Print what all of this does, for a console with no autocomplete. */
