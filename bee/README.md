@@ -628,6 +628,8 @@ chofter.controls.state(); // steering, turn, throttle, what's on screen
 chofter.controls.turn(1, 1000); // turn right for a second, bypassing the button
 chofter.controls.throttle(1, 1000); // drive, bypassing the track
 chofter.controls.tap("right"); // press the real button, through the DOM
+chofter.controls.tap($0); // ...or whichever one the inspector has selected
+chofter.controls.help(); // all of the above, printed
 chofter.controls.at(x, y); // what is actually on top at that point
 ```
 

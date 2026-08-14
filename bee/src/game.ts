@@ -362,8 +362,14 @@ export class Game {
         hold(v => this.turnButtons.force(v), dir, null, ms ?? 600),
       throttle: (value: number, ms?: number) =>
         hold(v => this.throttle.force(v), value, null, ms ?? 600),
-      tap: (which: "left" | "right", ms = 400) => {
-        const btn = this.turnButtons.buttons[which];
+      tap: (which?: "left" | "right" | Element | null, ms = 400) => {
+        const btn = this.resolveTurnButton(which);
+        if (!btn) {
+          console.log(
+            'chofter.controls.tap: expected "left", "right", a button element, or nothing.',
+          );
+          return;
+        }
         const r = btn.getBoundingClientRect();
         const at = {
           clientX: r.left + r.width / 2,
@@ -386,7 +392,52 @@ export class Game {
         const el = document.elementFromPoint(x, y);
         return el ? `${el.tagName}.${el.className}` : "nothing";
       },
+      help: () => {
+        console.log(
+          [
+            "chofter.logControls = true   narrate every press and release",
+            "chofter.controls.state()     steering, turn, throttle, what's on screen",
+            "chofter.controls.turn(1)     turn right, bypassing the buttons (-1 left, 0 stop)",
+            "chofter.controls.throttle(1) drive, bypassing the track",
+            'chofter.controls.tap("left") press the real button, through the DOM',
+            "chofter.controls.at(x, y)    what is actually on top at a point",
+            "",
+            "If turn() moves her and tap() does not, the button is at fault.",
+          ].join("\n"),
+        );
+      },
     };
+  }
+
+  /**
+   * What the console meant by "that button".
+   *
+   * Deliberately forgiving: this gets typed on a tablet, one-handed, into a
+   * console with no autocomplete, and `$0` from the inspector is the most
+   * natural thing to reach for. Anything unrecognised returns null so the
+   * caller can say so, rather than throwing "undefined is not an object" and
+   * leaving you wondering whether it was the button or the helper that broke.
+   */
+  private resolveTurnButton(
+    which?: "left" | "right" | Element | null,
+  ): HTMLButtonElement | null {
+    const {left, right} = this.turnButtons.buttons;
+    if (which instanceof Element) {
+      return which === left || which === right
+        ? (which as HTMLButtonElement)
+        : (which.closest(".turn-btn") as HTMLButtonElement | null);
+    }
+    if (which === undefined || which === null) {
+      return right;
+    }
+    const word = String(which).trim().toLowerCase();
+    if (word.startsWith("l") || word === "◀") {
+      return left;
+    }
+    if (word.startsWith("r") || word === "▶") {
+      return right;
+    }
+    return null;
   }
 
   /** Re-measure the canvas. Called when the visible viewport changes. */
