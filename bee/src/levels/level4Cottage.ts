@@ -100,6 +100,8 @@ const tmpB = new THREE.Vector3();
 const tmpMob = new THREE.Vector3();
 const tmpOrbit = new THREE.Vector3();
 const panEye = new THREE.Vector3();
+const boardEye = new THREE.Vector3();
+const doorLook = new THREE.Vector3();
 const panLook = new THREE.Vector3();
 
 /**
@@ -133,6 +135,8 @@ export class CottageLevel implements Level {
   private orbit = 0;
 
   private mat: DanceMat | null = null;
+  /** 0 while the board is the shot, 1 once the open door is. */
+  private exitShot = 0;
   private music: Music | null = null;
   private rounds = 0;
 
@@ -206,6 +210,7 @@ export class CottageLevel implements Level {
     this.hop = null;
     this.babiesOut = false;
     this.mat = null;
+    this.exitShot = 0;
     // Belt and braces: entering is a fresh start, whatever came before.
     this.music?.stop();
     this.music = null;
@@ -222,22 +227,51 @@ export class CottageLevel implements Level {
   }
 
   /**
-   * The locked-off shot on the mat, recomputed each frame.
+   * The parked shot outside the cottage, recomputed each frame.
    *
-   * Each frame rather than once, so a rotate or a resize re-fits the board
-   * instead of leaving it half off the screen — the position it returns is
-   * fixed for a given screen, so this is still a camera that doesn't move.
+   * Two framings, and which one is in force is decided by whether the door is
+   * open. While you're dancing it holds the board tight, and each frame rather
+   * than once so a rotate or a resize re-fits it — the position it returns is
+   * fixed for a given screen, so it's still a camera that doesn't move.
+   *
+   * The moment the lock springs it opens out to hold the mat and the doorway
+   * together. It has to: the door is 27 units behind the mat and six above it,
+   * so at the board's framing her whole flight into the house happened off the
+   * side of the screen.
    */
-  private holdMatCamera(ctx: GameContext): void {
-    ctx.setCameraCinematic(
+  private holdMatCamera(dt: number, ctx: GameContext): void {
+    const wantsDoor = this.phase === "opening" || this.phase === "entering";
+    this.exitShot +=
+      ((wantsDoor ? 1 : 0) - this.exitShot) *
+      (1 - Math.exp(-DANCE.exitRate * dt));
+
+    const {matCentre, doorway} = ctx.cottage;
+    // Board first, and copied: framedCameraEye hands back a shared vector.
+    boardEye.copy(
       ctx.framedCameraEye(
-        ctx.cottage.matCentre,
+        matCentre,
         MAT_HALF_WIDTH,
         DANCE.cameraPitch,
         DANCE.boardFill,
       ),
-      ctx.cottage.matCentre,
     );
+
+    if (this.exitShot < 0.001) {
+      ctx.setCameraCinematic(boardEye, matCentre);
+      return;
+    }
+
+    // Halfway between the mat and the door, on the ground, framing far enough
+    // to hold both ends of the flight with the house above them.
+    doorLook.copy(matCentre).lerp(doorway, 0.5).setY(0);
+    const span = Math.abs(doorway.z - matCentre.z) / 2 + DANCE.exitMargin;
+    panEye.lerpVectors(
+      boardEye,
+      ctx.framedCameraEye(doorLook, span, DANCE.exitPitch, DANCE.exitFill),
+      this.exitShot,
+    );
+    panLook.lerpVectors(matCentre, doorLook, this.exitShot);
+    ctx.setCameraCinematic(panEye, panLook);
   }
 
   update(dt: number, ctx: GameContext): void {
@@ -247,7 +281,7 @@ export class CottageLevel implements Level {
     // Everything from the fly-in to going through the door is played to the
     // one parked shot. `beginInside`'s configureFlight is what releases it.
     if (MAT_PHASES.has(this.phase)) {
-      this.holdMatCamera(ctx);
+      this.holdMatCamera(dt, ctx);
     }
     // Once the brood is out it flies itself, in every phase from here on —
     // without this they simply hang in the hive doorway where they hatched.

@@ -431,6 +431,21 @@ export const DANCE = {
    */
   cameraPitch: 1.25,
   boardFill: 0.88,
+  /**
+   * And the shot once the door opens.
+   *
+   * The board framing is tight on nine squares; the doorway is 27 units behind
+   * the mat and six up, so the whole of her flight into the house happened off
+   * the side of it. This opens out to hold the mat and the door together, and
+   * drops to a shallower angle because a door is a vertical thing — from the
+   * board's steep pitch you would be looking at the roof.
+   */
+  exitPitch: 0.72,
+  exitFill: 0.95,
+  /** Margin around the mat-to-door span, for the house standing above it. */
+  exitMargin: 1.5,
+  /** How fast the shot opens out. Over about a second, under the door swing. */
+  exitRate: 2.6,
 } as const;
 
 /**

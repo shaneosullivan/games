@@ -113,10 +113,13 @@ it light on the beat, and you tap each before it goes dark. It starts one at a
 time and then steps up to two per cue, the second half a beat behind the first —
 the window on each stays as long, so what gets harder is watching two places at
 once rather than reacting faster. 90% opens the door. The sweep lands on a
-locked-off shot looking down at the board, and the camera doesn't move again
-until you're through the door — this stage is about reading nine squares, not
-about flying, and a camera that follows the bee swims the targets around under
-your finger.
+locked-off shot looking down at the board, and it doesn't move while you play —
+this stage is about reading nine squares, not about flying, and a camera that
+follows the bee swims the targets around under your finger. The moment the lock
+springs it opens out and drops to a shallower angle to hold the mat and the
+doorway together, because the door is 27 units behind the mat and six above it:
+framed on the board, her whole flight into the house happened off the side of
+the screen.
 Inside is a lamplit room with a jar of honey glowing on the counter — fly over,
 pick it up, and it hangs from you on a rope that swings with real momentum.
 
