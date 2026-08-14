@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import {BEAR, CAMERA, COTTAGE, DANCE, FLIGHT, INSIDE} from "../config";
+import {BEAR, CAMERA, COTTAGE, DANCE, FLIGHT, INSIDE, WORLD} from "../config";
 import {DanceMat} from "../entities/danceMat";
 import type {Music} from "../core/music";
 import {Rng} from "../core/rng";
@@ -86,6 +86,13 @@ type Phase =
  * drift out of step with the mat that gets built.
  */
 const MAT_HALF_WIDTH = (3 * DANCE.padSize + 2 * DANCE.padGap) / 2;
+
+/** The phases spent flying the lane between the yard and the hive. */
+const HOMEWARD_PHASES: ReadonlySet<Phase> = new Set<Phase>([
+  "emerging",
+  "chased",
+  "delivering",
+]);
 
 /** The phases played to the parked shot on the mat. */
 const MAT_PHASES: ReadonlySet<Phase> = new Set<Phase>([
@@ -274,9 +281,50 @@ export class CottageLevel implements Level {
     ctx.setCameraCinematic(panEye, panLook);
   }
 
+  /**
+   * How far off the lane's centre line she may be at this z.
+   *
+   * The widest of three: the lane itself, the yard she is leaving, and the
+   * meadow she is heading for. Taking the largest makes the ends open out on
+   * their own — deep in the clearing the yard's disc is wider than the lane,
+   * and near the hive the meadow's is — so there is no seam where the corridor
+   * meets either end.
+   */
+  private laneAllowance(z: number): number {
+    const disc = (radius: number, offset: number): number =>
+      Math.sqrt(Math.max(0, radius * radius - offset * offset));
+    return Math.max(
+      COTTAGE.laneHalfWidth,
+      disc(COTTAGE.clearingRadius, z - COTTAGE.yardOffsetZ),
+      disc(WORLD.radius, z),
+    );
+  }
+
+  /** Hold her in the lane on the way home. See COTTAGE.laneHalfWidth. */
+  private confineToLane(ctx: GameContext): void {
+    const p = ctx.bee.position;
+    // Only north of the hive: past it she is home and the level has her.
+    if (p.z > 0) {
+      return;
+    }
+    const allowed = this.laneAllowance(p.z);
+    if (Math.abs(p.x) <= allowed) {
+      return;
+    }
+    p.x = Math.sign(p.x) * allowed;
+    // Shed the speed she was carrying into it, so holding the stick at the
+    // treeline is a slide along it rather than a grind.
+    ctx.bee.velocity.x *= 0.4;
+  }
+
   update(dt: number, ctx: GameContext): void {
     this.phaseTime += dt;
     this.updateHop(dt, ctx);
+
+    // The run home is a corridor, not the open meadow.
+    if (HOMEWARD_PHASES.has(this.phase)) {
+      this.confineToLane(ctx);
+    }
 
     // Everything from the fly-in to going through the door is played to the
     // one parked shot. `beginInside`'s configureFlight is what releases it.

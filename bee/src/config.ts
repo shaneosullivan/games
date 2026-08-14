@@ -695,6 +695,22 @@ export const COTTAGE = {
    */
   flightRadius: 240,
   /**
+   * Half the width of the lane home, for the flight with the bear behind you.
+   *
+   * The lane is planted with fifteen trees a side over a hundred and twelve
+   * units, which is far too sparse to be a wall — measured, the nearest trunk
+   * to the centre line is 12.3 and for most of the length there is nothing
+   * within sixty. So the corridor is a rule rather than geometry: without it
+   * you can simply fly out of the side of the chase and take the long way
+   * round, which is neither a chase nor what the trees are telling you.
+   *
+   * Eleven keeps her inside the treeline where there are trees and defines the
+   * lane where there aren't. It only applies between the yard and the meadow —
+   * both of those open out to their own discs, so the shape is a corridor with
+   * a clearing at each end rather than a tube.
+   */
+  laneHalfWidth: 11,
+  /**
    * How far back the camera pulls once the bear turns up. A bear this size
    * needs the room — at normal framing it fills the screen or sits off it.
    */

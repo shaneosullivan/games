@@ -133,6 +133,9 @@ own world rather than in a scene of its own, so what happens next has no cut in
 it at all: a hundred and seventy units down a tree-lined lane, out through the
 gate in the meadow's hedge and across to the hive, glowing at you from the far
 end, with the bear on your tail the whole way — about eighteen seconds flat out.
+The lane is a corridor you can't leave: the trees are far too sparse to be a
+wall, so it is enforced, opening out into the yard at one end and the meadow at
+the other.
 It's faster than you but corners badly,
 same as the wasp, so turning is what saves you. Drop the honey into the hive and
 the brood pours out to mob the bear; it rears up on its hind legs and swipes at
@@ -369,6 +372,14 @@ Things worth knowing before changing anything:
   shift applied. `syncCottageGate` walls the meadow off at that z until level 4;
   move the gate north with the yard and the player can fly the whole empty lane
   in level 1.
+- **The lane home is a corridor, and it has to be enforced.** Fifteen trees a
+  side over a hundred and twelve units is nothing like a wall — measured, the
+  nearest trunk to the centre line is 12.3 and for most of the length there is
+  nothing within sixty — so without `COTTAGE.laneHalfWidth` you can fly out of
+  the side of the bear chase and take the long way round, which is neither a
+  chase nor what the trees are telling you. The allowance is the widest of the
+  lane, the yard's disc and the meadow's, so both ends open out on their own
+  and there is no seam where the corridor meets them.
 - **`rig.snap()` faces the world origin unless told otherwise.** That was fine
   when every scene was built around it; the cottage isn't, so `ctx.placeBee()`
   takes an optional yaw and level 4 passes one. A level that places the bee far
