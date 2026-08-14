@@ -469,16 +469,21 @@ export const MAZE = {
    * eleven of nine, so the maze is no smaller — the lanes are just broader and
    * there are fewer turns, which suits who this is for.
    */
-  cellSize: 11,
+  cellSize: 18,
   /**
    * How far off a corridor's centre line the bee may stray.
    *
-   * The wall stands on the cell boundary at cellSize/2 = 5.5. The bushes are
-   * the near part of it: 1.6 of radius and up to 1.05 of scale puts their
-   * inner faces at 3.82, so this leaves her about 0.4 of air rather than
-   * letting her scrape through the leaves.
+   * Read off the maze rather than worked out from the wall's parts: raycast
+   * sideways from every corridor centre at every height she can fly, and the
+   * nearest leaf across the whole maze is 8.07 away. Half a unit back from
+   * that is her own body.
+   *
+   * It was 6.8, derived from the bush's radius on paper, and that ignored how
+   * much of a squashed blob is missing at flying height — it stopped her a
+   * unit and a third short of anything, which reads as an invisible wall with
+   * daylight on the other side of it.
    */
-  corridorHalfWidth: 3.4,
+  corridorHalfWidth: 7.5,
   minHeight: 1.2,
   /** Under the canopy, which starts at `canopyBase`. */
   maxHeight: 3.6,
@@ -491,7 +496,7 @@ export const MAZE = {
   cameraDistance: 8,
   cameraHeight: 3.2,
   /** Well outside the maze: the corridor clamp is the real boundary. */
-  boundsRadius: 90,
+  boundsRadius: 140,
 
   /** Wall trees. Bare to `canopyBase` so the shot can see down a corridor. */
   trunkRadius: 0.5,
@@ -503,7 +508,7 @@ export const MAZE = {
    */
   canopyRadius: 2.2,
   /** Trees along each walled cell edge, on top of the posts at its corners. */
-  treesPerWall: 2,
+  treesPerWall: 3,
 
   /**
    * The hedge between the trunks.
@@ -518,14 +523,14 @@ export const MAZE = {
    */
   bushRadius: 1.6,
   bushHeight: 5.6,
-  bushesPerWall: 4,
+  bushesPerWall: 6,
 
   /** The breeze. Trees lean on it; leaves come off it. */
   swayAmplitude: 0.045,
   swayRate: 0.85,
   leaves: 150,
   /** Leaves are recycled within this radius of the bee, so they're never gone. */
-  leafRadius: 40,
+  leafRadius: 55,
   leafFallSpeed: 1.2,
   leafDrift: 0.9,
   leafSize: 0.34,
@@ -571,7 +576,7 @@ export const MAZE = {
    * big reveal is a flat wash of nothing. Eased in with the rise, which also
    * reads as the mist thinning as she climbs out of it.
    */
-  surveyFogScale: 3,
+  surveyFogScale: 5,
   /**
    * How much bigger the scent motes get at the top of the survey. From 110
    * units up a mote is about two pixels across, and the whole point of going
@@ -580,38 +585,25 @@ export const MAZE = {
   scentSurveyScale: 7,
 
   /**
-   * The rescue shot for when the way behind the bee is a tree.
+   * Wall that comes between the camera and the bee is faded out of the way.
    *
-   * The rig wants to sit `cameraDistance` behind her; in a corridor that's
-   * free, but turn to face a dead end and "behind" is solid trunk. Rather than
-   * creep the eye closer — which just presses it against the bark — the boom
-   * swings up and looks down on her from overhead until she is clear again.
+   * The alternative was moving the camera — swinging it up over the hedge when
+   * the way behind her was blocked — and a maze blocks it constantly, so the
+   * shot spent its life climbing and dropping. Fading is steadier: the camera
+   * stays where the rig wants it and the trunk in front of it isn't there.
    *
-   * `overheadBoom` is deliberately short: at this pitch it puts the eye 5.9
-   * above her, which is under `canopyBase` at 8. Any longer and the rescue
-   * shot is inside the leaves.
+   * What gets faded is decided by depth, not by distance from the eye. Plain
+   * distance can't tell a bush blocking the view from the bush right beside
+   * her — they are both a few units away — so at a long range the whole maze
+   * washed out and at a short one the bee stayed hidden. Measuring against her
+   * own depth separates the two exactly: solid from `fadeMargin` in front of
+   * her outwards, gone `fadeBand` before that.
    */
-  overheadBoom: 6,
-  /** Radians above the horizontal — steep, but off vertical so `lookAt` is
-   *  never asked to resolve a straight-down shot against a world up axis. */
-  overheadPitch: 1.42,
-  /** Swings up briskly, comes back down gently. Nobody wants to wait to see
-   *  past a tree, but a shot that drops the moment it can flickers at a
-   *  junction where the way behind is clear every other frame. */
-  overheadIn: 5.5,
-  overheadOut: 2.2,
-  /**
-   * How long the way back has to stay blocked before the shot gives up on it.
-   *
-   * Every corner blocks the line for a moment — the rig's yaw takes about a
-   * second to come round after a turn, and until it has, "behind the bee"
-   * points into the hedge she just flew past. Without this the rescue was
-   * firing constantly: a measured run spent 42 of its 53 seconds overhead,
-   * which makes the exception the rule. Waiting a third of a second lets an
-   * ordinary corner resolve itself and leaves the swing for being genuinely
-   * boxed in.
-   */
-  overheadDwell: 0.34,
+  fadeMargin: 1.4,
+  fadeBand: 2.6,
+  /** Below this the fragment is dropped, so a ghost can't hide the bee behind
+   *  it by writing depth. */
+  fadeCutoff: 0.06,
 
   /** Close enough to the way out to have finished. */
   exitRadius: 3.2,

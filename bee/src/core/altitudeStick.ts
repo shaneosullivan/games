@@ -23,12 +23,14 @@ export class AltitudeStick {
   private readonly fill: HTMLDivElement;
   private readonly current: HTMLDivElement;
   private readonly keys = new Set<string>();
+  private readonly root: HTMLDivElement;
 
   constructor(host: HTMLElement, initialHeight: number) {
     this.value = this.to01(initialHeight);
 
     const root = document.createElement("div");
     root.className = "alt ui-interactive";
+    this.root = root;
 
     const track = document.createElement("div");
     track.className = "alt-track";
@@ -83,6 +85,11 @@ export class AltitudeStick {
   }
 
   /** Move the knob to a specific altitude, e.g. when a level places the bee. */
+  /** The maze has no use for altitude and puts turn buttons here instead. */
+  setVisible(visible: boolean): void {
+    this.root.style.display = visible ? "" : "none";
+  }
+
   setHeight(h: number): void {
     this.value = this.to01(h);
     this.draw();

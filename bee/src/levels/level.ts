@@ -118,14 +118,6 @@ export interface GameContext {
    * to the follow rig, which then glides in from wherever the shot ended.
    */
   setCameraCinematic(eye: THREE.Vector3 | null, look?: THREE.Vector3): void;
-  /**
-   * Give the follow rig a final say over where the eye may stand — for a shape
-   * no enclosure sphere describes, like the maze's corridors. Pass null to
-   * stop. `configureFlight` clears it, so set it after calling that.
-   */
-  setCameraConfine(
-    fn: ((point: THREE.Vector3, bee: THREE.Vector3) => void) | null,
-  ): void;
   /** Where the camera is right now, for a cutscene that eases away from it. */
   readonly cameraPosition: THREE.Vector3;
   /**

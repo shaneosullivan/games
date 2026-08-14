@@ -30,6 +30,8 @@ export interface MazeFlower {
   eaten: boolean;
   /** The head, scaled away as she eats it. The stem stays. */
   head: THREE.Mesh;
+  /** Where the head sits above the base, in the flower's own units. */
+  headHeight: number;
 }
 
 export interface MazeScene {
@@ -49,25 +51,15 @@ export interface MazeScene {
    * which is how the bee knows to drop the speed she was carrying into a tree.
    */
   confine(point: THREE.Vector3, halfWidth: number): boolean;
-  /** The same test, without moving anything. */
-  contains(point: THREE.Vector3, halfWidth: number): boolean;
-  /**
-   * Is there a clear run of corridor from `from` to `to` — no wall crossed?
-   *
-   * `contains` can't answer this. It asks whether a point sits inside its own
-   * cell's corridor, and a point on the far side of a wall sits perfectly well
-   * inside the *next* cell's. That's harmless for the bee, who moves a sixth
-   * of a unit a frame and gets clamped long before she reaches a wall, and
-   * quite wrong for the camera, which is placed eight units away in one go.
-   */
-  clearBetween(
-    from: THREE.Vector3,
-    to: THREE.Vector3,
-    halfWidth: number,
-  ): boolean;
   /** Which cell a point is in, clamped to the grid. */
   cellAt(point: THREE.Vector3): number;
   update(elapsed: number, dt: number, near: THREE.Vector3): void;
+  /**
+   * How far off the camera the bee is, so the walls know what counts as being
+   * in front of her. Call it before rendering; pass null to stop fading
+   * altogether, which any shot that isn't the chase rig has to do.
+   */
+  setFadeDepth(distanceToBee: number | null): void;
   dispose(): void;
 }
 
@@ -111,7 +103,12 @@ export function createMazeScene(maze: Maze, rng: Rng): MazeScene {
   // ---- the walls ---------------------------------------------------------
   const spots = wallTreeSpots(maze, originX, originZ, rng);
   const treeGeo = createMazeTree();
-  const trees = new THREE.InstancedMesh(treeGeo, vertexToon(), spots.length);
+  const treeFade = fadeInFront(vertexToon());
+  const trees = new THREE.InstancedMesh(
+    treeGeo,
+    treeFade.material,
+    spots.length,
+  );
   trees.castShadow = true;
   const dummy = new THREE.Object3D();
   /** Per-tree phase and scale, so the breeze isn't a single stiff wave. */
@@ -132,9 +129,10 @@ export function createMazeScene(maze: Maze, rng: Rng): MazeScene {
   // ---- the hedge between the trunks --------------------------------------
   const bushSpots = wallBushSpots(maze, originX, originZ, rng);
   const bushGeo = createBush();
+  const bushFade = fadeInFront(vertexToon());
   const bushes = new THREE.InstancedMesh(
     bushGeo,
-    vertexToon(),
+    bushFade.material,
     bushSpots.length,
   );
   bushes.castShadow = true;
@@ -200,23 +198,16 @@ export function createMazeScene(maze: Maze, rng: Rng): MazeScene {
 
   // ---- flowers at the dead ends ------------------------------------------
   const flowers: Array<MazeFlower> = [];
-  const heads = new Map<PollenKind, THREE.BufferGeometry>();
-  const stems = new Map<PollenKind, THREE.BufferGeometry>();
+  // One geometry per kind, shared by every flower of it. Built on demand and
+  // kept, rather than rebuilt per dead end.
+  const built = new Map<PollenKind, ReturnType<typeof createFlowerGeometry>>();
   const tmp = new THREE.Vector3();
   deadEnds(maze).forEach((cell, i) => {
     const kind = POLLEN_KINDS[i % POLLEN_KINDS.length];
-    let head = heads.get(kind);
-    let stem = stems.get(kind);
-    let headHeight = 0;
-    if (!head || !stem) {
-      const built = createFlowerGeometry(kind);
-      head = built.head;
-      stem = built.stem;
-      headHeight = built.headHeight;
-      heads.set(kind, head);
-      stems.set(kind, stem);
-    } else {
-      headHeight = createFlowerGeometry(kind).headHeight;
+    let geo = built.get(kind);
+    if (!geo) {
+      geo = createFlowerGeometry(kind);
+      built.set(kind, geo);
     }
 
     // Flowers stand up to be seen: this is a rescue, not a hidden collectible.
@@ -225,15 +216,20 @@ export function createMazeScene(maze: Maze, rng: Rng): MazeScene {
     const base = new THREE.Group();
     base.position.copy(tmp);
     base.scale.setScalar(stand);
-    const stemMesh = new THREE.Mesh(stem, vertexToon());
-    const headMesh = new THREE.Mesh(head, vertexToon());
+    const stemMesh = new THREE.Mesh(geo.stem, vertexToon());
+    const headMesh = new THREE.Mesh(geo.head, vertexToon());
+    // The head is authored about its own centre, not at the top of the stem —
+    // the meadow lifts it to `headHeight` in its own instance matrix and so
+    // must this. Parented at zero it sits in the ground, petals down.
+    headMesh.position.y = geo.headHeight;
     base.add(stemMesh, headMesh);
     group.add(base);
 
     flowers.push({
       cell,
       kind,
-      position: tmp.clone().setY(headHeight * stand),
+      headHeight: geo.headHeight,
+      position: tmp.clone().setY(geo.headHeight * stand),
       eaten: false,
       head: headMesh,
     });
@@ -319,46 +315,6 @@ export function createMazeScene(maze: Maze, rng: Rng): MazeScene {
     recycle(i, new THREE.Vector3(), true);
   }
 
-  const containsTmp = new THREE.Vector3();
-  const contains = (point: THREE.Vector3, w: number): boolean =>
-    !confine(containsTmp.copy(point), w);
-
-  const walkTmp = new THREE.Vector3();
-  const clearBetween = (
-    from: THREE.Vector3,
-    to: THREE.Vector3,
-    w: number,
-  ): boolean => {
-    const span = Math.hypot(to.x - from.x, to.z - from.z);
-    // Fine enough that a step can never skip a cell, and so can never step
-    // over the wall it was meant to notice.
-    const steps = Math.max(1, Math.ceil(span / (cellSize * 0.25)));
-    let cell = cellAt(from);
-    for (let i = 1; i <= steps; i++) {
-      walkTmp.lerpVectors(from, to, i / steps);
-      const next = cellAt(walkTmp);
-      if (next !== cell) {
-        const dcol = colOf(maze, next) - colOf(maze, cell);
-        const drow = rowOf(maze, next) - rowOf(maze, cell);
-        // A diagonal hop means it clipped a corner post; treat it as blocked
-        // rather than working out which of the two ways round it went.
-        if (Math.abs(dcol) + Math.abs(drow) !== 1) {
-          return false;
-        }
-        const side =
-          dcol === 1 ? EAST : dcol === -1 ? WEST : drow === 1 ? SOUTH : NORTH;
-        if (!isOpen(maze, cell, side)) {
-          return false;
-        }
-        cell = next;
-      }
-      if (!contains(walkTmp, w)) {
-        return false;
-      }
-    }
-    return true;
-  };
-
   return {
     group,
     maze,
@@ -368,9 +324,16 @@ export function createMazeScene(maze: Maze, rng: Rng): MazeScene {
     halfWidth: (Math.max(cols, rows) * cellSize) / 2,
     cellCentre,
     confine,
-    contains,
-    clearBetween,
     cellAt,
+
+    setFadeDepth(distanceToBee) {
+      // A depth behind the eye means nothing is ever in front of her, so the
+      // whole maze stays solid.
+      const upTo =
+        distanceToBee === null ? -1e9 : distanceToBee - MAZE.fadeMargin;
+      treeFade.setDepth(upTo);
+      bushFade.setDepth(upTo);
+    },
 
     update(elapsed, dt, near) {
       // Breeze: the whole wall leans together, each tree a little out of step
@@ -430,6 +393,65 @@ export function createMazeScene(maze: Maze, rng: Rng): MazeScene {
       treeGeo.dispose();
       bushGeo.dispose();
       leafGeo.dispose();
+    },
+  };
+}
+
+/**
+ * Make a material dissolve anything that comes between the camera and the bee.
+ *
+ * In a maze the shot is forever half inside a hedge — the rig sits eight units
+ * behind her and the corridors turn. Moving the camera to escape that means
+ * moving it constantly; fading what's in the way leaves the shot where it
+ * belongs and takes the obstruction out of it instead.
+ *
+ * The test is the fragment's own view depth against hers, handed in as
+ * `fadeUpTo`. Distance from the eye alone can't do it: a bush blocking the
+ * view and the bush standing next to her are both a few units off, so a range
+ * wide enough to clear the first washes the whole maze out and one narrow
+ * enough to spare the second leaves her hidden.
+ *
+ * Anything under the cutoff is discarded rather than drawn faint, because a
+ * transparent fragment still writes depth and would hide the bee behind a
+ * trunk you can see straight through.
+ */
+function fadeInFront(material: THREE.Material): {
+  material: THREE.Material;
+  setDepth(d: number): void;
+} {
+  material.transparent = true;
+  let live: {value: number} = {value: 1e9};
+  material.onBeforeCompile = shader => {
+    shader.uniforms.fadeUpTo = live;
+    shader.uniforms.fadeBand = {value: MAZE.fadeBand};
+    shader.vertexShader = shader.vertexShader
+      .replace(
+        "#include <common>",
+        "#include <common>\nvarying float vEyeDist;",
+      )
+      .replace(
+        "#include <fog_vertex>",
+        "#include <fog_vertex>\nvEyeDist = -mvPosition.z;",
+      );
+    shader.fragmentShader = shader.fragmentShader
+      .replace(
+        "#include <common>",
+        "#include <common>\nvarying float vEyeDist;\nuniform float fadeUpTo;\nuniform float fadeBand;",
+      )
+      .replace(
+        "#include <dithering_fragment>",
+        `float nearFade = smoothstep(fadeUpTo - fadeBand, fadeUpTo, vEyeDist);
+         if (nearFade < ${MAZE.fadeCutoff}) discard;
+         gl_FragColor.a *= nearFade;
+         #include <dithering_fragment>`,
+      );
+  };
+  // Without its own key three hands both wall materials the same program.
+  material.customProgramCacheKey = () => "mazeFade";
+  return {
+    material,
+    setDepth(d) {
+      live.value = d;
     },
   };
 }

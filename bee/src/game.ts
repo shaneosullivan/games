@@ -3,6 +3,7 @@ import {CAMERA, INSIDE, LEVELS, POLLEN_KINDS} from "./config";
 import {Audio} from "./core/audio";
 import {AltitudeStick} from "./core/altitudeStick";
 import {Joystick, type StickInput} from "./core/input";
+import {TurnButtons} from "./core/turnButtons";
 import {GameLoop} from "./core/loop";
 import {Rng} from "./core/rng";
 import {Save} from "./core/save";
@@ -72,6 +73,8 @@ export class Game {
   private readonly hud: Hud;
   private readonly stick: Joystick;
   private readonly altitude: AltitudeStick;
+  /** Swaps in for the altitude slider under tank steering. */
+  private readonly turnButtons: TurnButtons;
   private readonly bee = new BeeActor();
   private readonly rig: CameraRig;
   private readonly flowers: FlowerField;
@@ -190,6 +193,7 @@ export class Game {
     );
     this.stick = new Joystick(uiLayer);
     this.altitude = new AltitudeStick(uiLayer, this.bee.desiredHeight);
+    this.turnButtons = new TurnButtons(uiLayer);
 
     this.puzzle = createSlidePuzzle(uiLayer, () =>
       this.level.onPuzzleSolved?.(this.ctx),
@@ -228,7 +232,6 @@ export class Game {
         this.placeBee(position, desiredHeight, yaw),
       setCameraZoom: z => this.rig.setZoom(z),
       setCameraCinematic: (eye, look) => this.rig.setCinematic(eye, look),
-      setCameraConfine: fn => this.rig.setConfine(fn),
       cameraPosition: this.stage.camera.position,
       framedCameraEye: (centre, halfWidth, pitch, fill) =>
         this.rig.framedEye(centre, halfWidth, pitch, fill),
@@ -461,6 +464,11 @@ export class Game {
 
   private configureFlight(s: FlightSettings): void {
     this.bee.steering = s.steering ?? "camera";
+    // A level either flies or it turns, so the two controls swap places. The
+    // maze has nothing to do with altitude — she holds one height throughout.
+    const tank = this.bee.steering === "tank";
+    this.altitude.setVisible(!tank);
+    this.turnButtons.setVisible(tank);
     this.bee.bounds.radius = s.boundsRadius;
     this.bee.bounds.sphereRadius = s.boundsSphere ?? Infinity;
     // The lane north is walled off or not by syncCottageGate, which runs after
@@ -472,8 +480,6 @@ export class Game {
     // has open sky behind it.
     this.rig.setEnclosure(s.cameraEnclosure ?? null);
     this.rig.setMaxZoom(s.maxCameraZoom ?? null);
-    // Only the maze fences the camera; clear it so nothing leaks between levels.
-    this.rig.setConfine(null);
     // A new level starts framed normally; it can widen the shot itself.
     this.rig.setZoom(1, true);
     // A new level starts with the follow rig in charge.
@@ -638,10 +644,17 @@ export class Game {
 
     const locked = this.level.controlsLocked;
 
-    if (!locked) {
+    const tank = this.bee.steering === "tank";
+    // With the slider gone there is nothing to read; the level set her height.
+    if (!locked && !tank) {
       this.bee.desiredHeight = this.altitude.desiredHeight;
     }
-    this.bee.update(dt, locked ? this.idleStick : this.stick, this.rig.yaw);
+    this.bee.update(
+      dt,
+      locked ? this.idleStick : this.stick,
+      this.rig.yaw,
+      locked || !tank ? 0 : this.turnButtons.turn,
+    );
     // The jar hangs from the bee's belly wherever she goes.
     this.honeyJar.update(
       dt,

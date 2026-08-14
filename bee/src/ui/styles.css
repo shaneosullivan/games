@@ -958,8 +958,61 @@ body {
 
 /* Levels that aren't about flying hide the stick and slider entirely. */
 .no-flight .stick,
-.no-flight .alt {
+.no-flight .alt,
+.no-flight .turnpad {
   display: none;
+}
+
+/*
+ * The maze's turn buttons, in the altitude slider's corner — the two are never
+ * on screen together, because a level either flies or it turns.
+ *
+ * Sized well past the 44px minimum: these are held down for seconds at a time
+ * by a child's thumb, not tapped.
+ */
+.turnpad {
+  position: absolute;
+  right: calc(var(--safe-r) + 22px);
+  bottom: calc(var(--safe-b) + 26px);
+  display: flex;
+  gap: 14px;
+  pointer-events: auto;
+  touch-action: none;
+}
+
+.turnpad.hidden {
+  display: none;
+}
+
+.turn-btn {
+  width: 76px;
+  height: 76px;
+  border-radius: 50%;
+  border: 2px solid var(--stroke);
+  background: var(--panel-strong);
+  color: #fff;
+  font-size: 30px;
+  line-height: 1;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+  -webkit-tap-highlight-color: transparent;
+  touch-action: none;
+}
+
+.turn-btn:active {
+  transform: scale(0.94);
+  background: rgba(255, 209, 92, 0.5);
+}
+
+@media (max-width: 560px) {
+  .turn-btn {
+    width: 66px;
+    height: 66px;
+    font-size: 26px;
+  }
 }
 
 .land-hint {

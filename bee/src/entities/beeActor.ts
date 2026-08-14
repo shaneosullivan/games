@@ -173,7 +173,12 @@ export class BeeActor {
     this.climbRate = 0;
   }
 
-  update(dt: number, stick: StickInput, cameraYaw: number): void {
+  /**
+   * @param turn -1..1, only read under tank steering: the maze's turn buttons.
+   *   Kept separate from the stick because they are separate controls — the
+   *   thumbstick there is forward and back alone.
+   */
+  update(dt: number, stick: StickInput, cameraYaw: number, turn = 0): void {
     this.prevPosition.copy(this.position);
     this.prevYaw = this.yaw;
     this.prevRoll = this.roll;
@@ -198,7 +203,7 @@ export class BeeActor {
       // Right on the stick is a right turn, which is yaw *decreasing* — screen
       // right is -X when she faces +Z, and forward is (sin yaw, cos yaw).
       if (!stunned) {
-        this.yaw -= stick.x * FLIGHT.tankTurnRate * dt;
+        this.yaw -= turn * FLIGHT.tankTurnRate * dt;
       }
       tmpForward.set(Math.sin(this.yaw), 0, Math.cos(this.yaw));
       tmpDesired
@@ -294,11 +299,11 @@ export class BeeActor {
 
     // Bank into turns. Under tank steering the turn is the stick itself; under
     // camera steering it's how far the velocity has swung off her nose.
-    const turn = tank
-      ? -stick.x
+    const swing = tank
+      ? -turn
       : shortestAngle(this.yaw, Math.atan2(this.velocity.x, this.velocity.z));
     const targetRoll =
-      THREE.MathUtils.clamp(-turn * 2.2, -FLIGHT.maxBank, FLIGHT.maxBank) *
+      THREE.MathUtils.clamp(-swing * 2.2, -FLIGHT.maxBank, FLIGHT.maxBank) *
       (tank ? 1 : this.speed01);
     this.roll += (targetRoll - this.roll) * Math.min(1, FLIGHT.bankLerp * dt);
   }

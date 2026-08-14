@@ -145,15 +145,15 @@ and the real bear bolts, with rainbow confetti over the puzzle.
 **5 — The Windy Woods.** A maze of trees, generated fresh every time it is
 entered, so it cannot be learned. The walls are hedge and tree together — tall
 green bushes filling in between bare trunks, with a red autumn canopy overhead
-and leaves coming down on the breeze that leans them. The corridors are wide
-and leafy; the hedge tops sit just above the camera, so you catch a suggestion
-of the next lane but never a look into it.
+and leaves coming down on the breeze that leans them. The corridors are fifteen
+units wide and leafy; the hedge tops sit just above the camera, so you catch a
+suggestion of the next lane but never a look into it.
 
-**This level steers differently.** Left and right turn the bee on the spot and
-forward and back drive along her nose, because in a corridor the camera is
-often part-way round a corner and "the way the stick points" stops meaning
-anything. The camera sits low and behind; when the way behind her is hedge it
-swings up and looks down on her until she's clear.
+**This level steers differently.** The thumbstick is forward and back only, and
+a pair of held buttons in the altitude slider's corner turn her on the spot —
+in a corridor the camera is often part-way round a corner and "the way the
+stick points" stops meaning anything. The camera sits low and behind, and
+whatever comes between it and the bee simply fades away.
 
 Getting lost is the point, so the level helps rather than punishes. The bee
 drops yellow pollen behind her, so a corridor she has already tried looks
@@ -472,33 +472,40 @@ Things worth knowing before changing anything:
   matter of finding her cell and clamping against whichever of its four sides
   are walled — plus holding the middle of a doorway, without which you can cut
   the corner of a junction and clip the post standing on it.
-- **A maze camera goes up, not in.** The rig sits `cameraDistance` behind the
-  bee; round a corner or down a dead end that is solidly inside a hedge.
-  Clamping the eye sideways into the corridor jams it against the leaves with a
-  bush filling the screen, and creeping it closer only presses it there. The
-  level's `setCameraConfine` swings the boom _up_ instead and looks down on her
-  until the way behind is clear, which escapes through the one direction a
-  corridor never blocks. It shortens as it rises — a full-length boom at that
-  pitch would be in the canopy.
-- **Whether the shot is blocked is a question about a line, not a point.**
-  `contains()` asks whether a point sits in its own cell's corridor, and a point
-  on the far side of a wall sits perfectly well inside the _next_ cell's. That
-  is harmless for the bee, who moves a sixth of a unit a frame and is clamped
-  long before she reaches a wall, and quite wrong for a camera placed eight
-  units away in one go — it reported a clear shot through a hedge. Hence
-  `clearBetween()`.
-- **And it has to persist before it counts.** Every corner blocks the line for
-  a moment, because the rig's yaw takes about a second to come round after a
-  turn. Swinging up on that spent 42 seconds of a 53-second run overhead, which
-  makes the exception the rule; `MAZE.overheadDwell` waits a third of a second
-  and brings it to 23%.
-- **The maze has its own steering.** Camera-relative flying is the game's
-  default and it falls apart in corridors: the camera is often part-way round a
-  corner, so "left" stops meaning "down that lane". `FlightSettings.steering:
-"tank"` turns her on the spot with left/right and drives along her nose with
-  forward/back. It also removes the yaw feedback loop, so the rig follows her
-  briskly instead of gently — `Game.update` only reports "steering" to the rig
-  for the camera-relative mode.
+- **The maze camera doesn't move out of the way; the wall does.** The rig sits
+  `cameraDistance` behind the bee, and round a corner that is solidly inside a
+  hedge. Moving the camera was tried first — swinging the boom up over the
+  hedge whenever the way behind was blocked — and a maze blocks it constantly,
+  so the shot spent its life climbing and dropping. Now the camera stays put
+  and the wall in front of it fades out (`fadeInFront` in
+  `render/geometry/maze.ts`).
+- **What to fade is decided by depth against the bee, not distance from the
+  eye.** Distance can't tell a bush blocking the view from the bush standing
+  beside her — both are a few units off — so a range wide enough to clear the
+  first washed the whole maze out, and one narrow enough to spare the second
+  left the bee hidden behind a solid hedge. The shader compares each fragment's
+  view depth with hers (`setFadeDepth`), so only what is genuinely in front of
+  her goes. Any shot that isn't the chase rig has to turn it off: from the
+  survey 180 units up the entire maze is "in front of her", and the first
+  version faded all of it and left a scent trail over an empty field.
+- **Fragments below the cutoff are discarded, not drawn faint**, because a
+  transparent fragment still writes depth — a ghost you can see through would
+  otherwise hide the bee behind it.
+- **The maze has its own steering and its own controls.** Camera-relative
+  flying falls apart in corridors: the camera is often part-way round a corner,
+  so "left" stops meaning "down that lane". `FlightSettings.steering: "tank"`
+  drives along her nose with the thumbstick's forward and back, and turns her
+  on the spot with a pair of held buttons (`core/turnButtons.ts`) that take the
+  altitude slider's corner — nothing in the maze needs altitude. It also
+  removes the yaw feedback loop, so the rig follows her briskly instead of
+  gently; `Game.update` only reports "steering" to the rig for the
+  camera-relative mode.
+- **The corridor clamp is measured, not derived.** Worked out from the bush's
+  radius on paper it ignored how much of a squashed blob is missing at flying
+  height, and stopped her 1.3 units short of anything — an invisible wall with
+  daylight beyond it. Raycasting sideways from every corridor centre at every
+  flyable height puts the nearest leaf at 8.07, so `MAZE.corridorHalfWidth` is
+  7.5: half a unit for her own body.
 - **A shot that leaves the level's own scale needs the fog moved.** The Windy
   Woods fog out at 62 units precisely so you can't see across the maze from
   inside it. The survey shot stands 110 above the middle, so without
