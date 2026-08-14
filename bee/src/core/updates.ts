@@ -1,3 +1,5 @@
+import {installProbe, probeHelp, probeReport, showReport} from "./probe";
+
 /**
  * "A new version is ready" — polling, and the banner that offers the reload.
  *
@@ -155,6 +157,12 @@ interface ChofterApi {
   controls?: ControlsApi;
   /** Log every press and release of the maze controls. Off by default. */
   logControls: boolean;
+  /**
+   * Why isn't that button working? Tap the dead control a few times, then run
+   * this: it logs and copies the viewport, every control's geometry and hit
+   * test, and the presses it just recorded. See `core/probe.ts`.
+   */
+  probe(): Promise<string>;
 }
 
 /** What `chofter.controls` offers. Everything here is safe to call twice. */
@@ -206,6 +214,24 @@ function installConsoleApi(): ChofterApi {
   const api: ChofterApi = {
     build: null,
     logControls: false,
+    probe: async () => {
+      // Caches and workers, not just geometry: a control that works in dev and
+      // not in the installed app is a stale bundle until proven otherwise, and
+      // the installed app is exactly where a service worker can go on serving
+      // a build that predates the fix.
+      const text = await publish({
+        build: api.build,
+        caches: "caches" in window ? await caches.keys() : [],
+        workers: ((await navigator.serviceWorker?.getRegistrations?.()) ?? [])
+          .length,
+        ...probeReport(),
+      });
+      // On the device this is for, the panel is the point — the console line
+      // above is for a machine with a real keyboard.
+      showReport(text);
+      probeHelp();
+      return text;
+    },
     update: async () => {
       window.location.reload();
     },
@@ -254,23 +280,34 @@ function installConsoleApi(): ChofterApi {
           .length,
       };
 
-      const text = JSON.stringify(info);
-      console.log(info);
-      console.log(text);
-      try {
-        await navigator.clipboard?.writeText(text);
-        console.log("(copied to the clipboard)");
-      } catch {
-        // Safari can refuse a clipboard write outside a gesture. The line above
-        // is the fallback: select it and copy by hand.
-        console.log("(clipboard refused — copy the line above)");
-      }
-      return text;
+      return publish(info);
     },
   };
 
   (window as unknown as Record<string, unknown>).chofter = api;
+  // Starts recording presses immediately: `probe()` is run *after* the tap
+  // that failed, so the recording has to already have happened.
+  installProbe();
   return api;
+}
+
+/**
+ * Log a report both as an object (to expand) and as a line (to paste), and put
+ * it on the clipboard if the browser will allow it.
+ */
+async function publish(info: Record<string, unknown>): Promise<string> {
+  const text = JSON.stringify(info);
+  console.log(info);
+  console.log(text);
+  try {
+    await navigator.clipboard?.writeText(text);
+    console.log("(copied to the clipboard)");
+  } catch {
+    // Safari can refuse a clipboard write outside a gesture. The line above is
+    // the fallback: select it and copy by hand.
+    console.log("(clipboard refused — copy the line above)");
+  }
+  return text;
 }
 
 function createBanner(host: HTMLElement, onTake: () => void): {show(): void} {
