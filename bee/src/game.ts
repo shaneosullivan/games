@@ -216,6 +216,8 @@ export class Game {
         this.placeBee(position, desiredHeight, yaw),
       setCameraZoom: z => this.rig.setZoom(z),
       setCameraCinematic: (eye, look) => this.rig.setCinematic(eye, look),
+      framedCameraEye: (centre, halfWidth, pitch, fill) =>
+        this.rig.framedEye(centre, halfWidth, pitch, fill),
       showPuzzle: on => {
         this.setSplit(on);
         if (on) {

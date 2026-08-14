@@ -111,7 +111,11 @@ mat sits in front of it: the bee hovers over the middle square, the eight around
 it light on the beat, and you tap each before it goes dark. It starts one at a
 time and then steps up to two per cue, the second half a beat behind the first —
 the window on each stays as long, so what gets harder is watching two places at
-once rather than reacting faster. 90% opens the door.
+once rather than reacting faster. 90% opens the door. The sweep lands on a
+locked-off shot looking down at the board, and the camera doesn't move again
+until you're through the door — this stage is about reading nine squares, not
+about flying, and a camera that follows the bee swims the targets around under
+your finger.
 Inside is a lamplit room with a jar of honey glowing on the counter — fly over,
 pick it up, and it hangs from you on a rope that swings with real momentum.
 
@@ -422,6 +426,19 @@ Things worth knowing before changing anything:
   so it sees 4.4 units across against an iPad's 12.8, and pulling back scales
   both axes. Distance alone can't close that; widening the FOV on a narrow
   aspect is the lever if it's ever needed.
+- **A shot that has to frame something is computed, not written down.**
+  `rig.framedEye()` works out where the camera must stand for the dance mat to
+  fill the screen, from the real FOV and aspect, so the board is as large on a
+  portrait phone (where its width is the constraint) as on an iPad (where its
+  depth is). It bisects on the projected corners rather than using the
+  small-angle shortcut: at this distance perspective is severe — the near edge
+  subtends far more than the far edge — and treating them alike put the back
+  row off the top of the screen. Recomputed each frame, so a rotate re-fits.
+- **The mat's camera pitch is a gameplay number, not a look.** The bee waits
+  over the centre pad, and from a low angle she stands directly in front of the
+  pad behind her: at `DANCE.cameraPitch` 1.0 that pad was measured **100%
+  hidden**, so a cue landing there could not be answered. 1.25 puts the worst
+  covered target at 22%.
 - **A model's `animate()` must not write to the group the caller positioned.**
   The queen's bob originally set `group.position.y` directly, which silently
   dragged her from her dais down to the floor. Bobs and sways belong on an

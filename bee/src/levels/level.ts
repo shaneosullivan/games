@@ -99,6 +99,18 @@ export interface GameContext {
    * to the follow rig, which then glides in from wherever the shot ended.
    */
   setCameraCinematic(eye: THREE.Vector3 | null, look?: THREE.Vector3): void;
+  /**
+   * Where a scripted shot has to stand for a flat square of side `2 *
+   * halfWidth`, centred on `centre` and lying on the ground, to fill `fill` of
+   * the tighter screen axis when looked down at from `pitch` radians above the
+   * horizontal. Feed it to `setCameraCinematic`. Returns a shared vector.
+   */
+  framedCameraEye(
+    centre: THREE.Vector3,
+    halfWidth: number,
+    pitch: number,
+    fill: number,
+  ): THREE.Vector3;
   /** Split the screen and show the sliding puzzle, or put it away. */
   showPuzzle(on: boolean): void;
   /** Rainbow confetti over the puzzle panel. */

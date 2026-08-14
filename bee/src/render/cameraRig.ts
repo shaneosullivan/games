@@ -8,6 +8,7 @@ const smoothedLook = new THREE.Vector3();
 const boom = new THREE.Vector3();
 const outward = new THREE.Vector3();
 const sideways = new THREE.Vector3();
+const framed = new THREE.Vector3();
 
 function shortestAngle(from: number, to: number): number {
   let d = (to - from) % (Math.PI * 2);
@@ -154,6 +155,86 @@ export class CameraRig {
     if (immediate) {
       this.zoom = z;
     }
+  }
+
+  /**
+   * Where the camera has to stand for a flat square lying on the ground to
+   * fill the frame — used for the dance mat, which is the whole of that stage
+   * and wants to be looked at squarely rather than followed.
+   *
+   * Worked out from the real FOV and aspect rather than picked by eye, because
+   * "large on screen" means something different on an iPad and on a portrait
+   * phone: the board's width is measured against the horizontal axis and its
+   * foreshortened depth against the vertical, and whichever needs the camera
+   * further back wins. Recomputing it each frame means a rotate re-fits.
+   *
+   * @param centre middle of the square, on the ground
+   * @param halfWidth half its side
+   * @param pitch radians above the horizontal to look down from
+   * @param fill how much of the tighter screen axis it should span, 0..1
+   * @returns a shared vector — copy it if you need to keep it
+   */
+  framedEye(
+    centre: THREE.Vector3,
+    halfWidth: number,
+    pitch: number,
+    fill: number,
+  ): THREE.Vector3 {
+    const tanV = Math.tan((this.camera.fov * Math.PI) / 360);
+    const tanH = tanV * this.camera.aspect;
+    const sp = Math.sin(pitch);
+    const cp = Math.cos(pitch);
+
+    // The camera's axes at this pitch, looking down the boom at the centre.
+    // Right is world +X because the boom only ever leans in the ZY plane.
+    const fx = 0,
+      fy = -sp,
+      fz = -cp;
+    const ux = 0,
+      uy = cp,
+      uz = -sp;
+
+    /**
+     * How far out the worst corner lands, in screen units where 1 is the edge.
+     *
+     * Projected properly rather than by the small-angle shortcut: the shot is
+     * close enough that perspective matters a lot — the near edge of the board
+     * subtends far more than the far edge, and treating them alike put the
+     * back row off the top of the screen.
+     */
+    const worst = (d: number): number => {
+      let out = 0;
+      for (const sx of [-1, 1]) {
+        for (const sz of [-1, 1]) {
+          // Corner relative to the eye, which sits `d` up the boom.
+          const vx = sx * halfWidth;
+          const vy = -sp * d;
+          const vz = sz * halfWidth - cp * d;
+          const depth = vx * fx + vy * fy + vz * fz;
+          if (depth <= 1e-3) {
+            return Infinity;
+          }
+          const sxn = Math.abs(vx / (depth * tanH));
+          const syn = Math.abs((vx * ux + vy * uy + vz * uz) / (depth * tanV));
+          out = Math.max(out, sxn, syn);
+        }
+      }
+      return out;
+    };
+
+    // Monotonic in `d`, so bisect. Twenty steps lands well inside a pixel.
+    let lo = halfWidth * 0.5;
+    let hi = halfWidth * 40;
+    for (let i = 0; i < 20; i++) {
+      const mid = (lo + hi) / 2;
+      if (worst(mid) > fill) {
+        lo = mid;
+      } else {
+        hi = mid;
+      }
+    }
+
+    return framed.set(0, sp, cp).multiplyScalar(hi).add(centre);
   }
 
   /** Extra pull-back for a small screen. Applied at once, not eased. */

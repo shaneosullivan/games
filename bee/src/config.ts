@@ -405,13 +405,26 @@ export const DANCE = {
   hopTime: 0.42,
   hopArc: 1.1,
   /**
-   * Camera zoom while you're on the mat, as a fraction of the level's own rig.
+   * The shot while you're on the mat: locked off, square to the board, close.
    *
-   * The mat is the whole game for this stage and the pads are the targets, so
-   * the shot comes in until the mat fills the frame rather than sitting in the
-   * middle of a clearing.
+   * This stage isn't about flying, it's about reading nine squares and hitting
+   * them, so the chase rig is the wrong tool — following the bee's bob and
+   * her hops out to the pads swims the whole board around under the targets
+   * you're trying to tap. The camera is parked instead, and the distance is
+   * computed from the real FOV and aspect (see `CameraRig.framedEye`) so the
+   * board is as large on a phone as it is on an iPad.
+   *
+   * `cameraPitch` is radians above the horizontal. It has to be steep: the bee
+   * waits over the centre pad, and from a low angle she stands directly in
+   * front of the pad behind her — measured at 1.0 rad it was 100% hidden, so a
+   * cue landing there was unanswerable. By 1.25 the worst any target is
+   * covered is 22%, and nothing else reaches a quarter.
+   *
+   * `boardFill` is where the board's worst corner lands, with 1 being the edge
+   * of the screen; the rest is margin for the HUD along the top.
    */
-  matZoom: 0.75,
+  cameraPitch: 1.25,
+  boardFill: 0.88,
 } as const;
 
 export const COTTAGE = {

@@ -80,6 +80,21 @@ type Phase =
   | "celebrating"
   | "done";
 
+/**
+ * Half the width of the 3x3 board, from the pads themselves — three across
+ * with two gaps between them. Derived rather than written down so it can't
+ * drift out of step with the mat that gets built.
+ */
+const MAT_HALF_WIDTH = (3 * DANCE.padSize + 2 * DANCE.padGap) / 2;
+
+/** The phases played to the parked shot on the mat. */
+const MAT_PHASES: ReadonlySet<Phase> = new Set<Phase>([
+  "arriving",
+  "dancing",
+  "opening",
+  "entering",
+]);
+
 const tmp = new THREE.Vector3();
 const tmpB = new THREE.Vector3();
 const tmpMob = new THREE.Vector3();
@@ -163,8 +178,6 @@ export class CottageLevel implements Level {
       cameraDistance: COTTAGE.cameraDistance,
       cameraHeight: COTTAGE.cameraHeight,
     });
-    // configureFlight snaps the zoom back to 1, so this has to follow it.
-    ctx.setCameraZoom(DANCE.matZoom);
     ctx.setFlightControls(false);
     ctx.setObjectiveMarker(null);
     ctx.cottage.setDoorOpen(false);
@@ -173,20 +186,9 @@ export class CottageLevel implements Level {
 
     // Arrive from out in the clearing, facing the cottage.
     const start = new THREE.Vector3().copy(this.hover).add(tmpB.set(0, 1.4, 9));
-    // Facing the house, i.e. down -Z, which puts the camera behind her on +Z.
-    // That's where the pan has to land.
+    // Facing the house, i.e. down -Z, which puts the camera in front of her
+    // on +Z — the side the locked-off mat shot watches from.
     ctx.placeBee(start, DANCE.hoverHeight + 1.4, Math.PI);
-    // Where the follow rig will actually sit — zoom scales both offsets, and
-    // the pan has to land there exactly or the handover jumps.
-    this.panTo
-      .copy(start)
-      .add(
-        tmpB.set(
-          0,
-          COTTAGE.cameraHeight * DANCE.matZoom,
-          COTTAGE.cameraDistance * DANCE.matZoom,
-        ),
-      );
     ctx.bee.setCrown(true);
     ctx.bee.scripted = true;
     ctx.bee.setYaw(Math.PI); // face the door, which is at -Z of the mat
@@ -219,9 +221,34 @@ export class CottageLevel implements Level {
     ]);
   }
 
+  /**
+   * The locked-off shot on the mat, recomputed each frame.
+   *
+   * Each frame rather than once, so a rotate or a resize re-fits the board
+   * instead of leaving it half off the screen — the position it returns is
+   * fixed for a given screen, so this is still a camera that doesn't move.
+   */
+  private holdMatCamera(ctx: GameContext): void {
+    ctx.setCameraCinematic(
+      ctx.framedCameraEye(
+        ctx.cottage.matCentre,
+        MAT_HALF_WIDTH,
+        DANCE.cameraPitch,
+        DANCE.boardFill,
+      ),
+      ctx.cottage.matCentre,
+    );
+  }
+
   update(dt: number, ctx: GameContext): void {
     this.phaseTime += dt;
     this.updateHop(dt, ctx);
+
+    // Everything from the fly-in to going through the door is played to the
+    // one parked shot. `beginInside`'s configureFlight is what releases it.
+    if (MAT_PHASES.has(this.phase)) {
+      this.holdMatCamera(ctx);
+    }
     // Once the brood is out it flies itself, in every phase from here on —
     // without this they simply hang in the hive doorway where they hatched.
     if (this.babiesOut) {
@@ -284,13 +311,22 @@ export class CottageLevel implements Level {
     }
   }
 
-  /** Sweep past the cottage, then hand the camera back and fly the bee in. */
+  /** Sweep past the cottage and settle into the shot the mat is played on. */
   private updateEstablishing(ctx: GameContext): void {
     const t = Math.min(1, this.phaseTime / PAN_TIME);
     const u = ease(t);
 
-    // Quadratic Bezier from PAN_FROM through PAN_CONTROL to the follow rig's
-    // resting place, so the shot lands exactly where the chase camera wants.
+    // Quadratic Bezier from PAN_FROM through PAN_CONTROL to where the locked
+    // shot stands, so the sweep arrives exactly on it and stops — no cut, and
+    // nothing left for a spring to glide out afterwards.
+    this.panTo.copy(
+      ctx.framedCameraEye(
+        ctx.cottage.matCentre,
+        MAT_HALF_WIDTH,
+        DANCE.cameraPitch,
+        DANCE.boardFill,
+      ),
+    );
     const inv = 1 - u;
     panEye
       .copy(PAN_FROM)
@@ -301,7 +337,7 @@ export class CottageLevel implements Level {
 
     panLook.lerpVectors(
       tmp.copy(PAN_LOOK_FROM).add(YARD),
-      this.hover,
+      ctx.cottage.matCentre,
       ease(Math.max(0, t * 1.35 - 0.35)),
     );
     ctx.setCameraCinematic(panEye, panLook);
@@ -310,7 +346,6 @@ export class CottageLevel implements Level {
       return;
     }
 
-    ctx.setCameraCinematic(null);
     this.phase = "arriving";
     this.phaseTime = 0;
     ctx.hud.setObjective("The door is locked… what is that mat for?");
