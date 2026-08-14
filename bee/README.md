@@ -417,6 +417,17 @@ Things worth knowing before changing anything:
   leaving a band of bare background under the game. `visualViewport` is the one
   measurement that always describes what's visible, so the root is sized to it
   and the renderer re-measures whenever it changes.
+- **Anything anchored to an edge must clear `--ui-right` and friends.**
+  `fitViewport` sizes the app to the _largest_ of its three candidate
+  viewports, so it is deliberately allowed to be bigger than what the user can
+  see — right for the background, which should reach into every corner, and
+  wrong for a control, which lands in a strip that cannot be tapped at all. On
+  an iPad the maze's turn buttons, anchored 22px from the right, could not be
+  pressed; sliding them 173px left made them work and 172px did not. An edge
+  that sharp is a boundary, not a hit-testing quirk — and the throttle beside
+  them was fine throughout because it is anchored to the _left_. fitViewport
+  now publishes the overshoot on each side and the HUD, the sticks and the
+  banner all add it to their offsets.
 - **Coplanar faces z-fight.** The cottage's doorway recess and its door both
   used to end exactly on the wall's front face (z = 2.1 in house units), which
   showed up as brown lines flickering across the door. Anything laid _on_ a

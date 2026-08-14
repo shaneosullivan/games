@@ -1,4 +1,12 @@
 :root {
+  /* How far the app runs past the visible viewport on each side — see
+     fitViewport.ts. Anything anchored to an edge has to clear these, or it
+     lands in a strip the user cannot reach: on an iPad that is exactly why the
+     maze's right-hand turn buttons could not be tapped. */
+  --ui-left: 0px;
+  --ui-right: 0px;
+  --ui-top: 0px;
+  --ui-bottom: 0px;
   --safe-t: env(safe-area-inset-top, 0px);
   --safe-b: env(safe-area-inset-bottom, 0px);
   --safe-l: env(safe-area-inset-left, 0px);
@@ -96,9 +104,9 @@ body {
  */
 .hud-top {
   position: absolute;
-  top: calc(var(--safe-t) + 14px);
-  left: calc(var(--safe-l) + 16px);
-  right: calc(var(--safe-r) + 16px);
+  top: calc(var(--safe-t) + var(--ui-top) + 14px);
+  left: calc(var(--safe-l) + var(--ui-left) + 16px);
+  right: calc(var(--safe-r) + var(--ui-right) + 16px);
   display: grid;
   /* Equal side columns, so the title stays centred on the *screen* rather than
      in the gap between the counters and the buttons — those differ in width by
@@ -372,8 +380,8 @@ body {
 
 .alt {
   position: absolute;
-  right: calc(var(--safe-r) + 26px);
-  bottom: calc(var(--safe-b) + 26px);
+  right: calc(var(--safe-r) + var(--ui-right) + 26px);
+  bottom: calc(var(--safe-b) + var(--ui-bottom) + 26px);
   width: 64px;
   height: min(300px, 44vh);
   pointer-events: auto;
@@ -464,7 +472,7 @@ body {
 .carry {
   position: absolute;
   left: 50%;
-  bottom: calc(var(--safe-b) + 26px);
+  bottom: calc(var(--safe-b) + var(--ui-bottom) + 26px);
   transform: translate(-50%, 14px);
   display: flex;
   align-items: center;
@@ -1003,8 +1011,8 @@ body {
  */
 .throttle {
   position: absolute;
-  left: calc(var(--safe-l) + 26px);
-  bottom: calc(var(--safe-b) + 26px);
+  left: calc(var(--safe-l) + var(--ui-left) + 26px);
+  bottom: calc(var(--safe-b) + var(--ui-bottom) + 26px);
   width: 64px;
   height: min(300px, 44vh);
   pointer-events: auto;
@@ -1093,8 +1101,8 @@ body {
  */
 .turnpad {
   position: absolute;
-  right: calc(var(--safe-r) + 22px);
-  bottom: calc(var(--safe-b) + 26px);
+  right: calc(var(--safe-r) + var(--ui-right) + 22px);
+  bottom: calc(var(--safe-b) + var(--ui-bottom) + 26px);
   display: flex;
   gap: 14px;
   pointer-events: auto;
@@ -1314,7 +1322,7 @@ body {
 .update-banner {
   position: absolute;
   left: 50%;
-  bottom: calc(18px + env(safe-area-inset-bottom));
+  bottom: calc(18px + var(--ui-bottom) + env(safe-area-inset-bottom));
   transform: translateX(-50%);
   z-index: 30;
   display: flex;

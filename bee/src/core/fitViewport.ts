@@ -46,6 +46,33 @@ export function fitViewport(root: HTMLElement, onResize: () => void): void {
     root.style.width = `${width}px`;
     root.style.height = `${height}px`;
 
+    // How far the app runs past what the user can actually see.
+    //
+    // Taking the maximum above means it is deliberately allowed to be bigger
+    // than the visible viewport — right for the background, which should reach
+    // into every corner, and wrong for anything anchored to an edge, which
+    // lands in a strip that cannot be tapped at all.
+    //
+    // This is not hypothetical. On an iPad the maze's turn buttons, anchored
+    // 22px from the right, could not be pressed; sliding them 173px left made
+    // them work and 172px did not — an edge that sharp is a boundary, not a
+    // hit-testing quirk. The throttle beside them was fine throughout because
+    // it is anchored to the *left*. Edge-anchored UI adds these to its offsets;
+    // see `--ui-right` and friends in ui/styles.css.
+    const seenW = vv ? Math.round(vv.width) : width;
+    const seenH = vv ? Math.round(vv.height) : height;
+    const style = document.documentElement.style;
+    style.setProperty("--ui-left", `${Math.round(vv?.offsetLeft ?? 0)}px`);
+    style.setProperty("--ui-top", `${Math.round(vv?.offsetTop ?? 0)}px`);
+    style.setProperty(
+      "--ui-right",
+      `${Math.max(0, width - seenW - Math.round(vv?.offsetLeft ?? 0))}px`,
+    );
+    style.setProperty(
+      "--ui-bottom",
+      `${Math.max(0, height - seenH - Math.round(vv?.offsetTop ?? 0))}px`,
+    );
+
     if (width === lastW && height === lastH) {
       return;
     }
