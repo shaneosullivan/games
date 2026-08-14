@@ -12,8 +12,20 @@
  * you leave the knob; this is a throttle, and letting go has to mean stop.
  */
 export class ThrottleStick {
-  /** -1 full astern to +1 full ahead. */
+  /**
+   * -1 full astern to +1 full ahead, eased toward whatever the finger is
+   * asking for.
+   *
+   * Eased rather than taken straight because every source of it is a step: the
+   * dead zone snaps to nought, letting go snaps back to the middle, a key is
+   * on or off, and pointermove arrives in jumps. Fed to the flight model raw
+   * that reads as a bee that lurches — the acceleration curve underneath can't
+   * smooth an input that teleports.
+   */
   value = 0;
+
+  /** What the control is being asked for, before the easing. */
+  private target = 0;
 
   private readonly root: HTMLDivElement;
   private readonly rail: HTMLDivElement;
@@ -71,8 +83,25 @@ export class ThrottleStick {
     if (!visible) {
       this.pointerId = null;
       this.keys.clear();
-      this.sync();
+      this.target = 0;
+      this.value = 0;
+      this.draw();
     }
+  }
+
+  /**
+   * Ease toward what's being asked for. Called once a frame by the Game.
+   *
+   * Quick enough to feel direct — about a tenth of a second to most of the way
+   * — and slow enough that letting go is a glide rather than a stop.
+   */
+  update(dt: number): void {
+    const k = 1 - Math.exp(-THROTTLE_EASE * dt);
+    this.value += (this.target - this.value) * k;
+    if (Math.abs(this.target - this.value) < 0.004) {
+      this.value = this.target;
+    }
+    this.draw();
   }
 
   private readonly onDown = (e: PointerEvent): void => {
@@ -101,13 +130,13 @@ export class ThrottleStick {
   private track(e: PointerEvent): void {
     const box = this.rail.getBoundingClientRect();
     const t = (e.clientY - box.top) / Math.max(1, box.height);
-    this.value = Math.max(-1, Math.min(1, 1 - t * 2));
+    let v = Math.max(-1, Math.min(1, 1 - t * 2));
     // A dead zone in the middle, so resting a thumb on the centre is a stop
     // rather than a crawl.
-    if (Math.abs(this.value) < 0.12) {
-      this.value = 0;
+    if (Math.abs(v) < 0.12) {
+      v = 0;
     }
-    this.draw();
+    this.target = v;
   }
 
   private sync(): void {
@@ -125,8 +154,7 @@ export class ThrottleStick {
     ) {
       v -= 1;
     }
-    this.value = v;
-    this.draw();
+    this.target = v;
   }
 
   private draw(): void {
@@ -139,6 +167,9 @@ export class ThrottleStick {
     this.fill.style.height = `${half}%`;
   }
 }
+
+/** How fast `value` chases `target`, per second. */
+const THROTTLE_EASE = 16;
 
 const KEYS = new Set(["w", "W", "s", "S", "ArrowUp", "ArrowDown"]);
 

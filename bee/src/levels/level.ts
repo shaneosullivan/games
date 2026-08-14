@@ -186,4 +186,11 @@ export interface Level {
   /** Shown on the level-complete card. */
   readonly completionTitle: string;
   readonly completionBody: string;
+  /**
+   * True if there is nothing to carry on to. The completion card then offers
+   * the menu instead of "Keep flying" — at the end of the last level, leaving
+   * the player alone in a finished world with no prompt is a dead end, not a
+   * reward.
+   */
+  readonly finishesGame?: boolean;
 }

@@ -169,7 +169,8 @@ whole maze, and a scent appears along the correct route out, pulsing in the
 direction of travel. It shows the next nine cells only — enough of a nudge to
 get going, not enough to solve it, which is why the other dead ends still have
 something to offer. The scent stays for the rest of the level. Reaching the
-glowing ring at the far corner finishes it.
+glowing ring at the far corner finishes it — and because there is nothing after
+it, its completion card offers the map rather than "Keep flying".
 
 **The puzzle art is a placeholder** — a hand-authored SVG in
 `src/assets/bearPuzzle.ts`. To use the real picture, drop the image into

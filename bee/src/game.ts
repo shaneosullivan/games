@@ -395,6 +395,9 @@ export class Game {
       this.level.completionTitle,
       this.level.completionBody,
     );
+    this.completeScreen.setButton?.(
+      this.level.finishesGame ? "Back to the map" : "Keep flying",
+    );
     this.level.enter(this.ctx);
     this.syncCottageGate();
   }
@@ -525,6 +528,12 @@ export class Game {
       "Keep flying",
       () => {
         this.completeScreen.hide();
+        // The end of the road: back to the map rather than left flying around
+        // a finished level with nothing left to do in it.
+        if (this.level.finishesGame) {
+          this.openMenu();
+          return;
+        }
         this.running = true;
         // Finishing a level bumps the save; if a next level exists, go there.
         const next = this.save.data.level;
@@ -661,6 +670,9 @@ export class Game {
       this.bee.desiredHeight = this.altitude.desiredHeight;
     }
     if (tank) {
+      // Eased, so the knob and the bee both glide rather than snapping between
+      // the dead zone, full ahead and let-go.
+      this.throttle.update(dt);
       // Up the track is forward, and the flight model reads forward as -y.
       this.throttleInput.y = -this.throttle.value;
       this.throttleInput.magnitude = Math.abs(this.throttle.value);

@@ -56,6 +56,9 @@ export class MazeLevel implements Level {
   readonly completionBody =
     "You found your way through every twist and turn of the Windy Woods. Not one wrong turn could stop you.";
 
+  /** The last level there is, so finishing it hands back to the map. */
+  readonly finishesGame = true;
+
   complete = false;
 
   private phase: Phase = "exploring";

@@ -10,6 +10,8 @@ export interface Overlay {
   hide(): void;
   /** Re-word the card, so one overlay can serve every level. */
   setText(title: string, body: string): void;
+  /** Re-word the button too. Only the message card has one to re-word. */
+  setButton?(label: string): void;
 }
 
 function makeOverlay(host: HTMLElement): {
@@ -404,6 +406,9 @@ export function createMessageScreen(
     setText(nextTitle, nextBody) {
       h1.textContent = nextTitle;
       p.textContent = nextBody;
+    },
+    setButton(label) {
+      btn.textContent = label;
     },
   };
 }
