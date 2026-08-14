@@ -15,12 +15,53 @@
  *
  * @param onResize called after the size changes, so the renderer can follow
  */
+
+/**
+ * How often to re-measure with nothing having told us to.
+ *
+ * Events are not enough. iPadOS can resize an installed app's window without
+ * firing a resize anywhere the page can hear it — taking a screenshot of a
+ * standalone PWA is one way in — and every trigger below is an event, so the
+ * app would keep the numbers it measured before the change until it was
+ * restarted. That is not a cosmetic drift: the edge insets below come out of
+ * those numbers, and stale ones put edge-anchored controls somewhere a finger
+ * can't reach.
+ *
+ * Twice a second is far below anything a person notices and, because `apply`
+ * returns early when nothing moved, an idle poll writes nothing.
+ */
+const POLL_MS = 500;
+
+/** Fits worth remembering, for when a control misbehaves. See `core/probe.ts`. */
+export interface Fit {
+  t: number;
+  why: string;
+  size: [number, number];
+  seen: [number, number];
+  inset: [number, number, number, number];
+}
+
+/**
+ * The last few fits, newest last.
+ *
+ * `chofter.probe()` reports these. The question they answer is the one that
+ * can't be answered from a screenshot: when the app is laid out wrongly, is it
+ * because nothing told us to re-measure — in which case the poll below will
+ * have corrected it and the history shows the correction — or because the
+ * numbers the browser hands back are themselves stale, in which case every
+ * entry here agrees with every other and they are all wrong together.
+ */
+export const fits: Array<Fit> = [];
+const FITS_MAX = 8;
+
 export function fitViewport(root: HTMLElement, onResize: () => void): void {
   const vv = window.visualViewport;
   let lastW = 0;
   let lastH = 0;
+  /** Everything last written, so an unchanged poll can do nothing at all. */
+  let lastApplied = "";
 
-  const apply = (): void => {
+  const apply = (why: string): void => {
     // The *largest* of the three, not the visual viewport alone.
     //
     // On an installed iPad app the visual viewport comes back a status bar
@@ -41,11 +82,6 @@ export function fitViewport(root: HTMLElement, onResize: () => void): void {
       window.innerHeight,
     );
 
-    root.style.top = "0px";
-    root.style.left = "0px";
-    root.style.width = `${width}px`;
-    root.style.height = `${height}px`;
-
     // How far the app runs past what the user can actually see.
     //
     // Taking the maximum above means it is deliberately allowed to be bigger
@@ -61,17 +97,38 @@ export function fitViewport(root: HTMLElement, onResize: () => void): void {
     // see `--ui-right` and friends in ui/styles.css.
     const seenW = vv ? Math.round(vv.width) : width;
     const seenH = vv ? Math.round(vv.height) : height;
-    const style = document.documentElement.style;
-    style.setProperty("--ui-left", `${Math.round(vv?.offsetLeft ?? 0)}px`);
-    style.setProperty("--ui-top", `${Math.round(vv?.offsetTop ?? 0)}px`);
-    style.setProperty(
-      "--ui-right",
-      `${Math.max(0, width - seenW - Math.round(vv?.offsetLeft ?? 0))}px`,
-    );
-    style.setProperty(
-      "--ui-bottom",
-      `${Math.max(0, height - seenH - Math.round(vv?.offsetTop ?? 0))}px`,
-    );
+    const offsetX = Math.round(vv?.offsetLeft ?? 0);
+    const offsetY = Math.round(vv?.offsetTop ?? 0);
+    const right = Math.max(0, width - seenW - offsetX);
+    const bottom = Math.max(0, height - seenH - offsetY);
+
+    const signature = [width, height, offsetX, offsetY, right, bottom].join();
+    if (signature === lastApplied) {
+      return;
+    }
+    lastApplied = signature;
+
+    root.style.top = "0px";
+    root.style.left = "0px";
+    root.style.width = `${width}px`;
+    root.style.height = `${height}px`;
+
+    const style = doc.style;
+    style.setProperty("--ui-left", `${offsetX}px`);
+    style.setProperty("--ui-top", `${offsetY}px`);
+    style.setProperty("--ui-right", `${right}px`);
+    style.setProperty("--ui-bottom", `${bottom}px`);
+
+    fits.push({
+      t: Math.round(performance.now()),
+      why,
+      size: [width, height],
+      seen: [seenW, seenH],
+      inset: [offsetX, offsetY, right, bottom],
+    });
+    if (fits.length > FITS_MAX) {
+      fits.shift();
+    }
 
     if (width === lastW && height === lastH) {
       return;
@@ -81,12 +138,26 @@ export function fitViewport(root: HTMLElement, onResize: () => void): void {
     onResize();
   };
 
-  apply();
-  window.addEventListener("resize", apply);
+  apply("initial");
+  window.addEventListener("resize", () => apply("resize"));
   // iOS finishes its launch animation after load, and the viewport it settles
   // on is often not the one the first layout saw.
-  window.addEventListener("orientationchange", () => setTimeout(apply, 120));
-  window.addEventListener("pageshow", apply);
-  vv?.addEventListener("resize", apply);
-  vv?.addEventListener("scroll", apply);
+  window.addEventListener("orientationchange", () =>
+    setTimeout(() => apply("orientationchange"), 120),
+  );
+  window.addEventListener("pageshow", () => apply("pageshow"));
+  vv?.addEventListener("resize", () => apply("vv-resize"));
+  vv?.addEventListener("scroll", () => apply("vv-scroll"));
+
+  // Coming back to the app is the likeliest moment for the window to have
+  // changed under us — including the screenshot case, which puts a preview over
+  // the app and takes it away again.
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") {
+      apply("visible");
+    }
+  });
+  window.addEventListener("focus", () => apply("focus"));
+
+  setInterval(() => apply("poll"), POLL_MS);
 }

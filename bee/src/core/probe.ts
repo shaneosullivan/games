@@ -19,6 +19,8 @@
  * a chat. Tap the dead button a few times, then run `chofter.probe()`.
  */
 
+import {fits} from "./fitViewport";
+
 /** Live presses to keep. Enough for a few taps; small enough to read. */
 const RECENT_MAX = 14;
 
@@ -314,6 +316,10 @@ export function probeReport(): Record<string, unknown> {
     game: state ?? "no controls installed",
     overlayUp: describe(document.querySelector(".overlay:not(.hidden)")),
     viewport: viewportReport(),
+    // Every re-fit since load, and what prompted it. If the layout is wrong and
+    // the last entry says "poll", something resized the window without telling
+    // the page — see core/fitViewport.ts.
+    fits,
     controls,
     // Empty means the browser delivered nothing at all — which would be the
     // whole answer on its own.
