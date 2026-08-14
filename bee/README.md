@@ -177,7 +177,10 @@ drops yellow pollen behind her, so a corridor she has already tried looks
 different from one she hasn't. Every dead end holds a flower: fly into it and
 she eats it, the camera climbs above the woods for five seconds to show you the
 whole maze, and a scent appears along the correct route out, pulsing in the
-direction of travel. It shows the next nine cells only — enough of a nudge to
+direction of travel. It is drawn twice — solid where you can
+see it, and faintly through the hedges where you can't, because a guide that
+disappears behind a wall stops being one exactly when you are far enough away
+to need it. It shows the next nine cells only — enough of a nudge to
 get going, not enough to solve it, which is why the other dead ends still have
 something to offer. The scent stays for the rest of the level. Reaching the
 glowing ring at the far corner finishes it — and because there is nothing after

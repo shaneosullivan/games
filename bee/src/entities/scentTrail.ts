@@ -7,6 +7,15 @@ const colour = new THREE.Color();
 const base = new THREE.Color(MAZE_PALETTE.scent);
 
 /**
+ * How strongly the trail shows through a hedge.
+ *
+ * Enough to follow at a glance, little enough that the solid pass in front of
+ * it still reads as the nearer one — and that the few motes which pass behind
+ * the bee herself don't look painted over her.
+ */
+const GHOST_OPACITY = 0.3;
+
+/**
  * The scent a flower leaves on the air, showing which way is out.
  *
  * A line of motes rather than a drawn line, because what makes it read as a
@@ -20,6 +29,18 @@ const base = new THREE.Color(MAZE_PALETTE.scent);
  */
 export class ScentTrail {
   readonly mesh: THREE.InstancedMesh;
+  /**
+   * The same motes again, drawn through everything.
+   *
+   * The trail lies at 1.9 and the hedges stand 5.6, so from anywhere but the
+   * corridor you are actually in, the wall hides where it goes — the guide
+   * disappears exactly when you are far enough away to need it. (Close up it
+   * looks right only because the walls fade near the camera.) This pass has
+   * depth testing off so the route always reads, and it is faint enough that
+   * where it does cross something solid it is plainly a scent hanging in the
+   * air rather than a mistake.
+   */
+  readonly ghost: THREE.InstancedMesh;
 
   private count = 0;
   /** Distance along its own run, per mote — what the pulse travels through. */
@@ -47,6 +68,18 @@ export class ScentTrail {
       3,
     );
     this.mesh.frustumCulled = false;
+
+    const ghostMat = mat.clone();
+    ghostMat.opacity = GHOST_OPACITY;
+    ghostMat.depthTest = false;
+    this.ghost = new THREE.InstancedMesh(geo, ghostMat, capacity);
+    // Share the buffers rather than keeping two copies in step: an attribute
+    // marked dirty once is uploaded once and both meshes draw from it.
+    this.ghost.instanceMatrix = this.mesh.instanceMatrix;
+    this.ghost.instanceColor = this.mesh.instanceColor;
+    this.ghost.frustumCulled = false;
+    // After everything else, so "no depth test" means what it says.
+    this.ghost.renderOrder = 10;
     this.along = new Float32Array(capacity);
     this.reset();
   }

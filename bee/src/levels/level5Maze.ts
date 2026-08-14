@@ -85,7 +85,7 @@ export class MazeLevel implements Level {
     const maze = generateMaze(MAZE.cols, MAZE.rows, rng);
     this.scene = createMazeScene(maze, rng);
     ctx.woods.add(this.scene.group);
-    this.scene.group.add(this.crumbs.mesh, this.scent.mesh);
+    this.scene.group.add(this.crumbs.mesh, this.scent.mesh, this.scent.ghost);
     this.crumbs.reset();
     this.scent.reset();
 
@@ -140,7 +140,11 @@ export class MazeLevel implements Level {
     }
     // The trails are ours and get reused, so take them out before the group
     // they were parented to is thrown away with everything in it.
-    this.scene.group.remove(this.crumbs.mesh, this.scent.mesh);
+    this.scene.group.remove(
+      this.crumbs.mesh,
+      this.scent.mesh,
+      this.scent.ghost,
+    );
     ctx.woods.remove(this.scene.group);
     this.scene.dispose();
     this.scene = null;
