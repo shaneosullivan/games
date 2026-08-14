@@ -155,6 +155,11 @@ export interface GameContext {
    */
   pickTap(objects: ReadonlyArray<THREE.Object3D>): THREE.Object3D | null;
   /**
+   * Consume this frame's screen tap without caring where it landed — for
+   * "tap to get on with it". Taps on the HUD are never offered here.
+   */
+  takeTap(): boolean;
+  /**
    * Turn the brood loose in the meadow, pouring out of `origin`. Moves the ring
    * out of the hive interior so it renders outdoors.
    */

@@ -253,6 +253,11 @@ export class Game {
       celebratePuzzle: () => burstRainbow(this.puzzle.root),
       setFlightControls: on => this.setFlightControls(on),
       pickTap: objects => this.pickTap(objects),
+      takeTap: () => {
+        const tapped = this.pendingTap !== null;
+        this.pendingTap = null;
+        return tapped;
+      },
       cottage: this.cottage,
       woods: this.woodsGroup,
       inside: this.inside,
@@ -874,6 +879,12 @@ export class Game {
       this.save.flush();
       this.completeScreen.show();
     }
+
+    // A tap belongs to the frame it landed in. Without this it sits there
+    // until something happens to ask, and the next thing that does gets a tap
+    // from minutes ago — the maze's survey would skip itself the moment it
+    // began, on the strength of a tap taken while she was still flying.
+    this.pendingTap = null;
   }
 
   private setScreenFade(alpha: number): void {

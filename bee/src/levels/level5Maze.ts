@@ -36,6 +36,27 @@ const ease = (t: number): number =>
   t < 0.5 ? 2 * t * t : 1 - (1 - t) * (1 - t) * 2;
 
 /**
+ * How far up the survey shot is at time `t`: 0 behind the bee, 1 over the
+ * woods. Rise, hold, fall — and 0 once it's done.
+ *
+ * Separate from the phase because a tap has to know the height it is
+ * interrupting, so that it can come down from there rather than snapping.
+ */
+function surveyHeight(t: number): number {
+  const {surveyRise: rise, surveyHold: hold, surveyFall: fall} = MAZE;
+  if (t < rise) {
+    return ease(t / rise);
+  }
+  if (t < rise + hold) {
+    return 1;
+  }
+  if (t < rise + hold + fall) {
+    return 1 - ease((t - rise - hold) / fall);
+  }
+  return 0;
+}
+
+/**
  * Level 5 — The Windy Woods.
  *
  * A maze of trees, generated fresh on every entry so it can't be learned. The
@@ -72,6 +93,14 @@ export class MazeLevel implements Level {
   private nextFirework = 0;
   /** How much the scent motes are grown for the survey shot. 1 on the ground. */
   private scentScale = 1;
+  /**
+   * How high the shot was when it was tapped away, or -1 for "not tapped".
+   *
+   * The fall has to start from wherever the shot had got to: tapping during
+   * the rise and then playing the ordinary fall would snap the camera up to
+   * the top before bringing it down.
+   */
+  private surveySkipFrom = -1;
   get controlsLocked(): boolean {
     return this.phase !== "exploring";
   }
@@ -299,6 +328,7 @@ export class MazeLevel implements Level {
   private beginSurvey(ctx: GameContext): void {
     this.phase = "surveying";
     this.phaseTime = 0;
+    this.surveySkipFrom = -1;
     // The survey drives the camera itself, so the confine stops being called
     // and the swing would otherwise still be part-way up when it hands back.
     // Where the shot is now, so the rise starts from it and the fall comes
@@ -320,15 +350,31 @@ export class MazeLevel implements Level {
     );
 
     const {surveyRise: rise, surveyHold: hold, surveyFall: fall} = MAZE;
+
+    // Tap to get on with it. The shot is a nudge, not a cutscene, and a player
+    // who has already read the maze shouldn't have to sit out the hold. Taps on
+    // the HUD never reach here, so the home button still means the home button.
+    if (this.surveySkipFrom < 0 && ctx.takeTap()) {
+      this.surveySkipFrom = surveyHeight(this.phaseTime);
+      this.phaseTime = 0;
+    }
+
     const t = this.phaseTime;
     let k: number;
-    if (t < rise) {
-      k = ease(t / rise);
-    } else if (t < rise + hold) {
-      k = 1;
-    } else if (t < rise + hold + fall) {
-      k = 1 - ease((t - rise - hold) / fall);
+    let over: boolean;
+    if (this.surveySkipFrom >= 0) {
+      // Down from wherever it was, over the ordinary fall's time scaled to how
+      // far there is left to come — a tap early in the rise comes back quicker
+      // than one from the top, which is what "at once" means from close in.
+      const drop = fall * this.surveySkipFrom;
+      over = t >= drop;
+      k = over ? 0 : this.surveySkipFrom * (1 - ease(t / drop));
     } else {
+      k = surveyHeight(t);
+      over = t >= rise + hold + fall;
+    }
+
+    if (over) {
       // Hand it back to the follow rig, which glides in from here.
       ctx.setCameraCinematic(null);
       ctx.setFogScale(1);
@@ -336,6 +382,7 @@ export class MazeLevel implements Level {
       ctx.bee.scripted = false;
       this.phase = "exploring";
       this.phaseTime = 0;
+      this.surveySkipFrom = -1;
       ctx.hud.setObjective("Find your way out of the woods!");
       return;
     }
