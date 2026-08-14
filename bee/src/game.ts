@@ -529,9 +529,11 @@ export class Game {
       () => {
         this.completeScreen.hide();
         // The end of the road: back to the map rather than left flying around
-        // a finished level with nothing left to do in it.
+        // a finished level with nothing left to do in it. `showMenu`, not
+        // `openMenu` — this button has already decided, and must never be a
+        // press that appears to do nothing.
         if (this.level.finishesGame) {
-          this.openMenu();
+          this.showMenu();
           return;
         }
         this.running = true;
@@ -636,13 +638,23 @@ export class Game {
     return hits.length ? hits[0].object : null;
   }
 
-  /** The 🏠 button: pause and go back to the level menu. */
+  /**
+   * The 🏠 button: pause and go back to the level menu.
+   *
+   * Guarded on the menu already being up, not on `running` — otherwise it
+   * silently does nothing whenever another card is showing. Anything that has
+   * *decided* to go to the menu should call `showMenu` and not have to know
+   * about the guard: a button that does nothing is the worst possible answer.
+   */
   private openMenu(): void {
-    // Guard on the menu already being up, not on `running` — otherwise this
-    // silently does nothing whenever another card is showing.
     if (!this.codenameScreen.root.classList.contains("hidden")) {
       return;
     }
+    this.showMenu();
+  }
+
+  /** Put the menu up, whatever else is on screen. */
+  private showMenu(): void {
     this.completeScreen.hide();
     this.running = false;
     this.audio.setThreat(0);
