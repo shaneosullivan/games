@@ -143,7 +143,10 @@ export class RoyalChamberLevel implements Level {
     }
   }
 
-  /** Flying up to a glowing cell takes its hexagon. */
+  /**
+   * Flying up to a glowing cell takes its hexagon — or trades the one she's
+   * already carrying for it, if it's a different colour.
+   */
   private updateTaking(ctx: GameContext): void {
     const took = ctx.larder.tryTake(ctx.bee.position);
     if (!took) {
@@ -151,6 +154,16 @@ export class RoyalChamberLevel implements Level {
     }
     ctx.hud.setCarrying(took.kind, POLLEN_LABEL[took.kind]);
     ctx.audio.collect(1);
+    // On a swap, two puffs: the colour going back into the wall as well as the
+    // one coming out, so it reads as a trade and not as a pick-up she didn't
+    // ask for.
+    if (took.swapped) {
+      ctx.puff.burst(took.at, {
+        color: POLLEN_COLOR[took.swapped],
+        count: 10,
+        speed: 1.2,
+      });
+    }
     ctx.puff.burst(took.at, {color: POLLEN_COLOR[took.kind], count: 14});
     this.refreshObjective(ctx);
   }

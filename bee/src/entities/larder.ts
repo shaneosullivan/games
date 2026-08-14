@@ -11,6 +11,8 @@ export interface TakeResult {
   kind: PollenKind;
   /** Where it came out of the wall, for the puff. */
   at: THREE.Vector3;
+  /** What she put down to take it, if this was a swap rather than a pick-up. */
+  swapped: PollenKind | null;
 }
 
 interface Cell {
@@ -124,18 +126,31 @@ export class Larder {
 
   /**
    * Take the food out of whichever full cell the bee is close enough to.
-   * Returns null when there's nothing in reach, or when she's already loaded —
-   * one hexagon at a time keeps the trip a legible there-and-back.
+   *
+   * She carries one hexagon at a time, which keeps the trip a legible
+   * there-and-back — but "one at a time" used to mean a full bee couldn't
+   * touch the wall at all, and there was nothing anywhere to put a hexagon
+   * down on. Fetch a colour nobody turns out to want and that was the level
+   * over: no baby would take it and no cell would swap it. So a loaded bee may
+   * still take a *different* colour, and the one she was holding goes back to
+   * the wall she got it from.
+   *
+   * Swapping asks her to come closer than a fresh pick-up does. Both happen on
+   * proximity alone, and at the full take radius she would swap her load for
+   * whatever she happened to skim on the way back to the brood.
    */
   tryTake(beePosition: THREE.Vector3): TakeResult | null {
-    if (this.carrying || this.delivery) {
+    if (this.delivery) {
       return null;
     }
 
+    const reach = this.carrying ? FOOD.swapRadius : FOOD.takeRadius;
     let best: Cell | null = null;
-    let bestDist = FOOD.takeRadius * FOOD.takeRadius;
+    let bestDist = reach * reach;
     for (const entry of this.cells) {
-      if (entry.refillIn > 0) {
+      // Nothing to gain from swapping a colour for the same colour, and it
+      // would empty a cell for no reason.
+      if (entry.refillIn > 0 || entry.cell.kind === this.carrying) {
         continue;
       }
       const d = entry.cell.position.distanceToSquared(beePosition);
@@ -148,6 +163,8 @@ export class Larder {
       return null;
     }
 
+    const swapped = this.carrying;
+
     best.refillIn = FOOD.refillSeconds;
     best.cell.setFull(false);
     best.cell.ring.visible = false;
@@ -158,7 +175,7 @@ export class Larder {
     this.hex.setVisible(true);
     this.load.pickUp(belly.copy(beePosition).setY(beePosition.y - 0.35));
 
-    return {kind: best.cell.kind, at: best.cell.position.clone()};
+    return {kind: best.cell.kind, at: best.cell.position.clone(), swapped};
   }
 
   /**

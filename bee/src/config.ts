@@ -287,6 +287,15 @@ export const FOOD = {
   hoverOut: 2.6,
   /** Close enough to take it. Generous: this is a tap-free, one-handed game. */
   takeRadius: 3.4,
+  /**
+   * ...and closer still to swap one you're already carrying for it.
+   *
+   * A loaded bee can trade her hexagon for a different colour, which is what
+   * stops a wrong guess ending the level. Tighter than `takeRadius` because
+   * both happen on proximity alone: at the full radius she would swap her load
+   * for whatever she skimmed on the way back to the brood.
+   */
+  swapRadius: 2.2,
   /** Seconds before an emptied cell fills again. */
   refillSeconds: 6.0,
   /** Rate and depth of the glow pulse around a full cell. */

@@ -291,10 +291,21 @@ export function createBaby(): BabyModel {
   }
   geo.computeVertexNormals();
 
+  // Two groups on purpose. The ring that owns this baby sets `group`'s
+  // position and its yaw, to sit it on a perch facing out of the circle;
+  // everything animate() does goes on `pivot` inside it.
+  //
+  // It has to be that way round. Euler order XYZ applies the x rotation
+  // outermost, so writing rotation.x on the same group the ring had yawed
+  // pitched the baby about the *world's* x axis, not its own: the ones facing
+  // across the room tipped sideways and the ones facing away lifted their
+  // behinds instead of their heads.
   const group = new THREE.Group();
+  const pivot = new THREE.Group();
+  group.add(pivot);
   const body = new THREE.Mesh(geo, vertexToon());
   body.castShadow = true;
-  group.add(body);
+  pivot.add(body);
 
   // Proper bee stripes, earned at full growth. Parented to the body mesh so
   // they inherit the growth scaling for free. A torus lies in the XY plane,
@@ -335,12 +346,12 @@ export function createBaby(): BabyModel {
   const wings: Array<THREE.Object3D> = [];
   const wingSigns: Array<number> = [];
   for (const sx of [-1, 1]) {
-    const pivot = new THREE.Object3D();
-    pivot.position.set(sx * 0.1, 0.2, -0.05);
-    pivot.scale.set(sx, 1, 1);
-    pivot.add(new THREE.Mesh(wingGeo, wingMat));
-    group.add(pivot);
-    wings.push(pivot);
+    const wingPivot = new THREE.Object3D();
+    wingPivot.position.set(sx * 0.1, 0.2, -0.05);
+    wingPivot.scale.set(sx, 1, 1);
+    wingPivot.add(new THREE.Mesh(wingGeo, wingMat));
+    pivot.add(wingPivot);
+    wings.push(wingPivot);
     wingSigns.push(sx);
   }
 
@@ -366,11 +377,11 @@ export function createBaby(): BabyModel {
     animate(elapsed, wiggle, rear = 0) {
       // Hungry babies rock side to side and flap; full ones just breathe.
       const rock = Math.sin(elapsed * 5.5) * 0.22 * wiggle;
-      group.rotation.z = rock * (1 - rear);
+      pivot.rotation.z = rock * (1 - rear);
       // Reared: nose to the sky like a chick in a nest, with a quick eager
       // bob on top. The body runs along +Z with the head at the far end, so
       // pitching negative about x is what tips the face upward.
-      group.rotation.x =
+      pivot.rotation.x =
         Math.sin(elapsed * 2.2) * 0.05 -
         rear * (1.05 + Math.sin(elapsed * 7.5) * 0.09);
       const flap = Math.sin(elapsed * Math.PI * 2 * 9) * (0.15 + wiggle * 0.5);
@@ -379,7 +390,7 @@ export function createBaby(): BabyModel {
       }
       const breathe = 1 + Math.sin(elapsed * 1.7 + growth) * 0.03;
       // Stretching up as it begs, which is most of what sells the reach.
-      group.scale.y = breathe * (1 + rear * 0.18);
+      pivot.scale.y = breathe * (1 + rear * 0.18);
     },
   };
 }

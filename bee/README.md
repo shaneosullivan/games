@@ -86,6 +86,8 @@ colour and the baby rears up on end like a chick, mouth to the sky, and the
 hexagon flies out of your hands into it. The food is scattered up the wall as
 well as around it, so half the job is climbing to the right one. An emptied
 cell goes dark and fills again a few seconds later, so the wall can't run out.
+Carrying the wrong colour is never a dead end: fly right up to a cell holding a
+different one and she trades, putting hers back and taking that instead.
 Babies get hungry on their own clocks and
 crave a random colour each time; three feeds and one grows up — plumping out and
 earning a proper bee stripe, so you can see at a glance who's done. When all six are
@@ -531,7 +533,13 @@ Things worth knowing before changing anything:
 - **A model's `animate()` must not write to the group the caller positioned.**
   The queen's bob originally set `group.position.y` directly, which silently
   dragged her from her dais down to the floor. Bobs and sways belong on an
-  inner group.
+  inner group. The babies were a subtler version of the same thing: the ring
+  yaws each one to face out of the circle, and `animate` wrote `rotation.x` on
+  that same group — Euler order XYZ applies x outermost, so they pitched about
+  the _world's_ x axis rather than their own. The ones facing across the room
+  tipped sideways and the ones facing away lifted their behinds instead of
+  their heads. `createBaby` has an inner pivot now: the ring owns position and
+  yaw, `animate` owns everything else.
 - **The wasp's speed and `loseRadius` are coupled.** It is now slightly _faster_
   than the bee (`WASP.speed` 10.2 vs `FLIGHT.maxSpeed` 9.5) and escapes by
   cornering badly instead — at the original 7.2 a straight-line flee outran its
