@@ -16,7 +16,8 @@ import type {HiveSite} from "../render/geometry/world";
 import type {Hud} from "../ui/hud";
 
 /** Which set of scenery is on screen. */
-export type EnvironmentName = "meadow" | "hive" | "cottage" | "inside";
+export type EnvironmentName =
+  "meadow" | "hive" | "cottage" | "inside" | "woods";
 
 /** Playable volume and camera framing, which differ per level. */
 export interface FlightSettings {
@@ -60,6 +61,12 @@ export interface GameContext {
   wasp: WaspActor;
   bear: BearActor;
   cottage: CottageScene;
+  /**
+   * The container the Windy Woods is built into. Empty until level 5 fills it:
+   * that maze is generated fresh on entry rather than owned by the Game, so
+   * what the Game keeps is somewhere to put it and something to toggle.
+   */
+  woods: THREE.Group;
   inside: CottageInside;
   honeyJar: DanglingLoad;
   /** Small pollen motes. */
@@ -79,6 +86,12 @@ export interface GameContext {
   setScreenFade(alpha: number): void;
   /** Swap scenery, sky, fog and lighting. */
   setEnvironment(name: EnvironmentName): void;
+  /**
+   * Push this environment's fog out by a multiple of itself, for a shot that
+   * has to see further than the level normally lets you. 1 is normal;
+   * `setEnvironment` resets it.
+   */
+  setFogScale(scale: number): void;
   /** Re-bound the player and re-frame the camera for this level. */
   configureFlight(settings: FlightSettings): void;
   /** Drop the bee somewhere and settle the camera behind it immediately. */
@@ -99,6 +112,16 @@ export interface GameContext {
    * to the follow rig, which then glides in from wherever the shot ended.
    */
   setCameraCinematic(eye: THREE.Vector3 | null, look?: THREE.Vector3): void;
+  /**
+   * Give the follow rig a final say over where the eye may stand — for a shape
+   * no enclosure sphere describes, like the maze's corridors. Pass null to
+   * stop. `configureFlight` clears it, so set it after calling that.
+   */
+  setCameraConfine(
+    fn: ((point: THREE.Vector3, bee: THREE.Vector3) => void) | null,
+  ): void;
+  /** Where the camera is right now, for a cutscene that eases away from it. */
+  readonly cameraPosition: THREE.Vector3;
   /**
    * Where a scripted shot has to stand for a flat square of side `2 *
    * halfWidth`, centred on `centre` and lying on the ground, to fill `fill` of

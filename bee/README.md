@@ -55,7 +55,8 @@ touchscreen.
 | 4 — Level 2: the Royal Chamber (queen, babies, feeding)      | done        |
 | 5 — Level 3: Wasp at the Hive                                | done        |
 | 6 — Level 4: Caramel Cottage (dance mat, then inside)        | done        |
-| 7 — Wall-clock day system                                    | not started |
+| 7 — Level 5: The Windy Woods (maze)                          | done        |
+| 8 — Wall-clock day system                                    | not started |
 
 ## Levels
 
@@ -137,6 +138,22 @@ ground to the swarm first — it delivers you to the hive doorstep, and at its
 size that means standing on top of the hive and hiding it — and the camera
 circles the pair of them slowly for as long as it's up on its hind legs. Finish the picture
 and the real bear bolts, with rainbow confetti over the puzzle.
+
+**5 — The Windy Woods.** A maze of trees, generated fresh every time it is
+entered, so it cannot be learned. Trunks are bare to head height and the canopy
+is a red autumn one overhead, with leaves coming down on the breeze that also
+leans the trees. The camera sits lower and further back than elsewhere, looking
+along the corridor behind you.
+
+Getting lost is the point, so the level helps rather than punishes. The bee
+drops yellow pollen behind her, so a corridor she has already tried looks
+different from one she hasn't. Every dead end holds a flower: fly into it and
+she eats it, the camera climbs above the woods for five seconds to show you the
+whole maze, and a scent appears along the correct route out, pulsing in the
+direction of travel. It shows the next nine cells only — enough of a nudge to
+get going, not enough to solve it, which is why the other dead ends still have
+something to offer. The scent stays for the rest of the level. Reaching the
+glowing ring at the far corner finishes it.
 
 **The puzzle art is a placeholder** — a hand-authored SVG in
 `src/assets/bearPuzzle.ts`. To use the real picture, drop the image into
@@ -439,6 +456,29 @@ Things worth knowing before changing anything:
   pad behind her: at `DANCE.cameraPitch` 1.0 that pad was measured **100%
   hidden**, so a cue landing there could not be answered. 1.25 puts the worst
   covered target at 22%.
+- **The maze is a grid, so its walls are arithmetic rather than collision.**
+  `levels/maze.ts` holds the generation and solving with no Three in it at all;
+  `render/geometry/maze.ts` only draws it. Keeping the bee inside is then a
+  matter of finding her cell and clamping against whichever of its four sides
+  are walled — plus holding the middle of a doorway, without which you can cut
+  the corner of a junction and clip the post standing on it.
+- **A maze needs a camera that gives ground, not one that slides.** The rig
+  sits `cameraDistance` behind the bee; backed into a dead end that is solidly
+  inside a trunk. Clamping the eye sideways into the corridor leaves it jammed
+  against the bark with a trunk filling the screen — the first attempt did
+  exactly that. `setCameraConfine` lets the level walk the eye in from the bee
+  instead, keeping the direction and shortening the boom.
+- **A shot that leaves the level's own scale needs the fog moved.** The Windy
+  Woods fog out at 62 units precisely so you can't see across the maze from
+  inside it. The survey shot stands 110 above the middle, so without
+  `setFogScale` the big reveal was a flat wash of nothing — and the scent motes
+  are two pixels across from up there, which is why `ScentTrail.update` takes a
+  scale. Both ease in with the rise.
+- **`vertexColors: true` needs a `color` attribute even when you only want
+  `instanceColor`.** This has now caught three separate things: the particles,
+  the maze's falling leaves and the scent trail, all of which rendered black
+  until given a flat white attribute. `whiten()` in `render/geometry/maze.ts`
+  does it; `fx/particles.ts` has its own copy and the note that explains why.
 - **A model's `animate()` must not write to the group the caller positioned.**
   The queen's bob originally set `group.position.y` directly, which silently
   dragged her from her dais down to the floor. Bobs and sways belong on an

@@ -74,6 +74,15 @@ export class CameraRig {
    */
   private enclosure: number | null = null;
 
+  /**
+   * A last say over where the eye may stand, for a shape an enclosure sphere
+   * can't describe. The maze uses it to keep the camera in the corridors: it
+   * sits low and behind the bee in there, so without this every corner would
+   * park the shot inside a tree trunk.
+   */
+  private confine: ((point: THREE.Vector3, bee: THREE.Vector3) => void) | null =
+    null;
+
   constructor(private readonly camera: THREE.PerspectiveCamera) {
     smoothedLook.set(0, 1, 0);
   }
@@ -81,6 +90,13 @@ export class CameraRig {
   /** Keep the camera inside a sphere of this radius, or pass null to stop. */
   setEnclosure(radius: number | null): void {
     this.enclosure = radius;
+  }
+
+  /** Hand the eye to `fn` for a final correction, or null to stop. */
+  setConfine(
+    fn: ((point: THREE.Vector3, bee: THREE.Vector3) => void) | null,
+  ): void {
+    this.confine = fn;
   }
 
   /**
@@ -296,6 +312,7 @@ export class CameraRig {
     );
 
     this.clampToEnclosure(desired, bee.position);
+    this.confine?.(desired, bee.position);
 
     const k = 1 - Math.exp(-CAMERA.followLerp * dt);
     this.camera.position.lerp(desired, k);
@@ -371,6 +388,7 @@ export class CameraRig {
       bee.position.z - Math.cos(this.yaw) * this.distance * scale,
     );
     this.clampToEnclosure(desired, bee.position);
+    this.confine?.(desired, bee.position);
     this.camera.position.copy(desired);
     smoothedLook
       .copy(bee.position)

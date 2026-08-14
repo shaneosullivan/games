@@ -427,6 +427,135 @@ export const DANCE = {
   boardFill: 0.88,
 } as const;
 
+/**
+ * Level 5: the Windy Woods.
+ *
+ * A maze of trees, generated fresh every time so it can't be learned. Getting
+ * lost is the point, so the level hands out help rather than punishment: every
+ * dead end holds a flower, and eating one shows you the maze from above and
+ * leaves a scent on the correct way out.
+ */
+export const MAZE = {
+  /** Cells across and down. Odd numbers centre the grid on the origin. */
+  cols: 11,
+  rows: 11,
+  /** Middle of one corridor to the middle of the next. */
+  cellSize: 9,
+  /**
+   * How far off a corridor's centre line the bee may stray.
+   *
+   * The wall trees stand on the cell boundary at cellSize/2 = 4.5 with a
+   * trunk radius of 0.5, so their inner faces are at 4.0. This leaves nearly a
+   * unit of air rather than letting her scrape along the bark.
+   */
+  corridorHalfWidth: 3.1,
+  minHeight: 1.2,
+  /** Under the canopy, which starts at `canopyBase`. */
+  maxHeight: 3.6,
+  /**
+   * Lower and a little further back than the meadow rig, as the brief asks:
+   * you sit behind the bee looking down the corridor rather than over the top
+   * of the woods. Even at a phone's 1.35 pull-back the eye stays under
+   * `canopyBase`, which is what keeps the shot out of the leaves.
+   */
+  cameraDistance: 8,
+  cameraHeight: 3.2,
+  /** Well outside the maze: the corridor clamp is the real boundary. */
+  boundsRadius: 90,
+
+  /** Wall trees. Bare to `canopyBase` so the shot can see down a corridor. */
+  trunkRadius: 0.5,
+  canopyBase: 8,
+  /**
+   * Canopy spread. Two of these face each other across a 9-unit corridor and
+   * still leave 4.6 units of daylight between them, which is what makes the
+   * maze legible from the survey shot instead of a solid green roof.
+   */
+  canopyRadius: 2.2,
+  /** Trees along each walled cell edge, on top of the posts at its corners. */
+  treesPerWall: 2,
+
+  /** The breeze. Trees lean on it; leaves come off it. */
+  swayAmplitude: 0.045,
+  swayRate: 0.85,
+  leaves: 150,
+  /** Leaves are recycled within this radius of the bee, so they're never gone. */
+  leafRadius: 40,
+  leafFallSpeed: 1.2,
+  leafDrift: 0.9,
+  leafSize: 0.34,
+
+  /** The pollen she drops to mark where she's already been. */
+  crumbSpacing: 1.5,
+  crumbCount: 900,
+  crumbSize: 0.17,
+
+  /** Flowers at the dead ends. */
+  eatRadius: 2.6,
+  eatTime: 0.5,
+
+  /**
+   * How many cells of the correct route a flower reveals.
+   *
+   * Deliberately not all of it. The brief asks for a nudge "in the right
+   * direction for a bit, but not too long" — and if one flower solved the
+   * maze, the other dead ends would have nothing left to offer.
+   */
+  scentCells: 9,
+  /** Spacing of the scent motes along the route, and how big they are. */
+  scentSpacing: 0.7,
+  scentSize: 0.22,
+  scentHeight: 1.9,
+  /** Pulses run along the scent this fast, one every `pulseGap` units. */
+  pulseSpeed: 4.5,
+  pulseGap: 5,
+
+  /** The look at the whole maze after a flower. */
+  surveyRise: 1.4,
+  surveyHold: 5,
+  surveyFall: 1.4,
+  /** Nearly straight down, and how much of the screen the maze fills. */
+  surveyPitch: 1.35,
+  surveyFill: 0.92,
+  /**
+   * How far the fog is pushed back at the top of the survey.
+   *
+   * The woods fog out at 62 units so you can't see across the maze from inside
+   * it — that's what makes it a maze. The survey shot stands about 110 above
+   * the middle and the far corner is 130 away, so without lifting the fog the
+   * big reveal is a flat wash of nothing. Eased in with the rise, which also
+   * reads as the mist thinning as she climbs out of it.
+   */
+  surveyFogScale: 3,
+  /**
+   * How much bigger the scent motes get at the top of the survey. From 110
+   * units up a mote is about two pixels across, and the whole point of going
+   * up there is to see where the trail goes.
+   */
+  scentSurveyScale: 7,
+
+  /** Close enough to the way out to have finished. */
+  exitRadius: 3.2,
+} as const;
+
+/*
+ * Autumn, but a bright one. These are much lighter than a photograph of bark
+ * would be: the toon ramp's darkest band is 0.47, a vertical trunk catches
+ * mostly the horizon of the hemisphere light, and the corridor walls stand
+ * three metres from the camera — a realistic brown came out as a black
+ * silhouette against the sky.
+ */
+export const MAZE_PALETTE = {
+  bark: 0xa8825c,
+  canopy: 0xc4692f,
+  canopyDark: 0x9c4826,
+  ground: 0x7d8c52,
+  leaf: [0xb4462a, 0xc9662f, 0x8c3a22, 0xd08a3e] as ReadonlyArray<number>,
+  crumb: 0xffd23f,
+  scent: 0xcaff70,
+  exit: 0x9ef7c4,
+} as const;
+
 export const COTTAGE = {
   /**
    * The house is authored small and scaled up bodily. A bee is ~1.5 units

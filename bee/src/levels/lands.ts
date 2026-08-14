@@ -25,7 +25,7 @@ export const LANDS: ReadonlyArray<Land> = [
   {id: "bears", name: "The Bear's Lair", x: 0.163, y: 0.196, levels: []},
   {id: "mountain", name: "The Mouldy Mountain", x: 0.717, y: 0.215, levels: []},
   {id: "cottage", name: "Caramel Cottage", x: 0.491, y: 0.355, levels: [4]},
-  {id: "woods", name: "The Windy Woods", x: 0.826, y: 0.304, levels: []},
+  {id: "woods", name: "The Windy Woods", x: 0.826, y: 0.304, levels: [5]},
   // The Bee Tree is a landmark within the meadow, not somewhere you travel to,
   // so it gets no pin.
   {

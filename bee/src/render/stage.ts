@@ -74,6 +74,26 @@ export const INSIDE_ENV: EnvironmentSettings = {
   sunOffset: [3, 14, 5],
 };
 
+/**
+ * The Windy Woods: an autumn wood, overcast and close.
+ *
+ * The fog is deliberately short — you should not be able to see across the
+ * maze from inside it, or the walls stop being a maze. The survey shot escapes
+ * it by looking down from above, and the scent motes opt out of fog entirely.
+ */
+export const WOODS_ENV: EnvironmentSettings = {
+  background: 0xb9c4a0,
+  fogColor: 0xb3bd9a,
+  fogNear: 16,
+  fogFar: 62,
+  hemiSky: 0xf2ecd0,
+  hemiGround: 0x8a9660,
+  hemiIntensity: 1.3,
+  sunColor: 0xffeccb,
+  sunIntensity: 0.95,
+  sunOffset: [8, 18, 6],
+};
+
 export interface Stage {
   renderer: THREE.WebGLRenderer;
   scene: THREE.Scene;
@@ -82,6 +102,12 @@ export interface Stage {
   /** Offset the sun keeps from the bee; environment-dependent. */
   sunOffset: THREE.Vector3;
   setEnvironment(env: EnvironmentSettings): void;
+  /**
+   * Push the current environment's fog out by a multiple of itself. 1 is the
+   * environment as authored; `setEnvironment` resets it. For a shot that has to
+   * see much further than the level normally does.
+   */
+  setFogScale(scale: number): void;
   /** Dim the page behind a card, so the strip iOS keeps matches the scrim. */
   setPageDim(on: boolean): void;
   resize(): void;
@@ -197,13 +223,22 @@ export function createStage(host: HTMLElement): Stage {
     paintPage();
   }
 
+  /** The fog the current environment asked for, before any scaling. */
+  const fogBase = {near: 0, far: 0};
+
+  function setFogScale(scale: number): void {
+    fog.near = fogBase.near * scale;
+    fog.far = fogBase.far * scale;
+  }
+
   function setEnvironment(env: EnvironmentSettings): void {
     (scene.background as THREE.Color).set(env.background);
     pageBase.set(env.background);
     paintPage();
     fog.color.set(env.fogColor);
-    fog.near = env.fogNear;
-    fog.far = env.fogFar;
+    fogBase.near = env.fogNear;
+    fogBase.far = env.fogFar;
+    setFogScale(1);
     hemi.color.set(env.hemiSky);
     hemi.groundColor.set(env.hemiGround);
     hemi.intensity = env.hemiIntensity;
@@ -219,6 +254,7 @@ export function createStage(host: HTMLElement): Stage {
     sun,
     sunOffset,
     setEnvironment,
+    setFogScale,
     setPageDim,
     resize,
     dispose() {

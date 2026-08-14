@@ -15,6 +15,7 @@ import {FoundingLevel} from "./levels/level1Founding";
 import {RoyalChamberLevel} from "./levels/level2RoyalChamber";
 import {WaspLevel} from "./levels/level3Wasp";
 import {CottageLevel} from "./levels/level4Cottage";
+import {MazeLevel} from "./levels/level5Maze";
 import type {
   EnvironmentName,
   FlightSettings,
@@ -47,6 +48,7 @@ import {
   HIVE_ENV,
   INSIDE_ENV,
   MEADOW_ENV,
+  WOODS_ENV,
   type Stage,
 } from "./render/stage";
 import {Hud} from "./ui/hud";
@@ -76,6 +78,11 @@ export class Game {
   private readonly hive: HiveSite;
   /** Meadow scenery, toggled wholesale against the hive interior. */
   private readonly meadowGroup = new THREE.Group();
+  /**
+   * Where level 5 builds its maze. Empty otherwise — the woods are generated
+   * fresh on entry, so all the Game keeps is the container to toggle.
+   */
+  private readonly woodsGroup = new THREE.Group();
   private readonly interior: HiveInterior;
   private readonly queen = createQueen();
   private readonly babies: BabyRing;
@@ -139,6 +146,10 @@ export class Game {
       damping: INSIDE.jarDamping,
     });
     this.inside.group.add(this.honeyJar.rope);
+
+    // --- windy woods (level 5) ---
+    this.woodsGroup.visible = false;
+    this.stage.scene.add(this.woodsGroup);
 
     // --- hive interior (level 2) ---
     this.interior = createHiveInterior(rng);
@@ -211,11 +222,14 @@ export class Game {
       flashScreen: () => this.flashScreen(),
       setScreenFade: a => this.setScreenFade(a),
       setEnvironment: name => this.setEnvironment(name),
+      setFogScale: k => this.stage.setFogScale(k),
       configureFlight: s => this.configureFlight(s),
       placeBee: (position, desiredHeight, yaw) =>
         this.placeBee(position, desiredHeight, yaw),
       setCameraZoom: z => this.rig.setZoom(z),
       setCameraCinematic: (eye, look) => this.rig.setCinematic(eye, look),
+      setCameraConfine: fn => this.rig.setConfine(fn),
+      cameraPosition: this.stage.camera.position,
       framedCameraEye: (centre, halfWidth, pitch, fill) =>
         this.rig.framedEye(centre, halfWidth, pitch, fill),
       showPuzzle: on => {
@@ -230,6 +244,7 @@ export class Game {
       setFlightControls: on => this.setFlightControls(on),
       pickTap: objects => this.pickTap(objects),
       cottage: this.cottage,
+      woods: this.woodsGroup,
       inside: this.inside,
       honeyJar: this.honeyJar,
       bringHoney: () => {
@@ -304,12 +319,16 @@ export class Game {
     {number: 2, name: "The Royal Chamber"},
     {number: 3, name: "Wasp at the Hive"},
     {number: 4, name: "Caramel Cottage"},
+    {number: 5, name: "The Windy Woods"},
   ];
 
   private static readonly LAST_LEVEL = Game.LEVELS.length;
 
   private createLevel(n: number): Level {
-    if (n >= 4) {
+    if (n >= 5) {
+      return new MazeLevel();
+    }
+    if (n === 4) {
       return new CottageLevel();
     }
     if (n === 3) {
@@ -411,15 +430,18 @@ export class Game {
     // north has a cottage at the end of it rather than nothing.
     this.cottage.group.visible = name === "meadow" || name === "cottage";
     this.interior.group.visible = name === "hive";
+    this.woodsGroup.visible = name === "woods";
     this.inside.group.visible = name === "inside";
     this.stage.setEnvironment(
       name === "hive"
         ? HIVE_ENV
         : name === "inside"
           ? INSIDE_ENV
-          : name === "cottage"
-            ? COTTAGE_ENV
-            : MEADOW_ENV,
+          : name === "woods"
+            ? WOODS_ENV
+            : name === "cottage"
+              ? COTTAGE_ENV
+              : MEADOW_ENV,
     );
   }
 
@@ -435,6 +457,8 @@ export class Game {
     // has open sky behind it.
     this.rig.setEnclosure(s.cameraEnclosure ?? null);
     this.rig.setMaxZoom(s.maxCameraZoom ?? null);
+    // Only the maze fences the camera; clear it so nothing leaks between levels.
+    this.rig.setConfine(null);
     // A new level starts framed normally; it can widen the shot itself.
     this.rig.setZoom(1, true);
     // A new level starts with the follow rig in charge.
