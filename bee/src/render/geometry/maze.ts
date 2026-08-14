@@ -20,6 +20,17 @@ import {
 } from "../../levels/maze";
 import {paint, solidToon, vertexToon} from "../materials";
 import {createFlowerGeometry} from "./flower";
+import leaf1Url from "../../assets/leaf1.png";
+import leaf2Url from "../../assets/leaf2.png";
+import leaf3Url from "../../assets/leaf3.png";
+
+/**
+ * The three drawn leaves that fall through the woods.
+ *
+ * All three are square, which is what lets one plane geometry serve all three
+ * meshes — a different aspect would need a plane each.
+ */
+const LEAF_URLS = [leaf1Url, leaf2Url, leaf3Url];
 
 /** A flower standing at the end of a dead end, waiting to be eaten. */
 export interface MazeFlower {
@@ -161,40 +172,44 @@ export function createMazeScene(maze: Maze, rng: Rng): MazeScene {
   group.add(bushes);
 
   // ---- leaves coming off the breeze --------------------------------------
+  //
+  // Three drawn leaves rather than one tinted square. The square was a stand-in
+  // and read as confetti; these are the only picture in the level, so they get
+  // to be pictures. All three are square, so one plane serves all three meshes.
   const leafGeo = new THREE.PlaneGeometry(MAZE.leafSize, MAZE.leafSize);
-  // `vertexColors: true` makes the shader read a `color` attribute; with none
-  // it reads black and the per-instance colour never multiplies in. See the
-  // same note in fx/particles.ts — this is the third time it has bitten.
-  whiten(leafGeo);
-  const leaves = new THREE.InstancedMesh(
-    leafGeo,
-    new THREE.MeshBasicMaterial({
-      vertexColors: true,
-      side: THREE.DoubleSide,
-      // They're small and everywhere; fog would only mud them.
-      fog: true,
-    }),
-    MAZE.leaves,
-  );
-  leaves.instanceColor = new THREE.InstancedBufferAttribute(
-    new Float32Array(MAZE.leaves * 3),
-    3,
-  );
+  const loader = new THREE.TextureLoader();
+  const leafKinds = LEAF_URLS.map((url, k) => {
+    const map = loader.load(url);
+    // Without this the PNGs come back washed out — they are authored in sRGB
+    // and the renderer works in linear.
+    map.colorSpace = THREE.SRGBColorSpace;
+    return new THREE.InstancedMesh(
+      leafGeo,
+      new THREE.MeshBasicMaterial({
+        map,
+        // `alphaTest` rather than `transparent`: a hundred and fifty unsorted
+        // transparent quads cut holes in each other wherever they overlap, and
+        // a leaf's edge is hard enough that a cutout is all it needs.
+        alphaTest: MAZE.leafAlphaTest,
+        side: THREE.DoubleSide,
+        // They're small and everywhere; fog would only mud them.
+        fog: true,
+      }),
+      // Leaf `i` belongs to kind `i % 3`, so each kind takes every third one.
+      Math.ceil((MAZE.leaves - k) / LEAF_URLS.length),
+    );
+  });
+  for (const mesh of leafKinds) {
+    group.add(mesh);
+  }
   const leafPos: Array<THREE.Vector3> = [];
   const leafSpin = new Float32Array(MAZE.leaves);
   const leafPhase = new Float32Array(MAZE.leaves);
-  const colour = new THREE.Color();
   for (let i = 0; i < MAZE.leaves; i++) {
     leafPos.push(new THREE.Vector3());
     leafSpin[i] = rng.range(-2.4, 2.4);
     leafPhase[i] = rng.range(0, Math.PI * 2);
-    colour.set(P.leaf[i % P.leaf.length]);
-    leaves.setColorAt(i, colour);
   }
-  if (leaves.instanceColor) {
-    leaves.instanceColor.needsUpdate = true;
-  }
-  group.add(leaves);
 
   // ---- flowers at the dead ends ------------------------------------------
   const flowers: Array<MazeFlower> = [];
@@ -394,15 +409,23 @@ export function createMazeScene(maze: Maze, rng: Rng): MazeScene {
         dummy.rotateX(1.1 + Math.sin(elapsed + leafPhase[i]) * 0.5);
         dummy.scale.setScalar(1);
         dummy.updateMatrix();
-        leaves.setMatrixAt(i, dummy.matrix);
+        const kind = i % leafKinds.length;
+        leafKinds[kind].setMatrixAt((i / leafKinds.length) | 0, dummy.matrix);
       }
-      leaves.instanceMatrix.needsUpdate = true;
+      for (const mesh of leafKinds) {
+        mesh.instanceMatrix.needsUpdate = true;
+      }
     },
 
     dispose() {
       treeGeo.dispose();
       bushGeo.dispose();
       leafGeo.dispose();
+      for (const mesh of leafKinds) {
+        const material = mesh.material as THREE.MeshBasicMaterial;
+        material.map?.dispose();
+        material.dispose();
+      }
     },
   };
 }

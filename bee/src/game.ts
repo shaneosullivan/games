@@ -794,7 +794,9 @@ export class Game {
     this.completeScreen.hide();
     this.running = false;
     this.audio.setThreat(0);
-    this.audio.setFlightIntensity(0);
+    // Not `setFlightIntensity(0)` — that is a bee hovering, and she carried on
+    // buzzing under the map after the maze. On the menu there is no bee.
+    this.audio.silenceFlight();
     // Nothing resumes from here — the menu always ends in a level switch — so
     // the backing track goes with the level it belonged to.
     this.audio.stopMusic();

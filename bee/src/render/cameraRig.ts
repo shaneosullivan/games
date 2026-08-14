@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import {CAMERA} from "../config";
+import {callerOf, noteEvent} from "../core/probe";
 import type {BeeActor} from "../entities/beeActor";
 
 const desired = new THREE.Vector3();
@@ -260,6 +261,14 @@ export class CameraRig {
    */
   setCinematic(eye: THREE.Vector3 | null, look?: THREE.Vector3): void {
     if (!eye) {
+      // Note who let go of it. A scripted shot ending early looks, from the
+      // outside, exactly like a shot that was never started — and the maze's
+      // survey has been reported cutting short on a tap that cannot be
+      // reproduced here. This is the only way out of a cinematic, so whatever
+      // is doing it will be named in `chofter.probe()`.
+      if (this.cinematicEye) {
+        noteEvent("cinematic released", callerOf());
+      }
       this.cinematicEye = null;
       return;
     }

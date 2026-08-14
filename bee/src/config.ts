@@ -568,7 +568,21 @@ export const MAZE = {
   leafRadius: 45,
   leafFallSpeed: 1.2,
   leafDrift: 0.9,
-  leafSize: 0.34,
+  /**
+   * A leaf's plane, in world units.
+   *
+   * Bigger than the square it replaced: the drawn leaves sit inside a square
+   * image with transparent margin all round, so the same number renders a
+   * noticeably smaller leaf.
+   */
+  leafSize: 1.3,
+  /**
+   * How much of a leaf's image counts as leaf.
+   *
+   * Low enough to keep the soft edge the drawings are painted with, high
+   * enough that the transparent margin never shows as a square.
+   */
+  leafAlphaTest: 0.35,
 
   /** The pollen she drops to mark where she's already been. */
   crumbSpacing: 1.5,
@@ -659,7 +673,6 @@ export const MAZE_PALETTE = {
   canopy: 0xc4692f,
   canopyDark: 0x9c4826,
   ground: 0x7d8c52,
-  leaf: [0xb4462a, 0xc9662f, 0x8c3a22, 0xd08a3e] as ReadonlyArray<number>,
   crumb: 0xffd23f,
   scent: 0xcaff70,
   exit: 0x9ef7c4,

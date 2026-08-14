@@ -126,13 +126,35 @@ export class Audio {
     this.blip(140, 0.05, 0.3, 0.24, "sawtooth");
   }
 
+  /**
+   * The hum a bee makes doing nothing at all.
+   *
+   * `setFlightIntensity(0)` means hovering, not gone — she is still holding
+   * herself up. Anything that takes her out of the world wants `silenceFlight`
+   * instead.
+   */
+  private static readonly HUM_IDLE = 0.035;
+
   setFlightIntensity(t: number): void {
     if (!this.ctx || !this.humOsc || !this.humGain) {
       return;
     }
     const now = this.ctx.currentTime;
     this.humOsc.frequency.setTargetAtTime(88 + t * 46, now, 0.08);
-    this.humGain.gain.setTargetAtTime(0.035 + t * 0.05, now, 0.12);
+    this.humGain.gain.setTargetAtTime(Audio.HUM_IDLE + t * 0.05, now, 0.12);
+  }
+
+  /**
+   * Wings off. For the menu, where there is no bee to be hovering.
+   *
+   * The next `setFlightIntensity` brings the hum straight back, so a level
+   * starting after this needs no matching call to undo it.
+   */
+  silenceFlight(): void {
+    if (!this.ctx || !this.humGain) {
+      return;
+    }
+    this.humGain.gain.setTargetAtTime(0, this.ctx.currentTime, 0.08);
   }
 
   private blip(

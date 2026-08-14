@@ -43,6 +43,37 @@ interface Recorded {
 
 const recent: Array<Recorded> = [];
 
+/**
+ * Things the game wanted noticed, whenever they happened.
+ *
+ * For faults that are over before you can ask about them: the report is run
+ * afterwards, so whatever is worth knowing has to have been written down as it
+ * went past. Kept tiny — this is a breadcrumb trail, not a log.
+ */
+const notes: Array<Record<string, unknown>> = [];
+const NOTES_MAX = 10;
+
+/** Write one down. Cheap enough to call from anywhere that fires rarely. */
+export function noteEvent(what: string, detail?: unknown): void {
+  notes.push({
+    t: Math.round(performance.now()),
+    what,
+    ...(detail === undefined ? {} : {detail}),
+  });
+  if (notes.length > NOTES_MAX) {
+    notes.shift();
+  }
+}
+
+/** Who called me — trimmed to the few frames that identify a caller. */
+export function callerOf(depth = 4): string {
+  return (new Error().stack ?? "")
+    .split("\n")
+    .slice(2, 2 + depth)
+    .map(line => line.trim())
+    .join(" | ");
+}
+
 /** Selectors worth reporting on, in the order a reader wants them. */
 const CONTROLS = [
   ".turnpad",
@@ -324,6 +355,7 @@ export function probeReport(): Record<string, unknown> {
     // Empty means the browser delivered nothing at all — which would be the
     // whole answer on its own.
     recentPresses: recent,
+    notes,
   };
 }
 
