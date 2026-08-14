@@ -179,8 +179,12 @@ export interface ControlsApi {
     left(ms?: number): void;
     right(ms?: number): void;
   };
-  /** What is on top at a point on screen, for when a tap seems to go nowhere. */
-  at(x: number, y: number): string;
+  /**
+   * What is on top at a point — or, called with nothing, at the middle of each
+   * control. That answers "is something invisible sitting over my buttons",
+   * which is the one cause a handler can do nothing about.
+   */
+  at(x?: number, y?: number): unknown;
   /** Print what all of this does, for a console with no autocomplete. */
   help(): void;
 }

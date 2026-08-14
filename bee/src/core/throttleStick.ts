@@ -42,6 +42,8 @@ export class ThrottleStick {
   private readonly knob: HTMLDivElement;
   private readonly fill: HTMLDivElement;
   private pointerId: number | null = null;
+  /** True while a finger is on the track via the touch path. */
+  private touching = false;
   private readonly keys = new Set<string>();
 
   constructor(host: HTMLElement) {
@@ -73,15 +75,44 @@ export class ThrottleStick {
     window.addEventListener("pointermove", this.onMove, {passive: false});
     window.addEventListener("pointerup", this.onUp);
     window.addEventListener("pointercancel", this.onUp);
+
+    // The same drag as touches. On an iPad the pointer events above can simply
+    // never arrive — see the note in core/turnButtons.ts — and touch is the
+    // older path that always does. `touching` keeps the two from fighting.
+    this.root.addEventListener(
+      "touchstart",
+      e => {
+        e.preventDefault();
+        this.touching = true;
+        this.trackAt(e.changedTouches[0]?.clientY ?? 0);
+        controlLog("throttle touchstart", {target: this.target});
+      },
+      {passive: false},
+    );
+    this.root.addEventListener(
+      "touchmove",
+      e => {
+        e.preventDefault();
+        if (this.touching) {
+          this.trackAt(e.changedTouches[0]?.clientY ?? 0);
+        }
+      },
+      {passive: false},
+    );
     // Same iOS safety net as the turn buttons: if the last finger is gone, so
     // is the throttle, whatever became of its pointerup.
     for (const type of ["touchend", "touchcancel"]) {
       window.addEventListener(type, e => {
-        if ((e as TouchEvent).touches.length === 0 && this.pointerId !== null) {
-          this.pointerId = null;
-          this.sync();
-          controlLog(`throttle released by ${type}`, {target: this.target});
+        if ((e as TouchEvent).touches.length > 0) {
+          return;
         }
+        if (this.pointerId === null && !this.touching) {
+          return;
+        }
+        this.pointerId = null;
+        this.touching = false;
+        this.sync();
+        controlLog(`throttle released by ${type}`, {target: this.target});
       });
     }
 
@@ -103,6 +134,7 @@ export class ThrottleStick {
     this.root.style.display = visible ? "" : "none";
     if (!visible) {
       this.pointerId = null;
+      this.touching = false;
       this.keys.clear();
       this.target = 0;
       this.value = 0;
@@ -161,8 +193,12 @@ export class ThrottleStick {
 
   /** Where along the rail the finger is, as -1..1 with up positive. */
   private track(e: PointerEvent): void {
+    this.trackAt(e.clientY);
+  }
+
+  private trackAt(clientY: number): void {
     const box = this.rail.getBoundingClientRect();
-    const t = (e.clientY - box.top) / Math.max(1, box.height);
+    const t = (clientY - box.top) / Math.max(1, box.height);
     let v = Math.max(-1, Math.min(1, 1 - t * 2));
     // A dead zone in the middle, so resting a thumb on the centre is a stop
     // rather than a crawl.
@@ -177,7 +213,7 @@ export class ThrottleStick {
       this.target = this.forced;
       return;
     }
-    if (this.pointerId !== null) {
+    if (this.pointerId !== null || this.touching) {
       return;
     }
     let v = 0;

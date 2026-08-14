@@ -34,8 +34,14 @@ export class TurnButtons {
   readonly buttons: {left: HTMLButtonElement; right: HTMLButtonElement};
 
   private readonly root: HTMLDivElement;
-  /** Which button each active pointer is on, so two thumbs can't fight. */
-  private readonly held = new Map<number, number>();
+  /**
+   * Which button each live press is on, so two thumbs can't fight.
+   *
+   * Keyed by a string — "p12" for a pointer, "t0" for a touch — because the
+   * same finger can arrive down both paths and their ids are numbered
+   * independently. Two keys for one finger is harmless: `sync` clamps.
+   */
+  private readonly held = new Map<string, number>();
   private readonly keys = new Set<string>();
 
   constructor(host: HTMLElement) {
@@ -66,7 +72,7 @@ export class TurnButtons {
     // than on the button, so it arrives whether or not the press was captured.
     for (const type of ["pointerup", "pointercancel"]) {
       window.addEventListener(type, e => {
-        const had = this.held.delete((e as PointerEvent).pointerId);
+        const had = this.held.delete(`p${(e as PointerEvent).pointerId}`);
         this.sync();
         if (had) {
           controlLog(`turn ${type}`, {
@@ -106,6 +112,8 @@ export class TurnButtons {
     b.type = "button";
     b.textContent = glyph;
     b.setAttribute("aria-label", label);
+    const side = dir > 0 ? "right" : "left";
+
     b.addEventListener(
       "pointerdown",
       e => {
@@ -116,9 +124,8 @@ export class TurnButtons {
         // claim. Doing it before this line meant any such throw killed the
         // handler on its way past and the button did nothing at all, which is
         // the worst way for a control to fail.
-        this.held.set(e.pointerId, dir);
-        this.sync();
-        controlLog(`turn down ${dir > 0 ? "right" : "left"}`, {
+        this.press(`p${e.pointerId}`, dir);
+        controlLog(`turn down ${side} (pointer)`, {
           ...pointerNote(e),
           turn: this.turn,
         });
@@ -131,7 +138,48 @@ export class TurnButtons {
       },
       {passive: false},
     );
+
+    // ...and the same press as a touch.
+    //
+    // Not belt and braces: on an iPad the pointer event above simply never
+    // arrives, while a synthetic one dispatched at the same element turns her
+    // — so the handler and everything under it are fine and the browser is not
+    // delivering. Touch events are the older, dumber path and iOS has always
+    // delivered them. Both may fire; the two register under different keys and
+    // `sync` clamps, so a doubled press is still one turn, and the release of
+    // either ends it.
+    b.addEventListener(
+      "touchstart",
+      e => {
+        e.preventDefault();
+        for (const t of Array.from(e.changedTouches)) {
+          this.press(`t${t.identifier}`, dir);
+        }
+        controlLog(`turn down ${side} (touch)`, {
+          touches: e.changedTouches.length,
+          turn: this.turn,
+        });
+      },
+      {passive: false},
+    );
+
+    for (const type of ["touchend", "touchcancel"]) {
+      b.addEventListener(type, e => {
+        for (const t of Array.from((e as TouchEvent).changedTouches)) {
+          this.held.delete(`t${t.identifier}`);
+        }
+        this.sync();
+        controlLog(`turn ${type} ${side}`, {turn: this.turn});
+      });
+    }
+
     return b;
+  }
+
+  /** Register a press from whichever input path noticed it first. */
+  private press(key: string, dir: number): void {
+    this.held.set(key, dir);
+    this.sync();
   }
 
   /** Both held cancel out, which is the least surprising thing to do. */

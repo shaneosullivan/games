@@ -29,3 +29,34 @@ export function pointerNote(e: PointerEvent): Record<string, unknown> {
     target: (e.target as HTMLElement | null)?.className ?? null,
   };
 }
+
+/**
+ * Watch every pointer and touch the document sees, once.
+ *
+ * When a control does nothing the first question is whether the browser is
+ * delivering anything at all — a press that shows up here but not in the
+ * button's own handler is a very different fault from one that never arrives.
+ * Installed by the Game; costs nothing until `chofter.logControls` is on.
+ */
+export function watchInput(): void {
+  for (const type of [
+    "pointerdown",
+    "pointerup",
+    "touchstart",
+    "touchend",
+    "click",
+  ]) {
+    document.addEventListener(
+      type,
+      e => {
+        const el = e.target as HTMLElement | null;
+        controlLog(`document ${type}`, {
+          target: el?.tagName + "." + (el?.className ?? ""),
+          onTurnButton: !!el?.closest?.(".turn-btn"),
+          onThrottle: !!el?.closest?.(".throttle"),
+        });
+      },
+      true,
+    );
+  }
+}

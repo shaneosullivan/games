@@ -2,6 +2,7 @@ import * as THREE from "three";
 import {CAMERA, INSIDE, LEVELS, POLLEN_KINDS} from "./config";
 import {Audio} from "./core/audio";
 import {AltitudeStick} from "./core/altitudeStick";
+import {watchInput} from "./core/controlLog";
 import {Joystick, type StickInput} from "./core/input";
 import {ThrottleStick} from "./core/throttleStick";
 import {TurnButtons} from "./core/turnButtons";
@@ -287,6 +288,8 @@ export class Game {
     });
 
     this.installControlsApi();
+    // Silent unless chofter.logControls is on; see core/controlLog.ts.
+    watchInput();
 
     // ?unlock=1 opens every level, for getting straight to the one you're
     // working on. Before buildOverlays, so the menu is built already unlocked.
@@ -366,9 +369,36 @@ export class Game {
         left: (ms?: number) => this.pressTurnButton("left", ms),
         right: (ms?: number) => this.pressTurnButton("right", ms),
       },
-      at: (x: number, y: number) => {
-        const el = document.elementFromPoint(x, y);
-        return el ? `${el.tagName}.${el.className}` : "nothing";
+      at: (x?: number, y?: number) => {
+        const name = (el: Element | null): string =>
+          el ? `${el.tagName}.${el.className}` : "nothing";
+        if (typeof x === "number" && typeof y === "number") {
+          return name(document.elementFromPoint(x, y));
+        }
+        // No point given: check each control against itself.
+        const probe = (label: string, el: Element | null) => {
+          if (!el) {
+            return {[label]: "not on screen"};
+          }
+          const r = el.getBoundingClientRect();
+          const cx = Math.round(r.left + r.width / 2);
+          const cy = Math.round(r.top + r.height / 2);
+          const top = document.elementFromPoint(cx, cy);
+          return {
+            [label]: {
+              at: [cx, cy],
+              size: [Math.round(r.width), Math.round(r.height)],
+              onTop: name(top),
+              reachable: !!top && (top === el || el.contains(top)),
+            },
+          };
+        };
+        return {
+          ...probe("turnLeft", this.turnButtons.buttons.left),
+          ...probe("turnRight", this.turnButtons.buttons.right),
+          ...probe("throttle", document.querySelector(".throttle")),
+          screen: [window.innerWidth, window.innerHeight],
+        };
       },
       help: () => {
         console.log(
@@ -378,7 +408,10 @@ export class Game {
             "chofter.controls.turn(1)     turn right, bypassing the buttons (-1 left, 0 stop)",
             "chofter.controls.throttle(1) drive, bypassing the track",
             "chofter.controls.tap.left()  press the real button, through the DOM",
-            "chofter.controls.at(x, y)    what is actually on top at a point",
+            "chofter.controls.at()        is anything sitting over the controls?",
+            "",
+            "With logControls on, every pointer and touch the document sees is",
+            "logged too — so a press that never reaches the button is obvious.",
             "",
             "If turn() moves her and tap() does not, the button is at fault.",
           ].join("\n"),
