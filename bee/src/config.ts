@@ -469,21 +469,21 @@ export const MAZE = {
    * eleven of nine, so the maze is no smaller — the lanes are just broader and
    * there are fewer turns, which suits who this is for.
    */
-  cellSize: 18,
+  cellSize: 14.5,
   /**
-   * How far off a corridor's centre line the bee may stray.
+   * How far off a corridor's centre line the bee may stray — half the width of
+   * the flyable lane, which is 10.2 across.
    *
    * Read off the maze rather than worked out from the wall's parts: raycast
-   * sideways from every corridor centre at every height she can fly, and the
-   * nearest leaf across the whole maze is 8.07 away. Half a unit back from
-   * that is her own body.
-   *
-   * It was 6.8, derived from the bush's radius on paper, and that ignored how
-   * much of a squashed blob is missing at flying height — it stopped her a
-   * unit and a third short of anything, which reads as an invisible wall with
-   * daylight on the other side of it.
+   * sideways from every corridor centre at every height she can fly and the
+   * nearest leaf is 5.66 away, so this leaves half a unit for her own body.
+   * `cellSize` is set from that rather than the other way round: the lane's
+   * width is what was asked for, and the wall has to fit outside it.
+   * Derived on paper from the bush's radius it came out a unit and a third
+   * short of anything, which reads as an invisible wall with daylight beyond
+   * it — a squashed blob is much narrower at flying height than at its waist.
    */
-  corridorHalfWidth: 7.5,
+  corridorHalfWidth: 5.1,
   minHeight: 1.2,
   /** Under the canopy, which starts at `canopyBase`. */
   maxHeight: 3.6,
@@ -504,7 +504,7 @@ export const MAZE = {
    */
   speedScale: 1.7,
   /** Well outside the maze: the corridor clamp is the real boundary. */
-  boundsRadius: 140,
+  boundsRadius: 110,
 
   /** Wall trees. Bare to `canopyBase` so the shot can see down a corridor. */
   trunkRadius: 0.5,
@@ -516,7 +516,7 @@ export const MAZE = {
    */
   canopyRadius: 2.2,
   /** Trees along each walled cell edge, on top of the posts at its corners. */
-  treesPerWall: 3,
+  treesPerWall: 2,
 
   /**
    * The hedge between the trunks.
@@ -531,14 +531,14 @@ export const MAZE = {
    */
   bushRadius: 1.6,
   bushHeight: 5.6,
-  bushesPerWall: 6,
+  bushesPerWall: 5,
 
   /** The breeze. Trees lean on it; leaves come off it. */
   swayAmplitude: 0.045,
   swayRate: 0.85,
   leaves: 150,
   /** Leaves are recycled within this radius of the bee, so they're never gone. */
-  leafRadius: 55,
+  leafRadius: 45,
   leafFallSpeed: 1.2,
   leafDrift: 0.9,
   leafSize: 0.34,
@@ -584,7 +584,7 @@ export const MAZE = {
    * big reveal is a flat wash of nothing. Eased in with the rise, which also
    * reads as the mist thinning as she climbs out of it.
    */
-  surveyFogScale: 5,
+  surveyFogScale: 4,
   /**
    * How much bigger the scent motes get at the top of the survey. From 110
    * units up a mote is about two pixels across, and the whole point of going

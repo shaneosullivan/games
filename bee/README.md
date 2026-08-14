@@ -146,15 +146,17 @@ and the real bear bolts, with rainbow confetti over the puzzle.
 entered, so it cannot be learned. The walls are hedge and tree together — tall
 green bushes filling in between bare trunks, with a red autumn canopy overhead
 and leaves coming down on the breeze that leans them. The corridors are fifteen
-units wide and leafy; the hedge tops sit just above the camera, so you catch a
+wide and leafy; the hedge tops sit just above the camera, so you catch a
 suggestion of the next lane but never a look into it. She flies faster in here
 than anywhere else — the corridors are long and taken in a straight line, and
 at the meadow's pace the level is mostly waiting to cross a cell.
 
-**This level steers differently.** The thumbstick is forward and back only, and
-a pair of held buttons in the altitude slider's corner turn her on the spot —
-in a corridor the camera is often part-way round a corner and "the way the
-stick points" stops meaning anything. The camera sits low and behind, and
+**This level steers differently.** Two vertical controls, one each side: a
+throttle on the left that is forward and back only, and a pair of held buttons
+on the right that turn her on the spot. The floating thumbstick reads a whole
+circle of directions, which is exactly what a corridor doesn't want — the
+camera is often part-way round a corner, so "the way the stick points" stops
+meaning anything. The camera sits low and behind, and
 whatever comes between it and the bee simply fades away.
 
 Getting lost is the point, so the level helps rather than punishes. The bee
@@ -472,8 +474,16 @@ Things worth knowing before changing anything:
   `levels/maze.ts` holds the generation and solving with no Three in it at all;
   `render/geometry/maze.ts` only draws it. Keeping the bee inside is then a
   matter of finding her cell and clamping against whichever of its four sides
-  are walled — plus holding the middle of a doorway, without which you can cut
-  the corner of a junction and clip the post standing on it.
+  are walled.
+- **A cell's free space is a plus, not a square.** Two corridors crossing, with
+  a tree at each of the four corners between them — so the only place to keep
+  her out of is where _both_ offsets are past the corridor's half-width. The
+  first version clamped one axis whenever the other passed `half - w`, which is
+  a far bigger region than the posts and, once the corridors were widened,
+  bigger than the cell: at a half-width of 7.5 in a half of 9 it meant that
+  anywhere more than 1.5 off the centre line she could not reach the boundary
+  at all. An invisible wall across every doorway with the corridor plainly
+  visible through it.
 - **The maze camera doesn't move out of the way; the wall does.** The rig sits
   `cameraDistance` behind the bee, and round a corner that is solidly inside a
   hedge. Moving the camera was tried first — swinging the boom up over the
@@ -496,12 +506,11 @@ Things worth knowing before changing anything:
 - **The maze has its own steering and its own controls.** Camera-relative
   flying falls apart in corridors: the camera is often part-way round a corner,
   so "left" stops meaning "down that lane". `FlightSettings.steering: "tank"`
-  drives along her nose with the thumbstick's forward and back, and turns her
-  on the spot with a pair of held buttons (`core/turnButtons.ts`) that take the
-  altitude slider's corner — nothing in the maze needs altitude. It also
-  removes the yaw feedback loop, so the rig follows her briskly instead of
-  gently; `Game.update` only reports "steering" to the rig for the
-  camera-relative mode.
+  drives along her nose and turns her on the spot, and the floating thumbstick
+  is put away for a pair of vertical controls that can only say what they mean
+  — `core/throttleStick.ts` on the left for forward and back, `turnButtons.ts`
+  on the right where the altitude slider would be. It also removes the yaw
+  feedback loop, so the rig follows her briskly rather than gently.
 - **The corridor clamp is measured, not derived.** Worked out from the bush's
   radius on paper it ignored how much of a squashed blob is missing at flying
   height, and stopped her 1.3 units short of anything — an invisible wall with

@@ -3,6 +3,7 @@ import {CAMERA, INSIDE, LEVELS, POLLEN_KINDS} from "./config";
 import {Audio} from "./core/audio";
 import {AltitudeStick} from "./core/altitudeStick";
 import {Joystick, type StickInput} from "./core/input";
+import {ThrottleStick} from "./core/throttleStick";
 import {TurnButtons} from "./core/turnButtons";
 import {GameLoop} from "./core/loop";
 import {Rng} from "./core/rng";
@@ -75,6 +76,10 @@ export class Game {
   private readonly altitude: AltitudeStick;
   /** Swaps in for the altitude slider under tank steering. */
   private readonly turnButtons: TurnButtons;
+  /** ...and this for the thumbstick: forward and back, nothing else. */
+  private readonly throttle: ThrottleStick;
+  /** What the throttle looks like to the flight model. */
+  private readonly throttleInput = {x: 0, y: 0, magnitude: 0};
   private readonly bee = new BeeActor();
   private readonly rig: CameraRig;
   private readonly flowers: FlowerField;
@@ -194,6 +199,7 @@ export class Game {
     this.stick = new Joystick(uiLayer);
     this.altitude = new AltitudeStick(uiLayer, this.bee.desiredHeight);
     this.turnButtons = new TurnButtons(uiLayer);
+    this.throttle = new ThrottleStick(uiLayer);
 
     this.puzzle = createSlidePuzzle(uiLayer, () =>
       this.level.onPuzzleSolved?.(this.ctx),
@@ -470,6 +476,10 @@ export class Game {
     const tank = this.bee.steering === "tank";
     this.altitude.setVisible(!tank);
     this.turnButtons.setVisible(tank);
+    this.throttle.setVisible(tank);
+    // The floating thumbstick reads a whole circle of directions, which is
+    // exactly what the maze doesn't want; the throttle answers for it there.
+    this.stick.enabled = !tank;
     this.bee.bounds.radius = s.boundsRadius;
     this.bee.bounds.sphereRadius = s.boundsSphere ?? Infinity;
     // The lane north is walled off or not by syncCottageGate, which runs after
@@ -650,9 +660,14 @@ export class Game {
     if (!locked && !tank) {
       this.bee.desiredHeight = this.altitude.desiredHeight;
     }
+    if (tank) {
+      // Up the track is forward, and the flight model reads forward as -y.
+      this.throttleInput.y = -this.throttle.value;
+      this.throttleInput.magnitude = Math.abs(this.throttle.value);
+    }
     this.bee.update(
       dt,
-      locked ? this.idleStick : this.stick,
+      locked ? this.idleStick : tank ? this.throttleInput : this.stick,
       this.rig.yaw,
       locked || !tank ? 0 : this.turnButtons.turn,
     );

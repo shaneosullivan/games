@@ -959,8 +959,100 @@ body {
 /* Levels that aren't about flying hide the stick and slider entirely. */
 .no-flight .stick,
 .no-flight .alt,
-.no-flight .turnpad {
+.no-flight .turnpad,
+.no-flight .throttle {
   display: none;
+}
+
+/*
+ * The maze's forward/back track, on the left where the thumbstick would be.
+ *
+ * Deliberately the altitude slider's twin: same track, same rail, same caps,
+ * mirrored to the other side. The two are never on screen together — the maze
+ * has no altitude and nothing else turns on the spot — so the pair of vertical
+ * controls reads as one scheme rather than two.
+ */
+.throttle {
+  position: absolute;
+  left: calc(var(--safe-l) + 26px);
+  bottom: calc(var(--safe-b) + 26px);
+  width: 64px;
+  height: min(300px, 44vh);
+  pointer-events: auto;
+  touch-action: none;
+}
+
+.throttle-track {
+  position: absolute;
+  inset: 0;
+  border-radius: 32px;
+  border: 2px solid var(--stroke);
+  background: var(--panel);
+  backdrop-filter: blur(8px);
+  overflow: hidden;
+}
+
+.throttle-fill {
+  position: absolute;
+  left: 0;
+  right: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 213, 110, 0.55),
+    rgba(255, 184, 60, 0.3)
+  );
+}
+
+/* Inset from the track's ends so the knob can't half-leave it. */
+.throttle-rail {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 34px;
+  bottom: 34px;
+}
+
+.throttle-knob {
+  position: absolute;
+  left: 50%;
+  width: 52px;
+  height: 52px;
+  margin: -26px 0 0 -26px;
+  border-radius: 50%;
+  background: #fffaf0;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+}
+
+/* A line across the knob, so which way is up reads at a glance. */
+.throttle-knob::after {
+  content: "";
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  top: 50%;
+  height: 3px;
+  margin-top: -1.5px;
+  border-radius: 2px;
+  background: rgba(0, 0, 0, 0.25);
+}
+
+.throttle-cap {
+  position: absolute;
+  left: 0;
+  right: 0;
+  text-align: center;
+  color: #fff;
+  font-size: 13px;
+  opacity: 0.85;
+  text-shadow: 0 2px 5px rgba(0, 0, 0, 0.45);
+}
+
+.throttle-cap-top {
+  top: 8px;
+}
+
+.throttle-cap-bottom {
+  bottom: 8px;
 }
 
 /*

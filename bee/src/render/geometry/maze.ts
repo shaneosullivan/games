@@ -282,14 +282,24 @@ export function createMazeScene(maze: Maze, rng: Rng): MazeScene {
       nz = Math.min(nz, w);
     }
 
-    // In a doorway, hold the middle of it. Without this you could cut the
-    // corner of a junction and clip the post standing on it.
-    const half = cellSize / 2;
-    if (Math.abs(nx) > half - w) {
-      nz = Math.max(-w, Math.min(w, nz));
-    }
-    if (Math.abs(nz) > half - w) {
-      nx = Math.max(-w, Math.min(w, nx));
+    // The corner posts. A cell's free space is a plus, not a square: the two
+    // corridors crossing it, and a tree at each of the four corners between
+    // them. So the only place to keep her out of is where *both* offsets are
+    // past the corridor's half-width, and she leaves by whichever axis is the
+    // shorter push.
+    //
+    // This used to clamp one axis whenever the other got past `half - w`,
+    // which is a much bigger region than the posts and, once corridors grew
+    // wide, a bigger region than the cell: with w 7.5 of a half of 9 it meant
+    // that anywhere more than 1.5 off the centre line she could not reach the
+    // boundary at all. An invisible wall across every doorway, with the
+    // corridor plainly visible through it.
+    if (Math.abs(nx) > w && Math.abs(nz) > w) {
+      if (Math.abs(nx) - w < Math.abs(nz) - w) {
+        nx = Math.sign(nx) * w;
+      } else {
+        nz = Math.sign(nz) * w;
+      }
     }
 
     if (nx === dx && nz === dz) {
