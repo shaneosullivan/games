@@ -688,6 +688,35 @@ body {
   background: #fffdf5;
 }
 
+/*
+ * The code name once you already have one: a label, not a field.
+ *
+ * Sized and coloured to sit under the level list rather than compete with the
+ * Continue button — this screen is for choosing where to fly. Tapping it swaps
+ * the real input back in.
+ */
+.card .name-chip {
+  width: auto;
+  align-self: center;
+  margin: 0 0 10px;
+  padding: 6px 16px;
+  border: 1px dashed #cfd8e0;
+  border-radius: 999px;
+  background: transparent;
+  color: #5b6b7a;
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  cursor: pointer;
+  box-shadow: none;
+}
+
+.card .name-chip:active {
+  transform: scale(0.96);
+  background: #f2f6f9;
+}
+
 /* World map picker */
 
 .card.card-wide {

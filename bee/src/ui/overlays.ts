@@ -134,7 +134,7 @@ export function createCodenameScreen(
   card.appendChild(createHomeLink());
 
   const h1 = document.createElement("h1");
-  h1.textContent = existing ? `Welcome back` : "Bee a Queen";
+  h1.textContent = existing ? "Where to?" : "Bee a Queen";
   const p = document.createElement("p");
   p.textContent = existing
     ? levels.length > 1
@@ -160,6 +160,28 @@ export function createCodenameScreen(
 
   const start = document.createElement("button");
   start.textContent = existing ? "Continue" : "Start";
+
+  /*
+   * Once you have a name, this screen is the map and nothing else.
+   *
+   * It is reached far more often mid-game than at the start — the 🏠 button,
+   * and finishing the last level — and every one of those times the player is
+   * here to choose where to fly, not to introduce themselves. Leading with a
+   * big text box makes it read as a sign-in and buries the thing they came
+   * for. The name becomes a quiet chip that turns back into the field if it's
+   * tapped, so it can still be changed without erasing a hive to do it.
+   */
+  const nameChip = document.createElement("button");
+  nameChip.type = "button";
+  nameChip.className = "name-chip";
+  nameChip.textContent = existing;
+  nameChip.title = "Change your code name";
+  nameChip.setAttribute("aria-label", `Code name ${existing}. Tap to change.`);
+  nameChip.addEventListener("click", () => {
+    nameChip.replaceWith(input);
+    input.focus();
+    input.select();
+  });
 
   const sync = () => {
     // Clean as they type, so autofilled junk never survives to the save.
@@ -343,16 +365,20 @@ export function createCodenameScreen(
     }
   });
 
+  // Returning players get the chip; a new one gets the field, because naming
+  // yourself is the whole of the first screen.
+  const nameField = existing ? nameChip : input;
+
   if (hasMap) {
-    // The right-hand column carries the name field and the buttons too, so the
-    // map gets the full height of the card beside it.
-    side.append(input, start);
+    // The right-hand column carries the name and the buttons too, so the map
+    // gets the full height of the card beside it.
+    side.append(nameField, start);
     if (existing) {
       side.append(reset);
     }
     card.append(h1, p, picker);
   } else {
-    card.append(h1, p, input, start);
+    card.append(h1, p, nameField, start);
     if (existing) {
       card.append(reset);
     }

@@ -67,6 +67,12 @@ so they track any scale — see `levels/lands.ts`. The Mellow Meadow holds level
 the rest are padlocked or marked as still to come. Picking a land with more than
 one level shows those levels beside the map.
 
+Once you have a code name the screen is the map and little else — headed
+"Where to?", with the name reduced to a chip you can tap if you want to change
+it. It is reached far more often mid-game than at the start, and every one of
+those times you are there to pick where to fly rather than to introduce
+yourself. A first-time player still gets the full name entry.
+
 Your current level is preselected, so plain "Continue" resumes. Choosing a level
 you've already completed replays it from the start (level 1 resets its flower
 counts), and your furthest unlock is kept either way.
