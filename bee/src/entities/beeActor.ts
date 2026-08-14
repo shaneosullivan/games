@@ -64,6 +64,19 @@ export class BeeActor {
     sphereRadius: Infinity as number,
   };
 
+  /**
+   * How the stick is read.
+   *
+   * `camera` is the game's default: push a direction on screen and she flies
+   * that way, whichever way the camera faces. That falls apart in the maze,
+   * where the corridors are narrow and the camera is often part-way round a
+   * corner — you push "left" meaning "down that lane" and get something else.
+   * `tank` gives the maze its own scheme: left and right turn her on the spot,
+   * forward and back drive along her nose. Slower to fly, but you can always
+   * say which way she will go.
+   */
+  steering: "camera" | "tank" = "camera";
+
   /** Altitude the player has asked for, via the right-hand slider. */
   desiredHeight: number = FLIGHT.hoverHeight;
   /** Altitude actually reached so far; chases `desiredHeight` at climbSpeed. */
@@ -175,21 +188,36 @@ export class BeeActor {
       return;
     }
 
-    // Camera-space basis on the horizontal plane. The camera sits behind
-    // `cameraYaw`, so "into the screen" is that yaw's forward vector, and
-    // screen-right is forward x up.
-    tmpForward.set(Math.sin(cameraYaw), 0, Math.cos(cameraYaw));
-    tmpRight.set(-Math.cos(cameraYaw), 0, Math.sin(cameraYaw));
-
     // While stunned the stick is ignored and the bee just coasts out the shove.
     this.stunTime = Math.max(0, this.stunTime - dt);
     const stunned = this.stunTime > 0;
+    const tank = this.steering === "tank";
 
-    tmpDesired
-      .copy(tmpForward)
-      .multiplyScalar(stunned ? 0 : -stick.y)
-      .addScaledVector(tmpRight, stunned ? 0 : stick.x)
-      .multiplyScalar(FLIGHT.maxSpeed);
+    if (tank) {
+      // Left and right are a turn, not a direction: she pivots where she is.
+      // Right on the stick is a right turn, which is yaw *decreasing* — screen
+      // right is -X when she faces +Z, and forward is (sin yaw, cos yaw).
+      if (!stunned) {
+        this.yaw -= stick.x * FLIGHT.tankTurnRate * dt;
+      }
+      tmpForward.set(Math.sin(this.yaw), 0, Math.cos(this.yaw));
+      tmpDesired
+        .copy(tmpForward)
+        .multiplyScalar(stunned ? 0 : -stick.y)
+        .multiplyScalar(FLIGHT.maxSpeed);
+    } else {
+      // Camera-space basis on the horizontal plane. The camera sits behind
+      // `cameraYaw`, so "into the screen" is that yaw's forward vector, and
+      // screen-right is forward x up.
+      tmpForward.set(Math.sin(cameraYaw), 0, Math.cos(cameraYaw));
+      tmpRight.set(-Math.cos(cameraYaw), 0, Math.sin(cameraYaw));
+
+      tmpDesired
+        .copy(tmpForward)
+        .multiplyScalar(stunned ? 0 : -stick.y)
+        .addScaledVector(tmpRight, stunned ? 0 : stick.x)
+        .multiplyScalar(FLIGHT.maxSpeed);
+    }
 
     // Accelerate toward the desired velocity; coast to a stop when released.
     const rate = !stunned && stick.magnitude > 0 ? FLIGHT.accel : FLIGHT.drag;
@@ -254,22 +282,24 @@ export class BeeActor {
     // altitude they asked for and loses a little reach instead.
     this.clampToSphere();
 
-    // Face the direction of travel.
+    // Face the direction of travel — except under tank steering, where the
+    // player owns the yaw outright and deriving it from velocity would fight
+    // them every time she reverses.
     const planarSpeed = Math.hypot(this.velocity.x, this.velocity.z);
-    if (planarSpeed > 0.35) {
+    if (!tank && planarSpeed > 0.35) {
       const target = Math.atan2(this.velocity.x, this.velocity.z);
       this.yaw +=
         shortestAngle(this.yaw, target) * Math.min(1, FLIGHT.yawLerp * dt);
     }
 
-    // Bank into turns: roll proportional to how much velocity is turning.
-    const turn = shortestAngle(
-      this.yaw,
-      Math.atan2(this.velocity.x, this.velocity.z),
-    );
+    // Bank into turns. Under tank steering the turn is the stick itself; under
+    // camera steering it's how far the velocity has swung off her nose.
+    const turn = tank
+      ? -stick.x
+      : shortestAngle(this.yaw, Math.atan2(this.velocity.x, this.velocity.z));
     const targetRoll =
       THREE.MathUtils.clamp(-turn * 2.2, -FLIGHT.maxBank, FLIGHT.maxBank) *
-      this.speed01;
+      (tank ? 1 : this.speed01);
     this.roll += (targetRoll - this.roll) * Math.min(1, FLIGHT.bankLerp * dt);
   }
 

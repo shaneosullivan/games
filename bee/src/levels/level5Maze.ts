@@ -70,15 +70,34 @@ export class MazeLevel implements Level {
   /** How much the scent motes are grown for the survey shot. 1 on the ground. */
   private scentScale = 1;
   /**
-   * Keep the shot out of the trees by shortening the boom, not by sliding it.
+   * How far the shot has swung up out of a tree: 0 behind her, 1 overhead.
    *
-   * The rig wants to sit `cameraDistance` behind the bee. Down a straight
-   * corridor that's free; backed into a dead end it is solidly inside a trunk,
-   * and simply clamping the eye into the corridor leaves it jammed against the
-   * bark with a trunk filling the screen. Walking in from the bee instead
-   * keeps the camera behind her — the direction is the part that matters — and
-   * just brings it closer, which is what a third-person camera does when it
-   * meets a wall.
+   * `wanted` is decided by the confine below, which is the only thing that
+   * knows where the rig was trying to stand; `overhead` chases it in `update`,
+   * which is the only thing with a `dt`. One frame of lag between the two, and
+   * invisible at these rates.
+   */
+  private overhead = 0;
+  private overheadWanted = 0;
+  /** Set by the confine each frame; turned into `overheadWanted` in update. */
+  private blocked = false;
+  /** How long it has been blocked, for MAZE.overheadDwell. */
+  private blockedFor = 0;
+
+  /**
+   * When the way behind the bee is a trunk, swing the boom up and look down on
+   * her from above until she's clear again.
+   *
+   * Shortening the boom instead is the obvious move and it isn't good enough
+   * here: a maze is full of blocked shots, and creeping the eye toward her
+   * only presses it against the bark — you spend a dead end looking at a tree
+   * with the bee somewhere underneath it. Rotating the boom up escapes through
+   * the one direction that is always open, which in a corridor is the sky.
+   *
+   * The swing carries the length with it: at `overheadPitch` a full-length
+   * boom would put the eye in the canopy, so it shortens to `overheadBoom` on
+   * the way up. The corridor clamp at the end is the backstop for the case
+   * where she is hard against a wall and even the short offset leans into it.
    *
    * Bound once, so the rig is handed the same function for the whole level.
    */
@@ -88,28 +107,35 @@ export class MazeLevel implements Level {
       return;
     }
     const w = MAZE.corridorHalfWidth - 0.7;
-    if (scene.contains(eye, w)) {
+    // Asked of the shot the rig *wanted*, not of where we've put it, so it
+    // keeps reporting whether behind has become clear again. And asked as a
+    // line from the bee, not as a point: a point eight units back sits happily
+    // inside the next cell's corridor even with a wall in between.
+    this.blocked = !scene.clearBetween(bee, eye, w);
+    if (this.overhead < 0.001) {
       return;
     }
-    // March out from the bee and keep the last point that was still in a
-    // corridor. Never closer than `minBoom`, or she fills the frame.
-    const minBoom = 2.6;
-    const reach = tmp.copy(eye).sub(bee);
-    const total = reach.length();
-    if (total < 1e-4) {
+
+    const boom = tmp.copy(eye).sub(bee);
+    const length = boom.length();
+    if (length < 1e-4) {
       return;
     }
-    const steps = Math.max(1, Math.ceil(total / 0.4));
-    let best = Math.min(minBoom, total);
-    for (let i = 1; i <= steps; i++) {
-      const d = (total * i) / steps;
-      tmpB.copy(bee).addScaledVector(reach, d / total);
-      if (!scene.contains(tmpB, w)) {
-        break;
-      }
-      best = d;
-    }
-    eye.copy(bee).addScaledVector(reach, best / total);
+    // Split the boom into "which way back" and "how far up", so the swing is a
+    // rotation about the bee rather than a slide across the corridor.
+    const flat = Math.hypot(boom.x, boom.z);
+    const pitch = Math.atan2(boom.y, flat);
+    const k = this.overhead;
+    const nextPitch = pitch + (MAZE.overheadPitch - pitch) * k;
+    const nextLength = length + (MAZE.overheadBoom - length) * k;
+    const back = flat < 1e-4 ? 0 : (Math.cos(nextPitch) * nextLength) / flat;
+
+    eye.set(
+      bee.x + boom.x * back,
+      bee.y + Math.sin(nextPitch) * nextLength,
+      bee.z + boom.z * back,
+    );
+    scene.confine(eye, w);
   };
 
   get controlsLocked(): boolean {
@@ -131,6 +157,10 @@ export class MazeLevel implements Level {
 
     ctx.configureFlight({
       boundsRadius: MAZE.boundsRadius,
+      // Corridors are narrow and the camera is often part-way round a corner,
+      // so "the way the stick points" stops meaning anything useful. Turning
+      // on the spot always does.
+      steering: "tank",
       minHeight: MAZE.minHeight,
       maxHeight: MAZE.maxHeight,
       cameraDistance: MAZE.cameraDistance,
@@ -197,6 +227,17 @@ export class MazeLevel implements Level {
     // pulsing whatever else is going on, including from the survey shot.
     scene.update(this.elapsed, dt, ctx.bee.position);
     this.scent.update(this.elapsed, this.scentScale);
+
+    // A corner blocks the shot for a moment every time; only a blockage that
+    // outstays `overheadDwell` is worth swinging up for.
+    this.blockedFor = this.blocked ? this.blockedFor + dt : 0;
+    this.overheadWanted = this.blockedFor >= MAZE.overheadDwell ? 1 : 0;
+
+    // Chase the swing. Up fast, down gently — see the note on MAZE.overheadIn.
+    const rate =
+      this.overheadWanted > this.overhead ? MAZE.overheadIn : MAZE.overheadOut;
+    this.overhead +=
+      (this.overheadWanted - this.overhead) * (1 - Math.exp(-rate * dt));
 
     switch (this.phase) {
       case "exploring":
@@ -324,6 +365,11 @@ export class MazeLevel implements Level {
   private beginSurvey(ctx: GameContext): void {
     this.phase = "surveying";
     this.phaseTime = 0;
+    // The survey drives the camera itself, so the confine stops being called
+    // and the swing would otherwise still be part-way up when it hands back.
+    this.overhead = 0;
+    this.overheadWanted = 0;
+    this.blockedFor = 0;
     // Where the shot is now, so the rise starts from it and the fall comes
     // back to it — she can't have moved, the controls are locked.
     fromEye.copy(ctx.cameraPosition);

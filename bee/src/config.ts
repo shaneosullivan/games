@@ -40,6 +40,12 @@ export const FLIGHT = {
    */
   boundsGive: 1.0,
   boundsPush: 22,
+  /**
+   * How fast the bee spins on the spot under tank steering, radians a second.
+   * A right angle in about two thirds of a second — brisk enough that lining
+   * up with a corridor is a flick rather than a manoeuvre.
+   */
+  tankTurnRate: 2.4,
   /** How fast the bee climbs or dives toward the altitude the player set. */
   climbSpeed: 4.2,
   /** Amplitude / rate of the idle up-down bob. */
@@ -437,18 +443,27 @@ export const DANCE = {
  */
 export const MAZE = {
   /** Cells across and down. Odd numbers centre the grid on the origin. */
-  cols: 11,
-  rows: 11,
-  /** Middle of one corridor to the middle of the next. */
-  cellSize: 9,
+  cols: 9,
+  rows: 9,
+  /**
+   * Middle of one corridor to the middle of the next.
+   *
+   * Wider than the grid needs, because the walls are hedges as well as trees:
+   * a bush is 1.6 across before it's scaled, and two of them face each other
+   * over every corridor. Nine cells of eleven is the same 99 units across as
+   * eleven of nine, so the maze is no smaller — the lanes are just broader and
+   * there are fewer turns, which suits who this is for.
+   */
+  cellSize: 11,
   /**
    * How far off a corridor's centre line the bee may stray.
    *
-   * The wall trees stand on the cell boundary at cellSize/2 = 4.5 with a
-   * trunk radius of 0.5, so their inner faces are at 4.0. This leaves nearly a
-   * unit of air rather than letting her scrape along the bark.
+   * The wall stands on the cell boundary at cellSize/2 = 5.5. The bushes are
+   * the near part of it: 1.6 of radius and up to 1.05 of scale puts their
+   * inner faces at 3.82, so this leaves her about 0.4 of air rather than
+   * letting her scrape through the leaves.
    */
-  corridorHalfWidth: 3.1,
+  corridorHalfWidth: 3.4,
   minHeight: 1.2,
   /** Under the canopy, which starts at `canopyBase`. */
   maxHeight: 3.6,
@@ -474,6 +489,21 @@ export const MAZE = {
   canopyRadius: 2.2,
   /** Trees along each walled cell edge, on top of the posts at its corners. */
   treesPerWall: 2,
+
+  /**
+   * The hedge between the trunks.
+   *
+   * Bare trunks alone left the walls see-through at flying height, which reads
+   * as a wood you happen to be in rather than a maze you have to solve. Bushes
+   * fill them in to a proper leafy corridor.
+   *
+   * `bushHeight` is deliberately just above the camera's eye at 5.4: you can
+   * see a suggestion of the tops going by, but never over them into the next
+   * lane, or the maze would solve itself.
+   */
+  bushRadius: 1.6,
+  bushHeight: 5.6,
+  bushesPerWall: 4,
 
   /** The breeze. Trees lean on it; leaves come off it. */
   swayAmplitude: 0.045,
@@ -534,6 +564,40 @@ export const MAZE = {
    */
   scentSurveyScale: 7,
 
+  /**
+   * The rescue shot for when the way behind the bee is a tree.
+   *
+   * The rig wants to sit `cameraDistance` behind her; in a corridor that's
+   * free, but turn to face a dead end and "behind" is solid trunk. Rather than
+   * creep the eye closer — which just presses it against the bark — the boom
+   * swings up and looks down on her from overhead until she is clear again.
+   *
+   * `overheadBoom` is deliberately short: at this pitch it puts the eye 5.9
+   * above her, which is under `canopyBase` at 8. Any longer and the rescue
+   * shot is inside the leaves.
+   */
+  overheadBoom: 6,
+  /** Radians above the horizontal — steep, but off vertical so `lookAt` is
+   *  never asked to resolve a straight-down shot against a world up axis. */
+  overheadPitch: 1.42,
+  /** Swings up briskly, comes back down gently. Nobody wants to wait to see
+   *  past a tree, but a shot that drops the moment it can flickers at a
+   *  junction where the way behind is clear every other frame. */
+  overheadIn: 5.5,
+  overheadOut: 2.2,
+  /**
+   * How long the way back has to stay blocked before the shot gives up on it.
+   *
+   * Every corner blocks the line for a moment — the rig's yaw takes about a
+   * second to come round after a turn, and until it has, "behind the bee"
+   * points into the hedge she just flew past. Without this the rescue was
+   * firing constantly: a measured run spent 42 of its 53 seconds overhead,
+   * which makes the exception the rule. Waiting a third of a second lets an
+   * ordinary corner resolve itself and leaves the swing for being genuinely
+   * boxed in.
+   */
+  overheadDwell: 0.34,
+
   /** Close enough to the way out to have finished. */
   exitRadius: 3.2,
 } as const;
@@ -547,6 +611,9 @@ export const MAZE = {
  */
 export const MAZE_PALETTE = {
   bark: 0xa8825c,
+  bush: 0x5f9a44,
+  bushDark: 0x487c34,
+  bushLight: 0x77b155,
   canopy: 0xc4692f,
   canopyDark: 0x9c4826,
   ground: 0x7d8c52,

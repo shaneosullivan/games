@@ -277,6 +277,20 @@ export class Game {
       );
     });
 
+    // ?unlock=1 opens every level, for getting straight to the one you're
+    // working on. Before buildOverlays, so the menu is built already unlocked.
+    // Dev only: it writes to the same save the player uses, and it is not
+    // something a shared link should be able to do to a child's progress.
+    if (
+      import.meta.env.DEV &&
+      new URLSearchParams(location.search).has("unlock")
+    ) {
+      this.save.mutate(d => {
+        d.maxLevel = Game.LAST_LEVEL;
+        d.codename ||= "TESTER";
+      });
+    }
+
     this.buildOverlays(uiLayer);
     this.loop.start();
 
@@ -446,6 +460,7 @@ export class Game {
   }
 
   private configureFlight(s: FlightSettings): void {
+    this.bee.steering = s.steering ?? "camera";
     this.bee.bounds.radius = s.boundsRadius;
     this.bee.bounds.sphereRadius = s.boundsSphere ?? Infinity;
     // The lane north is walled off or not by syncCottageGate, which runs after
@@ -646,7 +661,14 @@ export class Game {
     // After the level, so a cutscene's freshly written position is what the
     // camera actually frames this step. The rig follows harder when nobody is
     // steering, so it needs to know whether a thumb is down.
-    this.rig.update(dt, this.bee, !locked && this.stick.magnitude > 0.05);
+    // Only camera-relative steering feeds back into the rig, so only it wants
+    // the gentle follow; under tank steering the yaw is the player's and the
+    // camera can simply come round behind her.
+    this.rig.update(
+      dt,
+      this.bee,
+      !locked && this.bee.steering === "camera" && this.stick.magnitude > 0.05,
+    );
 
     this.puff.update(dt);
     this.fireworks.update(dt);

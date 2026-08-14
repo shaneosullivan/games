@@ -23,6 +23,12 @@ export type EnvironmentName =
 export interface FlightSettings {
   boundsRadius: number;
   /**
+   * How the stick is read. Omit for the game's usual camera-relative flying;
+   * "tank" turns her on the spot with left/right and drives with forward/back,
+   * which is what the maze wants — see BeeActor.steering.
+   */
+  steering?: "camera" | "tank";
+  /**
    * Distance from the centre the bee may not exceed, rounding off the corner
    * where `boundsRadius` meets `maxHeight`. Set it for a level played inside a
    * dome; omit it and only the disc and the ceiling apply.

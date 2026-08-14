@@ -51,6 +51,20 @@ export interface MazeScene {
   confine(point: THREE.Vector3, halfWidth: number): boolean;
   /** The same test, without moving anything. */
   contains(point: THREE.Vector3, halfWidth: number): boolean;
+  /**
+   * Is there a clear run of corridor from `from` to `to` — no wall crossed?
+   *
+   * `contains` can't answer this. It asks whether a point sits inside its own
+   * cell's corridor, and a point on the far side of a wall sits perfectly well
+   * inside the *next* cell's. That's harmless for the bee, who moves a sixth
+   * of a unit a frame and gets clamped long before she reaches a wall, and
+   * quite wrong for the camera, which is placed eight units away in one go.
+   */
+  clearBetween(
+    from: THREE.Vector3,
+    to: THREE.Vector3,
+    halfWidth: number,
+  ): boolean;
   /** Which cell a point is in, clamped to the grid. */
   cellAt(point: THREE.Vector3): number;
   update(elapsed: number, dt: number, near: THREE.Vector3): void;
@@ -114,6 +128,39 @@ export function createMazeScene(maze: Maze, rng: Rng): MazeScene {
   }
   trees.instanceMatrix.needsUpdate = true;
   group.add(trees);
+
+  // ---- the hedge between the trunks --------------------------------------
+  const bushSpots = wallBushSpots(maze, originX, originZ, rng);
+  const bushGeo = createBush();
+  const bushes = new THREE.InstancedMesh(
+    bushGeo,
+    vertexToon(),
+    bushSpots.length,
+  );
+  bushes.castShadow = true;
+  bushes.receiveShadow = true;
+  const bushPhase = new Float32Array(bushSpots.length);
+  /** Per-bush scale, kept so the sway below can rebuild the matrix. */
+  const bushScale: Array<THREE.Vector3> = [];
+  for (let i = 0; i < bushSpots.length; i++) {
+    bushPhase[i] = rng.range(0, Math.PI * 2);
+    // Only ever narrower, never wider: a bush scaled past 1 across would reach
+    // into the corridor the flight bounds assume is clear.
+    bushScale.push(
+      new THREE.Vector3(
+        rng.range(0.86, 1),
+        rng.range(0.8, 1.08),
+        rng.range(0.86, 1),
+      ),
+    );
+    dummy.position.copy(bushSpots[i]);
+    dummy.rotation.set(0, rng.range(0, Math.PI * 2), 0);
+    dummy.scale.copy(bushScale[i]);
+    dummy.updateMatrix();
+    bushes.setMatrixAt(i, dummy.matrix);
+  }
+  bushes.instanceMatrix.needsUpdate = true;
+  group.add(bushes);
 
   // ---- leaves coming off the breeze --------------------------------------
   const leafGeo = new THREE.PlaneGeometry(MAZE.leafSize, MAZE.leafSize);
@@ -276,6 +323,42 @@ export function createMazeScene(maze: Maze, rng: Rng): MazeScene {
   const contains = (point: THREE.Vector3, w: number): boolean =>
     !confine(containsTmp.copy(point), w);
 
+  const walkTmp = new THREE.Vector3();
+  const clearBetween = (
+    from: THREE.Vector3,
+    to: THREE.Vector3,
+    w: number,
+  ): boolean => {
+    const span = Math.hypot(to.x - from.x, to.z - from.z);
+    // Fine enough that a step can never skip a cell, and so can never step
+    // over the wall it was meant to notice.
+    const steps = Math.max(1, Math.ceil(span / (cellSize * 0.25)));
+    let cell = cellAt(from);
+    for (let i = 1; i <= steps; i++) {
+      walkTmp.lerpVectors(from, to, i / steps);
+      const next = cellAt(walkTmp);
+      if (next !== cell) {
+        const dcol = colOf(maze, next) - colOf(maze, cell);
+        const drow = rowOf(maze, next) - rowOf(maze, cell);
+        // A diagonal hop means it clipped a corner post; treat it as blocked
+        // rather than working out which of the two ways round it went.
+        if (Math.abs(dcol) + Math.abs(drow) !== 1) {
+          return false;
+        }
+        const side =
+          dcol === 1 ? EAST : dcol === -1 ? WEST : drow === 1 ? SOUTH : NORTH;
+        if (!isOpen(maze, cell, side)) {
+          return false;
+        }
+        cell = next;
+      }
+      if (!contains(walkTmp, w)) {
+        return false;
+      }
+    }
+    return true;
+  };
+
   return {
     group,
     maze,
@@ -286,6 +369,7 @@ export function createMazeScene(maze: Maze, rng: Rng): MazeScene {
     cellCentre,
     confine,
     contains,
+    clearBetween,
     cellAt,
 
     update(elapsed, dt, near) {
@@ -301,6 +385,21 @@ export function createMazeScene(maze: Maze, rng: Rng): MazeScene {
         trees.setMatrixAt(i, dummy.matrix);
       }
       trees.instanceMatrix.needsUpdate = true;
+
+      // The hedge moves with the same breeze, but barely — a bush rooted along
+      // its whole base can't lean the way a trunk does.
+      for (let i = 0; i < bushSpots.length; i++) {
+        const lean =
+          Math.sin(elapsed * MAZE.swayRate * 1.4 + bushPhase[i]) *
+          MAZE.swayAmplitude *
+          0.35;
+        dummy.position.copy(bushSpots[i]);
+        dummy.rotation.set(lean, bushPhase[i], lean);
+        dummy.scale.copy(bushScale[i]);
+        dummy.updateMatrix();
+        bushes.setMatrixAt(i, dummy.matrix);
+      }
+      bushes.instanceMatrix.needsUpdate = true;
 
       for (let i = 0; i < MAZE.leaves; i++) {
         const p = leafPos[i];
@@ -329,6 +428,7 @@ export function createMazeScene(maze: Maze, rng: Rng): MazeScene {
 
     dispose() {
       treeGeo.dispose();
+      bushGeo.dispose();
       leafGeo.dispose();
     },
   };
@@ -426,6 +526,95 @@ function isExitDoor(maze: Maze, cell: number, side: number): boolean {
 export function whiten(geo: THREE.BufferGeometry): THREE.BufferGeometry {
   const white = new Float32Array(geo.attributes.position.count * 3).fill(1);
   geo.setAttribute("color", new THREE.BufferAttribute(white, 3));
+  return geo;
+}
+
+/**
+ * Where the hedge goes: along every walled edge, and on every lattice corner
+ * so the turns are sealed rather than showing a gap at each junction.
+ */
+function wallBushSpots(
+  maze: Maze,
+  originX: number,
+  originZ: number,
+  rng: Rng,
+): Array<THREE.Vector3> {
+  const {cols, rows, cellSize, bushesPerWall} = MAZE;
+  const half = cellSize / 2;
+  const out: Array<THREE.Vector3> = [];
+  const jitter = (): number => rng.range(-0.18, 0.18);
+
+  const run = (x: number, z: number, alongX: boolean): void => {
+    for (let i = 0; i < bushesPerWall; i++) {
+      const t = ((i + 0.5) / bushesPerWall - 0.5) * cellSize;
+      out.push(
+        new THREE.Vector3(
+          x + (alongX ? t : 0) + jitter(),
+          0,
+          z + (alongX ? 0 : t) + jitter(),
+        ),
+      );
+    }
+  };
+
+  for (let row = 0; row <= rows; row++) {
+    for (let col = 0; col <= cols; col++) {
+      out.push(
+        new THREE.Vector3(
+          originX + col * cellSize - half,
+          0,
+          originZ + row * cellSize - half,
+        ),
+      );
+    }
+  }
+
+  for (let cell = 0; cell < cols * rows; cell++) {
+    const col = colOf(maze, cell);
+    const row = rowOf(maze, cell);
+    const cx = originX + col * cellSize;
+    const cz = originZ + row * cellSize;
+    if (!isOpen(maze, cell, EAST) && !isExitDoor(maze, cell, EAST)) {
+      run(cx + half, cz, false);
+    }
+    if (!isOpen(maze, cell, SOUTH) && !isExitDoor(maze, cell, SOUTH)) {
+      run(cx, cz + half, true);
+    }
+    if (col === 0 && !isOpen(maze, cell, WEST)) {
+      run(cx - half, cz, false);
+    }
+    if (row === 0 && !isOpen(maze, cell, NORTH)) {
+      run(cx, cz - half, true);
+    }
+  }
+
+  return out;
+}
+
+/** One bush: stacked blobs, widest low down, so a run of them reads as hedge. */
+function createBush(): THREE.BufferGeometry {
+  const parts: Array<THREE.BufferGeometry> = [];
+  const {bushRadius: r, bushHeight: h} = MAZE;
+
+  for (const [y, size, tone] of [
+    [h * 0.24, r, P.bushDark],
+    [h * 0.52, r * 0.95, P.bush],
+    [h * 0.78, r * 0.78, P.bushLight],
+    [h * 0.95, r * 0.5, P.bush],
+  ] as const) {
+    const blob = new THREE.IcosahedronGeometry(size, 1);
+    // Squashed and a little wider than tall, which is what makes a row of them
+    // meet each other instead of reading as a line of separate shrubs.
+    blob.scale(1, 0.78, 1);
+    blob.translate(0, y, 0);
+    parts.push(paint(blob, tone));
+  }
+
+  const geo = mergeGeometries(parts, false);
+  if (!geo) {
+    throw new Error("maze: bush merge failed");
+  }
+  geo.computeVertexNormals();
   return geo;
 }
 

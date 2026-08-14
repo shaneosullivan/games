@@ -140,10 +140,17 @@ circles the pair of them slowly for as long as it's up on its hind legs. Finish 
 and the real bear bolts, with rainbow confetti over the puzzle.
 
 **5 — The Windy Woods.** A maze of trees, generated fresh every time it is
-entered, so it cannot be learned. Trunks are bare to head height and the canopy
-is a red autumn one overhead, with leaves coming down on the breeze that also
-leans the trees. The camera sits lower and further back than elsewhere, looking
-along the corridor behind you.
+entered, so it cannot be learned. The walls are hedge and tree together — tall
+green bushes filling in between bare trunks, with a red autumn canopy overhead
+and leaves coming down on the breeze that leans them. The corridors are wide
+and leafy; the hedge tops sit just above the camera, so you catch a suggestion
+of the next lane but never a look into it.
+
+**This level steers differently.** Left and right turn the bee on the spot and
+forward and back drive along her nose, because in a corridor the camera is
+often part-way round a corner and "the way the stick points" stops meaning
+anything. The camera sits low and behind; when the way behind her is hedge it
+swings up and looks down on her until she's clear.
 
 Getting lost is the point, so the level helps rather than punishes. The bee
 drops yellow pollen behind her, so a corridor she has already tried looks
@@ -462,12 +469,33 @@ Things worth knowing before changing anything:
   matter of finding her cell and clamping against whichever of its four sides
   are walled — plus holding the middle of a doorway, without which you can cut
   the corner of a junction and clip the post standing on it.
-- **A maze needs a camera that gives ground, not one that slides.** The rig
-  sits `cameraDistance` behind the bee; backed into a dead end that is solidly
-  inside a trunk. Clamping the eye sideways into the corridor leaves it jammed
-  against the bark with a trunk filling the screen — the first attempt did
-  exactly that. `setCameraConfine` lets the level walk the eye in from the bee
-  instead, keeping the direction and shortening the boom.
+- **A maze camera goes up, not in.** The rig sits `cameraDistance` behind the
+  bee; round a corner or down a dead end that is solidly inside a hedge.
+  Clamping the eye sideways into the corridor jams it against the leaves with a
+  bush filling the screen, and creeping it closer only presses it there. The
+  level's `setCameraConfine` swings the boom _up_ instead and looks down on her
+  until the way behind is clear, which escapes through the one direction a
+  corridor never blocks. It shortens as it rises — a full-length boom at that
+  pitch would be in the canopy.
+- **Whether the shot is blocked is a question about a line, not a point.**
+  `contains()` asks whether a point sits in its own cell's corridor, and a point
+  on the far side of a wall sits perfectly well inside the _next_ cell's. That
+  is harmless for the bee, who moves a sixth of a unit a frame and is clamped
+  long before she reaches a wall, and quite wrong for a camera placed eight
+  units away in one go — it reported a clear shot through a hedge. Hence
+  `clearBetween()`.
+- **And it has to persist before it counts.** Every corner blocks the line for
+  a moment, because the rig's yaw takes about a second to come round after a
+  turn. Swinging up on that spent 42 seconds of a 53-second run overhead, which
+  makes the exception the rule; `MAZE.overheadDwell` waits a third of a second
+  and brings it to 23%.
+- **The maze has its own steering.** Camera-relative flying is the game's
+  default and it falls apart in corridors: the camera is often part-way round a
+  corner, so "left" stops meaning "down that lane". `FlightSettings.steering:
+"tank"` turns her on the spot with left/right and drives along her nose with
+  forward/back. It also removes the yaw feedback loop, so the rig follows her
+  briskly instead of gently — `Game.update` only reports "steering" to the rig
+  for the camera-relative mode.
 - **A shot that leaves the level's own scale needs the fog moved.** The Windy
   Woods fog out at 62 units precisely so you can't see across the maze from
   inside it. The survey shot stands 110 above the middle, so without
@@ -515,6 +543,11 @@ All of it lives in `src/config.ts`. Current level 1 quota is 10 of each flower
 session-killer.
 
 ## Dev tools
+
+`?unlock=1` on the dev server opens every level on the map and fills in a
+codename, so you can get straight to whichever one you're working on. Dev
+builds only — it writes to the same save a player uses, and a link shouldn't be
+able to do that to a child's progress.
 
 - Tap the top-right corner (or press `` ` ``) to toggle the FPS / draw-call readout.
 - In dev builds, `window.game` is the live `Game` instance — handy for poking at
