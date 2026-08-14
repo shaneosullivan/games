@@ -17,7 +17,7 @@ import type {Hud} from "../ui/hud";
 
 /** Which set of scenery is on screen. */
 export type EnvironmentName =
-  "meadow" | "hive" | "cottage" | "inside" | "woods";
+  "meadow" | "hive" | "cottage" | "inside" | "woods" | "lair";
 
 /** Playable volume and camera framing, which differ per level. */
 export interface FlightSettings {
@@ -79,6 +79,12 @@ export interface GameContext {
    * what the Game keeps is somewhere to put it and something to toggle.
    */
   woods: THREE.Group;
+  /**
+   * The container the Bear's Lair is built into — the same arrangement as
+   * `woods`, and for the same reason: the cave belongs to level 6, not to the
+   * Game, so what the Game keeps is somewhere to put it.
+   */
+  lair: THREE.Group;
   inside: CottageInside;
   honeyJar: DanglingLoad;
   /** Small pollen motes. */
@@ -160,6 +166,19 @@ export interface GameContext {
    */
   takeTap(): boolean;
   /**
+   * Is the screen being held down right now? The Bear's Lair's whole control.
+   *
+   * Not a tap and not the stick: the press has a duration, and the level reads
+   * it every step. Presses on the HUD don't count — see `core/holdInput.ts`.
+   */
+  isHeld(): boolean;
+  /**
+   * The camera's width over its height. For a scripted shot that has to frame
+   * something against the screen it will actually be seen on — a portrait
+   * phone and a landscape iPad crop a side-on view completely differently.
+   */
+  readonly cameraAspect: number;
+  /**
    * Turn the brood loose in the meadow, pouring out of `origin`. Moves the ring
    * out of the hive interior so it renders outdoors.
    */
@@ -178,6 +197,12 @@ export interface Level {
   update(dt: number, ctx: GameContext, harvest: HarvestEvent | null): void;
   /** True once the player has met the win condition. */
   readonly complete: boolean;
+  /**
+   * True once the player has lost and the level has finished saying so — the
+   * Game then offers another go or the map. Only levels you can actually fail
+   * have one; everywhere else the worst that happens is you try again.
+   */
+  readonly failed?: boolean;
   /** While true the level is driving the bee itself; ignore player input. */
   readonly controlsLocked: boolean;
   /**

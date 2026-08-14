@@ -75,9 +75,13 @@ export class MazeLevel implements Level {
   readonly name = "The Windy Woods";
   readonly completionTitle = "Out of the woods!";
   readonly completionBody =
-    "You found your way through every twist and turn of the Windy Woods. Not one wrong turn could stop you.";
+    "You found your way through every twist and turn of the Windy Woods. Now the Bear's Lair is open — it's on the map, waiting for you.";
 
-  /** The last level there is, so finishing it hands back to the map. */
+  /**
+   * Hands back to the map rather than flying straight on. What comes next is
+   * a cave on the far side of the world, and arriving there without being
+   * shown where it is would make no sense of the map.
+   */
   readonly finishesGame = true;
 
   complete = false;
@@ -435,6 +439,12 @@ export class MazeLevel implements Level {
       this.phase = "done";
       this.complete = true;
       ctx.bee.scripted = false;
+      // Getting out of the woods is what opens the Bear's Lair. The Game
+      // unlocks whatever the save points at when a level completes, and the
+      // map comes up with it already selected.
+      ctx.save.mutate(d => {
+        d.level = 6;
+      });
       ctx.hud.setObjective("Out of the woods!");
     }
   }

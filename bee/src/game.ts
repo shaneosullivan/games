@@ -6,6 +6,7 @@ import {watchInput} from "./core/controlLog";
 import {Joystick, type StickInput} from "./core/input";
 import {ThrottleStick} from "./core/throttleStick";
 import {TurnButtons} from "./core/turnButtons";
+import {HoldInput} from "./core/holdInput";
 import {GameLoop} from "./core/loop";
 import {Rng} from "./core/rng";
 import {Save} from "./core/save";
@@ -19,6 +20,7 @@ import {RoyalChamberLevel} from "./levels/level2RoyalChamber";
 import {WaspLevel} from "./levels/level3Wasp";
 import {CottageLevel} from "./levels/level4Cottage";
 import {MazeLevel} from "./levels/level5Maze";
+import {LairLevel} from "./levels/level6Lair";
 import type {
   EnvironmentName,
   FlightSettings,
@@ -50,12 +52,14 @@ import {
   COTTAGE_ENV,
   HIVE_ENV,
   INSIDE_ENV,
+  LAIR_ENV,
   MEADOW_ENV,
   WOODS_ENV,
   type Stage,
 } from "./render/stage";
 import {Hud} from "./ui/hud";
 import {
+  createChoiceScreen,
   createCodenameScreen,
   createMessageScreen,
   type Overlay,
@@ -92,6 +96,10 @@ export class Game {
    * fresh on entry, so all the Game keeps is the container to toggle.
    */
   private readonly woodsGroup = new THREE.Group();
+  /** Where level 6 builds its cave. Empty otherwise, like the woods. */
+  private readonly lairGroup = new THREE.Group();
+  /** "Hold the screen to fly up" — level 6's only control. */
+  private readonly hold = new HoldInput();
   private readonly interior: HiveInterior;
   private readonly queen = createQueen();
   private readonly babies: BabyRing;
@@ -120,6 +128,8 @@ export class Game {
   private levelNumber = 1;
   private codenameScreen!: Overlay;
   private completeScreen!: Overlay;
+  /** "Try again" / "Back to the map", for a level you can lose. */
+  private failScreen!: Overlay;
   private running = false;
   private elapsed = 0;
   private beaconTime = 0;
@@ -159,6 +169,10 @@ export class Game {
     // --- windy woods (level 5) ---
     this.woodsGroup.visible = false;
     this.stage.scene.add(this.woodsGroup);
+
+    // --- bear's lair (level 6) ---
+    this.lairGroup.visible = false;
+    this.stage.scene.add(this.lairGroup);
 
     // --- hive interior (level 2) ---
     this.interior = createHiveInterior(rng);
@@ -214,6 +228,10 @@ export class Game {
     this.fade.className = "screen-fade";
     uiLayer.appendChild(this.fade);
 
+    // Captured for the getters below: inside an object literal `this` is the
+    // literal, not the Game.
+    const stage = this.stage;
+
     this.ctx = {
       scene: this.stage.scene,
       save: this.save,
@@ -253,6 +271,10 @@ export class Game {
       celebratePuzzle: () => burstRainbow(this.puzzle.root),
       setFlightControls: on => this.setFlightControls(on),
       pickTap: objects => this.pickTap(objects),
+      isHeld: () => this.hold.held,
+      get cameraAspect() {
+        return stage.camera.aspect;
+      },
       takeTap: () => {
         const tapped = this.pendingTap !== null;
         this.pendingTap = null;
@@ -260,6 +282,7 @@ export class Game {
       },
       cottage: this.cottage,
       woods: this.woodsGroup,
+      lair: this.lairGroup,
       inside: this.inside,
       honeyJar: this.honeyJar,
       bringHoney: () => {
@@ -484,12 +507,16 @@ export class Game {
     {number: 3, name: "Wasp at the Hive"},
     {number: 4, name: "Caramel Cottage"},
     {number: 5, name: "The Windy Woods"},
+    {number: 6, name: "The Bear's Lair"},
   ];
 
   private static readonly LAST_LEVEL = Game.LEVELS.length;
 
   private createLevel(n: number): Level {
-    if (n >= 5) {
+    if (n >= 6) {
+      return new LairLevel();
+    }
+    if (n === 5) {
       return new MazeLevel();
     }
     if (n === 4) {
@@ -598,6 +625,7 @@ export class Game {
     this.cottage.group.visible = name === "meadow" || name === "cottage";
     this.interior.group.visible = name === "hive";
     this.woodsGroup.visible = name === "woods";
+    this.lairGroup.visible = name === "lair";
     this.inside.group.visible = name === "inside";
     this.stage.setEnvironment(
       name === "hive"
@@ -606,9 +634,11 @@ export class Game {
           ? INSIDE_ENV
           : name === "woods"
             ? WOODS_ENV
-            : name === "cottage"
-              ? COTTAGE_ENV
-              : MEADOW_ENV,
+            : name === "lair"
+              ? LAIR_ENV
+              : name === "cottage"
+                ? COTTAGE_ENV
+                : MEADOW_ENV,
     );
   }
 
@@ -685,6 +715,25 @@ export class Game {
         } else {
           this.level.resumeAfterCompletion(this.ctx);
         }
+      },
+    );
+
+    this.failScreen = createChoiceScreen(
+      uiLayer,
+      "Bonk!",
+      "You bumped into a rock. That happens to everybody — the cave is tricky. Want another go?",
+      "Try again",
+      "Back to the map",
+      () => {
+        this.failScreen.hide();
+        // Straight back in at the start: `switchLevel` re-enters the level,
+        // which builds itself fresh, so there is nothing to unwind here.
+        this.running = true;
+        this.switchLevel(this.levelNumber);
+      },
+      () => {
+        this.failScreen.hide();
+        this.showMenu();
       },
     );
 
@@ -808,7 +857,12 @@ export class Game {
     // Drop the old card and rebuild it against current progress, defaulting to
     // the level they're actually on rather than whatever the save last stored.
     this.codenameScreen.root.remove();
-    this.buildCodenameScreen(this.uiLayer, this.levelNumber);
+    // The furthest of the two: after finishing a level the save points at the
+    // next one, and that is what should be sitting selected on the map.
+    this.buildCodenameScreen(
+      this.uiLayer,
+      Math.max(this.levelNumber, this.save.data.level),
+    );
     this.codenameScreen.show();
   }
 
@@ -852,6 +906,7 @@ export class Game {
         ? null
         : this.flowers.update(dt, this.bee.position);
     const wasComplete = this.level.complete;
+    const wasFailed = this.level.failed;
     this.level.update(dt, this.ctx, harvest);
 
     // After the level, so a cutscene's freshly written position is what the
@@ -874,8 +929,20 @@ export class Game {
       this.hud.setHarvest(locked ? 0 : this.flowers.harvestProgress);
     }
 
+    if (!wasFailed && this.level.failed) {
+      this.running = false;
+      this.failScreen.show();
+    }
+
     if (!wasComplete && this.level.complete) {
       this.running = false;
+      // Finishing a level points the save at the next one; unlocking it here
+      // rather than in each level means the menu is right even when nothing
+      // switches straight into it — which is how the maze hands back to the
+      // map with the Bear's Lair already open.
+      this.save.mutate(d => {
+        d.maxLevel = Math.max(d.maxLevel, d.level);
+      });
       this.save.flush();
       this.completeScreen.show();
     }

@@ -409,6 +409,50 @@ export function createCodenameScreen(
   };
 }
 
+/**
+ * A card with two ways out of it — "try again" and "back to the map".
+ *
+ * Separate from `createMessageScreen` rather than an option on it because the
+ * two say different things: one is an interruption you dismiss, this is a
+ * choice. The kind one goes first and is styled as the obvious answer, since
+ * the child reading it has just crashed and the thing they want is another go.
+ */
+export function createChoiceScreen(
+  host: HTMLElement,
+  title: string,
+  body: string,
+  primaryLabel: string,
+  secondaryLabel: string,
+  onPrimary: () => void,
+  onSecondary: () => void,
+): Overlay {
+  const {root, card} = makeOverlay(host);
+  const h1 = document.createElement("h1");
+  h1.textContent = title;
+  const p = document.createElement("p");
+  p.textContent = body;
+
+  const primary = document.createElement("button");
+  primary.textContent = primaryLabel;
+  primary.addEventListener("click", onPrimary);
+
+  const secondary = document.createElement("button");
+  secondary.className = "ghost";
+  secondary.textContent = secondaryLabel;
+  secondary.addEventListener("click", onSecondary);
+
+  card.append(h1, p, primary, secondary);
+  return {
+    root,
+    show: () => root.classList.remove("hidden"),
+    hide: () => root.classList.add("hidden"),
+    setText(nextTitle, nextBody) {
+      h1.textContent = nextTitle;
+      p.textContent = nextBody;
+    },
+  };
+}
+
 export function createMessageScreen(
   host: HTMLElement,
   title: string,

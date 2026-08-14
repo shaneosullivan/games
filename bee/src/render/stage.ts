@@ -94,6 +94,27 @@ export const WOODS_ENV: EnvironmentSettings = {
   sunOffset: [8, 18, 6],
 };
 
+/**
+ * The Bear's Lair: underground, lit by whatever gets in at the mouth.
+ *
+ * Dim, but not dark — the level is played against silhouettes, and a cave lit
+ * the way a real one is would leave a child guessing where the rocks are. The
+ * fog is long because the shot looks *along* the cave and the next few gates
+ * have to be readable from the far side of the screen.
+ */
+export const LAIR_ENV: EnvironmentSettings = {
+  background: 0x322b40,
+  fogColor: 0x3a3348,
+  fogNear: 70,
+  fogFar: 240,
+  hemiSky: 0xdfe4ff,
+  hemiGround: 0x6f6884,
+  hemiIntensity: 1.7,
+  sunColor: 0xfff0d8,
+  sunIntensity: 1.15,
+  sunOffset: [6, 20, 26],
+};
+
 export interface Stage {
   renderer: THREE.WebGLRenderer;
   scene: THREE.Scene;

@@ -678,6 +678,153 @@ export const MAZE_PALETTE = {
   exit: 0x9ef7c4,
 } as const;
 
+/**
+ * Level 6 — The Bear's Lair.
+ *
+ * A side-on flight through a cave, played the way Flappy Bird is: hold the
+ * screen and she climbs, let go and she sinks, and she goes right whatever you
+ * do. It is still the same 3D scene — the camera simply stands off to her left
+ * and everything is laid out in one plane so it reads flat.
+ *
+ * The numbers below are set for a child who has never played one of these. The
+ * gap is wide, the first gates are wider still, and the run is a minute at a
+ * pace that gives about two and a half seconds to line each one up.
+ */
+export const LAIR = {
+  // ---- the cave -----------------------------------------------------------
+  /** Floor and roof of the playable slot. The bee may not leave it. */
+  floorY: 0,
+  ceilingY: 24,
+  /**
+   * The plane everything is played in.
+   *
+   * The bee flies a little in front of the obstacles rather than among them:
+   * at z 0 a rock whose front face reached past her would draw over her, and a
+   * player who cannot see the bee cannot fly her. The offset is far smaller
+   * than the camera's standoff, so the parallax doesn't show.
+   */
+  beeZ: 2,
+  obstacleFrontZ: 0.4,
+  obstacleBackZ: -7,
+
+  // ---- the run ------------------------------------------------------------
+  /** Where the cave mouth stands; the bee starts outside it. */
+  mouthX: 0,
+  /** How far past the mouth the first gate is — a beat to settle before one. */
+  runIn: 34,
+  gateCount: 24,
+  gateSpacing: 21,
+  /** Clear air past the last gate, then she's out. */
+  runOut: 30,
+  /**
+   * The opening, floor-to-roof.
+   *
+   * A bee is about 1.9 across and 1.5 tall. `gapEasy` is what the first gates
+   * get, narrowing to `gap` by `gatesToFullDifficulty` — a child needs a few
+   * goes at a forgiving one before the real thing.
+   */
+  gap: 10,
+  gapEasy: 13.5,
+  gatesToFullDifficulty: 10,
+  /** How close to floor or roof the opening's edge may come. */
+  gapMargin: 2.5,
+  /** Most the opening may move between one gate and the next. */
+  gapStep: 4,
+  /** Half-width of a spike at its base, and of a rock at its widest. */
+  spikeHalfWidth: 2.6,
+  rockHalfWidth: 3.4,
+
+  // ---- flying -------------------------------------------------------------
+  /** Rightward pace. gateCount * gateSpacing / speed ≈ the minute asked for. */
+  speed: 8.6,
+  /** Terminal rates, held down and let go. */
+  riseSpeed: 7.5,
+  fallSpeed: 8.5,
+  /**
+   * How briskly she reaches them. Deliberately not an impulse: a flap you have
+   * to time is the hard part of these games, and holding a line is something a
+   * four-year-old can do on the first go.
+   */
+  riseAccel: 30,
+  fallAccel: 24,
+  /** Collision radius. Smaller than she looks, which always plays fairer. */
+  radius: 0.9,
+  /**
+   * How much bigger the bee is drawn here.
+   *
+   * The side-on shot stands nearly thirty units back to fit the cave in, and
+   * at that range she is a thumbnail — too small for a child to read her
+   * height against a gap, which is the whole game. Nothing else scales with
+   * her: `radius` is set against the cave, not against how she looks.
+   */
+  beeScale: 1.5,
+  /** Where she enters, and the height the first gap is centred on. */
+  startHeight: 12,
+
+  // ---- the shot -----------------------------------------------------------
+  /**
+   * How much cave the side-on camera has to show, as half-extents. The height
+   * is the whole slot plus a margin; the length decides how much warning of the
+   * next gate you get, and is the number to raise if the level plays tight.
+   */
+  frameHalfHeight: 14,
+  frameHalfLength: 17,
+  /** How far ahead of the bee the shot is centred, so there's road to read. */
+  cameraLead: 6,
+
+  // ---- the way in ---------------------------------------------------------
+  /** Facing the mouth from outside, before anything happens. */
+  approachPause: 2,
+  /** Distance outside the mouth she waits at. */
+  approachOut: 26,
+  /**
+   * Where the opening shot stands, relative to the bee: back, up, and off to
+   * her left.
+   *
+   * A held shot rather than the follow rig. The rig sits directly behind her,
+   * and "directly behind" is a straight line through the arch she is flying
+   * into — it ended up inside the boulders the moment she moved. This camera
+   * doesn't move at all while she flies in; she recedes into the cave, which
+   * is a better shot anyway.
+   */
+  approachCamera: {back: 20, up: 9, side: 30},
+  flyInTime: 2.4,
+  /** The swing from behind her round to her left. */
+  panTime: 1.5,
+
+  // ---- crashing -----------------------------------------------------------
+  /** The earthquake. Rate is in shakes per second. */
+  shakeTime: 1.1,
+  shakeAmplitude: 1.5,
+  shakeRate: 26,
+  /** Straight down and out of shot, then the card. */
+  crashFallSpeed: 17,
+  crashFallAccel: 30,
+  /** How far below the floor is off the bottom of the screen. */
+  crashDepth: 16,
+
+  // ---- getting out --------------------------------------------------------
+  celebrationTime: 3.2,
+} as const;
+
+/**
+ * Cave rock: cool and dim, but never actually dark.
+ *
+ * Same lesson as the woods — the toon ramp's darkest band is 0.47, so a
+ * photographic cave-grey comes out as a black cut-out. These are lifted well
+ * past what looks right in a swatch so that they read as stone on screen.
+ */
+export const LAIR_PALETTE = {
+  rock: 0x9d9ab0,
+  rockDark: 0x6d6a82,
+  rockLight: 0xbab6cc,
+  spike: 0xb0acc4,
+  spikeTip: 0xd6d2e4,
+  ground: 0x8a8799,
+  crystal: 0x7fe0d8,
+  glow: 0xffd98a,
+} as const;
+
 export const COTTAGE = {
   /**
    * The house is authored small and scaled up bodily. A bee is ~1.5 units

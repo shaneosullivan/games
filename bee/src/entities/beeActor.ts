@@ -157,6 +157,21 @@ export class BeeActor {
     this.stunTime = seconds;
   }
 
+  /**
+   * Nose up or down while scripted: 1 climbing hard, -1 diving, 0 level.
+   *
+   * The flight model works this out from how fast she is actually climbing,
+   * which is no use to a cutscene that writes `position` directly — the Bear's
+   * Lair moves her a whole cave without the model ever seeing a metre of it.
+   * Kept separate from `climbRate` so that a cutscene taking over a climbing
+   * bee doesn't inherit her last pitch and hold it for good.
+   */
+  setClimb(t: number): void {
+    this.scriptedClimb = Math.max(-1, Math.min(1, t));
+  }
+
+  private scriptedClimb = 0;
+
   /** Crown the bee — level 1 does this once the hive is finished. */
   setCrown(on: boolean): void {
     this.model.setCrown(on);
@@ -177,6 +192,9 @@ export class BeeActor {
     this.position.copy(position);
     this.prevPosition.copy(position);
     this.velocity.set(0, 0, 0);
+    // A level that placed her is starting fresh; a pitch held over from the
+    // last one's cutscene would land her nose-down in the new scene.
+    this.scriptedClimb = 0;
   }
 
   /** Jump to an altitude without the climb, for level entry. */
@@ -204,7 +222,7 @@ export class BeeActor {
       this.bobPhase += dt * FLIGHT.bobRate;
       this.roll += (0 - this.roll) * Math.min(1, 4 * dt);
       this.baseHeight = this.position.y;
-      this.climbRate = 0;
+      this.climbRate = this.scriptedClimb * FLIGHT.climbSpeed;
       return;
     }
 

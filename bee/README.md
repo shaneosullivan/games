@@ -56,7 +56,8 @@ touchscreen.
 | 5 — Level 3: Wasp at the Hive                                | done        |
 | 6 — Level 4: Caramel Cottage (dance mat, then inside)        | done        |
 | 7 — Level 5: The Windy Woods (maze)                          | done        |
-| 8 — Wall-clock day system                                    | not started |
+| 8 — Level 6: The Bear's Lair (side-scroller)                 | done        |
+| 9 — Wall-clock day system                                    | not started |
 
 ## Levels
 
@@ -183,8 +184,30 @@ disappears behind a wall stops being one exactly when you are far enough away
 to need it. It shows the next nine cells only — enough of a nudge to
 get going, not enough to solve it, which is why the other dead ends still have
 something to offer. The scent stays for the rest of the level. Reaching the
-glowing ring at the far corner finishes it — and because there is nothing after
-it, its completion card offers the map rather than "Keep flying".
+glowing ring at the far corner finishes it, which opens the Bear's Lair — its
+completion card offers the map rather than "Keep flying", and the map comes up
+with the Lair already selected.
+
+**6 — The Bear's Lair.** Flappy Bird, played in the bee's own world: hold
+anywhere on the screen and she climbs, let go and she sinks, and she flies
+right whatever you do. Twenty-four gates of stalactite and stalagmite, then
+rock outcrops, with about a minute of cave between the mouth and the far end.
+It opens on the ordinary 3D view, held outside a boulder arch while she flies
+in on her own, and the camera then swings round to her left for the side-on
+run.
+
+It is not a 2D game. It is the same scene, the same bee and the same renderer,
+with the cave laid out in one shallow plane and the camera parked off to one
+side — which is why the bee still pitches her nose up as she climbs and the
+rocks still catch the light. She flies a couple of units in front of the
+obstacles so that nothing can ever draw over her.
+
+Hitting anything shakes the screen like an earthquake and drops her out of the
+bottom of the frame, and then a card offers another go or the map. The gates
+start much wider than they end and only narrow over the first ten, and the
+whole cave is generated from a fixed seed, so it is meant to be learned — the
+difficulty curve is getting further each time rather than anything the level
+does to you.
 
 **The puzzle art is a placeholder** — a hand-authored SVG in
 `src/assets/bearPuzzle.ts`. To use the real picture, drop the image into
@@ -568,6 +591,29 @@ Things worth knowing before changing anything:
   `setFogScale` the big reveal was a flat wash of nothing — and the scent motes
   are two pixels across from up there, which is why `ScentTrail.update` takes a
   scale. Both ease in with the rise.
+- **An obstacle that tapers has to be tested as a taper, above its tip as well
+  as along it.** The Bear's Lair asks each spike how wide it is at the bee's
+  height, which is zero anywhere past the point — and the first version still
+  compared that against her radius, so the empty air above every spike was
+  solid for a body's width either side. That air is the middle of the gap: the
+  one place the player is aiming for. Past the tip the only thing near is the
+  point itself, and a point is tested as a point (`gateHit` in
+  `render/geometry/lair.ts`).
+- **A side-on cave wants no depth at all.** The floor and roof were first built
+  eighteen units deep, and from a camera off to one side they projected as huge
+  diagonal bands running up to the horizon, swallowing half the frame and
+  leaving the playable slot looking tiny. Nine units — just enough to hold the
+  obstacles — reads as the flat slot the game is actually played in.
+- **The Lair's opening shot is held, not followed.** The chase rig sits
+  directly behind the bee, and directly behind her is a straight line through
+  the arch she is flying into: the camera went through the boulders the moment
+  she moved. It stands still outside instead and lets her recede into the cave,
+  which is the better shot anyway, and the pan then swings it round to her left.
+- **The bee is drawn half again as big in the Lair.** The side-on camera stands
+  nearly thirty units back because that is what fits the cave, and at that range
+  she was a thumbnail — unreadable against a gap, which is the whole game.
+  `LAIR.beeScale` is a framing number; her collision radius is set against the
+  cave and doesn't follow it.
 - **`vertexColors: true` needs a `color` attribute even when you only want
   `instanceColor`.** This has now caught three separate things: the particles,
   the maze's falling leaves and the scent trail, all of which rendered black
