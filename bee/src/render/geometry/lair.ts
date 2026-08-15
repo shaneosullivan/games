@@ -194,16 +194,11 @@ export function createLairScene(rng: Rng): LairScene {
     const hi = ceilingY - LAIR.gapMargin - gap / 2;
     if (i > 0 && wasStair) {
       // The bottom of a stair: closer behind the last gate than anything else
-      // in the cave, and further below it than the way through ever moves
-      // otherwise. It is the roof coming down (see `shape` below) with open air
-      // underneath, so the diagonal is enforced from above and being a little
-      // too low costs nothing.
+      // in the cave, and its way through a little lower. Only a little — the
+      // two openings still overlap, so the diagonal is the natural line
+      // through the pair rather than the only one that fits.
       x += LAIR.stairSpacing;
-      // Put the roof of this gate *below* the floor of the last one, so the
-      // two openings don't overlap at all. Without that the pair is only two
-      // gates you can fly low through in a straight line; with it there is no
-      // height that clears both, and the way through has to be a descent.
-      centre = gates[gates.length - 1].gapBottom - LAIR.stairForce - gap / 2;
+      centre -= LAIR.stairOffset;
     } else if (i > 0) {
       x += spacing;
       // How far the way through moves, scaled by how far there is to move in.
@@ -213,35 +208,22 @@ export function createLairScene(rng: Rng): LairScene {
       const room = spacing / LAIR.spacingStart;
       centre += rng.range(-LAIR.gapStep, LAIR.gapStep) * room;
     }
-    // The bottom of a stair only has to clear the floor — nothing rises from
-    // it — while the top has to leave room for the whole fall.
-    const bottom = wasStair
-      ? floorY + LAIR.stairFloorRoom
-      : startsStair
-        ? // High enough that the bottom gate still clears the floor once its
-          // roof has been put a whole gap plus `stairForce` below this one's
-          // floor. Anything lower and the clamp would pull the pair back into
-          // line with each other, which is exactly the shape a stair isn't.
-          Math.min(hi, floorY + LAIR.stairFloorRoom + LAIR.stairForce + gap)
-        : lo;
-    centre = Math.min(hi, Math.max(bottom, centre));
-    // If the drop wouldn't have fitted, the stair is abandoned rather than
-    // squashed into something that isn't one.
-    stairing =
-      startsStair &&
-      centre - LAIR.stairForce - gap >= floorY + LAIR.stairFloorRoom - 0.01;
+    if (startsStair) {
+      // Leave room to drop into. Nothing else about a stair is special: it is
+      // an ordinary gate with an ordinary opening, and the one after it is an
+      // ordinary gate sitting slightly lower and much closer.
+      centre = Math.max(centre, lo + LAIR.stairOffset);
+    }
+    centre = Math.min(hi, Math.max(lo, centre));
+    stairing = startsStair;
 
     // The first few are pairs whatever the dice say: a pair is the shape that
     // teaches the level, and a one-sided gate only reads as a variation once
-    // you know what it is varying from. The bottom of a stair is always the
-    // roof coming down, so that falling too far costs nothing.
+    // you know what it is varying from. Both halves of a stair are pairs, so
+    // that what you are flying down through is plainly two offset gates.
     const roll = rng.next();
-    const shape = wasStair
-      ? "roof"
-      : // The top of a stair is always a pair. A one-sided gate's opening
-        // reaches the floor, and there would be nothing to be forced down past
-        // — she could fly the whole stair low and in a straight line.
-        startsStair || i < LAIR.pairsToStart || roll < LAIR.pairChance
+    const shape =
+      wasStair || startsStair || i < LAIR.pairsToStart || roll < LAIR.pairChance
         ? "pair"
         : roll < LAIR.pairChance + (1 - LAIR.pairChance) / 2
           ? "floor"
@@ -249,9 +231,9 @@ export function createLairScene(rng: Rng): LairScene {
 
     /** A spike or a rock, chosen per obstacle so a pair can be one of each. */
     const pick = (): {kind: LairObstacle["kind"]; halfWidth: number} =>
-      // The one hanging over a forced dive is always the slim spike: see
-      // LAIR.stairSpikeHalfWidth.
-      wasStair
+      // Slim ones through a stair: they stand close together and a pair of
+      // wide rocks a stair's length apart reads as one lump of cave.
+      wasStair || startsStair
         ? {kind: "spike", halfWidth: LAIR.stairSpikeHalfWidth}
         : rng.next() < 0.5
           ? {kind: "spike", halfWidth: LAIR.spikeHalfWidth}
@@ -346,12 +328,14 @@ export function createLairScene(rng: Rng): LairScene {
   // puts her against its rim rather than in the middle of the hole.
   const archZ = LAIR.beeZ - 2;
   const archRy = ceilingY - 1;
+  /** Half-width of the opening. The corridor behind it is built from this. */
+  const archRz = 11;
   // Two rings, the outer one bigger and set back: one ring alone reads as a
   // circle of stones standing in a field, and it is the thickness that makes
   // it a hole in a cliff.
   for (const ring of [
-    {rz: 11, scale: 1, back: 0, light: 3},
-    {rz: 16, scale: 1.5, back: -5, light: 4},
+    {rz: archRz, scale: 1, back: 0, light: 3},
+    {rz: archRz + 5, scale: 1.5, back: -5, light: 4},
   ]) {
     const steps = ring.rz > 12 ? 26 : 20;
     for (let i = 0; i <= steps; i++) {
@@ -375,28 +359,103 @@ export function createLairScene(rng: Rng): LairScene {
     geo.dispose();
   }
 
-  // ---- the wall across the mouth ------------------------------------------
+  // ---- the corridor you can see into --------------------------------------
   //
-  // Shown while the shot is outside, then taken away as the camera swings
-  // round. Without it the opening shot looks straight down the cave and shows
-  // the player the first few gates before they have flown a single one — the
-  // mouth should be a dark hole, and what is inside it should be a surprise
-  // you fly into.
-  const coverGeo = new THREE.PlaneGeometry(caveDepth + 6, height + 14);
-  coverGeo.rotateY(Math.PI / 2);
-  coverGeo.translate(LAIR.mouthX + 1, floorY + height / 2, caveMidZ);
+  // What the opening shot shows through the arch. Not the real cave — that is
+  // not drawn at all yet, because looking straight down it would show the
+  // player the first several gates before they had flown one.
+  //
+  // The same arch again and again, running back into the hill: identical
+  // profile, barely tapering, each ring a little darker than the one in front
+  // until they are lost. That is what makes it read as one construction with
+  // the doorway rather than as something sitting behind it — earlier goes at
+  // this were a flat wall across the opening, then a narrow stone tube, and
+  // both looked like an object stopping the hole rather than a cave carrying
+  // on.
+  const tunnelPieces: Array<THREE.BufferGeometry> = [];
+  const tunnelColours = [P.rock, P.rockLight, P.spike, P.rockDark];
+  const dark = new THREE.Color(0x06050b).convertSRGBToLinear();
+  const shade = new THREE.Color();
+  const ringGap = LAIR.tunnelLength / LAIR.tunnelRings;
+  for (let ring = 0; ring < LAIR.tunnelRings; ring++) {
+    const along = ring / (LAIR.tunnelRings - 1);
+    const ringX = LAIR.mouthX + (ring + 1) * ringGap;
+    // Only just narrowing. The corridor is the doorway continued, so it keeps
+    // the doorway's size; the taper is there to help the eye read depth in
+    // something this dark, not to make a funnel.
+    const shrink = 1 - along * LAIR.tunnelTaper;
+    const steps = 20;
+    for (let i = 0; i <= steps; i++) {
+      const a = (i / steps) * Math.PI;
+      const boulder = new THREE.IcosahedronGeometry(
+        rng.range(2.6, 4.4) * shrink,
+        0,
+      );
+      boulder.scale(0.7, 1, 1.1);
+      boulder.translate(
+        ringX + rng.range(-1.2, 1.2),
+        floorY + Math.sin(a) * archRy * shrink,
+        archZ + Math.cos(a) * archRz * shrink,
+      );
+      // The doorway's own stone, taken down toward black with distance.
+      shade
+        .set(tunnelColours[(ring + i) % tunnelColours.length])
+        .convertSRGBToLinear()
+        .lerp(dark, along ** 0.8);
+      const pos = boulder.attributes.position;
+      const colours = new Float32Array(pos.count * 3);
+      for (let v = 0; v < pos.count; v++) {
+        colours[v * 3] = shade.r;
+        colours[v * 3 + 1] = shade.g;
+        colours[v * 3 + 2] = shade.b;
+      }
+      boulder.setAttribute("color", new THREE.BufferAttribute(colours, 3));
+      tunnelPieces.push(boulder);
+    }
+  }
   const coverMaterial = new THREE.MeshBasicMaterial({
-    color: new THREE.Color(P.rockDark).convertSRGBToLinear(),
+    vertexColors: true,
     transparent: true,
-    // Flat, unlit and fogless: it stands for "you cannot see in", and any
-    // shading on it would read as a surface with a shape of its own.
+    // Unlit: the shading is painted in, so the far end stays black however the
+    // sun happens to be pointing.
     fog: false,
-    side: THREE.DoubleSide,
   });
-  const cover = new THREE.Mesh(coverGeo, coverMaterial);
-  // In front of the cave it hides, behind the arch that frames it.
+  const cover = new THREE.Mesh(
+    mergeGeometries(tunnelPieces, false),
+    coverMaterial,
+  );
   cover.renderOrder = 1;
   group.add(cover);
+  for (const geo of tunnelPieces) {
+    geo.dispose();
+  }
+
+  // Blackness behind the last ring, so the corridor finishes in nothing rather
+  // than in a view of whatever is beyond it. Sized to the last ring and stood
+  // just inside it, because anything wider shows past the edge of the arch as
+  // a black shape hanging outside the cave.
+  const capShrink = 1 - LAIR.tunnelTaper;
+  const capGeo = new THREE.PlaneGeometry(
+    archRz * 2 * capShrink,
+    archRy * capShrink,
+  );
+  capGeo.rotateY(Math.PI / 2);
+  capGeo.translate(
+    LAIR.mouthX + LAIR.tunnelLength - 1,
+    floorY + (archRy * capShrink) / 2,
+    archZ,
+  );
+  const cap = new THREE.Mesh(
+    capGeo,
+    new THREE.MeshBasicMaterial({
+      color: 0x06050b,
+      transparent: true,
+      fog: false,
+      side: THREE.DoubleSide,
+    }),
+  );
+  cap.renderOrder = 0;
+  group.add(cap);
 
   // ---- the obstacles ------------------------------------------------------
   const pieces: Array<THREE.BufferGeometry> = [];
@@ -560,6 +619,8 @@ export function createLairScene(rng: Rng): LairScene {
     setMouthCover(amount) {
       const a = Math.max(0, Math.min(1, amount));
       coverMaterial.opacity = a;
+      (cap.material as THREE.MeshBasicMaterial).opacity = a;
+      cap.visible = a > 0.01;
       // Fully transparent still costs a draw call and still writes nothing
       // useful; once it is gone it is gone.
       cover.visible = a > 0.01;

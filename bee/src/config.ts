@@ -749,13 +749,16 @@ export const LAIR = {
    */
   stairSpacing: 10.5,
   /**
-   * How far the bottom gate's roof reaches below the top gate's floor.
+   * How much lower the second gate of a stair sits.
    *
-   * This is what makes the descent compulsory rather than optional: any
-   * overlap at all between the two openings and there is a height that clears
-   * both, and the pair is just two gates you fly through in a straight line.
+   * Slight, and deliberately less than a gap: the two openings still overlap,
+   * so the diagonal is the natural line through the pair rather than the only
+   * one that fits. An offset big enough to leave no overlap at all makes the
+   * descent compulsory — and makes what hangs over it reach from the ceiling
+   * to below the previous gate's floor, which is a spike half the height of
+   * the cave.
    */
-  stairForce: 0.7,
+  stairOffset: 4.5,
   /**
    * The hanging obstacle at the bottom of a stair is always the slim kind.
    *
@@ -764,9 +767,7 @@ export const LAIR = {
    * clearer about where its point is. Still a real obstacle — the descent is
    * compulsory either way — just a fairer one to read at speed.
    */
-  stairSpikeHalfWidth: 2.1,
-  /** Air kept under the bottom of a stair, so a fall can't end on the floor. */
-  stairFloorRoom: 2.5,
+  stairSpikeHalfWidth: 1.6,
   /** How often a stair starts. Nothing at the mouth, ramping to this. */
   stairChanceEnd: 0.6,
   /** How far in before the first one can appear, as a fraction of the run. */
@@ -904,6 +905,16 @@ export const LAIR = {
   // ---- the way in ---------------------------------------------------------
   /** Facing the mouth from outside, before anything happens. */
   approachPause: 2,
+  /**
+   * The stand-in corridor seen through the arch before she flies in.
+   *
+   * Long enough that its end is lost in the dark — the point is that the mouth
+   * has depth and still gives nothing away about the level behind it.
+   */
+  tunnelLength: 80,
+  /** Rings of boulders receding into it, and how much they close in. */
+  tunnelRings: 8,
+  tunnelTaper: 0.18,
   /** Distance outside the mouth she waits at. */
   approachOut: 26,
   /**
