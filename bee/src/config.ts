@@ -712,8 +712,31 @@ export const LAIR = {
   mouthX: 0,
   /** How far past the mouth the first gate is — a beat to settle before one. */
   runIn: 34,
-  gateCount: 24,
+  gateCount: 29,
   gateSpacing: 21,
+  /**
+   * How much the distance between gates wanders, as a fraction of the spacing.
+   *
+   * A fixed pitch reads as a grid rather than a cave. The jitter is scaled back
+   * afterwards so the mean is exactly `gateSpacing` — irregular spacing must
+   * not quietly make the level longer or shorter than the minute it is meant
+   * to be.
+   */
+  spacingJitter: 0.34,
+  /**
+   * How often a gate is a matched pair, rather than a spike from the floor
+   * with open air above it or the roof coming down with open air below.
+   *
+   * A one-sided gate leaves exactly the clearance a pair would, on the side
+   * she has to be — the shapes vary, the flying doesn't get harder.
+   */
+  pairChance: 0.5,
+  /**
+   * Gates at the start that are pairs whatever the dice say. A pair is the
+   * shape that teaches the level, and a one-sided gate only reads as a
+   * variation once you know what it is varying from.
+   */
+  pairsToStart: 3,
   /** Clear air past the last gate, then she's out. */
   runOut: 30,
   /**
@@ -723,20 +746,43 @@ export const LAIR = {
    * get, narrowing to `gap` by `gatesToFullDifficulty` — a child needs a few
    * goes at a forgiving one before the real thing.
    */
-  gap: 10,
-  gapEasy: 13.5,
+  gap: 11.5,
+  gapEasy: 15,
   gatesToFullDifficulty: 10,
   /** How close to floor or roof the opening's edge may come. */
   gapMargin: 2.5,
   /** Most the opening may move between one gate and the next. */
   gapStep: 4,
+  /**
+   * Water off the stalactites.
+   *
+   * A cave that is completely still reads as a diagram. A few slow drips are
+   * the cheapest thing that makes it feel like somewhere — and slow is the
+   * point: anything quick enough to catch the eye competes with the rocks the
+   * player is trying to read.
+   */
+  dripChance: 0.65,
+  dripSpeed: 6,
+  dripSize: 0.17,
+  /** How long a drop hangs and swells at the tip before it lets go. */
+  dripHang: 1.3,
+  /** Seconds between one drop and the next, per stalactite. */
+  dripPeriod: [3, 7.5],
+
   /** Half-width of a spike at its base, and of a rock at its widest. */
   spikeHalfWidth: 2.6,
   rockHalfWidth: 3.4,
 
   // ---- flying -------------------------------------------------------------
-  /** Rightward pace. gateCount * gateSpacing / speed ≈ the minute asked for. */
-  speed: 8.6,
+  /**
+   * Rightward pace. gateCount * gateSpacing / speed ≈ the minute asked for.
+   *
+   * Flappy Bird runs at 4.41 body lengths a second (150 px/s against a 34px
+   * bird). The bee is a longer animal than that bird — 1.9 long per tall
+   * against 1.42 — so matching lengths would have made her slower than the
+   * original feels; this matches the *height* scale, like everything else here.
+   */
+  speed: 10.9,
   /**
    * The flap, and the falling.
    *
@@ -744,20 +790,20 @@ export const LAIR = {
    * upward at `flapSpeed` whatever she was doing before, and gravity takes it
    * back off her. Nothing about holding the screen down keeps her up.
    *
-   * The two numbers are one decision, not two, and the pair is chosen floaty.
-   * A flap carries her flapSpeed² / (2 * gravity) = 2.3 units up and takes
-   * 0.6s to get there, so holding a line costs one to two flaps a second.
+   * The two numbers are one decision, not two, and they are Flappy Bird's own,
+   * converted from its per-frame values at 30fps (gravity 1 px/frame², flap 9
+   * px/frame) and scaled by body height — a 24px bird against a bee drawn 1.74
+   * tall. A flap carries her 1.69 body heights up and takes 0.30s to get
+   * there, which is the arc the original has in the hand.
    *
-   * Measured, not guessed: an autopilot with a third of a second of reaction
-   * time flies the whole cave on these, and gets a third of the way on a
-   * snappier pair with the same gap. Time in the air is what a child has to
-   * correct in, so the floaty end of a real flap is both the kinder one and
-   * the one that still plays like the game it is copying.
+   * What is *not* copied is the course. Flappy's gap is 5.0 body heights and
+   * its pipes are 1.21s apart; this cave gives 5.75 and 1.65s, and starts
+   * wider still. The hands are the real thing, the room to use them isn't.
    */
-  flapSpeed: 7.8,
-  gravity: 13,
+  flapSpeed: 19.6,
+  gravity: 65,
   /** How fast she can end up falling, however long she's left it. */
-  maxFall: 15,
+  maxFall: 21.8,
   /**
    * Her hit box, half-extents, along the cave and up it.
    *
@@ -826,6 +872,12 @@ export const LAIR = {
   flyInTime: 2.4,
   /** The swing from behind her round to her left. */
   panTime: 1.5,
+  /**
+   * How much of the swing the wall across the mouth takes to disappear. Gone
+   * before the shot settles, so the reveal belongs to the camera move rather
+   * than happening in front of a static frame.
+   */
+  coverFade: 0.55,
 
   // ---- crashing -----------------------------------------------------------
   /** The earthquake. Rate is in shakes per second. */
@@ -857,6 +909,7 @@ export const LAIR_PALETTE = {
   spikeTip: 0xd6d2e4,
   ground: 0x8a8799,
   crystal: 0x7fe0d8,
+  water: 0xa9dcff,
   glow: 0xffd98a,
 } as const;
 

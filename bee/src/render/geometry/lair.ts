@@ -23,11 +23,21 @@ export interface LairObstacle {
   kind: "spike" | "rock";
 }
 
-/** A pair of obstacles with a gap between them. */
+/** One obstacle or two, with the way through between them. */
 export interface LairGate {
   x: number;
+  /** The opening, floor to roof. A one-sided gate opens onto one of them. */
   gapBottom: number;
   gapTop: number;
+  /**
+   * The height the gate was laid out around.
+   *
+   * For a pair it is the middle of the two. For a one-sided gate the opening
+   * runs all the way to the floor or the roof, so its middle is nowhere near
+   * where the level means you to be — this is the line the run was designed
+   * along, and it is what keeps successive gates a flyable distance apart.
+   */
+  pathY: number;
   obstacles: ReadonlyArray<LairObstacle>;
 }
 
@@ -36,6 +46,14 @@ export interface LairScene {
   gates: ReadonlyArray<LairGate>;
   /** Where the run ends and she's out in the open again. */
   endX: number;
+  /**
+   * How solid the wall across the mouth is: 1 shuts the cave off completely,
+   * 0 takes it away. The opening shot wants the cave to be a dark hole in a
+   * cliff rather than a diagram of the level you are about to play.
+   */
+  setMouthCover(amount: number): void;
+  /** Run the water. Everything else in the cave is still. */
+  update(elapsed: number): void;
   dispose(): void;
 }
 
@@ -130,10 +148,36 @@ export function createLairScene(rng: Rng): LairScene {
   const caveMidZ = (caveFront + caveBack) / 2;
 
   // ---- the gates, as data first ------------------------------------------
+  //
+  // Not a row of matched pairs on a fixed pitch. Every gate the same shape at
+  // the same interval reads as a grid rather than a cave — so some gates are a
+  // spike from the floor with open air above it, some are the roof coming down
+  // with open air below, and the distance between them varies too.
+  //
+  // What doesn't vary is how much room she is left. A one-sided gate leaves
+  // exactly the clearance a pair would, on the side she has to be: the shapes
+  // change, the flying doesn't get harder.
   const gates: Array<LairGate> = [];
+
+  // How far apart, gate by gate. Jittered, then scaled back so the run is the
+  // length it always was — the level is a minute long by design, and irregular
+  // spacing shouldn't quietly make it longer or shorter.
+  const spacings: Array<number> = [];
+  for (let i = 0; i < LAIR.gateCount - 1; i++) {
+    spacings.push(rng.range(1 - LAIR.spacingJitter, 1 + LAIR.spacingJitter));
+  }
+  const meanSpacing =
+    spacings.reduce((a, b) => a + b, 0) / Math.max(1, spacings.length);
+  for (let i = 0; i < spacings.length; i++) {
+    spacings[i] = (spacings[i] / meanSpacing) * LAIR.gateSpacing;
+  }
+
   let centre: number = LAIR.startHeight;
+  let x = LAIR.mouthX + LAIR.runIn;
   for (let i = 0; i < LAIR.gateCount; i++) {
-    const x = LAIR.mouthX + LAIR.runIn + i * LAIR.gateSpacing;
+    if (i > 0) {
+      x += spacings[i - 1];
+    }
     // Ease from the wide opening to the real one over the first few gates.
     const ramp = Math.min(1, i / LAIR.gatesToFullDifficulty);
     const gap = LAIR.gapEasy + (LAIR.gap - LAIR.gapEasy) * ramp;
@@ -142,33 +186,47 @@ export function createLairScene(rng: Rng): LairScene {
     const lo = floorY + LAIR.gapMargin + gap / 2;
     const hi = ceilingY - LAIR.gapMargin - gap / 2;
     if (i > 0) {
-      centre += rng.range(-LAIR.gapStep, LAIR.gapStep);
+      // How far the way through moves, scaled by how far there is to move in.
+      // A gate close behind the last one asking for the same climb as a distant
+      // one is the only way irregular spacing can make the level harder rather
+      // than just less regular.
+      const room = spacings[i - 1] / LAIR.gateSpacing;
+      centre += rng.range(-LAIR.gapStep, LAIR.gapStep) * room;
     }
     centre = Math.min(hi, Math.max(lo, centre));
 
-    const gapBottom = centre - gap / 2;
-    const gapTop = centre + gap / 2;
-    // Alternating, not random: a spike and a rock at the same gate reads as two
-    // different things to fly between rather than one shape repeated.
-    const kind: LairObstacle["kind"] = i % 2 === 0 ? "spike" : "rock";
-    const halfWidth =
-      kind === "spike" ? LAIR.spikeHalfWidth : LAIR.rockHalfWidth;
-    gates.push({
-      x,
-      gapBottom,
-      gapTop,
-      obstacles: [
-        {x, from: 1, rootY: floorY, tipY: gapBottom, halfWidth, kind},
-        {x, from: -1, rootY: ceilingY, tipY: gapTop, halfWidth, kind},
-      ],
-    });
+    // The first few are pairs whatever the dice say: a pair is the shape that
+    // teaches the level, and a one-sided gate only reads as a variation once
+    // you know what it is varying from.
+    const roll = rng.next();
+    const shape =
+      i < LAIR.pairsToStart || roll < LAIR.pairChance
+        ? "pair"
+        : roll < LAIR.pairChance + (1 - LAIR.pairChance) / 2
+          ? "floor"
+          : "roof";
+
+    /** A spike or a rock, chosen per obstacle so a pair can be one of each. */
+    const pick = (): {kind: LairObstacle["kind"]; halfWidth: number} =>
+      rng.next() < 0.5
+        ? {kind: "spike", halfWidth: LAIR.spikeHalfWidth}
+        : {kind: "rock", halfWidth: LAIR.rockHalfWidth};
+
+    const obstacles: Array<LairObstacle> = [];
+    let gapBottom = floorY;
+    let gapTop = ceilingY;
+    if (shape !== "roof") {
+      gapBottom = centre - gap / 2;
+      obstacles.push({x, from: 1, rootY: floorY, tipY: gapBottom, ...pick()});
+    }
+    if (shape !== "floor") {
+      gapTop = centre + gap / 2;
+      obstacles.push({x, from: -1, rootY: ceilingY, tipY: gapTop, ...pick()});
+    }
+    gates.push({x, gapBottom, gapTop, pathY: centre, obstacles});
   }
 
-  const endX =
-    LAIR.mouthX +
-    LAIR.runIn +
-    (LAIR.gateCount - 1) * LAIR.gateSpacing +
-    LAIR.runOut;
+  const endX = x + LAIR.runOut;
 
   // ---- the shell ----------------------------------------------------------
   //
@@ -262,6 +320,29 @@ export function createLairScene(rng: Rng): LairScene {
     geo.dispose();
   }
 
+  // ---- the wall across the mouth ------------------------------------------
+  //
+  // Shown while the shot is outside, then taken away as the camera swings
+  // round. Without it the opening shot looks straight down the cave and shows
+  // the player the first few gates before they have flown a single one — the
+  // mouth should be a dark hole, and what is inside it should be a surprise
+  // you fly into.
+  const coverGeo = new THREE.PlaneGeometry(caveDepth + 6, height + 14);
+  coverGeo.rotateY(Math.PI / 2);
+  coverGeo.translate(LAIR.mouthX + 1, floorY + height / 2, caveMidZ);
+  const coverMaterial = new THREE.MeshBasicMaterial({
+    color: new THREE.Color(P.rockDark).convertSRGBToLinear(),
+    transparent: true,
+    // Flat, unlit and fogless: it stands for "you cannot see in", and any
+    // shading on it would read as a surface with a shape of its own.
+    fog: false,
+    side: THREE.DoubleSide,
+  });
+  const cover = new THREE.Mesh(coverGeo, coverMaterial);
+  // In front of the cave it hides, behind the arch that frames it.
+  cover.renderOrder = 1;
+  group.add(cover);
+
   // ---- the obstacles ------------------------------------------------------
   const pieces: Array<THREE.BufferGeometry> = [];
   for (const gate of gates) {
@@ -327,6 +408,37 @@ export function createLairScene(rng: Rng): LairScene {
     geo.dispose();
   }
 
+  // ---- water off the stalactites ------------------------------------------
+  //
+  // Only the ones hanging from the roof, which is what a stalactite is — the
+  // spikes standing on the floor are stalagmites and have nothing to drip.
+  const drippers = gates
+    .flatMap(gate => gate.obstacles)
+    .filter(
+      o => o.from === -1 && o.kind === "spike" && rng.next() < LAIR.dripChance,
+    );
+
+  const dripGeo = new THREE.SphereGeometry(LAIR.dripSize, 6, 5);
+  // Slightly tall, the way a drop hanging off something is.
+  dripGeo.scale(1, 1.35, 1);
+  const drips = new THREE.InstancedMesh(
+    dripGeo,
+    solidToon(P.water),
+    Math.max(1, drippers.length),
+  );
+  drips.frustumCulled = false;
+  group.add(drips);
+
+  const dripState = drippers.map(o => ({
+    x: o.x,
+    // Just under the point, in the plane the obstacles are drawn in.
+    tipY: o.tipY,
+    z: LAIR.beeZ - LAIR.obstacleStandoff,
+    period: rng.range(LAIR.dripPeriod[0], LAIR.dripPeriod[1]),
+    phase: rng.range(0, 10),
+  }));
+  const dripDummy = new THREE.Object3D();
+
   // ---- crystals -----------------------------------------------------------
   //
   // Purely so the cave has something in it that isn't grey. They sit against
@@ -363,6 +475,40 @@ export function createLairScene(rng: Rng): LairScene {
     group,
     gates,
     endX,
+    update(elapsed) {
+      for (let i = 0; i < dripState.length; i++) {
+        const d = dripState[i];
+        const t = (elapsed + d.phase) % d.period;
+        const fallFrom = d.tipY;
+        let y: number;
+        let scale: number;
+        if (t < LAIR.dripHang) {
+          // Hanging on, swelling. This is most of what makes it read as a
+          // drip rather than a falling pebble.
+          y = fallFrom;
+          scale = 0.35 + 0.65 * (t / LAIR.dripHang);
+        } else {
+          const fallen = (t - LAIR.dripHang) * LAIR.dripSpeed;
+          y = fallFrom - fallen;
+          // An instance can't be skipped, so one that has landed is scaled to
+          // nothing instead — see the note in render/geometry/maze.ts.
+          scale = y > floorY ? 1 : 0;
+        }
+        dripDummy.position.set(d.x, Math.max(floorY, y), d.z);
+        dripDummy.scale.setScalar(scale);
+        dripDummy.updateMatrix();
+        drips.setMatrixAt(i, dripDummy.matrix);
+      }
+      drips.instanceMatrix.needsUpdate = true;
+    },
+
+    setMouthCover(amount) {
+      const a = Math.max(0, Math.min(1, amount));
+      coverMaterial.opacity = a;
+      // Fully transparent still costs a draw call and still writes nothing
+      // useful; once it is gone it is gone.
+      cover.visible = a > 0.01;
+    },
     dispose() {
       group.traverse(o => {
         const mesh = o as THREE.Mesh;

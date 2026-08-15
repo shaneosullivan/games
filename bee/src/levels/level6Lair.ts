@@ -88,6 +88,9 @@ export class LairLevel implements Level {
     // further each go is the whole of the level's difficulty curve.
     this.scene = createLairScene(new Rng(0x1a12b0d5));
     ctx.lair.add(this.scene.group);
+    // Shut until the pan: the mouth should be a dark hole in a cliff, not a
+    // diagram of the level you are about to fly.
+    this.scene.setMouthCover(1);
 
     ctx.configureFlight({
       // She is never handed to the flight model at all; these only have to be
@@ -163,6 +166,10 @@ export class LairLevel implements Level {
     this.elapsed += dt;
     this.phaseTime += dt;
 
+    // Above the phase switch: the water keeps running whatever else is going
+    // on, including behind the wall during the opening shot.
+    scene.update(this.elapsed);
+
     switch (this.phase) {
       case "waiting":
         this.updateWaiting(ctx);
@@ -171,7 +178,7 @@ export class LairLevel implements Level {
         this.updateFlyingIn(ctx);
         break;
       case "panning":
-        this.updatePanning(dt, ctx);
+        this.updatePanning(dt, ctx, scene);
         break;
       case "playing":
         this.updatePlaying(dt, ctx, scene);
@@ -222,8 +229,11 @@ export class LairLevel implements Level {
   }
 
   /** Swing from behind her round to her left, and the game is on. */
-  private updatePanning(dt: number, ctx: GameContext): void {
+  private updatePanning(dt: number, ctx: GameContext, scene: LairScene): void {
     const t = Math.min(1, this.phaseTime / LAIR.panTime);
+    // The cave opens up as the shot comes round — gone by halfway, so the
+    // second half of the swing is already showing the level she is in.
+    scene.setMouthCover(1 - Math.min(1, t / LAIR.coverFade));
     // Already moving, so the pan lands on a bee that is flying rather than one
     // that starts from nothing the moment the shot settles.
     ctx.bee.position.x += LAIR.speed * t * dt;
@@ -286,7 +296,10 @@ export class LairLevel implements Level {
         this.crash(ctx);
         return;
       }
-      const clear = gate.obstacles[0].halfWidth + LAIR.hitHalfLength;
+      // The widest of them: a gate can hold a slim spike and a fat rock, and
+      // it isn't behind her until she is past both.
+      const clear =
+        Math.max(...gate.obstacles.map(o => o.halfWidth)) + LAIR.hitHalfLength;
       if (bee.position.x > gate.x + clear) {
         this.nextGate++;
         this.passed++;
