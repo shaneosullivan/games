@@ -249,9 +249,13 @@ export function createLairScene(rng: Rng): LairScene {
 
     /** A spike or a rock, chosen per obstacle so a pair can be one of each. */
     const pick = (): {kind: LairObstacle["kind"]; halfWidth: number} =>
-      rng.next() < 0.5
-        ? {kind: "spike", halfWidth: LAIR.spikeHalfWidth}
-        : {kind: "rock", halfWidth: LAIR.rockHalfWidth};
+      // The one hanging over a forced dive is always the slim spike: see
+      // LAIR.stairSpikeHalfWidth.
+      wasStair
+        ? {kind: "spike", halfWidth: LAIR.stairSpikeHalfWidth}
+        : rng.next() < 0.5
+          ? {kind: "spike", halfWidth: LAIR.spikeHalfWidth}
+          : {kind: "rock", halfWidth: LAIR.rockHalfWidth};
 
     const obstacles: Array<LairObstacle> = [];
     let gapBottom = floorY;
@@ -281,19 +285,27 @@ export function createLairScene(rng: Rng): LairScene {
   const midX = (from + to) / 2;
 
   const shell: Array<THREE.BufferGeometry> = [];
+  /** The ledge outside the mouth, which is visible before she has flown in. */
+  const ledge: Array<THREE.BufferGeometry> = [];
   const slab = (
     y: number,
     thickness: number,
     colour: number,
     startX = from,
+    into: Array<THREE.BufferGeometry> = shell,
   ): void => {
     const run = to - startX;
     const geo = new THREE.BoxGeometry(run, thickness, caveDepth);
     geo.translate(startX + run / 2, y, caveMidZ);
-    shell.push(paint(geo, colour));
+    into.push(paint(geo, colour));
   };
-  slab(floorY - 1.5, 3, P.ground, outside);
+  slab(floorY - 1.5, 3, P.ground);
   slab(ceilingY + 1.5, 3, P.rock);
+  // Separately, so it can stay on screen while the cave behind it is not
+  // drawn at all: she stands on this in the opening shot.
+  const ledgeGeo = new THREE.BoxGeometry(from - outside, 3, caveDepth);
+  ledgeGeo.translate((outside + from) / 2, floorY - 1.5, caveMidZ);
+  ledge.push(paint(ledgeGeo, P.ground));
   // The back of the cave. Everything is seen against this, so it is the darkest
   // thing in the level — the silhouettes have to come off it.
   const back = new THREE.BoxGeometry(length, height + 12, 2);
@@ -307,7 +319,7 @@ export function createLairScene(rng: Rng): LairScene {
     const roof = rng.next() < 0.5;
     lump.scale(rng.range(0.8, 1.6), rng.range(0.5, 1), 0.7);
     lump.translate(
-      rng.range(roof ? from : outside, to),
+      rng.range(from, to),
       roof ? ceilingY + rng.range(-1, 0.4) : floorY + rng.range(-0.4, 1),
       rng.range(caveBack + 1, caveFront - 1),
     );
@@ -317,7 +329,9 @@ export function createLairScene(rng: Rng): LairScene {
   const shellMesh = new THREE.Mesh(mergeGeometries(shell, false), vertexToon());
   shellMesh.renderOrder = -1;
   group.add(shellMesh);
-  for (const geo of shell) {
+  const ledgeMesh = new THREE.Mesh(mergeGeometries(ledge, false), vertexToon());
+  group.add(ledgeMesh);
+  for (const geo of [...shell, ...ledge]) {
     geo.dispose();
   }
 
@@ -549,6 +563,19 @@ export function createLairScene(rng: Rng): LairScene {
       // Fully transparent still costs a draw call and still writes nothing
       // useful; once it is gone it is gone.
       cover.visible = a > 0.01;
+      // The corridor isn't merely hidden behind the wall — it isn't drawn.
+      //
+      // A wall across the opening is not enough on its own: the cave runs six
+      // hundred units off to the right, and from a shot standing outside and
+      // to one side you see the length of it past the edge of the arch, which
+      // nothing placed in the doorway can cover. Everything except the ledge
+      // she is standing on and the arch itself goes away until the camera has
+      // committed to going in.
+      const shut = a >= 0.999;
+      shellMesh.visible = !shut;
+      obstacleMesh.visible = !shut;
+      crystalMesh.visible = !shut;
+      drips.visible = !shut;
     },
     dispose() {
       group.traverse(o => {

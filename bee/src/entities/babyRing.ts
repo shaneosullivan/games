@@ -471,7 +471,55 @@ export class BabyRing {
     }
   }
 
+  /**
+   * Move the loose swarm bodily, keeping every baby's own wandering loop.
+   *
+   * `mobAround` pulls the whole cloud into a tight ball around one point,
+   * which is right for teasing a bear and wrong for flying home in formation:
+   * this shifts each baby's own centre instead, so the swarm travels while
+   * staying as spread out as it was.
+   */
+  driftSwarm(dx: number, dz: number): void {
+    for (const baby of this.babies) {
+      if (!baby.swarm) {
+        continue;
+      }
+      baby.swarm.centreX += dx;
+      baby.swarm.centreZ += dz;
+    }
+    this.swarmOrigin.set(
+      this.swarmOrigin.x + dx,
+      this.swarmOrigin.y,
+      this.swarmOrigin.z + dz,
+    );
+  }
+
+  /**
+   * Fly the loose swarm at a given height, each baby a little off it.
+   *
+   * Height is kept separately from `driftSwarm` because a swarm's height is
+   * absolute — it is how high they are wandering above the meadow, not an
+   * offset from anything. Drifting it with a descent put the whole brood
+   * underground.
+   */
+  setSwarmHeight(y: number): void {
+    for (const baby of this.babies) {
+      if (!baby.swarm) {
+        continue;
+      }
+      // The spread is derived from the loop they already have, so nobody
+      // changes lane when this is first called.
+      baby.swarm.height = y + (baby.swarm.radiusX - 5.5) * 0.7;
+    }
+    this.swarmOrigin.setY(y);
+  }
+
   /** Live positions, so fireworks can track the rising babies. */
+  /** How many there are — for anything handing them one of something each. */
+  get count(): number {
+    return this.babies.length;
+  }
+
   positionOf(index: number): THREE.Vector3 {
     return this.babies[index % this.babies.length].position;
   }

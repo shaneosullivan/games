@@ -307,8 +307,14 @@ function createWallPicture(
   return g;
 }
 
-/** A fat jar of honey with a cork stopper and a paper label. */
-function createHoneyJar(): THREE.Group {
+/**
+ * A fat jar of honey with a cork stopper and a paper label.
+ *
+ * Exported because the Bear's Lair piles a hoard of them: same jar, so the
+ * treasure at the end of the cave is plainly the same stuff she carried home
+ * from the cottage.
+ */
+export function createHoneyJar(): THREE.Group {
   const g = new THREE.Group();
   const h = INSIDE.jarHeight;
   const parts: Array<THREE.BufferGeometry> = [];

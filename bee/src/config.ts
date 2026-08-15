@@ -755,7 +755,16 @@ export const LAIR = {
    * overlap at all between the two openings and there is a height that clears
    * both, and the pair is just two gates you fly through in a straight line.
    */
-  stairForce: 1.5,
+  stairForce: 0.7,
+  /**
+   * The hanging obstacle at the bottom of a stair is always the slim kind.
+   *
+   * It is the one thing in the level you are forced to dive under, so it is
+   * the last place for a wide rock: a spike is a third narrower and much
+   * clearer about where its point is. Still a real obstacle — the descent is
+   * compulsory either way — just a fairer one to read at speed.
+   */
+  stairSpikeHalfWidth: 2.1,
   /** Air kept under the bottom of a stair, so a fall can't end on the floor. */
   stairFloorRoom: 2.5,
   /** How often a stair starts. Nothing at the mouth, ramping to this. */
@@ -931,6 +940,104 @@ export const LAIR = {
 
   // ---- getting out --------------------------------------------------------
   celebrationTime: 3.2,
+} as const;
+
+/**
+ * The chamber at the end of the Bear's Lair, and the cut scene played in it.
+ *
+ * Nothing here is flown through or collided with — it is the one room in the
+ * game that exists purely to be looked at, so the numbers are all framing and
+ * timing rather than gameplay.
+ */
+export const DOME = {
+  // ---- the room -----------------------------------------------------------
+  radius: 34,
+  height: 30,
+  /**
+   * Where the hole in the roof sits, from the middle of the room.
+   *
+   * Deliberately off-centre. Straight above the hoard would put the light, the
+   * treasure and the way out all on one axis with nowhere for the shot to
+   * move; off to one side the climb out is a diagonal across the room, and the
+   * light rakes across the jars instead of sitting flat on them.
+   */
+  holeOffsetX: 13,
+  holeOffsetZ: -9,
+  holeRadius: 6.5,
+  skyColor: 0xbfe4ff,
+  lightColor: 0xfff0c4,
+  shaftOpacity: 0.14,
+
+  // ---- the hoard ----------------------------------------------------------
+  /** Layers in the pyramid; the bottom one is this many jars a side. */
+  hoardLayers: 5,
+  jarSpacing: 1.5,
+  jarRise: 1.35,
+  /** Bones start this far out, so the pile itself stays clear. */
+  hoardClear: 7,
+  boneSpread: 22,
+  bones: 34,
+  boneColor: 0xfbf8f2,
+  boneShade: 0xe8e3d8,
+  sparkleCount: 40,
+  sparkleSize: 0.16,
+  sparkleColor: 0xfff6d0,
+
+  // ---- the cut scene ------------------------------------------------------
+  /** Flying in from the corridor and settling into the room. */
+  arriveTime: 3,
+  /**
+   * The dance: she flies the shape of her own route through the cave, which
+   * leaves a glowing line behind her — a map for the next bee to follow.
+   * `danceSize` is how wide that route is drawn, in units.
+   */
+  danceTime: 7,
+  danceSize: 26,
+  /**
+   * How far in front of the hoard the map hangs, toward the camera.
+   *
+   * Drawn on the hoard's own plane the middle of it disappears behind the pile
+   * — and the middle is the part with the shape in it.
+   */
+  danceStandoff: 11,
+  danceHeight: 11,
+  /** How high above the floor the drawn map hangs. */
+  danceFloor: 6,
+  /** The brood arriving, in a burst each. */
+  gatherTime: 2.6,
+  /** Diving into the pile and coming up with a jar each. */
+  lootTime: 3.2,
+  /** Up through the hole, camera trailing. */
+  climbTime: 4,
+  /** Out over the meadow and home to the hive. */
+  homeTime: 5.5,
+  /** How far behind the swarm the camera follows on the way out. */
+  chaseDistance: 16,
+  /**
+   * Where the chamber is watched from: back from the middle, and how high.
+   *
+   * It drifts slowly right through the cut scene — a still camera on a still
+   * room for twenty seconds reads as a photograph rather than a place.
+   */
+  cameraBack: 40,
+  cameraHeight: 15,
+  cameraDrift: 0.055,
+  /**
+   * How far under its carrier a jar hangs, how much it swings, and how big it
+   * is once someone is carrying it.
+   *
+   * The hoard is drawn at the cottage's own jar size, which is right for a
+   * pile on the floor and much too big slung under a baby bee — she is smaller
+   * than the jar. Shrunk on pick-up rather than in the pile, so the treasure
+   * still looks like treasure.
+   */
+  jarHang: 0.85,
+  jarSwing: 0.18,
+  jarCarryScale: 0.5,
+  /** The map she draws: mote size, and how far apart they are laid. */
+  trailSize: 0.26,
+  trailSpacing: 0.85,
+  trailColor: 0xffe89a,
 } as const;
 
 /**

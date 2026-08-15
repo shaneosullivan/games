@@ -1,12 +1,15 @@
 import * as THREE from "three";
-import {CAMERA, LAIR, LAIR_PALETTE} from "../config";
+import * as THREETypes from "three";
+import {CAMERA, DOME, LAIR, LAIR_PALETTE} from "../config";
 import {Rng} from "../core/rng";
+import {DanceTrail} from "../entities/danceTrail";
 import {FIREWORK_PALETTE} from "../fx/particles";
 import {
   createLairScene,
   gateHit,
   type LairScene,
 } from "../render/geometry/lair";
+import {createLairDome, type LairDome} from "../render/geometry/lairDome";
 import type {GameContext, Level} from "./level";
 
 type Phase =
@@ -16,7 +19,13 @@ type Phase =
   | "playing"
   | "crashing"
   | "failed"
-  | "celebrating"
+  // The cut scene at the end, in order.
+  | "arriving"
+  | "dancing"
+  | "gathering"
+  | "looting"
+  | "climbing"
+  | "homing"
   | "done";
 
 const eye = new THREE.Vector3();
@@ -27,6 +36,9 @@ const blendEye = new THREE.Vector3();
 const blendLook = new THREE.Vector3();
 const tmp = new THREE.Vector3();
 const tmpB = new THREE.Vector3();
+const prevBee = new THREE.Vector3();
+/** Where the flight home starts: high over the meadow, out past the flowers. */
+const homeFrom = new THREE.Vector3(-70, 34, 70);
 
 /** Facing +x. Forward is (sin yaw, cos yaw), so this points her down the cave. */
 const FACING_ALONG_CAVE = Math.PI / 2;
@@ -72,6 +84,13 @@ export class LairLevel implements Level {
   /** Which gate to test next. They're in x order, so there's no search. */
   private nextGate = 0;
   private nextFirework = 0;
+  /** The chamber at the end, and the cut scene's props. */
+  private dome: LairDome | null = null;
+  /** Seconds since the cut scene started, for the slow camera drift. */
+  private domeTime = 0;
+  private readonly trail = new DanceTrail();
+  /** Jars taken off the hoard, one per bee, carried home. */
+  private readonly carried: Array<THREETypes.Group> = [];
 
   /** The whole level is a cutscene except while she's being flown. */
   get controlsLocked(): boolean {
@@ -91,6 +110,13 @@ export class LairLevel implements Level {
     // Shut until the pan: the mouth should be a dark hole in a cliff, not a
     // diagram of the level you are about to fly.
     this.scene.setMouthCover(1);
+
+    // The chamber at the end, and the map she will draw in it.
+    this.dome = createLairDome(new Rng(0x5eed0e), this.scene.endX);
+    this.scene.group.add(this.dome.group);
+    this.scene.group.add(this.trail.mesh);
+    this.trail.reset();
+    this.carried.length = 0;
 
     ctx.configureFlight({
       // She is never handed to the flight model at all; these only have to be
@@ -153,6 +179,17 @@ export class LairLevel implements Level {
       ctx.lair.remove(this.scene.group);
       this.scene.dispose();
     }
+    this.dome?.dispose();
+    this.dome = null;
+    for (const jar of this.carried) {
+      jar.removeFromParent();
+    }
+    this.carried.length = 0;
+    // The brood belong to the hive; the cut scene only borrows them.
+    ctx.babies.group.removeFromParent();
+    ctx.interior.group.add(ctx.babies.group);
+    ctx.babies.reset();
+    ctx.setScreenFade(0);
     this.scene = null;
     ctx.setCameraCinematic(null);
     ctx.bee.setClimb(0);
@@ -167,8 +204,22 @@ export class LairLevel implements Level {
     this.phaseTime += dt;
 
     // Above the phase switch: the water keeps running whatever else is going
-    // on, including behind the wall during the opening shot.
+    // on, including behind the wall during the opening shot, and the hoard
+    // keeps glinting through every beat of the cut scene.
     scene.update(this.elapsed);
+    const dome = this.dome;
+    if (!dome) {
+      return;
+    }
+    dome.update(this.elapsed);
+    this.trail.update(this.elapsed);
+    // The brood are the Game's, so nothing ticks them unless the level using
+    // them does it — see bee/README.md. Without this they hang at the point
+    // they were released and never fly at all.
+    ctx.babies.update(dt, ctx.bee.position, null);
+    if (this.phase !== "playing" && this.phase !== "crashing") {
+      this.domeTime += dt;
+    }
 
     switch (this.phase) {
       case "waiting":
@@ -186,8 +237,23 @@ export class LairLevel implements Level {
       case "crashing":
         this.updateCrashing(dt, ctx);
         break;
-      case "celebrating":
-        this.updateCelebrating(dt, ctx, scene);
+      case "arriving":
+        this.updateArriving(ctx, dome);
+        break;
+      case "dancing":
+        this.updateDancing(ctx, dome);
+        break;
+      case "gathering":
+        this.updateGathering(dt, ctx, dome);
+        break;
+      case "looting":
+        this.updateLooting(ctx, dome);
+        break;
+      case "climbing":
+        this.updateClimbing(ctx, dome);
+        break;
+      case "homing":
+        this.updateHoming(ctx, dome);
         break;
       case "failed":
       case "done":
@@ -330,7 +396,7 @@ export class LairLevel implements Level {
     this.frameSideOn(ctx);
 
     if (bee.position.x >= scene.endX) {
-      this.beginCelebration(ctx);
+      this.beginArriving(ctx);
     }
   }
 
@@ -373,54 +439,337 @@ export class LairLevel implements Level {
     }
   }
 
-  private beginCelebration(ctx: GameContext): void {
-    this.phase = "celebrating";
+  // ---- the cut scene ------------------------------------------------------
+  //
+  // She flies out of the corridor into the bear's own chamber: a dome with a
+  // hole in the roof, a hoard of stolen honey under the shaft of daylight that
+  // comes through it, and bones all over the floor. She dances the shape of
+  // the route she just flew, which leaves a glowing map of it hanging in the
+  // air; the brood arrive, take a jar each, and everyone leaves through the
+  // roof and flies home.
+
+  private beginArriving(ctx: GameContext): void {
+    this.phase = "arriving";
     this.phaseTime = 0;
-    this.nextFirework = 0;
+    this.domeTime = 0;
     ctx.audio.levelComplete();
-    ctx.flashScreen();
-    ctx.hud.setObjective("You made it!");
+    ctx.hud.setObjective("The bear's treasure!");
+    ctx.bee.setClimb(0);
+    fromEye.copy(ctx.cameraPosition);
+    fromLook.copy(ctx.bee.position);
   }
 
-  private updateCelebrating(
-    dt: number,
-    ctx: GameContext,
-    scene: LairScene,
-  ): void {
-    // Still flying, out into the open, with the shot holding on her.
-    ctx.bee.position.x += LAIR.speed * dt;
-    ctx.bee.position.y += (LAIR.startHeight - ctx.bee.position.y) * 2 * dt;
-    ctx.bee.setClimb(0);
-    this.frameSideOn(ctx);
+  /** Out of the corridor and into the room, with the shot opening up. */
+  private updateArriving(ctx: GameContext, dome: LairDome): void {
+    const t = Math.min(1, this.phaseTime / DOME.arriveTime);
+    const k = ease(t);
+    // She glides to the front of the hoard, still moving, and turns to face it.
+    tmp
+      .copy(dome.centre)
+      .add(tmpB.set(-DOME.danceSize * 0.5, DOME.danceFloor, 0));
+    ctx.bee.position.lerpVectors(dome.entry, tmp, k);
+    ctx.bee.setYaw(Math.PI / 2);
+
+    this.domeEye(dome, eye);
+    ctx.setCameraCinematic(
+      blendEye.copy(fromEye).lerp(eye, k),
+      blendLook.copy(fromLook).lerp(dome.centre, k),
+    );
+
+    if (t >= 1) {
+      this.phase = "dancing";
+      this.phaseTime = 0;
+      this.trail.reset();
+      ctx.hud.setObjective("Show them the way!");
+    }
+  }
+
+  /**
+   * The dance: she flies the shape of her own route through the cave.
+   *
+   * This is what a bee's waggle dance actually is — a flown description of
+   * where she has been, for the others to follow — so the shape is not
+   * invented. It is the real gate-by-gate path, scaled down to fit the room.
+   */
+  private updateDancing(ctx: GameContext, dome: LairDome): void {
+    const t = Math.min(1, this.phaseTime / DOME.danceTime);
+    this.dancePoint(dome, t, tmp);
+    // Facing the way she is going, so the dance reads as flying rather than
+    // sliding: the direction is taken from a point just ahead on the path.
+    this.dancePoint(dome, Math.min(1, t + 0.02), tmpB);
+    ctx.bee.position.copy(tmp);
+    ctx.bee.setYaw(Math.atan2(tmpB.x - tmp.x, tmpB.z - tmp.z));
+    this.trail.mark(tmp);
+
+    this.domeEye(dome, eye);
+    ctx.setCameraCinematic(eye, dome.centre);
+
+    if (t >= 1) {
+      this.phase = "gathering";
+      this.phaseTime = 0;
+      this.nextFirework = 0;
+      // Out of the hive and into the chamber: they arrive where she is.
+      ctx.babies.group.removeFromParent();
+      dome.group.add(ctx.babies.group);
+      ctx.babies.swarm(dome.centre);
+      ctx.hud.setObjective("Here come the babies!");
+    }
+  }
+
+  /** The brood arriving, each in a burst of sparks. */
+  private updateGathering(dt: number, ctx: GameContext, dome: LairDome): void {
+    this.domeEye(dome, eye);
+    ctx.setCameraCinematic(eye, dome.centre);
 
     this.nextFirework -= dt;
-    if (this.nextFirework <= 0 && this.phaseTime < LAIR.celebrationTime - 0.4) {
-      this.nextFirework = 0.24;
-      tmp
-        .copy(ctx.bee.position)
-        .add(
-          tmpB.set(
-            (Math.random() - 0.5) * 12,
-            (Math.random() - 0.5) * 9,
-            (Math.random() - 0.5) * 4,
-          ),
-        );
-      ctx.fireworks.burst(tmp, {
-        color: FIREWORK_PALETTE,
-        count: 30,
-        speed: 4.2,
-        lift: 0.6,
-        gravity: 2.2,
-        ttl: 1.4,
-        spherical: 1,
-      });
+    if (this.nextFirework <= 0) {
+      this.nextFirework = 0.18;
+      const a = Math.random() * Math.PI * 2;
+      const r = 4 + Math.random() * 14;
+      ctx.fireworks.burst(
+        tmp.set(
+          dome.centre.x + Math.cos(a) * r,
+          2 + Math.random() * 12,
+          dome.centre.z + Math.sin(a) * r,
+        ),
+        {
+          color: FIREWORK_PALETTE,
+          count: 30,
+          speed: 4.4,
+          lift: 0.7,
+          gravity: 2.2,
+          ttl: 1.5,
+          spherical: 1,
+        },
+      );
     }
 
-    if (this.phaseTime >= LAIR.celebrationTime) {
+    if (this.phaseTime >= DOME.gatherTime) {
+      this.phase = "looting";
+      this.phaseTime = 0;
+      ctx.hud.setObjective("A jar each!");
+    }
+  }
+
+  /** Everyone dives into the pile and comes up carrying a jar. */
+  private updateLooting(ctx: GameContext, dome: LairDome): void {
+    const t = Math.min(1, this.phaseTime / DOME.lootTime);
+    // In, then straight back out: they mob the pile for the first half and
+    // are already rising with the loot for the second.
+    ctx.babies.mobAround(dome.centre);
+    tmp.copy(dome.centre).setY(DOME.danceFloor * (0.4 + 0.8 * t));
+    ctx.bee.position.lerp(tmp, 0.05);
+
+    this.domeEye(dome, eye);
+    ctx.setCameraCinematic(eye, dome.centre);
+
+    this.carryJars(ctx);
+
+    // Hand out the jars as they reach the pile, one at a time rather than all
+    // at once, so the hoard visibly comes apart from the top down.
+    const wanted = Math.floor(t * (ctx.babies.count + 1));
+    while (this.carried.length < wanted) {
+      const jar = dome.takeJar(this.carried.length);
+      if (!jar) {
+        break;
+      }
+      dome.group.add(jar);
+      this.carried.push(jar);
+    }
+
+    if (t >= 1) {
+      this.phase = "climbing";
+      this.phaseTime = 0;
+      ctx.hud.setObjective("Out through the roof!");
+    }
+  }
+
+  /**
+   * Everyone's jar, hung under whoever is carrying it.
+   *
+   * The queen takes the first one and the brood the rest, and they swing a
+   * little as they fly — a jar held dead still under a moving bee looks
+   * welded on.
+   */
+  private carryJars(ctx: GameContext): void {
+    for (let i = 0; i < this.carried.length; i++) {
+      const jar = this.carried[i];
+      const owner = i === 0 ? ctx.bee.position : ctx.babies.positionOf(i - 1);
+      const swing = Math.sin(this.elapsed * 2.4 + i) * DOME.jarSwing;
+      jar.position.set(
+        owner.x + swing,
+        owner.y - DOME.jarHang,
+        owner.z + swing * 0.6,
+      );
+      jar.rotation.z = -swing * 0.5;
+      jar.scale.setScalar(DOME.jarCarryScale);
+    }
+  }
+
+  /** Up through the hole in the roof, camera trailing behind. */
+  private updateClimbing(ctx: GameContext, dome: LairDome): void {
+    const t = Math.min(1, this.phaseTime / DOME.climbTime);
+    const k = ease(t);
+    // From over the hoard, up and out through the hole, and on into the sky.
+    tmp.copy(dome.centre).setY(DOME.danceFloor);
+    tmpB.copy(dome.holeCentre).setY(DOME.height + 40);
+    prevBee.copy(ctx.bee.position);
+    ctx.bee.position.lerpVectors(tmp, tmpB, k);
+    // The whole swarm goes with her, each baby keeping her own loop — see
+    // BabyRing.driftSwarm. `mobAround` would bunch them into one ball.
+    ctx.babies.mobAround(null);
+    ctx.babies.driftSwarm(
+      ctx.bee.position.x - prevBee.x,
+      ctx.bee.position.z - prevBee.z,
+    );
+    ctx.babies.setSwarmHeight(ctx.bee.position.y);
+    this.carryJars(ctx);
+
+    // Behind and below her, so the hole passes over the camera on the way out.
+    eye.copy(ctx.bee.position);
+    eye.y -= DOME.chaseDistance * (1 - k * 0.6);
+    eye.x -= DOME.chaseDistance * 0.4;
+    ctx.setCameraCinematic(eye, ctx.bee.position);
+
+    // A wash over the last of it, to carry the cut outside.
+    ctx.setScreenFade(Math.max(0, (t - 0.82) / 0.18));
+
+    if (t >= 1) {
+      this.beginHoming(ctx);
+    }
+  }
+
+  /** Outside: over the meadow, home to the hive, and in. */
+  private beginHoming(ctx: GameContext): void {
+    this.phase = "homing";
+    this.phaseTime = 0;
+    ctx.setEnvironment("meadow");
+    // The jars come out of the cave with them. They were part of the hoard, so
+    // they live in the lair's group — which `setEnvironment` has just hidden.
+    // Straight onto the scene rather than into the meadow: they belong to the
+    // cut scene, not to the world, and `exit` takes them away again.
+    for (const jar of this.carried) {
+      ctx.scene.add(jar);
+    }
+    // High over the meadow, a little way out, heading for the hive.
+    ctx.bee.teleport(homeFrom);
+    ctx.bee.setYaw(Math.atan2(-homeFrom.x, -homeFrom.z));
+    ctx.releaseBabies(homeFrom);
+    // The hive is only built by level 1, and nothing since has needed it to be
+    // standing. It is the last thing this cut scene flies into, so it had
+    // better be there — finished, and with its halo on.
+    ctx.hive.setProgress(1);
+    ctx.hive.setGlow(true);
+    // Loose and spread out, not mobbing: they fly home in formation.
+    ctx.babies.mobAround(null);
+    ctx.hud.setObjective("Home!");
+  }
+
+  private updateHoming(ctx: GameContext, dome: LairDome): void {
+    void dome;
+    const t = Math.min(1, this.phaseTime / DOME.homeTime);
+    const k = ease(t);
+    // Down and in. The doorway is the hive's own, so this lands wherever the
+    // hive actually is rather than at a number written down here.
+    tmp.copy(homeFrom);
+    tmpB.copy(ctx.hive.entrance);
+    prevBee.copy(ctx.bee.position);
+    ctx.bee.position.lerpVectors(tmp, tmpB, k);
+    ctx.bee.setYaw(Math.atan2(tmpB.x - tmp.x, tmpB.z - tmp.z));
+    ctx.babies.driftSwarm(
+      ctx.bee.position.x - prevBee.x,
+      ctx.bee.position.z - prevBee.z,
+    );
+    ctx.babies.setSwarmHeight(ctx.bee.position.y);
+    this.carryJars(ctx);
+    // Everyone shrinks into the doorway at the very end, the way level 1 ends.
+    const gone = Math.max(0, (t - 0.88) / 0.12);
+    ctx.bee.setScale(LAIR.beeScale * (1 - gone));
+    for (const jar of this.carried) {
+      jar.scale.setScalar(DOME.jarCarryScale * (1 - gone));
+    }
+
+    // Trailing behind and above, and looking at the hive rather than at her
+    // once she is nearly home: the point of the last shot is the hive.
+    eye
+      .copy(ctx.bee.position)
+      .add(
+        tmpB.set(
+          DOME.chaseDistance * 0.9,
+          DOME.chaseDistance * 0.5,
+          DOME.chaseDistance,
+        ),
+      );
+    look.copy(ctx.bee.position).lerp(ctx.hive.entrance, k);
+    ctx.setCameraCinematic(eye, look);
+    ctx.setScreenFade(Math.max(0, 1 - this.phaseTime / 0.6));
+
+    if (t >= 1) {
       this.phase = "done";
       this.complete = true;
-      ctx.hud.setCount("gates", scene.gates.length, scene.gates.length);
+      ctx.bee.setScale(1);
+      ctx.bee.object.visible = false;
+      ctx.hud.setObjective("Home with the honey!");
     }
+  }
+
+  /**
+   * Where the chamber is watched from.
+   *
+   * Across the room and above head height, on the opposite side from the hole,
+   * so the shaft of light comes toward the camera and the hoard is between the
+   * two. It drifts slowly the whole way round the cut scene, because a still
+   * camera on a still room for twenty seconds reads as a photograph.
+   */
+  private domeEye(dome: LairDome, out: THREE.Vector3): THREE.Vector3 {
+    const swing = this.domeTime * DOME.cameraDrift;
+    return out.set(
+      dome.centre.x - Math.cos(swing) * DOME.cameraBack,
+      DOME.cameraHeight,
+      dome.centre.z + Math.sin(swing) * DOME.cameraBack,
+    );
+  }
+
+  /**
+   * A point on the dance, 0 to 1 along it.
+   *
+   * The shape is her own route: gate by gate, exactly what she just flew,
+   * squeezed into the width of the room and stood up on its end so it reads as
+   * a map rather than a lap of the chamber. Standing it up is the point — the
+   * route is a long thin thing, and drawn flat on the floor from a camera at
+   * head height it would be a line.
+   */
+  private dancePoint(
+    dome: LairDome,
+    t: number,
+    out: THREE.Vector3,
+  ): THREE.Vector3 {
+    const gates = this.scene?.gates ?? [];
+    if (gates.length < 2) {
+      return out.copy(dome.centre);
+    }
+    const at = Math.min(gates.length - 1.001, t * (gates.length - 1));
+    const i = Math.floor(at);
+    const f = at - i;
+    const x0 = gates[i].x,
+      x1 = gates[i + 1].x;
+    const y0 = gates[i].pathY,
+      y1 = gates[i + 1].pathY;
+    const runFrom = gates[0].x;
+    const runTo = gates[gates.length - 1].x;
+    const alongRun = (x0 + (x1 - x0) * f - runFrom) / (runTo - runFrom);
+    const height =
+      (y0 + (y1 - y0) * f - LAIR.floorY) / (LAIR.ceilingY - LAIR.floorY);
+    // Drawn across z, not across x.
+    //
+    // The chamber is watched from along the cave's own axis, so a map laid out
+    // the way the cave runs is seen end-on and reads as a single line. Turned a
+    // quarter turn it faces the camera, which is the whole point of drawing it.
+    return out.set(
+      dome.centre.x - DOME.danceStandoff,
+      DOME.danceFloor + (height - 0.5) * DOME.danceHeight,
+      dome.centre.z + (alongRun - 0.5) * DOME.danceSize,
+    );
   }
 
   /** Point the camera at the bee from her left, and hold it there. */
