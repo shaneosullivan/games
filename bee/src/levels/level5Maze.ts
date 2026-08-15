@@ -355,10 +355,18 @@ export class MazeLevel implements Level {
 
     const {surveyRise: rise, surveyHold: hold, surveyFall: fall} = MAZE;
 
-    // Tap to get on with it. The shot is a nudge, not a cutscene, and a player
-    // who has already read the maze shouldn't have to sit out the hold. Taps on
-    // the HUD never reach here, so the home button still means the home button.
-    if (this.surveySkipFrom < 0 && ctx.takeTap()) {
+    // Tap to get on with it — but only once the shot has finished going up.
+    //
+    // The rise is the part that is worth anything: it is what shows you the
+    // maze. A tap during it turns the whole thing around before you have seen
+    // what you were shown, and a finger resting on the glass from the flower
+    // she just ate is enough to do it. Taps that land during the rise are
+    // dropped rather than saved up — a tap belongs to the frame it arrived in
+    // (see Game.update), so nothing fires the instant the rise ends.
+    //
+    // Taps on the HUD never reach here, so the home button still means the
+    // home button.
+    if (this.phaseTime >= rise && this.surveySkipFrom < 0 && ctx.takeTap()) {
       this.surveySkipFrom = surveyHeight(this.phaseTime);
       this.phaseTime = 0;
     }
