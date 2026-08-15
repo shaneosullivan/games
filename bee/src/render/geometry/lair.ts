@@ -372,9 +372,92 @@ export function createLairScene(rng: Rng): LairScene {
   // this were a flat wall across the opening, then a narrow stone tube, and
   // both looked like an object stopping the hole rather than a cave carrying
   // on.
+  //
+  // Rings of boulders alone are not a wall, though: they are beads on a
+  // thread, and you can see between them and out the other side. So the rock
+  // is relief on top of a solid surface — a skinned arch running the length of
+  // the corridor, shaded the same way — and the boulders break its silhouette
+  // up so it doesn't read as a moulded tube.
+
+  /** The arch's profile at a given depth: `i` runs 0..profileSteps over it. */
+  const profileSteps = 20;
+  const profileAt = (
+    along: number,
+    i: number,
+    out: THREE.Vector3,
+  ): THREE.Vector3 => {
+    const shrink = 1 - along * LAIR.tunnelTaper;
+    const a = (i / profileSteps) * Math.PI;
+    return out.set(
+      LAIR.mouthX + along * LAIR.tunnelLength,
+      floorY + Math.sin(a) * archRy * shrink,
+      archZ + Math.cos(a) * archRz * shrink,
+    );
+  };
+
+  const dark = new THREE.Color(0x06050b).convertSRGBToLinear();
+  const skinPositions: Array<number> = [];
+  const skinColours: Array<number> = [];
+  const pA = new THREE.Vector3();
+  const pB = new THREE.Vector3();
+  const pC = new THREE.Vector3();
+  const pD = new THREE.Vector3();
+  const shadeA = new THREE.Color();
+  const shadeB = new THREE.Color();
+  const skinShade = (along: number, out: THREE.Color): THREE.Color =>
+    out
+      .set(P.rockDark)
+      .convertSRGBToLinear()
+      .lerp(dark, Math.min(1, along ** 0.7));
+  const quad = (c0: THREE.Color, c1: THREE.Color): void => {
+    for (const [p, c] of [
+      [pA, c0],
+      [pB, c0],
+      [pC, c1],
+      [pA, c0],
+      [pC, c1],
+      [pD, c1],
+    ] as Array<[THREE.Vector3, THREE.Color]>) {
+      skinPositions.push(p.x, p.y, p.z);
+      skinColours.push(c.r, c.g, c.b);
+    }
+  };
+  const skinSpans = LAIR.tunnelRings * 2;
+  for (let span = 0; span < skinSpans; span++) {
+    const t0 = span / skinSpans;
+    const t1 = (span + 1) / skinSpans;
+    skinShade(t0, shadeA);
+    skinShade(t1, shadeB);
+    for (let i = 0; i < profileSteps; i++) {
+      profileAt(t0, i, pA);
+      profileAt(t0, i + 1, pB);
+      profileAt(t1, i + 1, pC);
+      profileAt(t1, i, pD);
+      quad(shadeA, shadeB);
+    }
+  }
+  // ...and a floor for it, since the arch stands on the ground and the cave's
+  // own floor is one of the things not being drawn yet.
+  profileAt(0, 0, pA);
+  profileAt(0, profileSteps, pB);
+  profileAt(1, profileSteps, pC);
+  profileAt(1, 0, pD);
+  skinShade(0, shadeA);
+  skinShade(1, shadeB);
+  quad(shadeA, shadeB);
+
+  const skinGeo = new THREE.BufferGeometry();
+  skinGeo.setAttribute(
+    "position",
+    new THREE.BufferAttribute(new Float32Array(skinPositions), 3),
+  );
+  skinGeo.setAttribute(
+    "color",
+    new THREE.BufferAttribute(new Float32Array(skinColours), 3),
+  );
+
   const tunnelPieces: Array<THREE.BufferGeometry> = [];
   const tunnelColours = [P.rock, P.rockLight, P.spike, P.rockDark];
-  const dark = new THREE.Color(0x06050b).convertSRGBToLinear();
   const shade = new THREE.Color();
   const ringGap = LAIR.tunnelLength / LAIR.tunnelRings;
   for (let ring = 0; ring < LAIR.tunnelRings; ring++) {
@@ -410,20 +493,29 @@ export function createLairScene(rng: Rng): LairScene {
         colours[v * 3 + 2] = shade.b;
       }
       boulder.setAttribute("color", new THREE.BufferAttribute(colours, 3));
+      // The skin is written by hand with nothing but positions and colours,
+      // and merging only works across geometries with the same attributes —
+      // an unlit material wants neither of these anyway.
+      boulder.deleteAttribute("normal");
+      boulder.deleteAttribute("uv");
       tunnelPieces.push(boulder);
     }
   }
   const coverMaterial = new THREE.MeshBasicMaterial({
     vertexColors: true,
     transparent: true,
+    // Seen from inside the arch, so both faces are drawn: the skin is a shell
+    // with no thickness at all.
+    side: THREE.DoubleSide,
     // Unlit: the shading is painted in, so the far end stays black however the
     // sun happens to be pointing.
     fog: false,
   });
   const cover = new THREE.Mesh(
-    mergeGeometries(tunnelPieces, false),
+    mergeGeometries([skinGeo, ...tunnelPieces], false),
     coverMaterial,
   );
+  skinGeo.dispose();
   cover.renderOrder = 1;
   group.add(cover);
   for (const geo of tunnelPieces) {
