@@ -647,7 +647,7 @@ export class LairLevel implements Level {
     // is off-centre, where the roof is lower.
     pathB.copy(dome.holeCentre).setY(dome.holeCentre.y - 6);
     if (t <= turn) {
-      pathA.set(dome.centre.x, DOME.danceFloor, dome.centre.z);
+      pathA.set(dome.centre.x, DOME.climbFrom, dome.centre.z);
       return out.lerpVectors(pathA, pathB, ease(t / turn));
     }
     pathA.copy(dome.holeCentre).setY(dome.holeCentre.y + 55);
@@ -677,6 +677,14 @@ export class LairLevel implements Level {
     }
     this.carryJars(ctx);
 
+    // What is left of the hoard settles to two thirds as they lift off with
+    // it. A jar each is a handful off a pile of forty, so the pile is scaled
+    // down bodily rather than counted out — the shot is meant to say they made
+    // off with the treasure.
+    dome.setHoardScale(
+      1 - (1 - DOME.hoardLeft) * ease(Math.min(1, this.phaseTime / 1.2)),
+    );
+
     // Directly behind the last one, on the line itself, so the camera goes out
     // through the hole after them rather than past it — and looking at the
     // queen at the head of the queue, so what is in frame is the whole line
@@ -684,9 +692,11 @@ export class LairLevel implements Level {
     const tailU = lead - DOME.lineGap * ctx.babies.count;
     this.exitPath(dome, tailU, tmp);
     this.exitPath(dome, tailU - 0.02, tmpB);
-    eye.copy(tmp).sub(tmpB).normalize().multiplyScalar(-DOME.chaseDistance);
-    eye.add(tmp);
-    this.exitPath(dome, lead, look);
+    // The direction she is travelling, as a unit vector; the shot is built
+    // along it so the camera goes out through the hole after her.
+    tmpB.subVectors(tmp, tmpB).normalize();
+    eye.copy(tmp).addScaledVector(tmpB, -DOME.climbChase);
+    look.copy(tmp).addScaledVector(tmpB, DOME.climbLookAhead);
     ctx.setCameraCinematic(eye, look);
 
     // A wash over the last of it, to carry the cut outside.

@@ -1042,6 +1042,30 @@ export const DOME = {
   /** How far behind the swarm the camera follows on the way out. */
   chaseDistance: 16,
   /**
+   * The shot on the way up through the roof: how far behind the last bee the
+   * camera sits, and how far ahead of her it looks.
+   *
+   * Further back than the chase elsewhere, and aimed between the tail and the
+   * queen rather than at the queen herself. Pointed all the way up the line
+   * the last bee ends up at the very bottom of the frame with her jar cut off
+   * by the edge; this leaves her whole, with air around her, and still has the
+   * hole and the rest of the queue ahead.
+   */
+  /** How much of the hoard is left once they have flown off with it. */
+  hoardLeft: 2 / 3,
+  climbChase: 27,
+  climbLookAhead: 34,
+  /**
+   * How high above the floor the climb starts.
+   *
+   * Well clear of the hoard, which tops out around seven. The camera sits a
+   * long way back along the line from the first bee, so a climb that starts
+   * just above the pile is shot from inside it — and clamping the camera's
+   * height instead fixes the jars but tips the last bee out of frame, which is
+   * the thing the shot is of.
+   */
+  climbFrom: 14,
+  /**
    * Where the chamber is watched from: back from the middle, and how high.
    *
    * It drifts slowly right through the cut scene — a still camera on a still

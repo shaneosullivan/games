@@ -15,6 +15,15 @@ export interface LairDome {
   entry: THREE.Vector3;
   /** The jars, top of the pile first, for handing one to each bee. */
   jars: ReadonlyArray<THREE.Group>;
+  /**
+   * Shrink what is left of the hoard, 1 being the pile as it was found.
+   *
+   * A swarm can only carry a jar each, which is a handful off a pile of forty
+   * — so the hoard is scaled down bodily as they leave rather than counted
+   * out. It reads as "they took a lot of it", which is the point of the shot,
+   * and it costs nothing.
+   */
+  setHoardScale(scale: number): void;
   /** Take a jar off the pile; it keeps its world position for the caller. */
   takeJar(index: number): THREE.Group | null;
   update(elapsed: number): void;
@@ -78,9 +87,9 @@ export function createLairDome(rng: Rng, atX: number): LairDome {
   ).normalize();
   // A little wider than the hole itself, so its rim is rock rather than a
   // fringe of half-quads.
-  const holeCos = Math.cos(
-    Math.asin(Math.min(1, DOME.holeRadius / DOME.radius)) * 1.25,
-  );
+  const holeAngle =
+    Math.asin(Math.min(1, DOME.holeRadius / DOME.radius)) * 1.25;
+  const holeCos = Math.cos(holeAngle);
   const dir = new THREE.Vector3();
   const shellPoint = (
     e: number,
@@ -171,23 +180,39 @@ export function createLairDome(rng: Rng, atX: number): LairDome {
   // Two jobs: it hides the stepped edge left by dropping quads, and it makes
   // the hole read as somewhere the roof has fallen in rather than as a shape
   // cut out of a surface. Same stones as the cave mouth, for the same reason.
+  //
+  // Each stone is put on the hole's own edge rather than on a circle around
+  // it. The hole is an angular cap of an *ellipsoid*, so on the surface it is
+  // an ellipse — a flat ring of the same radius sits inside it in one
+  // direction and outside it in the other, and doesn't frame anything.
   const rim: Array<THREE.BufferGeometry> = [];
   const rimUp = new THREE.Vector3(0, 1, 0);
   const rimSide = new THREE.Vector3().crossVectors(holeDir, rimUp).normalize();
   const rimOther = new THREE.Vector3()
     .crossVectors(holeDir, rimSide)
     .normalize();
-  for (let i = 0; i < 18; i++) {
-    const a = (i / 18) * Math.PI * 2;
+  const rimDir = new THREE.Vector3();
+  const rimCount = 20;
+  for (let i = 0; i < rimCount; i++) {
+    const a = (i / rimCount) * Math.PI * 2;
     const size = rng.range(1.4, 2.4);
     const boulder = new THREE.IcosahedronGeometry(size, 0);
-    // Round the opening and clear of it: a stone centred on the rim reaches
-    // its own radius into the gap, and a ring of them closed most of it.
-    const r = DOME.holeRadius + size * 1.15;
+    // A direction tilted off the hole's own by exactly the angle the shell was
+    // cut at: that is the edge of the gap, whatever shape it comes out as.
+    rimDir
+      .copy(holeDir)
+      .multiplyScalar(Math.cos(holeAngle))
+      .addScaledVector(rimSide, Math.sin(holeAngle) * Math.cos(a))
+      .addScaledVector(rimOther, Math.sin(holeAngle) * Math.sin(a))
+      .normalize();
+    // ...mapped back onto the surface, which is where the stone sits. Nudged
+    // outward by a third of its own size so it laps the edge rather than
+    // hanging over the opening.
+    const out = 1 + (size * 0.34) / DOME.radius;
     boulder.translate(
-      holeCentre.x + rimSide.x * Math.cos(a) * r + rimOther.x * Math.sin(a) * r,
-      holeCentre.y + rimSide.y * Math.cos(a) * r + rimOther.y * Math.sin(a) * r,
-      holeCentre.z + rimSide.z * Math.cos(a) * r + rimOther.z * Math.sin(a) * r,
+      centre.x + rimDir.x * DOME.radius * out,
+      rimDir.y * DOME.height * out,
+      centre.z + rimDir.z * DOME.radius * out,
     );
     rim.push(paint(boulder, i % 3 === 0 ? P.rockLight : P.rock));
   }
@@ -297,6 +322,8 @@ export function createLairDome(rng: Rng, atX: number): LairDome {
           centre.z + (b - (side - 1) / 2) * step,
         );
         jar.rotation.y = rng.range(0, Math.PI * 2);
+        // Kept so the pile can be shrunk without burying itself in the floor.
+        jar.userData.restY = jar.position.y;
         group.add(jar);
         jars.push(jar);
       }
@@ -407,11 +434,25 @@ export function createLairDome(rng: Rng, atX: number): LairDome {
     holeCentre,
     entry: new THREE.Vector3(atX + 2, DOME.height * 0.45, 0),
     jars,
+    setHoardScale(scale) {
+      for (const jar of jars) {
+        // Only what is still in the pile. A jar someone is carrying goes back
+        // into this group so it survives the scene, and scaling it here would
+        // fight whoever is holding it — and snap it back onto the pile.
+        if (jar.userData.taken) {
+          continue;
+        }
+        jar.scale.setScalar(scale);
+        // Standing on the floor as they shrink, not sinking into it.
+        jar.position.y = (jar.userData.restY as number) * scale;
+      }
+    },
     takeJar(index) {
       const jar = jars[index];
-      if (!jar || !jar.parent) {
+      if (!jar || jar.userData.taken) {
         return null;
       }
+      jar.userData.taken = true;
       group.remove(jar);
       return jar;
     },
