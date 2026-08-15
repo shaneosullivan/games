@@ -37,6 +37,15 @@ const blendLook = new THREE.Vector3();
 const tmp = new THREE.Vector3();
 const tmpB = new THREE.Vector3();
 const prevBee = new THREE.Vector3();
+/**
+ * Scratch for `exitPath` alone.
+ *
+ * It must not share with `tmp`/`tmpB`: callers pass those in as the output,
+ * and a function that lerps between its own scratch vectors while writing into
+ * one of them returns nonsense.
+ */
+const pathA = new THREE.Vector3();
+const pathB = new THREE.Vector3();
 /** Where the flight home starts: high over the meadow, out past the flowers. */
 const homeFrom = new THREE.Vector3(-70, 34, 70);
 
@@ -216,7 +225,15 @@ export class LairLevel implements Level {
     // The brood are the Game's, so nothing ticks them unless the level using
     // them does it — see bee/README.md. Without this they hang at the point
     // they were released and never fly at all.
-    ctx.babies.update(dt, ctx.bee.position, null);
+    //
+    // Except on the way out, where the level is flying them itself in a line:
+    // their own wandering would pull them straight back off it and into the
+    // roof. Their wings still need ticking.
+    if (this.phase === "climbing") {
+      ctx.babies.tickModels(dt);
+    } else {
+      ctx.babies.update(dt, ctx.bee.position, null);
+    }
     if (this.phase !== "playing" && this.phase !== "crashing") {
       this.domeTime += dt;
     }
@@ -606,33 +623,74 @@ export class LairLevel implements Level {
     }
   }
 
-  /** Up through the hole in the roof, camera trailing behind. */
+  /**
+   * A point on the way out: over the hoard, up through the hole, into the sky.
+   *
+   * Every bee flies this same line, one behind the other. The hole is thirteen
+   * units across and the room is sixty-eight, so anything with the spread of a
+   * swarm in it sends most of the brood through solid rock — the way out is
+   * single file or it is nothing.
+   */
+  private exitPath(
+    dome: LairDome,
+    u: number,
+    out: THREE.Vector3,
+  ): THREE.Vector3 {
+    // Clamped at the bottom only. Past the hole the last leg is allowed to
+    // extrapolate, so the leader keeps climbing into the sky while the tail is
+    // still coming up — clamping there would stack the whole line on the exit.
+    const t = Math.max(0, u);
+    // Two legs: across the room to under the hole, then straight up through it.
+    // The corner is eased so the turn isn't a hinge.
+    const turn = DOME.exitTurn;
+    // Measured off the hole itself rather than off the dome's peak: the hole
+    // is off-centre, where the roof is lower.
+    pathB.copy(dome.holeCentre).setY(dome.holeCentre.y - 6);
+    if (t <= turn) {
+      pathA.set(dome.centre.x, DOME.danceFloor, dome.centre.z);
+      return out.lerpVectors(pathA, pathB, ease(t / turn));
+    }
+    pathA.copy(dome.holeCentre).setY(dome.holeCentre.y + 55);
+    return out.lerpVectors(pathB, pathA, (t - turn) / (1 - turn));
+  }
+
+  /** Up through the hole in the roof, in single file, camera behind the last. */
   private updateClimbing(ctx: GameContext, dome: LairDome): void {
     const t = Math.min(1, this.phaseTime / DOME.climbTime);
-    const k = ease(t);
-    // From over the hoard, up and out through the hole, and on into the sky.
-    tmp.copy(dome.centre).setY(DOME.danceFloor);
-    tmpB.copy(dome.holeCentre).setY(DOME.height + 40);
-    prevBee.copy(ctx.bee.position);
-    ctx.bee.position.lerpVectors(tmp, tmpB, k);
-    // The whole swarm goes with her, each baby keeping her own loop — see
-    // BabyRing.driftSwarm. `mobAround` would bunch them into one ball.
-    ctx.babies.mobAround(null);
-    ctx.babies.driftSwarm(
-      ctx.bee.position.x - prevBee.x,
-      ctx.bee.position.z - prevBee.z,
-    );
-    ctx.babies.setSwarmHeight(ctx.bee.position.y);
+    // The queue is strung out along the path from the first frame: the queen a
+    // whole line-length ahead of the tail, and the tail starting at the near
+    // end of it. Starting everyone at zero instead piles the brood up on the
+    // spot the camera is about to fly through.
+    const line = DOME.lineGap * ctx.babies.count;
+    const lead = line + ease(t);
+
+    // The queen first, then the brood strung out behind her.
+    this.exitPath(dome, lead, tmp);
+    ctx.bee.position.copy(tmp);
+    this.exitPath(dome, lead - 0.012, tmpB);
+    ctx.bee.setYaw(Math.atan2(tmp.x - tmpB.x, tmp.z - tmpB.z));
+    ctx.bee.setClimb(1);
+
+    for (let i = 0; i < ctx.babies.count; i++) {
+      this.exitPath(dome, lead - DOME.lineGap * (i + 1), tmp);
+      ctx.babies.flyTo(i, tmp);
+    }
     this.carryJars(ctx);
 
-    // Behind and below her, so the hole passes over the camera on the way out.
-    eye.copy(ctx.bee.position);
-    eye.y -= DOME.chaseDistance * (1 - k * 0.6);
-    eye.x -= DOME.chaseDistance * 0.4;
-    ctx.setCameraCinematic(eye, ctx.bee.position);
+    // Directly behind the last one, on the line itself, so the camera goes out
+    // through the hole after them rather than past it — and looking at the
+    // queen at the head of the queue, so what is in frame is the whole line
+    // and the daylight it is heading for rather than one bee's back.
+    const tailU = lead - DOME.lineGap * ctx.babies.count;
+    this.exitPath(dome, tailU, tmp);
+    this.exitPath(dome, tailU - 0.02, tmpB);
+    eye.copy(tmp).sub(tmpB).normalize().multiplyScalar(-DOME.chaseDistance);
+    eye.add(tmp);
+    this.exitPath(dome, lead, look);
+    ctx.setCameraCinematic(eye, look);
 
     // A wash over the last of it, to carry the cut outside.
-    ctx.setScreenFade(Math.max(0, (t - 0.82) / 0.18));
+    ctx.setScreenFade(Math.max(0, (t - 0.86) / 0.14));
 
     if (t >= 1) {
       this.beginHoming(ctx);

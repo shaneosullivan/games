@@ -975,8 +975,12 @@ export const DOME = {
   holeOffsetX: 13,
   holeOffsetZ: -9,
   holeRadius: 6.5,
-  skyColor: 0xbfe4ff,
-  lightColor: 0xfff0c4,
+  /**
+   * The disc of daylight in the roof. Saturated, because the shaft of light is
+   * drawn additively over it and washes anything paler out to white.
+   */
+  skyColor: 0x6ab8ff,
+  lightColor: 0xffe08a,
   shaftOpacity: 0.14,
 
   // ---- the hoard ----------------------------------------------------------
@@ -1019,7 +1023,18 @@ export const DOME = {
   /** Diving into the pile and coming up with a jar each. */
   lootTime: 3.2,
   /** Up through the hole, camera trailing. */
-  climbTime: 4,
+  climbTime: 5,
+  /**
+   * The gap between one bee and the next on the way out, as a fraction of the
+   * path. They leave in single file: the hole is thirteen units across in a
+   * room of sixty-eight, so a swarm with any spread in it flies through rock.
+   */
+  lineGap: 0.075,
+  /**
+   * Where the way out stops crossing the room and starts going up, as a
+   * fraction of the path. The corner is eased, so the turn isn't a hinge.
+   */
+  exitTurn: 0.45,
   /** Out over the meadow and home to the hive. */
   homeTime: 5.5,
   /** How far behind the swarm the camera follows on the way out. */

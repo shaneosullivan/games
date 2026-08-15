@@ -37,9 +37,18 @@ export interface LairDome {
 export function createLairDome(rng: Rng, atX: number): LairDome {
   const group = new THREE.Group();
   const centre = new THREE.Vector3(atX + DOME.radius, 0, 0);
+  // How high the roof actually is where the hole is.
+  //
+  // Not `DOME.height` — that is the dome's peak, and the hole is deliberately
+  // off to one side, where an ellipsoid roof is lower. Using the peak put the
+  // disc of sky a clear three units above the rock it was supposed to be a
+  // hole in, so the shell hid it and the way out looked like more cave.
+  const holeR = Math.hypot(DOME.holeOffsetX, DOME.holeOffsetZ);
+  const holeY =
+    DOME.height * Math.sqrt(Math.max(0, 1 - (holeR / DOME.radius) ** 2));
   const holeCentre = new THREE.Vector3(
     centre.x + DOME.holeOffsetX,
-    DOME.height,
+    holeY,
     DOME.holeOffsetZ,
   );
 
@@ -60,9 +69,31 @@ export function createLairDome(rng: Rng, atX: number): LairDome {
   );
   shell.scale(1, DOME.height / DOME.radius, 1);
   shell.translate(centre.x, 0, centre.z);
+  // Shaded by height rather than by light.
+  //
+  // A back-facing surface has its normals pointing away from everything, so
+  // lit materials leave it flat black and the room reads as a void with things
+  // floating in it. Painting the curve in — stone where it meets the floor,
+  // fading into the dark overhead — is what makes it a domed chamber, and it
+  // is the same trick the hive interior uses to look round.
+  {
+    const pos = shell.attributes.position;
+    const colours = new Float32Array(pos.count * 3);
+    const low = new THREE.Color(P.rock).convertSRGBToLinear();
+    const high = new THREE.Color(0x14111d).convertSRGBToLinear();
+    const mix = new THREE.Color();
+    for (let i = 0; i < pos.count; i++) {
+      const up = Math.min(1, Math.max(0, pos.getY(i) / DOME.height));
+      mix.copy(low).lerp(high, up ** 0.55);
+      colours[i * 3] = mix.r;
+      colours[i * 3 + 1] = mix.g;
+      colours[i * 3 + 2] = mix.b;
+    }
+    shell.setAttribute("color", new THREE.BufferAttribute(colours, 3));
+  }
   const shellMesh = new THREE.Mesh(
-    paint(shell, P.rockDark),
-    new THREE.MeshToonMaterial({
+    shell,
+    new THREE.MeshBasicMaterial({
       vertexColors: true,
       side: THREE.BackSide,
       fog: false,
@@ -82,19 +113,28 @@ export function createLairDome(rng: Rng, atX: number): LairDome {
   // A ring of sky rather than a hole cut in the shell: there is no boolean
   // geometry here, so the "hole" is a bright disc laid just inside the dome
   // with the shell's own darkness around it.
-  const sky = new THREE.CircleGeometry(DOME.holeRadius, 24);
+  // A little wider than the hole, so no rim of shell shows around it.
+  const sky = new THREE.CircleGeometry(DOME.holeRadius * 1.08, 24);
   sky.rotateX(Math.PI / 2);
-  sky.translate(holeCentre.x, holeCentre.y - 0.4, holeCentre.z);
+  // A shade under the roof, so the shell can't win the depth test against it.
+  sky.translate(holeCentre.x, holeCentre.y - 0.5, holeCentre.z);
   const skyMesh = new THREE.Mesh(
     sky,
-    new THREE.MeshBasicMaterial({color: DOME.skyColor, fog: false}),
+    new THREE.MeshBasicMaterial({
+      color: DOME.skyColor,
+      // Both faces. It is looked at from underneath for the whole scene — a
+      // front-facing disc laid flat is invisible from below, which is what
+      // made the hole read as more darkness rather than as daylight.
+      side: THREE.DoubleSide,
+      fog: false,
+    }),
   );
   skyMesh.renderOrder = 2;
   group.add(skyMesh);
 
   // The shaft: a cone of pale light standing on the floor, wider at the
   // bottom, drawn additively so it lies over the room rather than in it.
-  const shaftHeight = DOME.height;
+  const shaftHeight = holeY;
   const shaft = new THREE.CylinderGeometry(
     DOME.holeRadius * 0.92,
     DOME.holeRadius * 1.9,

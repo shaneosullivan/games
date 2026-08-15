@@ -472,6 +472,40 @@ export class BabyRing {
   }
 
   /**
+   * Fly one baby exactly here, for a cutscene driving the whole formation.
+   *
+   * Nothing else in the game places a baby directly — they fly their own loops
+   * — but a line going out through a hole in a roof has to be a line, and a
+   * swarm with any spread at all sends most of it through solid rock. The
+   * caller owns the path; this just puts her on it, points her along it and
+   * keeps her wings going.
+   */
+  flyTo(index: number, position: THREE.Vector3): void {
+    const baby = this.babies[index % this.babies.length];
+    baby.prev.copy(baby.position);
+    baby.position.copy(position);
+    baby.model.group.position.copy(position);
+
+    tmpDelta.copy(baby.position).sub(baby.prev);
+    if (tmpDelta.lengthSq() > 1e-8) {
+      baby.model.group.rotation.y = Math.atan2(tmpDelta.x, tmpDelta.z);
+      // A real pitch rather than the swarm's small-angle guess: this path goes
+      // straight up at the end, where the approximation would spin her.
+      baby.model.group.rotation.x = -Math.atan2(
+        tmpDelta.y,
+        Math.hypot(tmpDelta.x, tmpDelta.z),
+      );
+      baby.model.group.rotation.z = 0;
+    }
+    baby.model.animate(this.elapsed + baby.index * 1.7, 1);
+  }
+
+  /** Keep the wings going while a cutscene is flying them. */
+  tickModels(dt: number): void {
+    this.elapsed += dt;
+  }
+
+  /**
    * Move the loose swarm bodily, keeping every baby's own wandering loop.
    *
    * `mobAround` pulls the whole cloud into a tight ball around one point,

@@ -261,7 +261,11 @@ export function createLairScene(rng: Rng): LairScene {
   // the opening shot stands the bee outside looking in, and a roof over her
   // there would mean she was already in the cave she is about to fly into.
   const outside = LAIR.mouthX - 70;
-  const to = endX + 60;
+  // The corridor stops where the chamber begins, with a few units of overlap
+  // so there is no seam. It used to run sixty units further, which put its
+  // flat floor, roof and back wall straight through the middle of the dome —
+  // the round room had a square one inside it.
+  const to = endX + 8;
   const from: number = LAIR.mouthX;
   const length = to - from;
   const midX = (from + to) / 2;
