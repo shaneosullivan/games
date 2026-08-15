@@ -25,6 +25,49 @@ const SPIKE_SKINS = [stalag1Url, gradient1Url, gradient2Url];
 const ROCK_SKINS = [rock1Url, rock2Url];
 
 /**
+ * Load a texture with the colour taken out of it.
+ *
+ * The rock patterns are drawn in oranges and browns, which against a blue-grey
+ * cave read as lava rather than stone. Greyed, the same drawing is rock — and
+ * doing it here rather than in the source art means the originals stay
+ * editable.
+ *
+ * Alpha is left alone: these are drawings on a transparent background, and it
+ * is the transparency that lets them sit on the rock as markings rather than
+ * as a wrapper around it.
+ */
+function greyTexture(url: string): THREE.Texture {
+  const texture = new THREE.Texture();
+  texture.colorSpace = THREE.SRGBColorSpace;
+  const image = new Image();
+  image.onload = () => {
+    const canvas = document.createElement("canvas");
+    canvas.width = image.width;
+    canvas.height = image.height;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) {
+      return;
+    }
+    ctx.drawImage(image, 0, 0);
+    const data = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const px = data.data;
+    for (let i = 0; i < px.length; i += 4) {
+      // Perceived brightness, so the pattern keeps the contrast it was drawn
+      // with rather than flattening to a mid-grey.
+      const l = 0.299 * px[i] + 0.587 * px[i + 1] + 0.114 * px[i + 2];
+      px[i] = l;
+      px[i + 1] = l;
+      px[i + 2] = l;
+    }
+    ctx.putImageData(data, 0, 0);
+    texture.image = canvas;
+    texture.needsUpdate = true;
+  };
+  image.src = url;
+  return texture;
+}
+
+/**
  * One obstacle: a spike or a rock, growing from the floor or the roof.
  *
  * `halfWidthAt` is what collision asks. A cone tested as its bounding box
@@ -596,7 +639,9 @@ export function createLairScene(rng: Rng): LairScene {
   // whole cave is still nothing.
   const loader = new THREE.TextureLoader();
   const skinned = [...SPIKE_SKINS, ...ROCK_SKINS].map(url => {
-    const map = loader.load(url);
+    // The rock patterns lose their colour; the spikes keep theirs.
+    const rock = (ROCK_SKINS as ReadonlyArray<string>).includes(url);
+    const map = rock ? greyTexture(url) : loader.load(url);
     map.colorSpace = THREE.SRGBColorSpace;
     // The gradients are a strip 83 across and 790 tall; a cone wraps its
     // whole circumference into u, so the strip has to repeat round it.
@@ -604,6 +649,8 @@ export function createLairScene(rng: Rng): LairScene {
     map.wrapT = THREE.ClampToEdgeWrapping;
     return {url, map, pieces: [] as Array<THREE.BufferGeometry>};
   });
+  /** The plain rock under the markings; see below. */
+  const bare: Array<THREE.BufferGeometry> = [];
   let spikeSkin = 0;
   let rockSkin = 0;
   for (const gate of gates) {
@@ -662,25 +709,43 @@ export function createLairScene(rng: Rng): LairScene {
           ? skinned[spikeSkin++ % SPIKE_SKINS.length]
           : skinned[SPIKE_SKINS.length + (rockSkin++ % ROCK_SKINS.length)];
       skin.pieces.push(geo);
+      // The same shape again underneath, in plain stone. These are drawings on
+      // a transparent background — markings, not a wrapper — so without
+      // something solid behind them the cave shows through the gaps and the
+      // obstacle is a handful of floating streaks.
+      bare.push(paint(geo.clone(), o.kind === "spike" ? P.spike : P.rock));
     }
   }
-  const obstacleMeshes = skinned
-    .filter(skin => skin.pieces.length > 0)
-    .map(skin => {
-      const mesh = new THREE.Mesh(
-        mergeGeometries(skin.pieces, false),
-        // Unlit, like the corridor's own walls: the cave is dim by design and
-        // toon shading took these drawings down to near-black. They are seen
-        // as silhouettes anyway, so there is no shape for the shading to
-        // describe — what matters is that the art reads.
-        new THREE.MeshBasicMaterial({map: skin.map}),
-      );
-      group.add(mesh);
-      for (const geo of skin.pieces) {
-        geo.dispose();
-      }
-      return mesh;
-    });
+  const obstacleMeshes: Array<THREE.Mesh> = [];
+  const bareMesh = new THREE.Mesh(mergeGeometries(bare, false), vertexToon());
+  group.add(bareMesh);
+  obstacleMeshes.push(bareMesh);
+  for (const geo of bare) {
+    geo.dispose();
+  }
+  for (const skin of skinned) {
+    if (skin.pieces.length === 0) {
+      continue;
+    }
+    const mesh = new THREE.Mesh(
+      mergeGeometries(skin.pieces, false),
+      new THREE.MeshBasicMaterial({
+        map: skin.map,
+        // Drawn on transparency, so the markings sit on the stone underneath.
+        transparent: true,
+        // Lifted a hair toward the camera, or it z-fights with the rock it is
+        // painted on — same geometry, same depth.
+        polygonOffset: true,
+        polygonOffsetFactor: -2,
+        depthWrite: false,
+      }),
+    );
+    group.add(mesh);
+    obstacleMeshes.push(mesh);
+    for (const geo of skin.pieces) {
+      geo.dispose();
+    }
+  }
 
   // ---- water off the stalactites ------------------------------------------
   //
