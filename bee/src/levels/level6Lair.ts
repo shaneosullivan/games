@@ -265,8 +265,8 @@ export class LairLevel implements Level {
     // Floor and roof are walls like any other. Without that, sitting on the
     // floor would be the safe way to play.
     if (
-      bee.position.y - LAIR.radius <= LAIR.floorY ||
-      bee.position.y + LAIR.radius >= LAIR.ceilingY
+      bee.position.y - LAIR.hitHalfHeight <= LAIR.floorY ||
+      bee.position.y + LAIR.hitHalfHeight >= LAIR.ceilingY
     ) {
       this.crash(ctx);
       return;
@@ -274,11 +274,19 @@ export class LairLevel implements Level {
 
     const gate = scene.gates[this.nextGate];
     if (gate) {
-      if (gateHit(gate, bee.position.x, bee.position.y, LAIR.radius)) {
+      if (
+        gateHit(
+          gate,
+          bee.position.x,
+          bee.position.y,
+          LAIR.hitHalfLength,
+          LAIR.hitHalfHeight,
+        )
+      ) {
         this.crash(ctx);
         return;
       }
-      const clear = gate.obstacles[0].halfWidth + LAIR.radius;
+      const clear = gate.obstacles[0].halfWidth + LAIR.hitHalfLength;
       if (bee.position.x > gate.x + clear) {
         this.nextGate++;
         this.passed++;

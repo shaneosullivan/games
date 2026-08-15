@@ -59,36 +59,46 @@ export function halfWidthAt(o: LairObstacle, y: number): number {
     : o.halfWidth * Math.sqrt(Math.max(0, 1 - t * t));
 }
 
-/** Is a circle at (x, y) touching this gate? */
+/**
+ * Is the bee — a box `2 * halfLength` by `2 * halfHeight`, centred on (x, y) —
+ * touching this gate?
+ *
+ * A box, not a circle. She is drawn 3.3 long and 1.7 tall, and a circle can
+ * only match one of those: the first version used a radius of 0.9, which let
+ * her nose three quarters of a unit into a rock before anything happened. Both
+ * numbers here are measured off the model she is actually drawn from.
+ *
+ * The test is exact rather than sampled. Every profile here narrows away from
+ * its root, so within the band of heights her box covers, the widest the
+ * obstacle ever gets is at whichever end of that band is nearest the root —
+ * one lookup, no marching.
+ */
 export function gateHit(
   gate: LairGate,
   x: number,
   y: number,
-  radius: number,
+  halfLength: number,
+  halfHeight: number,
 ): boolean {
   for (const o of gate.obstacles) {
     const dx = Math.abs(x - o.x);
-    if (dx > o.halfWidth + radius) {
+    if (dx > o.halfWidth + halfLength) {
       continue;
     }
-    // How far past the point she is, in the direction it grows.
-    //
-    // This case has to come first. Above the tip the profile is zero wide, and
-    // testing `dx <= width + radius` there would make the empty air above every
-    // spike solid for a body's width either side of it — which is the middle of
-    // the gap, the one place the player is aiming for.
-    const past = (y - o.tipY) * o.from;
-    if (past > 0) {
-      // Only the point itself is anywhere near, and a point is a point.
-      if (Math.hypot(dx, past) <= radius) {
-        return true;
-      }
+    // The heights her box shares with the obstacle. None, and there is nothing
+    // to hit — which is what makes the empty air above a spike empty, the one
+    // place the player is aiming for.
+    const lo = Math.min(o.rootY, o.tipY);
+    const hi = Math.max(o.rootY, o.tipY);
+    const from = Math.max(y - halfHeight, lo);
+    const to = Math.min(y + halfHeight, hi);
+    if (from > to) {
       continue;
     }
-    // Inside its height: widen the silhouette by her radius and ask whether her
-    // centre is in it. Exact enough at this scale, and it errs the forgiving
-    // way where the taper is steepest.
-    if (dx <= halfWidthAt(o, y) + radius) {
+    // Widest where the obstacle is thickest: the end of that band nearest its
+    // root. Below the tip the profile is monotone, so this is the maximum.
+    const widest = o.from === 1 ? from : to;
+    if (dx <= halfWidthAt(o, widest) + halfLength) {
       return true;
     }
   }
@@ -265,12 +275,26 @@ export function createLairScene(rng: Rng): LairScene {
         // Six sides: enough to be round, few enough to keep the facets the
         // rest of the game is drawn with.
         geo = new THREE.ConeGeometry(o.halfWidth, span, 6);
+        // Turned an eighth of a facet, so a vertex faces the camera.
+        //
+        // ConeGeometry puts its vertices at x = r·sin(θ) for θ = 0, 60, 120…,
+        // which never reaches sin 90° — so a six-sided spike is only drawn
+        // 0.866·r wide, while collision uses r. Raycasting the mesh put the
+        // gap at 0.33 units on the widest spike: a third of a unit of solid
+        // air, exactly the invisible wall this level must not have. Rotating
+        // by 30° lands a vertex on the silhouette and makes the drawing as
+        // wide as the model says it is.
+        geo.rotateY(Math.PI / 6);
         geo.translate(0, span / 2, 0);
       } else {
+        // Twelve around and eight up. Coarser than this and the rings near the
+        // pole cut the corner off the dome: at 8x6 the drawn tip came back
+        // 0.19 narrower than the curve collision tests against, which is five
+        // or six pixels of rock that isn't there.
         geo = new THREE.SphereGeometry(
           o.halfWidth,
+          12,
           8,
-          6,
           0,
           Math.PI * 2,
           0,
@@ -281,14 +305,16 @@ export function createLairScene(rng: Rng): LairScene {
       if (o.from === -1) {
         geo.rotateZ(Math.PI);
       }
-      // Squashed in z so it is a silhouette, not a boulder: the camera only
-      // ever sees this edge-on, and depth here would only muddy the outline.
-      geo.scale(1, 1, 0.75);
-      geo.translate(
-        o.x,
-        o.rootY,
-        (LAIR.obstacleFrontZ + LAIR.obstacleBackZ) / 2 + 2,
-      );
+      // Flattened almost to a cut-out, and stood just behind the bee.
+      //
+      // Both for the same reason: what the player judges is the gap between
+      // two silhouettes, and silhouettes at different depths don't measure the
+      // same. With the obstacles three units behind her they projected about
+      // 11% narrower than collision tested them — a third of a unit of clear
+      // air on the widest rock that still counted as a hit. Thin and close
+      // brings that to under 3%, which is a pixel or two on screen.
+      geo.scale(1, 1, LAIR.obstacleFlatten);
+      geo.translate(o.x, o.rootY, LAIR.beeZ - LAIR.obstacleStandoff);
       pieces.push(paint(geo, o.kind === "spike" ? P.spike : P.rock));
     }
   }

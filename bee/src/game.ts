@@ -543,6 +543,10 @@ export class Game {
     // Let the outgoing level put away anything that outlives it, and take the
     // backing track away regardless, so a level that forgets can't leak one.
     this.level.exit?.(this.ctx);
+    // Any card belonging to the level being left goes with it. Both of the
+    // fail card's buttons already hide it, so this is only insurance against a
+    // future path that switches level without going through one of them.
+    this.failScreen?.hide();
     this.audio.stopMusic();
     this.wasp.reset();
     this.bear.reset();

@@ -758,8 +758,32 @@ export const LAIR = {
   gravity: 13,
   /** How fast she can end up falling, however long she's left it. */
   maxFall: 15,
-  /** Collision radius. Smaller than she looks, which always plays fairer. */
-  radius: 0.9,
+  /**
+   * Her hit box, half-extents, along the cave and up it.
+   *
+   * Measured off the model she is drawn from rather than picked: at this
+   * level's scale her body reaches 1.66 along and 0.87 up (98th percentile of
+   * its vertices, so a whisker of antenna doesn't count as her). These shave a
+   * little off both, which is the only forgiveness left in the test and is
+   * small enough to look like contact when it fires.
+   *
+   * It replaces a single radius of 0.9. A circle can only match one axis of
+   * something drawn twice as long as it is tall, and that one let her nose
+   * three quarters of a unit into a rock before anything happened.
+   */
+  hitHalfLength: 1.45,
+  hitHalfHeight: 0.78,
+  /**
+   * How flat the obstacles are, and how far behind her they stand.
+   *
+   * What the player judges is two silhouettes, and silhouettes at different
+   * depths don't measure the same: three units of separation projected the
+   * obstacles about 11% narrower than collision tested them. Thin cut-outs
+   * standing just behind her bring that under 3% — a pixel or two — while
+   * still keeping them behind, so nothing can ever draw over the bee.
+   */
+  obstacleFlatten: 0.14,
+  obstacleStandoff: 0.75,
   /**
    * How much bigger the bee is drawn here.
    *
