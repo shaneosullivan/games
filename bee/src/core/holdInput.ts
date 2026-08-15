@@ -93,17 +93,21 @@ export class HoldInput {
       });
     }
 
-    // Space and up, so it's playable on a laptop.
+    // Space, up and W, so it's playable on a laptop: each one is a flap,
+    // exactly like a tap.
     window.addEventListener("keydown", e => {
-      if (HOLD_KEYS.has(e.key)) {
-        e.preventDefault();
-        // `keydown` repeats while a key is held; a flap is one press.
-        if (!e.repeat && !this.keys.has(e.key)) {
-          this.pending++;
-        }
-        this.keys.add(e.key);
-        this.sync();
+      if (!HOLD_KEYS.has(e.key) || typing(e)) {
+        return;
       }
+      // Held off the game, this would stop the codename field taking a space
+      // or the letter w — the keys a flap wants are also keys a name wants.
+      e.preventDefault();
+      // `keydown` repeats while a key is held; a flap is one press.
+      if (!e.repeat && !this.keys.has(e.key)) {
+        this.pending++;
+      }
+      this.keys.add(e.key);
+      this.sync();
     });
     window.addEventListener("keyup", e => {
       this.keys.delete(e.key);
@@ -131,4 +135,18 @@ export class HoldInput {
   }
 }
 
-const HOLD_KEYS = new Set([" ", "Spacebar", "ArrowUp", "w", "W"]);
+const HOLD_KEYS = new Set([
+  " ",
+  // What older browsers call the same two keys.
+  "Spacebar",
+  "ArrowUp",
+  "Up",
+  "w",
+  "W",
+]);
+
+/** Is this key going into a text field rather than into the game? */
+function typing(e: KeyboardEvent): boolean {
+  const el = e.target as HTMLElement | null;
+  return !!el?.closest?.("input, textarea, select, [contenteditable]");
+}
