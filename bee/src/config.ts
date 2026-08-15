@@ -712,17 +712,56 @@ export const LAIR = {
   mouthX: 0,
   /** How far past the mouth the first gate is — a beat to settle before one. */
   runIn: 34,
-  gateCount: 29,
-  gateSpacing: 21,
+  gateCount: 40,
+  /**
+   * How far apart the gates are at the mouth, and at the far end.
+   *
+   * It tightens the whole way rather than reaching its real difficulty in the
+   * first few gates and staying there. The far end is Flappy Bird's own pitch
+   * — 1.19s between gates — and the start is half again as much room.
+   */
+  spacingStart: 19,
+  spacingEnd: 13,
   /**
    * How much the distance between gates wanders, as a fraction of the spacing.
-   *
-   * A fixed pitch reads as a grid rather than a cave. The jitter is scaled back
-   * afterwards so the mean is exactly `gateSpacing` — irregular spacing must
-   * not quietly make the level longer or shorter than the minute it is meant
-   * to be.
+   * A fixed pitch reads as a grid rather than a cave.
    */
-  spacingJitter: 0.34,
+  spacingJitter: 0.28,
+  /**
+   * A stair: two gates close together with the second one lower, so the way
+   * through the pair is a diagonal she has to fall down rather than two
+   * openings she can line up on separately.
+   *
+   * The spacing has to clear both obstacles' own width — they are up to 3.4
+   * across — or there is no air *between* them to fall through, and the pair
+   * stops being a diagonal and becomes a single slot you have to thread. At
+   * six units apart the way through was a window 1.5 units tall; ten and a
+   * half leaves three units of clear air between the rocks and a real descent
+   * to fly down.
+   *
+   * The drop is not a free fall. A free fall over this distance is 27 units,
+   * far more than the cave is tall — so a stair is a *controlled* dive, still
+   * flapping, just less than usual. It is bigger than `gapStep` allows
+   * anywhere else, which is what makes it the hardest thing in the level.
+   *
+   * The bottom gate is always the roof coming down with open air beneath it,
+   * so being too low costs nothing and the diagonal is enforced from above.
+   */
+  stairSpacing: 10.5,
+  /**
+   * How far the bottom gate's roof reaches below the top gate's floor.
+   *
+   * This is what makes the descent compulsory rather than optional: any
+   * overlap at all between the two openings and there is a height that clears
+   * both, and the pair is just two gates you fly through in a straight line.
+   */
+  stairForce: 1.5,
+  /** Air kept under the bottom of a stair, so a fall can't end on the floor. */
+  stairFloorRoom: 2.5,
+  /** How often a stair starts. Nothing at the mouth, ramping to this. */
+  stairChanceEnd: 0.6,
+  /** How far in before the first one can appear, as a fraction of the run. */
+  stairsFrom: 0.3,
   /**
    * How often a gate is a matched pair, rather than a spike from the floor
    * with open air above it or the roof coming down with open air below.
@@ -742,13 +781,13 @@ export const LAIR = {
   /**
    * The opening, floor-to-roof.
    *
-   * A bee is about 1.9 across and 1.5 tall. `gapEasy` is what the first gates
-   * get, narrowing to `gap` by `gatesToFullDifficulty` — a child needs a few
-   * goes at a forgiving one before the real thing.
+   * `gapEasy` is what the first gate gets and `gap` the last, closing steadily
+   * the whole way: a child needs a few goes at a forgiving one before the real
+   * thing, and the far end should be something to work up to. For scale, the
+   * bee is drawn 1.74 tall and Flappy Bird's gap is 5.0 of its bird's heights.
    */
-  gap: 11.5,
+  gap: 9.5,
   gapEasy: 15,
-  gatesToFullDifficulty: 10,
   /** How close to floor or roof the opening's edge may come. */
   gapMargin: 2.5,
   /** Most the opening may move between one gate and the next. */
@@ -775,7 +814,7 @@ export const LAIR = {
 
   // ---- flying -------------------------------------------------------------
   /**
-   * Rightward pace. gateCount * gateSpacing / speed ≈ the minute asked for.
+   * Rightward pace. The run works out at about the minute asked for.
    *
    * Flappy Bird runs at 4.41 body lengths a second (150 px/s against a 34px
    * bird). The bee is a longer animal than that bird — 1.9 long per tall

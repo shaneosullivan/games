@@ -282,8 +282,19 @@ export class LairLevel implements Level {
       return;
     }
 
-    const gate = scene.gates[this.nextGate];
-    if (gate) {
+    // Every gate she is anywhere near, not just the next one.
+    //
+    // A stair puts two gates seven units apart, which is less than the width
+    // of the rocks either side of them — so she can be inside both at once,
+    // and testing only `nextGate` would let her fly through the second one's
+    // rock while the first was still current.
+    const reach = LAIR.rockHalfWidth + LAIR.hitHalfLength;
+    for (let i = this.nextGate; i < scene.gates.length; i++) {
+      const gate = scene.gates[i];
+      if (gate.x - bee.position.x > reach) {
+        // In x order, so everything past this one is further ahead still.
+        break;
+      }
       if (
         gateHit(
           gate,
@@ -296,17 +307,24 @@ export class LairLevel implements Level {
         this.crash(ctx);
         return;
       }
+    }
+
+    // ...and count off the ones she has left behind. A `while`, because a
+    // stair's two gates can both fall behind her within one step.
+    while (this.nextGate < scene.gates.length) {
+      const gate = scene.gates[this.nextGate];
       // The widest of them: a gate can hold a slim spike and a fat rock, and
       // it isn't behind her until she is past both.
       const clear =
         Math.max(...gate.obstacles.map(o => o.halfWidth)) + LAIR.hitHalfLength;
-      if (bee.position.x > gate.x + clear) {
-        this.nextGate++;
-        this.passed++;
-        ctx.hud.setCount("gates", this.passed, scene.gates.length, true);
-        // Rising notes as they stack up, so getting further sounds like it.
-        ctx.audio.collect(this.passed);
+      if (bee.position.x <= gate.x + clear) {
+        break;
       }
+      this.nextGate++;
+      this.passed++;
+      ctx.hud.setCount("gates", this.passed, scene.gates.length, true);
+      // Rising notes as they stack up, so getting further sounds like it.
+      ctx.audio.collect(this.passed);
     }
 
     this.frameSideOn(ctx);

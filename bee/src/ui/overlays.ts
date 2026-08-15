@@ -373,10 +373,13 @@ export function createCodenameScreen(
     // The right-hand column carries the name and the buttons too, so the map
     // gets the full height of the card beside it.
     side.append(nameField, start);
-    if (existing) {
-      side.append(reset);
-    }
     card.append(h1, p, picker);
+    if (existing) {
+      // Right at the bottom of the card, under the map, rather than directly
+      // beneath the Continue button. Sitting there it reads as a caption
+      // explaining what Continue does — which is the opposite of what it does.
+      card.append(reset);
+    }
   } else {
     card.append(h1, p, nameField, start);
     if (existing) {

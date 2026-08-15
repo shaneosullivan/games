@@ -159,48 +159,89 @@ export function createLairScene(rng: Rng): LairScene {
   // change, the flying doesn't get harder.
   const gates: Array<LairGate> = [];
 
-  // How far apart, gate by gate. Jittered, then scaled back so the run is the
-  // length it always was — the level is a minute long by design, and irregular
-  // spacing shouldn't quietly make it longer or shorter.
-  const spacings: Array<number> = [];
-  for (let i = 0; i < LAIR.gateCount - 1; i++) {
-    spacings.push(rng.range(1 - LAIR.spacingJitter, 1 + LAIR.spacingJitter));
-  }
-  const meanSpacing =
-    spacings.reduce((a, b) => a + b, 0) / Math.max(1, spacings.length);
-  for (let i = 0; i < spacings.length; i++) {
-    spacings[i] = (spacings[i] / meanSpacing) * LAIR.gateSpacing;
-  }
-
   let centre: number = LAIR.startHeight;
   let x = LAIR.mouthX + LAIR.runIn;
+  /** Is the gate about to be built the bottom half of a stair? */
+  let stairing = false;
   for (let i = 0; i < LAIR.gateCount; i++) {
-    if (i > 0) {
-      x += spacings[i - 1];
-    }
-    // Ease from the wide opening to the real one over the first few gates.
-    const ramp = Math.min(1, i / LAIR.gatesToFullDifficulty);
-    const gap = LAIR.gapEasy + (LAIR.gap - LAIR.gapEasy) * ramp;
+    // 0 at the mouth, 1 at the far end. Everything that gets harder does so
+    // against this, so the level tightens the whole way rather than arriving
+    // at its real difficulty in the first ten gates and staying there.
+    const progress = LAIR.gateCount > 1 ? i / (LAIR.gateCount - 1) : 1;
+    const gap = LAIR.gapEasy + (LAIR.gap - LAIR.gapEasy) * progress;
+    const spacing =
+      (LAIR.spacingStart + (LAIR.spacingEnd - LAIR.spacingStart) * progress) *
+      rng.range(1 - LAIR.spacingJitter, 1 + LAIR.spacingJitter);
+
+    // Does a stair start at this gate? Decided *before* the gate is placed,
+    // because the top of one has to stand high enough for the whole drop to
+    // fit above the floor — work it out afterwards and the clamp pulls the
+    // second gate back up, and the diagonal comes out as two gates in a row.
+    //
+    // Never at the very start and never three deep: a stair is one drop, not a
+    // staircase to the floor.
+    const startsStair: boolean =
+      !stairing &&
+      progress > LAIR.stairsFrom &&
+      i < LAIR.gateCount - 1 &&
+      rng.next() < LAIR.stairChanceEnd * progress;
+
+    /** Is this gate itself the bottom half of a stair? */
+    const wasStair = stairing;
 
     // Where the opening can sit without pinching against floor or roof.
     const lo = floorY + LAIR.gapMargin + gap / 2;
     const hi = ceilingY - LAIR.gapMargin - gap / 2;
-    if (i > 0) {
+    if (i > 0 && wasStair) {
+      // The bottom of a stair: closer behind the last gate than anything else
+      // in the cave, and further below it than the way through ever moves
+      // otherwise. It is the roof coming down (see `shape` below) with open air
+      // underneath, so the diagonal is enforced from above and being a little
+      // too low costs nothing.
+      x += LAIR.stairSpacing;
+      // Put the roof of this gate *below* the floor of the last one, so the
+      // two openings don't overlap at all. Without that the pair is only two
+      // gates you can fly low through in a straight line; with it there is no
+      // height that clears both, and the way through has to be a descent.
+      centre = gates[gates.length - 1].gapBottom - LAIR.stairForce - gap / 2;
+    } else if (i > 0) {
+      x += spacing;
       // How far the way through moves, scaled by how far there is to move in.
       // A gate close behind the last one asking for the same climb as a distant
       // one is the only way irregular spacing can make the level harder rather
       // than just less regular.
-      const room = spacings[i - 1] / LAIR.gateSpacing;
+      const room = spacing / LAIR.spacingStart;
       centre += rng.range(-LAIR.gapStep, LAIR.gapStep) * room;
     }
-    centre = Math.min(hi, Math.max(lo, centre));
+    // The bottom of a stair only has to clear the floor — nothing rises from
+    // it — while the top has to leave room for the whole fall.
+    const bottom = wasStair
+      ? floorY + LAIR.stairFloorRoom
+      : startsStair
+        ? // High enough that the bottom gate still clears the floor once its
+          // roof has been put a whole gap plus `stairForce` below this one's
+          // floor. Anything lower and the clamp would pull the pair back into
+          // line with each other, which is exactly the shape a stair isn't.
+          Math.min(hi, floorY + LAIR.stairFloorRoom + LAIR.stairForce + gap)
+        : lo;
+    centre = Math.min(hi, Math.max(bottom, centre));
+    // If the drop wouldn't have fitted, the stair is abandoned rather than
+    // squashed into something that isn't one.
+    stairing =
+      startsStair &&
+      centre - LAIR.stairForce - gap >= floorY + LAIR.stairFloorRoom - 0.01;
 
     // The first few are pairs whatever the dice say: a pair is the shape that
     // teaches the level, and a one-sided gate only reads as a variation once
-    // you know what it is varying from.
+    // you know what it is varying from. The bottom of a stair is always the
+    // roof coming down, so that falling too far costs nothing.
     const roll = rng.next();
-    const shape =
-      i < LAIR.pairsToStart || roll < LAIR.pairChance
+    const shape = wasStair
+      ? "roof"
+      : // The top of a stair is always a pair. A one-sided gate's opening
+        // reaches the floor, and there would be nothing to be forced down past
+        // — she could fly the whole stair low and in a straight line.
+        startsStair || i < LAIR.pairsToStart || roll < LAIR.pairChance
         ? "pair"
         : roll < LAIR.pairChance + (1 - LAIR.pairChance) / 2
           ? "floor"
