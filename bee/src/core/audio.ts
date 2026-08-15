@@ -120,6 +120,16 @@ export class Audio {
     this.threatGain!.gain.setTargetAtTime(t * 0.09, now, 0.2);
   }
 
+  /**
+   * One wingbeat, for the Lair's flap.
+   *
+   * Short and soft on purpose: at better than a flap a second for a solid
+   * minute, anything with a tail on it turns into a drone.
+   */
+  flap(): void {
+    this.blip(430, 0, 0.07, 0.09, "triangle");
+  }
+
   /** Nasty little zap when the wasp connects. */
   sting(): void {
     this.blip(220, 0, 0.18, 0.3, "square");

@@ -166,12 +166,15 @@ export interface GameContext {
    */
   takeTap(): boolean;
   /**
-   * Is the screen being held down right now? The Bear's Lair's whole control.
+   * Consume one press of the screen, if one has begun since the last call.
    *
-   * Not a tap and not the stick: the press has a duration, and the level reads
-   * it every step. Presses on the HUD don't count — see `core/holdInput.ts`.
+   * The Bear's Lair's flap, and its whole control. A press rather than a
+   * state, counted as it arrives rather than sampled, so a tap that starts and
+   * ends inside a single frame still counts — that tap is the one the player
+   * meant most. Presses on the HUD never reach here, so the home button is
+   * still the home button. See `core/holdInput.ts`.
    */
-  isHeld(): boolean;
+  takePress(): boolean;
   /**
    * The camera's width over its height. For a scripted shot that has to frame
    * something against the screen it will actually be seen on — a portrait

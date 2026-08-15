@@ -34,25 +34,18 @@ const FACING_ALONG_CAVE = Math.PI / 2;
 const ease = (t: number): number =>
   t < 0.5 ? 2 * t * t : 1 - (1 - t) * (1 - t) * 2;
 
-/** Move `value` toward `target` by `rate`, without overshooting it. */
-function approach(value: number, target: number, rate: number): number {
-  return value < target
-    ? Math.min(target, value + rate)
-    : Math.max(target, value - rate);
-}
-
 /**
  * Level 6 — The Bear's Lair.
  *
- * Flappy Bird in the bee's own world: hold the screen and she climbs, let go
- * and she sinks, and she moves right whatever you do. The trick is that it is
+ * Flappy Bird in the bee's own world: tap and she flaps upward, gravity takes
+ * it back off her, and she moves right whatever you do. The trick is that it is
  * not a 2D game at all — it is the same scene, the same bee and the same
  * renderer, with the camera parked off to her left and the cave laid out in one
  * plane so that it reads flat.
  *
  * The level drives the bee itself from the moment it starts (`scripted`), so
  * none of the ordinary flight model applies: no stick, no bounds, no altitude
- * slider. All the player has is `ctx.isHeld()`.
+ * slider. All the player has is `ctx.takePress()`.
  *
  * Failing is a phase, not an ending. She shakes, falls out of shot, and the
  * Game offers another go — nothing here is allowed to feel like a punishment.
@@ -246,7 +239,7 @@ export class LairLevel implements Level {
       this.phase = "playing";
       this.phaseTime = 0;
       this.climb = 0;
-      ctx.hud.setObjective("Hold anywhere to fly up!");
+      ctx.hud.setObjective("Tap anywhere to flap!");
     }
   }
 
@@ -254,20 +247,20 @@ export class LairLevel implements Level {
     const bee = ctx.bee;
     bee.position.x += LAIR.speed * dt;
 
-    // Hold to climb, let go to sink. Both rates are approached rather than
-    // jumped to, so she arcs instead of switching between two straight lines —
-    // and the arc is what makes a gap readable before you reach it.
-    const held = ctx.isHeld();
-    this.climb = approach(
-      this.climb,
-      held ? LAIR.riseSpeed : -LAIR.fallSpeed,
-      (held ? LAIR.riseAccel : LAIR.fallAccel) * dt,
-    );
+    // A flap, and then gravity. Each press throws her upward at `flapSpeed`
+    // whatever she was doing before — including mid-fall, which is what makes
+    // a late flap a save rather than a slow correction — and nothing about
+    // holding the screen down keeps her there.
+    if (ctx.takePress()) {
+      this.climb = LAIR.flapSpeed;
+      ctx.audio.flap();
+    }
+    this.climb = Math.max(-LAIR.maxFall, this.climb - LAIR.gravity * dt);
     bee.position.y += this.climb * dt;
 
-    // Nose up when climbing, down when sinking. It reads as effort, and it
+    // Nose up out of a flap, down as it runs out. It reads as effort, and it
     // shows which way she is going before the height has visibly changed.
-    bee.setClimb(this.climb / LAIR.riseSpeed);
+    bee.setClimb(this.climb / LAIR.flapSpeed);
 
     // Floor and roof are walls like any other. Without that, sitting on the
     // floor would be the safe way to play.

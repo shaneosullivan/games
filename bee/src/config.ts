@@ -737,16 +737,27 @@ export const LAIR = {
   // ---- flying -------------------------------------------------------------
   /** Rightward pace. gateCount * gateSpacing / speed ≈ the minute asked for. */
   speed: 8.6,
-  /** Terminal rates, held down and let go. */
-  riseSpeed: 7.5,
-  fallSpeed: 8.5,
   /**
-   * How briskly she reaches them. Deliberately not an impulse: a flap you have
-   * to time is the hard part of these games, and holding a line is something a
-   * four-year-old can do on the first go.
+   * The flap, and the falling.
+   *
+   * A real flap, as the game this is modelled on has: each press throws her
+   * upward at `flapSpeed` whatever she was doing before, and gravity takes it
+   * back off her. Nothing about holding the screen down keeps her up.
+   *
+   * The two numbers are one decision, not two, and the pair is chosen floaty.
+   * A flap carries her flapSpeed² / (2 * gravity) = 2.3 units up and takes
+   * 0.6s to get there, so holding a line costs one to two flaps a second.
+   *
+   * Measured, not guessed: an autopilot with a third of a second of reaction
+   * time flies the whole cave on these, and gets a third of the way on a
+   * snappier pair with the same gap. Time in the air is what a child has to
+   * correct in, so the floaty end of a real flap is both the kinder one and
+   * the one that still plays like the game it is copying.
    */
-  riseAccel: 30,
-  fallAccel: 24,
+  flapSpeed: 7.8,
+  gravity: 13,
+  /** How fast she can end up falling, however long she's left it. */
+  maxFall: 15,
   /** Collision radius. Smaller than she looks, which always plays fairer. */
   radius: 0.9,
   /**

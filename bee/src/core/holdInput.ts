@@ -15,6 +15,25 @@ export class HoldInput {
   held = false;
 
   /**
+   * Presses that have begun and not yet been read.
+   *
+   * Counted rather than derived from `held`, because a flap is a press and not
+   * a state: a quick tap can start and finish inside one frame, and a level
+   * that only looked at `held` once a step would never see it. That tap is the
+   * one the player meant most.
+   */
+  private pending = 0;
+
+  /** Take one press, if there is one waiting. */
+  takePress(): boolean {
+    if (this.pending === 0) {
+      return false;
+    }
+    this.pending = 0;
+    return true;
+  }
+
+  /**
    * Live presses, keyed the way the maze's buttons key theirs: "p12" for a
    * pointer, "t0" for a touch. The same finger can arrive down both paths and
    * their ids are numbered independently, so one finger may hold two keys —
@@ -34,6 +53,7 @@ export class HoldInput {
           return;
         }
         this.down.add(`p${e.pointerId}`);
+        this.pending++;
         this.sync();
       },
       {passive: true},
@@ -54,6 +74,7 @@ export class HoldInput {
         for (const t of Array.from(e.changedTouches)) {
           this.down.add(`t${t.identifier}`);
         }
+        this.pending++;
         this.sync();
       },
       {passive: true},
@@ -76,6 +97,10 @@ export class HoldInput {
     window.addEventListener("keydown", e => {
       if (HOLD_KEYS.has(e.key)) {
         e.preventDefault();
+        // `keydown` repeats while a key is held; a flap is one press.
+        if (!e.repeat && !this.keys.has(e.key)) {
+          this.pending++;
+        }
         this.keys.add(e.key);
         this.sync();
       }
@@ -97,6 +122,7 @@ export class HoldInput {
   release(): void {
     this.down.clear();
     this.keys.clear();
+    this.pending = 0;
     this.sync();
   }
 

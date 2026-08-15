@@ -98,7 +98,7 @@ export class Game {
   private readonly woodsGroup = new THREE.Group();
   /** Where level 6 builds its cave. Empty otherwise, like the woods. */
   private readonly lairGroup = new THREE.Group();
-  /** "Hold the screen to fly up" — level 6's only control. */
+  /** "Tap to flap" — level 6's only control. */
   private readonly hold = new HoldInput();
   private readonly interior: HiveInterior;
   private readonly queen = createQueen();
@@ -271,7 +271,7 @@ export class Game {
       celebratePuzzle: () => burstRainbow(this.puzzle.root),
       setFlightControls: on => this.setFlightControls(on),
       pickTap: objects => this.pickTap(objects),
-      isHeld: () => this.hold.held,
+      takePress: () => this.hold.takePress(),
       get cameraAspect() {
         return stage.camera.aspect;
       },
