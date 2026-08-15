@@ -58,44 +58,102 @@ export function createLairDome(rng: Rng, atX: number): LairDome {
   // a cap around the hole's bearing left off. Drawn from the inside — the
   // camera never leaves the room except through the hole, and a closed dome
   // would black the shot out on the way through.
-  const shell = new THREE.SphereGeometry(
-    DOME.radius,
-    28,
-    18,
-    0,
-    Math.PI * 2,
-    0,
-    Math.PI / 2,
-  );
-  shell.scale(1, DOME.height / DOME.radius, 1);
-  shell.translate(centre.x, 0, centre.z);
-  // Shaded by height rather than by light.
   //
-  // A back-facing surface has its normals pointing away from everything, so
-  // lit materials leave it flat black and the room reads as a void with things
-  // floating in it. Painting the curve in — stone where it meets the floor,
-  // fading into the dark overhead — is what makes it a domed chamber, and it
-  // is the same trick the hive interior uses to look round.
-  {
-    const pos = shell.attributes.position;
-    const colours = new Float32Array(pos.count * 3);
-    const low = new THREE.Color(P.rock).convertSRGBToLinear();
-    const high = new THREE.Color(0x14111d).convertSRGBToLinear();
-    const mix = new THREE.Color();
-    for (let i = 0; i < pos.count; i++) {
-      const up = Math.min(1, Math.max(0, pos.getY(i) / DOME.height));
-      mix.copy(low).lerp(high, up ** 0.55);
-      colours[i * 3] = mix.r;
-      colours[i * 3 + 1] = mix.g;
-      colours[i * 3 + 2] = mix.b;
+  // Built by hand, quad by quad, so the hole can be a hole. There is no
+  // boolean geometry here, and the first version faked one with a bright disc
+  // laid under a solid roof — which meant anything flying out through it was
+  // hidden by the rock it was supposed to be passing through. Skipping the
+  // quads that fall inside the hole's bearing leaves a real gap, and bees go
+  // through it.
+  const shellPositions: Array<number> = [];
+  const shellColours: Array<number> = [];
+  const low = new THREE.Color(P.rock).convertSRGBToLinear();
+  const high = new THREE.Color(0x14111d).convertSRGBToLinear();
+  const mix = new THREE.Color();
+  /** Direction from the middle of the room to the hole, on the unit sphere. */
+  const holeDir = new THREE.Vector3(
+    DOME.holeOffsetX / DOME.radius,
+    holeY / DOME.height,
+    DOME.holeOffsetZ / DOME.radius,
+  ).normalize();
+  // A little wider than the hole itself, so its rim is rock rather than a
+  // fringe of half-quads.
+  const holeCos = Math.cos(
+    Math.asin(Math.min(1, DOME.holeRadius / DOME.radius)) * 1.25,
+  );
+  const dir = new THREE.Vector3();
+  const shellPoint = (
+    e: number,
+    a: number,
+    out: THREE.Vector3,
+  ): THREE.Vector3 =>
+    out.set(
+      centre.x + Math.cos(e) * Math.cos(a) * DOME.radius,
+      Math.sin(e) * DOME.height,
+      centre.z + Math.cos(e) * Math.sin(a) * DOME.radius,
+    );
+  const corner = [
+    new THREE.Vector3(),
+    new THREE.Vector3(),
+    new THREE.Vector3(),
+    new THREE.Vector3(),
+  ];
+  // Fine enough that the hole's edge doesn't read as steps: the gap is made by
+  // dropping whole quads, so the quads have to be small where it is.
+  const rings = 36;
+  const segments = 96;
+  for (let r = 0; r < rings; r++) {
+    const e0 = (r / rings) * (Math.PI / 2);
+    const e1 = ((r + 1) / rings) * (Math.PI / 2);
+    for (let sIdx = 0; sIdx < segments; sIdx++) {
+      const a0 = (sIdx / segments) * Math.PI * 2;
+      const a1 = ((sIdx + 1) / segments) * Math.PI * 2;
+      // Is the middle of this quad inside the hole? Compared on the unit
+      // sphere, which is where the hole is a circle.
+      const em = (e0 + e1) / 2;
+      const am = (a0 + a1) / 2;
+      dir
+        .set(
+          Math.cos(em) * Math.cos(am),
+          Math.sin(em),
+          Math.cos(em) * Math.sin(am),
+        )
+        .normalize();
+      if (dir.dot(holeDir) > holeCos) {
+        continue;
+      }
+      shellPoint(e0, a0, corner[0]);
+      shellPoint(e0, a1, corner[1]);
+      shellPoint(e1, a1, corner[2]);
+      shellPoint(e1, a0, corner[3]);
+      for (const i of [0, 1, 2, 0, 2, 3]) {
+        const p = corner[i];
+        shellPositions.push(p.x, p.y, p.z);
+        // Shaded by height rather than by light: a back-facing surface has its
+        // normals pointing away from everything, so a lit material leaves it
+        // flat black and the room reads as a void with things floating in it.
+        const up = Math.min(1, Math.max(0, p.y / DOME.height));
+        mix.copy(low).lerp(high, up ** 0.55);
+        shellColours.push(mix.r, mix.g, mix.b);
+      }
     }
-    shell.setAttribute("color", new THREE.BufferAttribute(colours, 3));
   }
+  const shell = new THREE.BufferGeometry();
+  shell.setAttribute(
+    "position",
+    new THREE.BufferAttribute(new Float32Array(shellPositions), 3),
+  );
+  shell.setAttribute(
+    "color",
+    new THREE.BufferAttribute(new Float32Array(shellColours), 3),
+  );
   const shellMesh = new THREE.Mesh(
     shell,
     new THREE.MeshBasicMaterial({
       vertexColors: true,
-      side: THREE.BackSide,
+      // Both faces: the camera goes out through the hole, and from above the
+      // dome would otherwise vanish.
+      side: THREE.DoubleSide,
       fog: false,
     }),
   );
@@ -108,28 +166,57 @@ export function createLairDome(rng: Rng, atX: number): LairDome {
   const floorMesh = new THREE.Mesh(paint(floor, P.ground), vertexToon());
   group.add(floorMesh);
 
-  // ---- the hole, and the light through it ---------------------------------
+  // A rim of boulders round the opening.
   //
-  // A ring of sky rather than a hole cut in the shell: there is no boolean
-  // geometry here, so the "hole" is a bright disc laid just inside the dome
-  // with the shell's own darkness around it.
-  // A little wider than the hole, so no rim of shell shows around it.
-  const sky = new THREE.CircleGeometry(DOME.holeRadius * 1.08, 24);
+  // Two jobs: it hides the stepped edge left by dropping quads, and it makes
+  // the hole read as somewhere the roof has fallen in rather than as a shape
+  // cut out of a surface. Same stones as the cave mouth, for the same reason.
+  const rim: Array<THREE.BufferGeometry> = [];
+  const rimUp = new THREE.Vector3(0, 1, 0);
+  const rimSide = new THREE.Vector3().crossVectors(holeDir, rimUp).normalize();
+  const rimOther = new THREE.Vector3()
+    .crossVectors(holeDir, rimSide)
+    .normalize();
+  for (let i = 0; i < 18; i++) {
+    const a = (i / 18) * Math.PI * 2;
+    const size = rng.range(1.4, 2.4);
+    const boulder = new THREE.IcosahedronGeometry(size, 0);
+    // Round the opening and clear of it: a stone centred on the rim reaches
+    // its own radius into the gap, and a ring of them closed most of it.
+    const r = DOME.holeRadius + size * 1.15;
+    boulder.translate(
+      holeCentre.x + rimSide.x * Math.cos(a) * r + rimOther.x * Math.sin(a) * r,
+      holeCentre.y + rimSide.y * Math.cos(a) * r + rimOther.y * Math.sin(a) * r,
+      holeCentre.z + rimSide.z * Math.cos(a) * r + rimOther.z * Math.sin(a) * r,
+    );
+    rim.push(paint(boulder, i % 3 === 0 ? P.rockLight : P.rock));
+  }
+  const rimMesh = new THREE.Mesh(mergeGeometries(rim, false), vertexToon());
+  group.add(rimMesh);
+  for (const geo of rim) {
+    geo.dispose();
+  }
+
+  // ---- the daylight above the hole ----------------------------------------
+  //
+  // A backdrop rather than a lid: it hangs a long way above the roof, so the
+  // bees climbing out are always in front of it. Put in the opening itself it
+  // would swallow them exactly the way the old solid roof did.
+  const sky = new THREE.CircleGeometry(DOME.holeRadius * 16, 28);
   sky.rotateX(Math.PI / 2);
-  // A shade under the roof, so the shell can't win the depth test against it.
-  sky.translate(holeCentre.x, holeCentre.y - 0.5, holeCentre.z);
+  sky.translate(holeCentre.x, holeCentre.y + DOME.skyHeight, holeCentre.z);
   const skyMesh = new THREE.Mesh(
     sky,
     new THREE.MeshBasicMaterial({
       color: DOME.skyColor,
-      // Both faces. It is looked at from underneath for the whole scene — a
-      // front-facing disc laid flat is invisible from below, which is what
-      // made the hole read as more darkness rather than as daylight.
       side: THREE.DoubleSide,
+      // Behind everything, and writing no depth, so nothing it sits behind can
+      // ever be hidden by it.
+      depthWrite: false,
       fog: false,
     }),
   );
-  skyMesh.renderOrder = 2;
+  skyMesh.renderOrder = -2;
   group.add(skyMesh);
 
   // The shaft: a cone of pale light standing on the floor, wider at the

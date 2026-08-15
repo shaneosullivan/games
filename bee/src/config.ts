@@ -980,6 +980,8 @@ export const DOME = {
    * drawn additively over it and washes anything paler out to white.
    */
   skyColor: 0x6ab8ff,
+  /** How far above the roof the disc of daylight hangs. See lairDome.ts. */
+  skyHeight: 70,
   lightColor: 0xffe08a,
   shaftOpacity: 0.14,
 
