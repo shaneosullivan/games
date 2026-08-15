@@ -980,8 +980,14 @@ export const DOME = {
    * drawn additively over it and washes anything paler out to white.
    */
   skyColor: 0x6ab8ff,
-  /** How far above the roof the disc of daylight hangs. See lairDome.ts. */
-  skyHeight: 70,
+  /**
+   * How big the ball of sky around the hole is.
+   *
+   * Big enough to be well outside the dome and to stay ahead of the swarm all
+   * the way up: they climb fifty-five units past the roof, and the camera goes
+   * with them.
+   */
+  skyRadius: 170,
   lightColor: 0xffe08a,
   shaftOpacity: 0.14,
 

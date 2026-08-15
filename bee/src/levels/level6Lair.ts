@@ -469,6 +469,8 @@ export class LairLevel implements Level {
     this.phase = "arriving";
     this.phaseTime = 0;
     this.domeTime = 0;
+    // Daylight outside the hole, from here on: see lairDome.ts.
+    this.scene?.group && this.dome?.setSkyVisible(true);
     ctx.audio.levelComplete();
     ctx.hud.setObjective("The bear's treasure!");
     ctx.bee.setClimb(0);

@@ -26,6 +26,8 @@ export interface LairDome {
   setHoardScale(scale: number): void;
   /** Take a jar off the pile; it keeps its world position for the caller. */
   takeJar(index: number): THREE.Group | null;
+  /** Show the sky outside. Off until the cut scene; see above. */
+  setSkyVisible(on: boolean): void;
   update(elapsed: number): void;
   dispose(): void;
 }
@@ -222,26 +224,34 @@ export function createLairDome(rng: Rng, atX: number): LairDome {
     geo.dispose();
   }
 
-  // ---- the daylight above the hole ----------------------------------------
+  // ---- the daylight outside ------------------------------------------------
   //
-  // A backdrop rather than a lid: it hangs a long way above the roof, so the
-  // bees climbing out are always in front of it. Put in the opening itself it
-  // would swallow them exactly the way the old solid roof did.
-  const sky = new THREE.CircleGeometry(DOME.holeRadius * 16, 28);
-  sky.rotateX(Math.PI / 2);
-  sky.translate(holeCentre.x, holeCentre.y + DOME.skyHeight, holeCentre.z);
+  // A sphere of sky around the hole rather than a disc above it.
+  //
+  // A flat lid only fills the opening when you are looking straight up it: at
+  // any angle the far half of the aperture showed the shell's own inside
+  // instead, which is why the ring of stones looked like it was sitting on
+  // solid roof rather than framing anything. A sphere is sky along every line
+  // of sight that leaves through the gap, and once the camera is out through
+  // the roof it is inside it, which is what being outdoors looks like.
+  //
+  // Hidden until the cut scene starts: it is unlit and unfogged, and from
+  // inside the cave it would otherwise be a blue ball six hundred units away.
+  const sky = new THREE.SphereGeometry(DOME.skyRadius, 20, 14);
+  sky.translate(holeCentre.x, holeCentre.y, holeCentre.z);
   const skyMesh = new THREE.Mesh(
     sky,
     new THREE.MeshBasicMaterial({
       color: DOME.skyColor,
-      side: THREE.DoubleSide,
-      // Behind everything, and writing no depth, so nothing it sits behind can
-      // ever be hidden by it.
+      side: THREE.BackSide,
+      // Behind everything, and writing no depth, so nothing can be hidden by
+      // it — least of all a bee on her way out.
       depthWrite: false,
       fog: false,
     }),
   );
   skyMesh.renderOrder = -2;
+  skyMesh.visible = false;
   group.add(skyMesh);
 
   // The shaft: a cone of pale light standing on the floor, wider at the
@@ -434,6 +444,9 @@ export function createLairDome(rng: Rng, atX: number): LairDome {
     holeCentre,
     entry: new THREE.Vector3(atX + 2, DOME.height * 0.45, 0),
     jars,
+    setSkyVisible(on) {
+      skyMesh.visible = on;
+    },
     setHoardScale(scale) {
       for (const jar of jars) {
         // Only what is still in the pile. A jar someone is carrying goes back
