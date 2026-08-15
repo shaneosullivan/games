@@ -1165,6 +1165,44 @@ export const DOME = {
 } as const;
 
 /**
+ * The meadow outside the cave mouth.
+ *
+ * The level opens on it: two seconds of somewhere pleasant, with the hole in
+ * the hill sitting in the middle of it. The contrast is the point — the cave
+ * has to look like somewhere you would rather not go, and it only does if what
+ * you are leaving is somewhere you would rather stay.
+ */
+export const LAIR_OUTSIDE = {
+  /** How far out from the mouth the grass runs, and how wide. */
+  depth: 70,
+  /** The ball of daylight around it all. Big enough to hold the cliff too. */
+  skyRadius: 200,
+  halfWidth: 46,
+  /** Tufts of grass and little flowers standing in it. */
+  tufts: 260,
+  flowers: 34,
+  butterflies: 4,
+  /** How big a butterfly's wing is, and how fast it beats. */
+  wingSize: 0.55,
+  wingBeat: 9,
+  /** How far a butterfly wanders, and how briskly. */
+  roam: 13,
+  roamRate: 0.5,
+  /** Height band they fly in. */
+  flyLow: 2.5,
+  flyHigh: 7,
+} as const;
+
+export const LAIR_OUTSIDE_PALETTE = {
+  grass: 0x6fbf4a,
+  grassDark: 0x53a337,
+  grassLight: 0x92d966,
+  sky: 0x9fd8f5,
+  petals: [0xffd23f, 0xff8ac1, 0xfff3f6, 0xff7a45] as ReadonlyArray<number>,
+  wings: [0xffb02e, 0xff6f91, 0xfff0a0, 0x8ad7ff] as ReadonlyArray<number>,
+} as const;
+
+/**
  * Cave rock: cool and dim, but never actually dark.
  *
  * Same lesson as the woods — the toon ramp's darkest band is 0.47, so a

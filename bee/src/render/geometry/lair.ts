@@ -3,6 +3,26 @@ import {mergeGeometries} from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import {LAIR, LAIR_PALETTE as P} from "../../config";
 import type {Rng} from "../../core/rng";
 import {paint, solidToon, vertexToon} from "../materials";
+import stalag1Url from "../../assets/cave/stalag1.png";
+import gradient1Url from "../../assets/cave/gradient1.jpg";
+import gradient2Url from "../../assets/cave/gradient2.png";
+import rock1Url from "../../assets/cave/rock1.png";
+import rock2Url from "../../assets/cave/rock2.png";
+import {createLairOutside} from "./lairOutside";
+
+/**
+ * The rock the obstacles are painted with.
+ *
+ * The pointed ones get the stalactite drawing and the two tall gradients —
+ * 83 and 110 across against 790 tall, and a cone's own mapping runs those
+ * straight up the spike, which is the way the streaks in a stalactite run.
+ * The rounded ones get the two rock patterns.
+ *
+ * Cycled rather than picked at random, so no two neighbours are ever the
+ * same — at this size that is the only thing the eye notices.
+ */
+const SPIKE_SKINS = [stalag1Url, gradient1Url, gradient2Url];
+const ROCK_SKINS = [rock1Url, rock2Url];
 
 /**
  * One obstacle: a spike or a rock, growing from the floor or the roof.
@@ -287,7 +307,6 @@ export function createLairScene(rng: Rng): LairScene {
   // The cave proper starts at the mouth. Only the floor reaches back past it —
   // the opening shot stands the bee outside looking in, and a roof over her
   // there would mean she was already in the cave she is about to fly into.
-  const outside = LAIR.mouthX - 70;
   // The corridor stops where the chamber begins, with a few units of overlap
   // so there is no seam. It used to run sixty units further, which put its
   // flat floor, roof and back wall straight through the middle of the dome —
@@ -298,27 +317,16 @@ export function createLairScene(rng: Rng): LairScene {
   const midX = (from + to) / 2;
 
   const shell: Array<THREE.BufferGeometry> = [];
-  /** The ledge outside the mouth, which is visible before she has flown in. */
-  const ledge: Array<THREE.BufferGeometry> = [];
-  const slab = (
-    y: number,
-    thickness: number,
-    colour: number,
-    startX = from,
-    into: Array<THREE.BufferGeometry> = shell,
-  ): void => {
-    const run = to - startX;
+  const slab = (y: number, thickness: number, colour: number): void => {
+    const run = to - from;
     const geo = new THREE.BoxGeometry(run, thickness, caveDepth);
-    geo.translate(startX + run / 2, y, caveMidZ);
-    into.push(paint(geo, colour));
+    geo.translate(from + run / 2, y, caveMidZ);
+    shell.push(paint(geo, colour));
   };
   slab(floorY - 1.5, 3, P.ground);
   slab(ceilingY + 1.5, 3, P.rock);
-  // Separately, so it can stay on screen while the cave behind it is not
-  // drawn at all: she stands on this in the opening shot.
-  const ledgeGeo = new THREE.BoxGeometry(from - outside, 3, caveDepth);
-  ledgeGeo.translate((outside + from) / 2, floorY - 1.5, caveMidZ);
-  ledge.push(paint(ledgeGeo, P.ground));
+  // Nothing outside the mouth: the meadow is the ground out there now, and a
+  // grey ledge at the same height as its grass only fought with it.
   // The back of the cave. Everything is seen against this, so it is the darkest
   // thing in the level — the silhouettes have to come off it.
   const back = new THREE.BoxGeometry(length, height + 12, 2);
@@ -342,9 +350,10 @@ export function createLairScene(rng: Rng): LairScene {
   const shellMesh = new THREE.Mesh(mergeGeometries(shell, false), vertexToon());
   shellMesh.renderOrder = -1;
   group.add(shellMesh);
-  const ledgeMesh = new THREE.Mesh(mergeGeometries(ledge, false), vertexToon());
-  group.add(ledgeMesh);
-  for (const geo of [...shell, ...ledge]) {
+  // The meadow the mouth opens onto, and what is flying around in it.
+  const outsideScene = createLairOutside(rng);
+  group.add(outsideScene.group);
+  for (const geo of shell) {
     geo.dispose();
   }
 
@@ -581,7 +590,22 @@ export function createLairScene(rng: Rng): LairScene {
   group.add(cap);
 
   // ---- the obstacles ------------------------------------------------------
-  const pieces: Array<THREE.BufferGeometry> = [];
+  //
+  // One mesh per skin rather than one mesh for the lot: they are textured now,
+  // and a merged geometry can only carry one material. Five draw calls for the
+  // whole cave is still nothing.
+  const loader = new THREE.TextureLoader();
+  const skinned = [...SPIKE_SKINS, ...ROCK_SKINS].map(url => {
+    const map = loader.load(url);
+    map.colorSpace = THREE.SRGBColorSpace;
+    // The gradients are a strip 83 across and 790 tall; a cone wraps its
+    // whole circumference into u, so the strip has to repeat round it.
+    map.wrapS = THREE.RepeatWrapping;
+    map.wrapT = THREE.ClampToEdgeWrapping;
+    return {url, map, pieces: [] as Array<THREE.BufferGeometry>};
+  });
+  let spikeSkin = 0;
+  let rockSkin = 0;
   for (const gate of gates) {
     for (const o of gate.obstacles) {
       const span = Math.abs(o.tipY - o.rootY);
@@ -633,17 +657,30 @@ export function createLairScene(rng: Rng): LairScene {
       // brings that to under 3%, which is a pixel or two on screen.
       geo.scale(1, 1, LAIR.obstacleFlatten);
       geo.translate(o.x, o.rootY, LAIR.beeZ - LAIR.obstacleStandoff);
-      pieces.push(paint(geo, o.kind === "spike" ? P.spike : P.rock));
+      const skin =
+        o.kind === "spike"
+          ? skinned[spikeSkin++ % SPIKE_SKINS.length]
+          : skinned[SPIKE_SKINS.length + (rockSkin++ % ROCK_SKINS.length)];
+      skin.pieces.push(geo);
     }
   }
-  const obstacleMesh = new THREE.Mesh(
-    mergeGeometries(pieces, false),
-    vertexToon(),
-  );
-  group.add(obstacleMesh);
-  for (const geo of pieces) {
-    geo.dispose();
-  }
+  const obstacleMeshes = skinned
+    .filter(skin => skin.pieces.length > 0)
+    .map(skin => {
+      const mesh = new THREE.Mesh(
+        mergeGeometries(skin.pieces, false),
+        // Unlit, like the corridor's own walls: the cave is dim by design and
+        // toon shading took these drawings down to near-black. They are seen
+        // as silhouettes anyway, so there is no shape for the shading to
+        // describe — what matters is that the art reads.
+        new THREE.MeshBasicMaterial({map: skin.map}),
+      );
+      group.add(mesh);
+      for (const geo of skin.pieces) {
+        geo.dispose();
+      }
+      return mesh;
+    });
 
   // ---- water off the stalactites ------------------------------------------
   //
@@ -713,6 +750,7 @@ export function createLairScene(rng: Rng): LairScene {
     gates,
     endX,
     update(elapsed) {
+      outsideScene.update(elapsed);
       for (let i = 0; i < dripState.length; i++) {
         const d = dripState[i];
         const t = (elapsed + d.phase) % d.period;
@@ -757,7 +795,12 @@ export function createLairScene(rng: Rng): LairScene {
       // committed to going in.
       const shut = a >= 0.999;
       shellMesh.visible = !shut;
-      obstacleMesh.visible = !shut;
+      for (const mesh of obstacleMeshes) {
+        mesh.visible = !shut;
+      }
+      // The meadow is only ever seen from outside, and its sky would show
+      // through the doorway as a bright hole once the camera is in the cave.
+      outsideScene.group.visible = shut;
       crystalMesh.visible = !shut;
       drips.visible = !shut;
     },
