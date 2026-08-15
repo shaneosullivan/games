@@ -1065,7 +1065,12 @@ export const DOME = {
   danceStandoff: 11,
   danceHeight: 11,
   /** How high above the floor the drawn map hangs. */
-  danceFloor: 8,
+  /**
+   * How high the drawn map hangs. Above the hoard, which is seven tall and
+   * stands in the middle of the room — anything lower is half hidden behind
+   * the treasure.
+   */
+  danceFloor: 13,
   /** The brood arriving, in a burst each. */
   gatherTime: 2.6,
   /** Diving into the pile and coming up with a jar each. */
@@ -1134,6 +1139,13 @@ export const DOME = {
    * way in at the edge of frame.
    */
   cameraStart: 1.15,
+  /**
+   * How far above the floor the chamber shots look.
+   *
+   * Aimed at the floor, the map the queen draws — which hangs above the hoard,
+   * clear of it — rides off the top of the frame.
+   */
+  lookHeight: 7,
   /**
    * How far under its carrier a jar hangs, how much it swings, and how big it
    * is once someone is carrying it.

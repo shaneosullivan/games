@@ -521,7 +521,7 @@ export class LairLevel implements Level {
     this.trail.mark(tmp);
 
     this.domeEye(dome, eye);
-    ctx.setCameraCinematic(eye, dome.centre);
+    ctx.setCameraCinematic(eye, this.domeLook(dome, look));
 
     if (t >= 1) {
       this.phase = "gathering";
@@ -538,7 +538,7 @@ export class LairLevel implements Level {
   /** The brood arriving, each in a burst of sparks. */
   private updateGathering(dt: number, ctx: GameContext, dome: LairDome): void {
     this.domeEye(dome, eye);
-    ctx.setCameraCinematic(eye, dome.centre);
+    ctx.setCameraCinematic(eye, this.domeLook(dome, look));
 
     this.nextFirework -= dt;
     if (this.nextFirework <= 0) {
@@ -580,7 +580,7 @@ export class LairLevel implements Level {
     ctx.bee.position.lerp(tmp, 0.05);
 
     this.domeEye(dome, eye);
-    ctx.setCameraCinematic(eye, dome.centre);
+    ctx.setCameraCinematic(eye, this.domeLook(dome, look));
 
     this.carryJars(ctx);
 
@@ -791,6 +791,11 @@ export class LairLevel implements Level {
    * two. It drifts slowly the whole way round the cut scene, because a still
    * camera on a still room for twenty seconds reads as a photograph.
    */
+  /** What the chamber shots look at: above the floor, not at it. */
+  private domeLook(dome: LairDome, out: THREE.Vector3): THREE.Vector3 {
+    return out.set(dome.centre.x, DOME.lookHeight, dome.centre.z);
+  }
+
   private domeEye(dome: LairDome, out: THREE.Vector3): THREE.Vector3 {
     const swing = DOME.cameraStart + this.domeTime * DOME.cameraDrift;
     return out.set(
@@ -830,15 +835,23 @@ export class LairLevel implements Level {
     const alongRun = (x0 + (x1 - x0) * f - runFrom) / (runTo - runFrom);
     const height =
       (y0 + (y1 - y0) * f - LAIR.floorY) / (LAIR.ceilingY - LAIR.floorY);
-    // Drawn across z, not across x.
-    //
-    // The chamber is watched from along the cave's own axis, so a map laid out
-    // the way the cave runs is seen end-on and reads as a single line. Turned a
-    // quarter turn it faces the camera, which is the whole point of drawing it.
+    // Laid out across whatever the camera is looking at, not along a fixed
+    // axis: a map drawn end-on to the shot reads as a single line, which is
+    // what it did when the chamber's camera moved and this didn't. The bearing
+    // is the one the shot starts on, so the drift only ever turns the finished
+    // map a few degrees.
+    const swing = DOME.cameraStart;
+    // Across the view...
+    const acrossX = Math.sin(swing);
+    const acrossZ = Math.cos(swing);
+    // ...and toward the camera, so the middle of it isn't behind the hoard.
+    const towardX = -Math.cos(swing);
+    const towardZ = Math.sin(swing);
+    const across = (alongRun - 0.5) * DOME.danceSize;
     return out.set(
-      dome.centre.x - DOME.danceStandoff,
+      dome.centre.x + acrossX * across + towardX * DOME.danceStandoff,
       DOME.danceFloor + (height - 0.5) * DOME.danceHeight,
-      dome.centre.z + (alongRun - 0.5) * DOME.danceSize,
+      dome.centre.z + acrossZ * across + towardZ * DOME.danceStandoff,
     );
   }
 
