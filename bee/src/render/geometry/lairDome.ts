@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import {mergeGeometries} from "three/examples/jsm/utils/BufferGeometryUtils.js";
-import {DOME, LAIR_PALETTE as P} from "../../config";
+import {DOME, LAIR, LAIR_PALETTE as P} from "../../config";
 import type {Rng} from "../../core/rng";
 import {paint, solidToon, vertexToon} from "../materials";
 import {createHoneyJar} from "./cottageInside";
@@ -55,8 +55,11 @@ export function createLairDome(rng: Rng, atX: number): LairDome {
   // disc of sky a clear three units above the rock it was supposed to be a
   // hole in, so the shell hid it and the way out looked like more cave.
   const holeR = Math.hypot(DOME.holeOffsetX, DOME.holeOffsetZ);
+  // On the domed part, which starts on top of the wall.
   const holeY =
-    DOME.height * Math.sqrt(Math.max(0, 1 - (holeR / DOME.radius) ** 2));
+    DOME.wallHeight +
+    (DOME.height - DOME.wallHeight) *
+      Math.sqrt(Math.max(0, 1 - (holeR / DOME.radius) ** 2));
   const holeCentre = new THREE.Vector3(
     centre.x + DOME.holeOffsetX,
     holeY,
@@ -89,20 +92,36 @@ export function createLairDome(rng: Rng, atX: number): LairDome {
   ).normalize();
   // A little wider than the hole itself, so its rim is rock rather than a
   // fringe of half-quads.
-  const holeAngle =
-    Math.asin(Math.min(1, DOME.holeRadius / DOME.radius)) * 1.25;
-  const holeCos = Math.cos(holeAngle);
-  const dir = new THREE.Vector3();
+  /** How far from the hole's middle the roof is taken away. */
+  const holeCut = DOME.holeRadius * 1.25;
+  /**
+   * A point on the room's wall, `u` running 0 at the floor to 1 at the top.
+   *
+   * Straight wall first, dome on top of it. A pure dome meets the floor at its
+   * rim, and from a camera inside at head height a level look passes over that
+   * rim and straight out of the room — which is why the top of the shot was
+   * sky. A room has walls.
+   */
   const shellPoint = (
-    e: number,
+    u: number,
     a: number,
     out: THREE.Vector3,
-  ): THREE.Vector3 =>
-    out.set(
+  ): THREE.Vector3 => {
+    if (u <= DOME.wallFraction) {
+      return out.set(
+        centre.x + Math.cos(a) * DOME.radius,
+        (u / DOME.wallFraction) * DOME.wallHeight,
+        centre.z + Math.sin(a) * DOME.radius,
+      );
+    }
+    const e =
+      ((u - DOME.wallFraction) / (1 - DOME.wallFraction)) * (Math.PI / 2);
+    return out.set(
       centre.x + Math.cos(e) * Math.cos(a) * DOME.radius,
-      Math.sin(e) * DOME.height,
+      DOME.wallHeight + Math.sin(e) * (DOME.height - DOME.wallHeight),
       centre.z + Math.cos(e) * Math.sin(a) * DOME.radius,
     );
+  };
   const corner = [
     new THREE.Vector3(),
     new THREE.Vector3(),
@@ -111,32 +130,46 @@ export function createLairDome(rng: Rng, atX: number): LairDome {
   ];
   // Fine enough that the hole's edge doesn't read as steps: the gap is made by
   // dropping whole quads, so the quads have to be small where it is.
-  const rings = 36;
+  const rings = 40;
   const segments = 96;
+  const mid = new THREE.Vector3();
   for (let r = 0; r < rings; r++) {
-    const e0 = (r / rings) * (Math.PI / 2);
-    const e1 = ((r + 1) / rings) * (Math.PI / 2);
+    const e0 = r / rings;
+    const e1 = (r + 1) / rings;
     for (let sIdx = 0; sIdx < segments; sIdx++) {
       const a0 = (sIdx / segments) * Math.PI * 2;
       const a1 = ((sIdx + 1) / segments) * Math.PI * 2;
-      // Is the middle of this quad inside the hole? Compared on the unit
-      // sphere, which is where the hole is a circle.
-      const em = (e0 + e1) / 2;
-      const am = (a0 + a1) / 2;
-      dir
-        .set(
-          Math.cos(em) * Math.cos(am),
-          Math.sin(em),
-          Math.cos(em) * Math.sin(am),
-        )
-        .normalize();
-      if (dir.dot(holeDir) > holeCos) {
+      // Is the middle of this quad inside the hole? Measured straight against
+      // the hole's own position, which works whatever shape the surface is —
+      // an angular test only works on a sphere, and this is a wall with a dome
+      // on top of it.
+      shellPoint((e0 + e1) / 2, (a0 + a1) / 2, mid);
+      if (mid.distanceTo(holeCentre) < holeCut) {
         continue;
       }
       shellPoint(e0, a0, corner[0]);
       shellPoint(e0, a1, corner[1]);
       shellPoint(e1, a1, corner[2]);
       shellPoint(e1, a0, corner[3]);
+      // ...and the doorway, where the corridor arrives.
+      //
+      // The cave runs into the side of this room, so the wall it runs into
+      // cannot be there: without the gap she flew in through solid rock and
+      // the shot outside had a closed dome in front of everything. Everything
+      // on the near side below the corridor's own roof comes out.
+      const midX = (corner[0].x + corner[2].x) / 2;
+      const midY = (corner[0].y + corner[2].y) / 2;
+      const midZ = (corner[0].z + corner[2].z) / 2;
+      if (
+        midX < centre.x - DOME.radius * DOME.doorwaySpan &&
+        midY < LAIR.ceilingY + DOME.doorwayHeadroom &&
+        // ...and only as wide as the corridor. Without this the whole near
+        // half of the room goes, at every bearing, and from inside you look
+        // straight out of the side of the dome at the sky.
+        Math.abs(midZ - LAIR.beeZ) < DOME.doorwayHalfWidth
+      ) {
+        continue;
+      }
       for (const i of [0, 1, 2, 0, 2, 3]) {
         const p = corner[i];
         shellPositions.push(p.x, p.y, p.z);
@@ -162,8 +195,13 @@ export function createLairDome(rng: Rng, atX: number): LairDome {
     shell,
     new THREE.MeshBasicMaterial({
       vertexColors: true,
-      // Both faces: the camera goes out through the hole, and from above the
-      // dome would otherwise vanish.
+      // Both faces.
+      //
+      // The quads are written out by hand, and their winding puts the front
+      // face outward — so drawing back faces only culled the whole room from
+      // inside it, and the sky sitting behind everything was what showed. The
+      // doorway is what stops it being a lid over the shot from outside; the
+      // shell can be solid from both sides.
       side: THREE.DoubleSide,
       fog: false,
     }),
@@ -193,28 +231,19 @@ export function createLairDome(rng: Rng, atX: number): LairDome {
   const rimOther = new THREE.Vector3()
     .crossVectors(holeDir, rimSide)
     .normalize();
-  const rimDir = new THREE.Vector3();
   const rimCount = 20;
   for (let i = 0; i < rimCount; i++) {
     const a = (i / rimCount) * Math.PI * 2;
     const size = rng.range(1.4, 2.4);
     const boulder = new THREE.IcosahedronGeometry(size, 0);
-    // A direction tilted off the hole's own by exactly the angle the shell was
-    // cut at: that is the edge of the gap, whatever shape it comes out as.
-    rimDir
-      .copy(holeDir)
-      .multiplyScalar(Math.cos(holeAngle))
-      .addScaledVector(rimSide, Math.sin(holeAngle) * Math.cos(a))
-      .addScaledVector(rimOther, Math.sin(holeAngle) * Math.sin(a))
-      .normalize();
-    // ...mapped back onto the surface, which is where the stone sits. Nudged
-    // outward by a third of its own size so it laps the edge rather than
-    // hanging over the opening.
-    const out = 1 + (size * 0.34) / DOME.radius;
+    // On the cut itself: the roof is taken away within `holeCut` of the hole's
+    // middle, so a stone at exactly that distance sits on the edge of the gap,
+    // whatever shape the surface it was cut out of happens to be.
+    const r = holeCut + size * 0.3;
     boulder.translate(
-      centre.x + rimDir.x * DOME.radius * out,
-      rimDir.y * DOME.height * out,
-      centre.z + rimDir.z * DOME.radius * out,
+      holeCentre.x + (rimSide.x * Math.cos(a) + rimOther.x * Math.sin(a)) * r,
+      holeCentre.y + (rimSide.y * Math.cos(a) + rimOther.y * Math.sin(a)) * r,
+      holeCentre.z + (rimSide.z * Math.cos(a) + rimOther.z * Math.sin(a)) * r,
     );
     rim.push(paint(boulder, i % 3 === 0 ? P.rockLight : P.rock));
   }

@@ -792,7 +792,7 @@ export class LairLevel implements Level {
    * camera on a still room for twenty seconds reads as a photograph.
    */
   private domeEye(dome: LairDome, out: THREE.Vector3): THREE.Vector3 {
-    const swing = this.domeTime * DOME.cameraDrift;
+    const swing = DOME.cameraStart + this.domeTime * DOME.cameraDrift;
     return out.set(
       dome.centre.x - Math.cos(swing) * DOME.cameraBack,
       DOME.cameraHeight,

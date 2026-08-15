@@ -161,6 +161,10 @@ export function createLairScene(rng: Rng): LairScene {
 
   let centre: number = LAIR.startHeight;
   let x = LAIR.mouthX + LAIR.runIn;
+  /** Which way the way through moved last. It alternates; see below. */
+  let swing = -1;
+  /** The last gate's shape, so the same one-sided one can't run on. */
+  let lastShape = "pair";
   /** Is the gate about to be built the bottom half of a stair? */
   let stairing = false;
   for (let i = 0; i < LAIR.gateCount; i++) {
@@ -201,12 +205,22 @@ export function createLairScene(rng: Rng): LairScene {
       centre -= LAIR.stairOffset;
     } else if (i > 0) {
       x += spacing;
-      // How far the way through moves, scaled by how far there is to move in.
-      // A gate close behind the last one asking for the same climb as a distant
-      // one is the only way irregular spacing can make the level harder rather
-      // than just less regular.
+      // Up, then down, then up.
+      //
+      // A random walk was letting the way through drift — six gates in a row
+      // near the roof, which is a straight line to fly and no game at all.
+      // Alternating the direction outright means every gate is a move the
+      // other way, so she is never left holding a height for long.
+      //
+      // The distance still scales with how far there is to move in: a gate
+      // close behind the last one asking for the same climb as a distant one
+      // is the only way irregular spacing can make the level harder rather
+      // than just less regular. And it grows as the run goes on.
       const room = spacing / LAIR.spacingStart;
-      centre += rng.range(-LAIR.gapStep, LAIR.gapStep) * room;
+      const reach =
+        LAIR.gapStep * (LAIR.gapStepStart + (1 - LAIR.gapStepStart) * progress);
+      swing = -swing;
+      centre += swing * rng.range(reach * 0.65, reach) * room;
     }
     if (startsStair) {
       // Leave room to drop into. Nothing else about a stair is special: it is
@@ -214,7 +228,14 @@ export function createLairScene(rng: Rng): LairScene {
       // ordinary gate sitting slightly lower and much closer.
       centre = Math.max(centre, lo + LAIR.stairOffset);
     }
+    const wanted = centre;
     centre = Math.min(hi, Math.max(lo, centre));
+    // Pinned against the floor or the roof, the next move has to come back the
+    // other way — otherwise it pushes into the same wall again and she gets a
+    // second gate at the same height, which is the drift this is here to stop.
+    if (centre !== wanted) {
+      swing = centre > wanted ? 1 : -1;
+    }
     stairing = startsStair;
 
     // The first few are pairs whatever the dice say: a pair is the shape that
@@ -222,12 +243,18 @@ export function createLairScene(rng: Rng): LairScene {
     // you know what it is varying from. Both halves of a stair are pairs, so
     // that what you are flying down through is plainly two offset gates.
     const roll = rng.next();
-    const shape =
+    let shape =
       wasStair || startsStair || i < LAIR.pairsToStart || roll < LAIR.pairChance
         ? "pair"
         : roll < LAIR.pairChance + (1 - LAIR.pairChance) / 2
           ? "floor"
           : "roof";
+    // Never the same one-sided gate twice running: a row of them is a row of
+    // openings on the same side, which is the flattest thing the cave can do.
+    if (shape !== "pair" && shape === lastShape) {
+      shape = "pair";
+    }
+    lastShape = shape;
 
     /** A spike or a rock, chosen per obstacle so a pair can be one of each. */
     const pick = (): {kind: LairObstacle["kind"]; halfWidth: number} =>

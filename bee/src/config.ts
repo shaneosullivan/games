@@ -694,7 +694,16 @@ export const LAIR = {
   // ---- the cave -----------------------------------------------------------
   /** Floor and roof of the playable slot. The bee may not leave it. */
   floorY: 0,
-  ceilingY: 24,
+  /**
+   * How tall the flown slot is.
+   *
+   * It has to be a good deal more than the gap, or there is nowhere for the
+   * way through to move: with a 15-unit opening in a 24-unit cave the path had
+   * a four-unit band to live in, so alternating it up and down produced moves
+   * of a tenth of a unit and a flat run of gates you could hold one height
+   * through. Room to move is `ceilingY - 2 * gapMargin - gap`.
+   */
+  ceilingY: 29,
   /**
    * The plane everything is played in.
    *
@@ -797,11 +806,18 @@ export const LAIR = {
    * bee is drawn 1.74 tall and Flappy Bird's gap is 5.0 of its bird's heights.
    */
   gap: 9.5,
-  gapEasy: 15,
+  gapEasy: 13,
   /** How close to floor or roof the opening's edge may come. */
-  gapMargin: 2.5,
-  /** Most the opening may move between one gate and the next. */
-  gapStep: 4,
+  gapMargin: 2,
+  /**
+   * How far the way through moves from one gate to the next.
+   *
+   * It alternates — up, then down, then up — rather than wandering, so there
+   * is never a stretch of gates at the same height to coast along. The move
+   * starts at `gapStepStart` of this and reaches all of it by the far end.
+   */
+  gapStep: 6,
+  gapStepStart: 0.55,
   /**
    * Water off the stalactites.
    *
@@ -889,7 +905,7 @@ export const LAIR = {
    */
   beeScale: 1.5,
   /** Where she enters, and the height the first gap is centred on. */
-  startHeight: 12,
+  startHeight: 14,
 
   // ---- the shot -----------------------------------------------------------
   /**
@@ -897,7 +913,7 @@ export const LAIR = {
    * is the whole slot plus a margin; the length decides how much warning of the
    * next gate you get, and is the number to raise if the level plays tight.
    */
-  frameHalfHeight: 14,
+  frameHalfHeight: 16.5,
   frameHalfLength: 17,
   /** How far ahead of the bee the shot is centred, so there's road to read. */
   cameraLead: 6,
@@ -962,8 +978,23 @@ export const LAIR = {
  */
 export const DOME = {
   // ---- the room -----------------------------------------------------------
-  radius: 34,
-  height: 30,
+  /**
+   * The room. It has to stand well clear of the corridor that arrives in it:
+   * the doorway is cut as everything below the corridor's own roof, so a dome
+   * only as tall as the corridor loses its whole near wall and you see out
+   * through the back of it.
+   */
+  radius: 38,
+  height: 44,
+  /**
+   * The straight wall the dome sits on, and how much of the surface it takes.
+   *
+   * A pure dome meets the floor at its rim, and a level look from a camera
+   * inside at head height passes over that rim and out of the room — the top
+   * of every shot was sky. A room has walls.
+   */
+  wallHeight: 17,
+  wallFraction: 0.3,
   /**
    * Where the hole in the roof sits, from the middle of the room.
    *
@@ -975,6 +1006,15 @@ export const DOME = {
   holeOffsetX: 13,
   holeOffsetZ: -9,
   holeRadius: 6.5,
+  /**
+   * The doorway the corridor arrives through: everything on the near side of
+   * this fraction of the radius, below the corridor's own roof plus a little
+   * headroom, is left out of the shell.
+   */
+  doorwaySpan: 0.5,
+  doorwayHeadroom: 2,
+  /** How wide the doorway is, either side of the corridor's own centre. */
+  doorwayHalfWidth: 11,
   /**
    * The disc of daylight in the roof. Saturated, because the shaft of light is
    * drawn additively over it and washes anything paler out to white.
@@ -1025,7 +1065,7 @@ export const DOME = {
   danceStandoff: 11,
   danceHeight: 11,
   /** How high above the floor the drawn map hangs. */
-  danceFloor: 6,
+  danceFloor: 8,
   /** The brood arriving, in a burst each. */
   gatherTime: 2.6,
   /** Diving into the pile and coming up with a jar each. */
@@ -1070,16 +1110,30 @@ export const DOME = {
    * height instead fixes the jars but tips the last bee out of frame, which is
    * the thing the shot is of.
    */
-  climbFrom: 14,
+  climbFrom: 16,
   /**
    * Where the chamber is watched from: back from the middle, and how high.
    *
    * It drifts slowly right through the cut scene — a still camera on a still
    * room for twenty seconds reads as a photograph rather than a place.
    */
-  cameraBack: 40,
-  cameraHeight: 15,
+  /**
+   * Where the chamber is watched from. Inside it: the room is 34 across, and a
+   * shot standing further back than that is outside the wall looking at rock.
+   */
+  cameraBack: 29,
+  cameraHeight: 17,
   cameraDrift: 0.055,
+  /**
+   * Which way round the room the shot starts, in radians.
+   *
+   * Not zero, which is the bearing the corridor arrives on: the doorway is a
+   * hole in the wall, so a camera standing on that bearing is standing in the
+   * gap, with the room's wall missing all around it and daylight where the
+   * rock should be. Off to one side it looks back across the chamber with the
+   * way in at the edge of frame.
+   */
+  cameraStart: 1.15,
   /**
    * How far under its carrier a jar hangs, how much it swings, and how big it
    * is once someone is carrying it.
