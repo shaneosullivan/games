@@ -834,6 +834,14 @@ export const LAIR = {
   /** Seconds between one drop and the next, per stalactite. */
   dripPeriod: [3, 7.5],
 
+  /**
+   * Where a signature sits on its boulder, as a fraction of the rock's height,
+   * and how much of the rock's width it takes there. Only the two tallest
+   * floor boulders get one; see SIGNATURES in render/geometry/lair.ts.
+   */
+  signatureHeight: 0.45,
+  signatureFill: 0.72,
+
   /** Half-width of a spike at its base, and of a rock at its widest. */
   spikeHalfWidth: 2.6,
   rockHalfWidth: 3.4,

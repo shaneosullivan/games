@@ -8,6 +8,8 @@ import gradient1Url from "../../assets/cave/gradient1.jpg";
 import gradient2Url from "../../assets/cave/gradient2.png";
 import rock1Url from "../../assets/cave/rock1.png";
 import rock2Url from "../../assets/cave/rock2.png";
+import signature1Url from "../../assets/cave/signature1.png";
+import signature2Url from "../../assets/cave/signature2.png";
 import {createLairOutside} from "./lairOutside";
 
 /**
@@ -23,6 +25,19 @@ import {createLairOutside} from "./lairOutside";
  */
 const SPIKE_SKINS = [stalag1Url, gradient1Url, gradient2Url];
 const ROCK_SKINS = [rock1Url, rock2Url];
+
+/**
+ * Signed rock: one each, on the two biggest boulders standing on the floor.
+ *
+ * They go on over whatever pattern that boulder already has, on a flat panel
+ * facing the camera rather than wrapped onto the dome — a signature bent round
+ * a curved surface and repeated is a texture, and the point of this one is
+ * that there is exactly one of it.
+ */
+const SIGNATURES = [
+  {url: signature1Url, aspect: 185 / 205},
+  {url: signature2Url, aspect: 152 / 166},
+];
 
 /**
  * Load a texture with the colour taken out of it.
@@ -651,6 +666,8 @@ export function createLairScene(rng: Rng): LairScene {
   });
   /** The plain rock under the markings; see below. */
   const bare: Array<THREE.BufferGeometry> = [];
+  /** Big boulders on the floor, biggest first — the signatures go on these. */
+  const boulders: Array<{x: number; halfWidth: number; span: number}> = [];
   let spikeSkin = 0;
   let rockSkin = 0;
   for (const gate of gates) {
@@ -714,6 +731,9 @@ export function createLairScene(rng: Rng): LairScene {
       // something solid behind them the cave shows through the gaps and the
       // obstacle is a handful of floating streaks.
       bare.push(paint(geo.clone(), o.kind === "spike" ? P.spike : P.rock));
+      if (o.kind === "rock" && o.from === 1) {
+        boulders.push({x: o.x, halfWidth: o.halfWidth, span});
+      }
     }
   }
   const obstacleMeshes: Array<THREE.Mesh> = [];
@@ -723,6 +743,49 @@ export function createLairScene(rng: Rng): LairScene {
   for (const geo of bare) {
     geo.dispose();
   }
+  // ---- the signatures -----------------------------------------------------
+  //
+  // On the two tallest floor boulders, and nowhere else. A panel standing just
+  // in front of the rock rather than a texture wrapped onto it: the level is
+  // seen from one side, so a flat panel is undistorted and unrepeated, which
+  // is what a signature has to be.
+  boulders.sort((a, b) => b.span - a.span);
+  for (let i = 0; i < SIGNATURES.length && i < boulders.length; i++) {
+    const rock = boulders[i];
+    const signature = SIGNATURES[i];
+    // Sized against the rock at the height it sits at: a dome is
+    // halfWidth·√(1−t²) across, and two thirds of that leaves a margin of
+    // stone all round.
+    const t = LAIR.signatureHeight;
+    const wide = rock.halfWidth * Math.sqrt(1 - t * t) * 2 * LAIR.signatureFill;
+    const panel = new THREE.PlaneGeometry(wide, wide * signature.aspect);
+    panel.translate(
+      rock.x,
+      rock.span * t,
+      // Just in front of the boulder's own front face, and still behind the
+      // bee, who flies at LAIR.beeZ.
+      LAIR.beeZ -
+        LAIR.obstacleStandoff +
+        rock.halfWidth * LAIR.obstacleFlatten +
+        0.06,
+    );
+    const map = new THREE.TextureLoader().load(signature.url);
+    map.colorSpace = THREE.SRGBColorSpace;
+    const mesh = new THREE.Mesh(
+      panel,
+      new THREE.MeshBasicMaterial({
+        map,
+        transparent: true,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+      }),
+    );
+    // After the rock and its pattern, both of which it is painted over.
+    mesh.renderOrder = 2;
+    group.add(mesh);
+    obstacleMeshes.push(mesh);
+  }
+
   for (const skin of skinned) {
     if (skin.pieces.length === 0) {
       continue;
