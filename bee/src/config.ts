@@ -1858,13 +1858,13 @@ export const ANT_HUNT = {
   /**
    * The ants.
    *
-   * Numbers per island, and each carries one piece of cargo. There are more
-   * ants than the quota so the last one is a chase rather than a clean-up: an
-   * island where every remaining ant is needed ends with a child cornering the
-   * one that is left.
+   * One number, not two: every ant on an island carries one thing and the gate
+   * wants all of them, so the count of ants *is* the quota. A separate quota
+   * that happened to be smaller would leave an ant wandering about with a
+   * flower on its back after the gate had opened, which reads as something
+   * missed rather than something spare.
    */
   antsPerIsland: 8,
-  cargoNeeded: 6,
   antLength: 2.4,
   antSpeed: 7.2,
   antTurn: 3.2,

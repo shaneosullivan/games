@@ -152,7 +152,7 @@ export class AntHuntLevel implements Level {
         label: "Net",
         color: P.netRim,
         value: 0,
-        target: A.cargoNeeded,
+        target: A.antsPerIsland,
       },
     ]);
     ctx.hud.setCallout("Fly your net into the ants!");
@@ -196,8 +196,30 @@ export class AntHuntLevel implements Level {
     this.world.dispose();
     this.antGeometry.dispose();
     this.antMaterial.dispose();
+    // The net and everything that belongs to it live in the Game's island
+    // group rather than in this level's own, because the net has to keep
+    // hanging under her while she is over open water between two islands. So
+    // they have to be taken out by hand: disposing them alone left the last
+    // net floating in the world, and starting the level again hung a second
+    // one under her.
+    for (const object of [
+      this.net?.group,
+      this.rope?.rope,
+      this.carriedNet?.group,
+      this.carrier?.group,
+      ...this.inFlight.map(f => f.item),
+    ]) {
+      if (object) {
+        ctx.islands.remove(object);
+      }
+    }
     this.net?.dispose();
     this.carriedNet?.dispose();
+    this.net = null;
+    this.rope = null;
+    this.carriedNet = null;
+    this.carrier = null;
+    this.inFlight.length = 0;
     ctx.bee.setCrown(false);
   }
 
@@ -305,10 +327,11 @@ export class AntHuntLevel implements Level {
         time: 0,
       });
       this.collected++;
-      ctx.hud.setCount("cargo", this.collected, A.cargoNeeded, true);
+      ctx.hud.setCount("cargo", this.collected, A.antsPerIsland, true);
       ctx.hud.setCallout(null);
       ctx.audio.collect(this.collected);
-      if (this.collected >= A.cargoNeeded) {
+      // Every ant's cargo, which is what opens the gate.
+      if (this.collected >= A.antsPerIsland) {
         this.islandDone(ctx);
         return;
       }
@@ -342,7 +365,7 @@ export class AntHuntLevel implements Level {
     this.collected = 0;
     this.phase = "hunting";
     this.phaseTime = 0;
-    ctx.hud.setCount("cargo", 0, A.cargoNeeded);
+    ctx.hud.setCount("cargo", 0, A.antsPerIsland);
     ctx.hud.setCallout("A fresh net! Fill it up.");
     this.giveNet(ctx);
   }
@@ -517,10 +540,10 @@ export class AntHuntLevel implements Level {
   /**
    * Fill an island with ants.
    *
-   * Every island carries one of each flower and enough jars to make up the
-   * quota, with a couple of spares on top: the quota can always be met by
-   * whatever is out there, and the spares mean losing one to a long chase
-   * isn't the end of it.
+   * One of each flower and jars for the rest. Every one of them has to be
+   * caught to open the gate, which is safe to ask: an ant only runs for its
+   * hill once it has already been robbed, so nothing here can carry its cargo
+   * out of reach.
    */
   private stockIsland(index: number, rng: Rng): void {
     const island = this.world.islands[index];

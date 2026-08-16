@@ -147,6 +147,8 @@ export function createAntIslands(rng: Rng): AntIslands {
     open: boolean;
     swing: number;
     bar: THREE.Mesh;
+    /** The angle at which the bar lies across the deck, barring the way. */
+    shutYaw: number;
   }> = [];
   const spans: Array<{a: THREE.Vector3; b: THREE.Vector3}> = [];
 
@@ -223,16 +225,34 @@ export function createAntIslands(rng: Rng): AntIslands {
       0.55,
       gateAt.z - Math.sin(yaw) * A.bridgeHalfWidth,
     );
-    pivot.rotation.y = yaw;
+    /*
+     * Shut is a quarter turn off the bridge's own heading — and which quarter
+     * matters.
+     *
+     * The bar is built along its pivot's -z and hung from one end, and the
+     * pivot stands on one rail. At the bridge's own yaw the bar lies *down*
+     * the bridge, which is what a gate standing open looks like. A quarter
+     * turn the wrong way swings it out over the water beside the bridge: still
+     * square to the way through, and still not barring it. This is the quarter
+     * that lays it from its own rail across to the other one.
+     */
+    const shutYaw = yaw + Math.PI / 2;
+    pivot.rotation.y = shutYaw;
     const barGeo = new THREE.BoxGeometry(0.2, 0.9, A.bridgeHalfWidth * 2);
     // Hung from one end, so rotating the pivot swings it like a farm gate.
     barGeo.translate(0, 0, -A.bridgeHalfWidth);
-    const bar = new THREE.Mesh(paint(barGeo, P.gate), vertexToon());
+    // Painted white and coloured by the material, not the vertices: the bar
+    // changes colour as it swings, and vertex colours multiply — tinting a red
+    // bar green gives mud rather than green.
+    const bar = new THREE.Mesh(
+      paint(barGeo, 0xffffff),
+      new THREE.MeshToonMaterial({vertexColors: true, color: P.gate}),
+    );
     const slats: Array<THREE.BufferGeometry> = [];
     for (const y of [-0.25, 0.25]) {
       const slat = new THREE.BoxGeometry(0.16, 0.16, A.bridgeHalfWidth * 1.9);
       slat.translate(0, y, -A.bridgeHalfWidth);
-      slats.push(paint(slat, P.gate));
+      slats.push(paint(slat, 0xffffff));
     }
     const barMerged = mergeGeometries([bar.geometry, ...slats], false);
     if (barMerged) {
@@ -244,7 +264,7 @@ export function createAntIslands(rng: Rng): AntIslands {
     }
     pivot.add(bar);
     group.add(pivot);
-    gates.push({pivot, open: false, swing: 0, bar});
+    gates.push({pivot, open: false, swing: 0, bar, shutYaw});
     void i;
   }
 
@@ -397,16 +417,13 @@ export function createAntIslands(rng: Rng): AntIslands {
         }
         const step = dt / A.gateSwing;
         gate.swing = Math.min(1, gate.swing + step);
-        // Swings aside and stands open, and goes green as it does — the colour
-        // is what carries at the distance the camera watches from.
-        gate.pivot.rotation.y =
-          Math.atan2(
-            islands[A.bridges[gates.indexOf(gate)].to].centre.x -
-              islands[A.bridges[gates.indexOf(gate)].from].centre.x,
-            islands[A.bridges[gates.indexOf(gate)].to].centre.z -
-              islands[A.bridges[gates.indexOf(gate)].from].centre.z,
-          ) +
-          ease(gate.swing) * (Math.PI / 2);
+        // A quarter turn back, from across the way through to alongside it.
+        gate.pivot.rotation.y = gate.shutYaw - ease(gate.swing) * (Math.PI / 2);
+        // And it goes green as it swings. The angle is the truth of it, but
+        // the colour is what carries at the height the camera watches from.
+        (gate.bar.material as THREE.MeshToonMaterial).color
+          .set(P.gate)
+          .lerp(new THREE.Color(P.gateOpen), ease(gate.swing));
       }
     },
 

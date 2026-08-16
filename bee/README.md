@@ -310,8 +310,10 @@ the first. Three islands in a triangle, joined one to two and two to three by
 old wooden bridges with a gate across each, and no way back across the middle.
 Ants run about every island with a flower or a jar of honey on their backs, and
 a net hangs under the queen on a rope: fly the net into an ant and its cargo is
-hers, and the robbed ant runs for its hill and disappears down the hole. Fill
-the net and the gate opens, a baby comes and carries the whole netful away, and
+hers, and the robbed ant runs for its hill and disappears down the hole. Every
+ant on the island has to be emptied — the number of ants _is_ the quota, so
+there is no ant left wandering about with a flower on its back after the gate
+has opened. Fill the net and the gate opens, a baby comes and carries the whole netful away, and
 she gets an empty one when she lands on the next island. Three netfuls and the
 level is over.
 
@@ -320,6 +322,13 @@ Two things carry it. The net swings rather than being strapped on — it is a
 a matter of leading an ant rather than flying at it, and a hard turn throws the
 mouth of the bag wide. And each island is sealed until its work is done, so
 there is never a moment where what to do next is somewhere else.
+
+**The net is the level, and leading it is the skill.** Measured with two
+autopilots on the same board: one that flies at where an ant _is_ takes three
+minutes an island and sometimes far longer, and one that aims at where the ant
+is _going_ clears an island in ten seconds. That gap is the whole game. If it
+proves too much for a child, `ANT_HUNT.antsPerIsland` is the lever — it is both
+how many ants there are and how many the gate wants.
 
 **Containment is the level's own.** The flight model bounds the bee to one
 circle about a centre, and this is three circles with corridors between them, so
