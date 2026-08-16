@@ -212,9 +212,11 @@ does to you.
 
 **7 — Silent Islands.** Frogger, with the frogs on the other side of it. Eight
 streams run in alternate directions between two banks, carrying frogs on
-lilypads and alligators, and the bee crosses them a square at a time: share a
-stream with a frog and come within one square and its tongue has you; meet an
-alligator and it doesn't need a tongue. It opens on the ordinary 3D view from
+lilypads and alligators, and the bee crosses them a square at a time. A frog's
+tongue only goes out of the front of its face, so it catches what is in front of
+it and the square behind one is the safest on the board — riding along just
+behind a frog is the one thing here that rewards watching rather than waiting.
+An alligator has no tongue and no front: it is the whole animal, either end. It opens on the ordinary 3D view from
 the near bank and the camera then lifts to look straight down at the board,
 which is where it stays — this is a game about a gap four squares away
 arriving in three seconds, and a shot that only showed the row she was on
@@ -246,9 +248,11 @@ two squares wide as an obstacle because it reaches one square either side, and
 what is left is the gap you hop into — so the time you get is
 `(wrapSpan / riders - 2) / speed` seconds. No lane leaves less than two of
 them, and the gaps tighten from 8 seconds on the first stream to about 2 on
-the last. Driven by an autopilot that plans, a single crossing succeeds every time; driven
-by one that only presses forward, it survives one crossing in twenty-four and
-usually drowns on the second or third stream — and the level asks for five.
+the last. Measured against a greedy autopilot — one that hops when the next square holds
+still, dodges when its own stops holding, and never looks more than one hop
+ahead — five errands in ten are finished, in 44 to 51 seconds. An autopilot that
+only presses forward survives one crossing in twelve, and the level asks for
+five of them.
 
 **The puzzle art is a placeholder** — a hand-authored SVG in
 `src/assets/bearPuzzle.ts`. To use the real picture, drop the image into

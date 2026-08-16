@@ -1559,7 +1559,22 @@ export const ISLANDS = {
   /** Tongue out, then the level says so. */
   strikeReach: 0.3,
   strikeHold: 0.45,
-  /** An alligator has no tongue; it has a mouth. Half its length, in squares. */
+  /**
+   * How far behind itself a frog can still catch you, in squares.
+   *
+   * Almost nothing: a tongue goes out of the front of a frog, so what is
+   * behind one is safe and the only thing this covers is its own body. It
+   * halves the danger around every frog, which is why the lane table was
+   * re-measured after it — see `lanes`.
+   */
+  behindSlack: 0.25,
+  /**
+   * An alligator has no tongue; it has a mouth. Half its length, in squares.
+   *
+   * Unlike a frog this reaches both ways, because it isn't a reach at all —
+   * it is the animal. Behind an alligator is its back, and there is nowhere
+   * on one that is somewhere to be.
+   */
   gatorHalf: 0.9,
   /** Half the bee, in squares, for the alligator's mouth to close on. */
   beeHalf: 0.22,
@@ -1638,6 +1653,14 @@ export const ISLANDS = {
   babies: 3,
   /** Columns the pedestals stand on, at both ends. */
   babyColumns: [3, 5, 7],
+  /**
+   * Which of them she fetches, in order.
+   *
+   * The middle one first, because she starts the level in the middle column
+   * and it is the one standing directly behind her — sending her sideways to
+   * collect an outer baby first reads as her having walked past one.
+   */
+  babyOrder: [1, 0, 2],
   pedestalHeight: 1.6,
   /**
    * A baby is smaller than the queen, and flies a little lower.

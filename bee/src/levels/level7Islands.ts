@@ -335,12 +335,21 @@ export class IslandsLevel implements Level {
 
     // Reaching a bank is tested before the strike: arriving on the same frame
     // as a tongue counts as having got there.
-    if (this.row > I.streams && this.escorting) {
-      this.deliver(ctx);
-      return;
-    }
-    if (this.row === 0 && !this.escorting && this.delivered < I.babies) {
-      this.collect(ctx);
+    //
+    // Only once the hop has landed, though. `row` is set the moment a hop
+    // begins, so testing it alone declared her arrived while she was still
+    // physically over the last stream — and the delivery then held her there,
+    // hovering above the water, for the whole of the baby's dance. Play
+    // resumed with a frog arriving exactly where she had been parked, which
+    // is why every attempt died with one baby across.
+    if (this.hopT >= 1) {
+      if (this.row > I.streams && this.escorting) {
+        this.deliver(ctx);
+        return;
+      }
+      if (this.row === 0 && !this.escorting && this.delivered < I.babies) {
+        this.collect(ctx);
+      }
     }
 
     const striker = this.threat(ctx);
@@ -368,8 +377,24 @@ export class IslandsLevel implements Level {
       if (Math.abs(bee.z - this.scene.rowZ(rider.lane)) > I.square / 2) {
         continue;
       }
-      const dx = Math.abs(bee.x - rider.x * I.square);
-      if (dx <= rider.reach * I.square) {
+      const dx = bee.x - rider.x * I.square;
+      if (rider.kind === "gator") {
+        // The whole animal, either end of it.
+        if (Math.abs(dx) <= rider.reach * I.square) {
+          return rider;
+        }
+        continue;
+      }
+      // A frog only catches what is in front of it: the tongue comes out of
+      // its face, and every one of them faces the way its stream runs. Behind
+      // one is the safest square on the board, and being able to ride along
+      // just behind a frog is worth knowing — it is the one thing here that
+      // rewards watching rather than waiting.
+      const ahead = dx * Math.sign(rider.speed);
+      if (
+        ahead >= -I.behindSlack * I.square &&
+        ahead <= rider.reach * I.square
+      ) {
         return rider;
       }
     }
@@ -421,7 +446,7 @@ export class IslandsLevel implements Level {
 
   /** The next baby leaves its pedestal and tucks in behind her. */
   private collect(ctx: GameContext): void {
-    const baby = this.babies[this.delivered];
+    const baby = this.babies[I.babyOrder[this.delivered]];
     if (!baby || baby.state !== "waiting") {
       return;
     }
