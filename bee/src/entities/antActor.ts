@@ -88,7 +88,12 @@ export class AntActor {
     return cargo;
   }
 
-  update(dt: number): void {
+  /**
+   * @param pace how fast it runs compared to normal — see ANT_HUNT.antTire.
+   *   The island slows its ants down the longer the queen has been on it, so
+   *   the last one is catchable by anybody.
+   */
+  update(dt: number, pace = 1): void {
     this.stateTime += dt;
     switch (this.state) {
       case "wandering":
@@ -96,10 +101,10 @@ export class AntActor {
         if (this.wanderLeft <= 0) {
           this.pickTarget();
         }
-        this.runTowards(this.target, A.antSpeed, dt);
+        this.runTowards(this.target, A.antSpeed * pace, dt);
         break;
       case "fleeing":
-        this.runTowards(this.island.hill, A.antFleeSpeed, dt);
+        this.runTowards(this.island.hill, A.antFleeSpeed * pace, dt);
         if (
           tmp.copy(this.group.position).sub(this.island.hill).setY(0).length() <
           A.antHomeRadius
@@ -123,8 +128,9 @@ export class AntActor {
         return;
     }
 
-    // Legs and body bob with the running, at a rate that follows the speed.
-    this.walk += dt * (this.state === "fleeing" ? 26 : 18);
+    // Legs and body bob with the running, at a rate that follows the speed —
+    // including a tiring one, or a slowed ant scurries on the spot.
+    this.walk += dt * pace * (this.state === "fleeing" ? 26 : 18);
     this.body.position.y = Math.abs(Math.sin(this.walk)) * 0.12;
     this.body.rotation.z = Math.sin(this.walk * 0.5) * 0.08;
     this.group.rotation.y = this.heading;

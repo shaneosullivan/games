@@ -1865,6 +1865,25 @@ export const ANT_HUNT = {
    * missed rather than something spare.
    */
   antsPerIsland: 8,
+  /**
+   * How the ants tire.
+   *
+   * The last ant on an island is the hard one: with every other ant emptied
+   * there is nothing to switch to, and a child who chases rather than leads
+   * can end up following one around for minutes. So the island itself gives
+   * way — the longer she has been on it, the slower the ants run.
+   *
+   * Nothing at all for the first minute, because a minute is about how long a
+   * good hunt takes and help arriving before you needed it would take the
+   * hunt away. From there it eases down to `floor` by the three-minute mark
+   * and stays there, which is slow enough to be run down by flying straight
+   * at one.
+   */
+  antTire: {
+    from: 60,
+    to: 180,
+    floor: 0.4,
+  },
   antLength: 2.4,
   antSpeed: 7.2,
   antTurn: 3.2,

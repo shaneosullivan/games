@@ -75,6 +75,8 @@ export class AntHuntLevel implements Level {
   private island = 0;
   /** Cargo in the net right now, which is also what the counter shows. */
   private collected = 0;
+  /** How long she has been working this island, which is what tires its ants. */
+  private islandTime = 0;
 
   private readonly ants: Array<AntActor> = [];
   private antGeometry!: THREE.BufferGeometry;
@@ -117,6 +119,7 @@ export class AntHuntLevel implements Level {
     this.inFlight.length = 0;
     this.island = 0;
     this.collected = 0;
+    this.islandTime = 0;
     this.phase = "opening";
     this.phaseTime = 0;
     this.complete = false;
@@ -238,8 +241,10 @@ export class AntHuntLevel implements Level {
     // keep moving whatever the level is otherwise doing.
     this.world.update(dt);
     this.water.update(dt);
+    this.islandTime += dt;
+    const pace = this.antPace();
     for (const ant of this.ants) {
-      ant.update(dt);
+      ant.update(dt, pace);
     }
     this.updateNet(dt, ctx);
     this.updateInFlight(dt);
@@ -300,6 +305,22 @@ export class AntHuntLevel implements Level {
       this.phase = "hunting";
       this.phaseTime = 0;
     }
+  }
+
+  /**
+   * How fast this island's ants are running just now.
+   *
+   * Full pace for the first minute and then easing down to a floor by three,
+   * so the last ant on an island is always eventually catchable. See
+   * ANT_HUNT.antTire.
+   */
+  private antPace(): number {
+    const {from, to, floor} = A.antTire;
+    if (this.islandTime <= from) {
+      return 1;
+    }
+    const t = Math.min(1, (this.islandTime - from) / (to - from));
+    return 1 - (1 - floor) * t;
   }
 
   // ---- the hunt -----------------------------------------------------------
@@ -369,6 +390,7 @@ export class AntHuntLevel implements Level {
     }
     this.island = here;
     this.collected = 0;
+    this.islandTime = 0;
     this.phase = "hunting";
     this.phaseTime = 0;
     ctx.hud.setCount("cargo", 0, A.antsPerIsland);
