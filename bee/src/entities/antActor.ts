@@ -114,10 +114,12 @@ export class AntActor {
         }
         break;
       case "entering": {
-        // Down the hole rather than out like a light.
+        // Up the side and down the hole, rather than out like a light. The
+        // hole is in the top of the mound, so an ant that shrank where it
+        // stood vanished at the foot of the hill instead of going into it.
         const t = Math.min(1, this.stateTime / A.antEnterTime);
-        this.group.scale.setScalar(Math.max(0.001, 1 - t));
-        this.group.position.y = -t * A.hillHeight * 0.5;
+        this.group.position.lerp(this.island.hill, Math.min(1, t * 1.6));
+        this.group.scale.setScalar(Math.max(0.001, 1 - t * t));
         if (t >= 1) {
           this.state = "gone";
           this.group.visible = false;

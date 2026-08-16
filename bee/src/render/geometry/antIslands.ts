@@ -110,23 +110,45 @@ export function createAntIslands(rng: Rng): AntIslands {
       0,
       centre.z + Math.sin(angle) * A.islandRadius * 0.42,
     );
-    const mound = new THREE.ConeGeometry(A.hillRadius, A.hillHeight, 14);
+    /*
+     * A mound with its top taken off, and the hole set into that.
+     *
+     * It was a plain cone with a collar and a dark funnel stacked on top, and
+     * the collar was far wider than the cone was at that height — so the hole
+     * floated in the air above the peak instead of being a way into the hill.
+     * Flattening the top to exactly the collar's width is what makes the two
+     * meet: everything below is the mound, everything above it is the rim, and
+     * the funnel drops away inside.
+     */
+    /*
+     * A low mound with its top taken off, and the hole laid into that top.
+     *
+     * Everything here is flat and faces up, which is the whole trick. The
+     * first version had a funnel sunk into the mound and it could not be seen
+     * at all — looking into a cone means looking at its inside, and back faces
+     * are culled. The second made the opening nearly as wide as the top, which
+     * read as a dark lid on the hill rather than a way into it. This is a
+     * brown collar with a black opening inside it, in the proportions of a
+     * real ant hill: mostly earth, with a small dark mouth.
+     */
+    const topRadius = A.hillRadius * 0.62;
+    const mound = new THREE.CylinderGeometry(
+      topRadius,
+      A.hillRadius,
+      A.hillHeight,
+      16,
+    );
     mound.translate(hill.x, A.hillHeight / 2, hill.z);
     still.push(paint(mound, P.hill));
-    // A darker collar, and then the hole itself: a short cone pointing down
-    // into the mound, which from any angle a child plays at reads as a way in.
-    const collar = new THREE.CylinderGeometry(
-      A.hillRadius * 0.34,
-      A.hillRadius * 0.44,
-      0.4,
-      12,
-    );
-    collar.translate(hill.x, A.hillHeight - 0.2, hill.z);
+    const collar = new THREE.RingGeometry(topRadius * 0.55, topRadius, 16);
+    collar.rotateX(-Math.PI / 2);
+    collar.translate(hill.x, A.hillHeight + 0.02, hill.z);
     still.push(paint(collar, P.hillDark));
-    const hole = new THREE.ConeGeometry(A.hillRadius * 0.3, 1.2, 12);
-    hole.translate(hill.x, A.hillHeight - 0.75, hill.z);
+    const hole = new THREE.CircleGeometry(topRadius * 0.56, 16);
+    hole.rotateX(-Math.PI / 2);
+    hole.translate(hill.x, A.hillHeight + 0.03, hill.z);
     still.push(paint(hole, P.hillHole));
-    hill.y = A.hillHeight - 0.4;
+    hill.y = A.hillHeight;
     islands.push({centre, hill});
 
     // Tufts and stones, kept off the middle where the ants run.

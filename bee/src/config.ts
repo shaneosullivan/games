@@ -1896,7 +1896,9 @@ export const ANT_HUNT = {
   /** It shrinks into the hole rather than blinking out. */
   antEnterTime: 0.45,
   hillRadius: 3.4,
-  hillHeight: 1.9,
+  /** Low and wide: the hole is in the top, and the camera looks along the
+      ground rather than down at it, so a tall mound hides its own opening. */
+  hillHeight: 1.5,
 
   /** The cargo is carried on the ant's back, and rides above it. */
   cargoLift: 1,
@@ -1952,9 +1954,12 @@ export const ANT_PALETTE = {
   sand: 0xe8d9a6,
   cliff: 0x9a8b6a,
   rock: 0x9a9384,
-  hill: 0x8a6a3f,
-  hillDark: 0x6b5130,
-  hillHole: 0x2a1f12,
+  /* Light enough that the hole in the top of it reads as a hole. The first
+     draft was a dark earth with a darker rim and a black funnel, and from the
+     air the whole mound was one brown shape with nothing in it. */
+  hill: 0xb08750,
+  hillDark: 0x8a6a3f,
+  hillHole: 0x241a0f,
   plank: 0xb98b4e,
   plankDark: 0x8a6636,
   rope: 0xd8c79a,
