@@ -15,6 +15,16 @@ export default defineConfig({
   // the bundle. The parts of it worth having are set by hand underneath.
   plugins: [viteSingleFile({useRecommendedBuildConfig: false})],
 
+  /**
+   * The two glTF files in level 7.
+   *
+   * Vite's built-in asset list covers images, fonts and media but not models,
+   * so without this it hands a .glb to the JS parser and the build dies on
+   * "invalid JS syntax". They then follow exactly the same path as the jpgs:
+   * never inlined, content-hashed, written beside index.html.
+   */
+  assetsInclude: ["**/*.glb"],
+
   // host: true binds 0.0.0.0 so the iPad on the same Wi-Fi can reach it.
   server: {
     host: true,

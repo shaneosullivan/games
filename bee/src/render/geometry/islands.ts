@@ -3,6 +3,7 @@ import {mergeGeometries} from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import {ISLANDS as I, ISLANDS_PALETTE as P} from "../../config";
 import type {Rng} from "../../core/rng";
 import {paint, vertexToon} from "../materials";
+import {loadIslandModels} from "./islandModels";
 
 /** One thing riding one stream. */
 export interface Rider {
@@ -17,6 +18,7 @@ export interface Rider {
       gator. Kept here so the level's hit test doesn't have to know which is
       which. */
   reach: number;
+  /** What is moved along the stream: a container, not the model itself. */
   mesh: THREE.Object3D;
 }
 
@@ -202,6 +204,9 @@ export function createIslandsScene(rng: Rng): IslandsScene {
 
   // ---- the riders ---------------------------------------------------------
   const lilyGeo = frogOnLily();
+  const padGeo = lilyPad();
+  /** Each rider, with the hand-built shape the model file will replace. */
+  const swapped: Array<{rider: Rider; drawn: THREE.Object3D}> = [];
   const gatorGeo = gator();
   const mat = vertexToon();
   const riders: Array<Rider> = [];
@@ -215,9 +220,15 @@ export function createIslandsScene(rng: Rng): IslandsScene {
     const start = rng.range(0, spacing);
     for (let n = 0; n < settings.riders; n++) {
       const isGator = n < settings.gators;
-      const mesh = new THREE.Mesh(isGator ? gatorGeo : lilyGeo, mat);
-      mesh.castShadow = true;
-      // Facing the way it travels. The models are built pointing along +x.
+      // A container that is moved along the stream, with the shape inside it.
+      // The shape is hand-built to begin with and is replaced by the model
+      // file when that arrives — the level is built in one synchronous call
+      // and cannot wait for a download, so this is what it puts up meanwhile.
+      const mesh = new THREE.Group();
+      const drawn = new THREE.Mesh(isGator ? gatorGeo : lilyGeo, mat);
+      drawn.castShadow = true;
+      mesh.add(drawn);
+      // Facing the way it travels. Everything here is built pointing along +x.
       mesh.rotation.y = dir > 0 ? 0 : Math.PI;
       group.add(mesh);
       riders.push({
@@ -228,20 +239,78 @@ export function createIslandsScene(rng: Rng): IslandsScene {
         reach: isGator ? I.gatorHalf + I.beeHalf : I.strikeSquares,
         mesh,
       });
+      swapped.push({rider: riders[riders.length - 1], drawn});
     }
   }
+
+  // ---- the model files ----------------------------------------------------
+  //
+  // When they land, every rider trades its hand-built shape for one. A frog
+  // keeps its lilypad — that is still ours, and a frog that could drift off
+  // its pad would be a bug rather than a feature.
+  let alive = true;
+  /** Geometry this scene built rather than loaded, and so has to dispose. */
+  const built: Array<THREE.BufferGeometry> = [];
+  /**
+   * Where a frog's mouth is, in its own frame. Zero until the models land,
+   * which is also when it starts being asked for — the hand-built frog's mouth
+   * is close enough to the model's that the fallback below covers the gap.
+   */
+  const mouth = new THREE.Vector3();
+  void loadIslandModels()
+    .then(models => {
+      // The level may have been left while the files were still coming down.
+      if (!alive) {
+        return;
+      }
+      // One geometry per kind, the frog's with its lilypad merged into it:
+      // the pad never moves relative to the frog, so keeping them apart would
+      // only cost a second draw call per rider.
+      const pad = padGeo.clone().translate(0, -I.frogModel.sit, 0);
+      // The pad is built from primitives and still carries their uvs; the
+      // model's were dropped when it was baked. `mergeGeometries` answers a
+      // mismatch with null rather than an error, and the pads simply vanish.
+      pad.deleteAttribute("uv");
+      const frogGeo =
+        mergeGeometries([models.frog.clone(), pad], false) ?? models.frog;
+      pad.dispose();
+      built.push(frogGeo);
+      mouth.copy(models.mouth);
+      for (const {rider, drawn} of swapped) {
+        rider.mesh.remove(drawn);
+        const mesh = new THREE.Mesh(
+          rider.kind === "gator" ? models.croc : frogGeo,
+          mat,
+        );
+        mesh.castShadow = true;
+        mesh.position.y = rider.kind === "gator" ? 0 : I.frogModel.sit;
+        rider.mesh.add(mesh);
+      }
+    })
+    .catch(() => {
+      // The hand-built frogs and gators are already on screen and will do.
+    });
 
   // ---- the tongue ---------------------------------------------------------
   //
   // One of them, moved to whichever frog is using it. It is built along +x
   // from the origin and one unit long, so pointing it is a lookAt and a
   // scale — the only thing in the level that isn't on the grid.
-  const tongueGeo = new THREE.CylinderGeometry(0.13, 0.16, 1, 5);
+  const tongueGeo = new THREE.CylinderGeometry(0.24, 0.3, 1, 6);
   tongueGeo.rotateZ(-Math.PI / 2);
   tongueGeo.translate(0.5, 0, 0);
   const tongue = new THREE.Mesh(paint(tongueGeo, P.tongue), vertexToon());
   tongue.visible = false;
   group.add(tongue);
+  // The end of it, which is what makes it read as a tongue rather than a
+  // stick. Its own mesh, because the tongue is stretched along one axis and
+  // anything merged into it would be stretched with it.
+  const tip = new THREE.Mesh(
+    paint(new THREE.SphereGeometry(0.42, 8, 6), P.tongue),
+    vertexToon(),
+  );
+  tip.visible = false;
+  group.add(tip);
 
   const riderPos = (r: Rider, out: THREE.Vector3): THREE.Vector3 =>
     out.set(r.x * sq, r.kind === "gator" ? 0.35 : 0.5, rowZ(r.lane));
@@ -257,21 +326,39 @@ export function createIslandsScene(rng: Rng): IslandsScene {
 
     strike(rider, at, extent) {
       riderPos(rider, tmp);
-      // From the frog's mouth rather than its middle, which is half a body
-      // forward of where it sits.
-      tmp.x += Math.sign(rider.speed) * sq * 0.3;
-      tmp.y = 0.75;
+      // Out of the frog's face. `mouth` is measured off the model itself and
+      // is in the frog's own frame, so which way it faces decides which way
+      // the tongue leaves it; until the model lands, half a body forward and
+      // a little up is close enough for the shape that is standing in.
+      const forward = mouth.lengthSq() > 0 ? mouth.x : sq * 0.3;
+      tmp.x += Math.sign(rider.speed) * forward;
+      // `tmp.y` is the height the rider itself rides at; the mouth is that far
+      // up the frog again.
+      tmp.y += mouth.lengthSq() > 0 ? mouth.y + I.frogModel.sit : 0.25;
       tongue.position.copy(tmp);
       tongue.visible = true;
       const reach = tmp.distanceTo(at) * extent;
       tongue.lookAt(at);
       // `lookAt` points -z at the target; the model runs along +x.
       tongue.rotateY(Math.PI / 2);
-      tongue.scale.set(reach, 1, 1);
+      // Thinner the further it goes, like something flicked out.
+      tongue.scale.set(reach, 1 - extent * 0.3, 1 - extent * 0.3);
+      // The tip travels along it, so the tongue arrives at the bee rather than
+      // appearing already there.
+      tip.visible = true;
+      tip.position.lerpVectors(tmp, at, extent);
+      tip.scale.setScalar(0.7 + extent * 0.5);
+
+      // And the frog goes with it. Seen from directly overhead the tongue ends
+      // up underneath the bee's own body, so without this the strike is a
+      // thing you are told about rather than a thing you watch: the lunge is
+      // what actually reads at this camera angle.
+      rider.mesh.position.x += Math.sign(rider.speed) * extent * sq * 0.3;
     },
 
     hideTongue() {
       tongue.visible = false;
+      tip.visible = false;
     },
 
     update(dt) {
@@ -302,10 +389,18 @@ export function createIslandsScene(rng: Rng): IslandsScene {
     },
 
     dispose() {
+      // Anything still downloading is no longer wanted.
+      alive = false;
+      for (const geo of built) {
+        geo.dispose();
+      }
       board.geometry.dispose();
       lilyGeo.dispose();
+      padGeo.dispose();
       gatorGeo.dispose();
       tongue.geometry.dispose();
+      tip.geometry.dispose();
+      (tip.material as THREE.Material).dispose();
       foamGeo.dispose();
       foam.dispose();
       mat.dispose();
@@ -337,16 +432,7 @@ function wrap(x: number): number {
  * which is the direction its stream runs.
  */
 function frogOnLily(): THREE.BufferGeometry {
-  const sq = I.square;
-  const parts: Array<THREE.BufferGeometry> = [];
-
-  const pad = new THREE.CylinderGeometry(sq * 0.42, sq * 0.42, 0.18, 14);
-  parts.push(paint(pad, P.lily));
-  // The notch every lilypad has, cut as a wedge sitting proud of the pad so it
-  // reads from above without a second material.
-  const notch = new THREE.CylinderGeometry(sq * 0.13, sq * 0.13, 0.2, 8);
-  notch.translate(-sq * 0.33, 0.01, 0);
-  parts.push(paint(notch, P.lilyDark));
+  const parts: Array<THREE.BufferGeometry> = [lilyPad()];
 
   const body = new THREE.SphereGeometry(0.62, 10, 8);
   body.scale(1.25, 0.85, 1);
@@ -384,6 +470,28 @@ function frogOnLily(): THREE.BufferGeometry {
   for (const geo of parts) {
     geo.dispose();
   }
+  return merged ?? new THREE.BufferGeometry();
+}
+
+/**
+ * The lilypad on its own.
+ *
+ * The pad is ours whichever frog is sitting on it: the bought model is a frog
+ * and nothing else, and a frog without a pad would be swimming.
+ */
+function lilyPad(): THREE.BufferGeometry {
+  const sq = I.square;
+  const pad = paint(
+    new THREE.CylinderGeometry(sq * 0.42, sq * 0.42, 0.18, 14),
+    P.lily,
+  );
+  // The notch every lilypad has, sitting slightly proud of the pad so it reads
+  // from above without needing a second material.
+  const notch = new THREE.CylinderGeometry(sq * 0.13, sq * 0.13, 0.2, 8);
+  notch.translate(-sq * 0.33, 0.01, 0);
+  const merged = mergeGeometries([pad, paint(notch, P.lilyDark)], false);
+  pad.dispose();
+  notch.dispose();
   return merged ?? new THREE.BufferGeometry();
 }
 

@@ -222,6 +222,31 @@ which is where it stays — this is a game about a gap four squares away
 arriving in three seconds, and a shot that only showed the row she was on
 would hide the whole decision.
 
+**The frogs and the crocodiles are the only model files in the game.**
+`src/assets/islands/frog1.glb` and `croc1.glb` — everything else in the repo is
+generated in code, and what earns these the exception is that they are what you
+look at most in this level: hand-built lozenges are fine for water and banks and
+not for the animals trying to eat you.
+
+Both are put into the level's terms on load, by `render/geometry/islandModels.ts`
+rather than by hand: measured, scaled so the longest axis is the length the
+level wants, stood on the ground, centred, and turned to face +x like every
+hand-built rider. The facing is measured too — the centroid of the frog's mouth
+material and of the white of the crocodile's teeth says where each one's head
+is. Guessing put the crocodiles broadside across the lanes, and then backwards.
+
+They also get baked: four flat-coloured primitives each, merged into one
+geometry with the colours in the vertices, because as loaded they cost five draw
+calls per rider — 159 for a board of them, on a game meant for an iPad. One
+each brings it to 67. The frog's lilypad is merged in as well, and note that the
+pad has to have its `uv` deleted first or `mergeGeometries` returns null and the
+pads silently vanish.
+
+The frog arrived rigged, with an armature and four animation clips it has no use
+for. Those were stripped out of the file, which halved it — 587 kB to 270 kB, 44
+nodes to 2 — and the tongue is drawn by the level instead, out of the mouth the
+model was measured for.
+
 **It is an errand, not a crossing.** Three babies wait on pedestals at the near
 bank, and she takes them over one at a time: one follows her out, dances on
 arrival and goes to wait on a pedestal at the far end, and she then has to make
@@ -311,7 +336,7 @@ src/
 
 Things worth knowing before changing anything:
 
-- **All 3D assets are generated in code.** No .glb files, no rigs, no textures.
+- **Almost all 3D assets are generated in code.** No .glb files, no rigs, no textures.
   A bee is merged primitives with vertex colours; flowers are lathed petal
   rings. Look in `src/render/geometry/`. Every prop is merged into a single
   vertex-coloured mesh so the whole meadow is ~27 draw calls.

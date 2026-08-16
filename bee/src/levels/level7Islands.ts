@@ -638,8 +638,10 @@ export class IslandsLevel implements Level {
     if (!this.striker) {
       return;
     }
-    // The tongue goes out, catches her, and holds while it reads.
-    const out = Math.min(1, this.phaseTime / I.strikeReach);
+    // The tongue goes out, catches her, and holds while it reads. Eased hard
+    // out of the frog: a tongue is flicked, not extended.
+    const t = Math.min(1, this.phaseTime / I.strikeReach);
+    const out = 1 - (1 - t) * (1 - t) * (1 - t);
     this.scene.strike(this.striker, ctx.bee.position, out);
     if (this.phaseTime >= I.strikeReach + I.strikeHold) {
       this.scene.hideTongue();

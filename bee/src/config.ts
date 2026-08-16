@@ -1716,6 +1716,44 @@ export const ISLANDS = {
   danceSpins: 2,
   danceBob: 1.1,
 
+  /**
+   * The two model files, in the level's terms.
+   *
+   * `yaw` turns each one to face +x, which is the way every hand-built rider in
+   * the level is drawn and the way its stream runs. Both are measured rather
+   * than guessed — a model arrives facing whatever its author chose, and the
+   * way to settle it is to ask where the head is: the centroid of the frog's
+   * eye and mouth material, and of the white of the crocodile's teeth. Guessing
+   * put the crocodiles broadside across the lanes.
+   */
+  /**
+   * How much to lift the model files' own colours, 0 to 1.
+   *
+   * Both were authored dark — a frog of 0.22, 0.4, 0.12 and a crocodile
+   * barely lighter — which reads as almost black against this water when seen
+   * from as far up as the camera sits. This raises the lightness without
+   * touching the hue, so they stay the green their authors chose. Near-black
+   * is left alone: that is eyes and pupils, and a lifted eye is a grey smudge.
+   */
+  modelLift: 0.42,
+  frogModel: {
+    /** Nose to tail. A little under a square, so it sits on its lilypad. */
+    length: 3.1,
+    /** How high on the pad it sits — the pad is 0.18 thick, drawn about zero. */
+    sit: 0.09,
+    yaw: Math.PI / 2,
+    /** Idle plays from a different point per frog, or they breathe in step. */
+    idleStagger: 1.7,
+  },
+  /**
+   * Half a turn: this one was drawn lying along the travel axis already, but
+   * facing the wrong way down it. Measured the same way as the frog's, by
+   * asking where the white of its teeth sits relative to the middle of it —
+   * at a quarter turn it swam broadside across the lanes, and at none it swam
+   * backwards.
+   */
+  crocModel: {yaw: Math.PI},
+
   /** Bursts when she reaches the far bank. */
   winBursts: 7,
   winBurstEvery: 0.22,
