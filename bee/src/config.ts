@@ -1893,6 +1893,15 @@ export const ANT_HUNT = {
   antFleeSpeed: 10.5,
   /** How close to the hill's mouth counts as home. */
   antHomeRadius: 1.6,
+  /**
+   * How far clear of the hill a *loaded* ant stays, on top of its radius.
+   *
+   * The mound is solid to an ant that still has its cargo — one that walked
+   * through the hill it lives in looked like a bug, and worse, made the hill
+   * a place to hide rather than the place they run to. An ant that has been
+   * robbed ignores this: it is going in.
+   */
+  antHillClearance: 0.8,
   /** It shrinks into the hole rather than blinking out. */
   antEnterTime: 0.45,
   hillRadius: 3.4,

@@ -145,15 +145,30 @@ export class AntActor {
     }
   }
 
-  /** Somewhere else on this island to be. */
+  /**
+   * Somewhere else on this island to be, and not inside the hill.
+   *
+   * A few tries rather than a solve: the hill covers a small part of the
+   * island, so a point outside it turns up almost at once, and taking the last
+   * try regardless keeps this from ever spinning. Anything that does end up
+   * inside is pushed back out by `runTowards`.
+   */
   private pickTarget(): void {
-    const angle = this.rng.range(0, Math.PI * 2);
-    const radius = A.islandRadius * Math.sqrt(this.rng.range(0.05, 0.82));
-    this.target.set(
-      this.island.centre.x + Math.cos(angle) * radius,
-      0,
-      this.island.centre.z + Math.sin(angle) * radius,
-    );
+    const keepOut = A.hillRadius + A.antHillClearance;
+    for (let attempt = 0; attempt < 6; attempt++) {
+      const angle = this.rng.range(0, Math.PI * 2);
+      const radius = A.islandRadius * Math.sqrt(this.rng.range(0.05, 0.82));
+      this.target.set(
+        this.island.centre.x + Math.cos(angle) * radius,
+        0,
+        this.island.centre.z + Math.sin(angle) * radius,
+      );
+      if (
+        tmp.copy(this.target).sub(this.island.hill).setY(0).length() > keepOut
+      ) {
+        break;
+      }
+    }
     this.wanderLeft = this.rng.range(A.antWander[0], A.antWander[1]);
   }
 
@@ -174,6 +189,28 @@ export class AntActor {
     }
     this.group.position.x += Math.sin(this.heading) * speed * dt;
     this.group.position.z += Math.cos(this.heading) * speed * dt;
+
+    /*
+     * The hill is solid until it has been robbed.
+     *
+     * A loaded ant walking through the mound reads as a bug, and makes the
+     * hill somewhere to hide inside rather than the place they run to when
+     * they lose their cargo. One that is fleeing or going in ignores this
+     * entirely — that is the whole point of it.
+     */
+    if (this.state === "wandering") {
+      tmp.copy(this.group.position).sub(this.island.hill).setY(0);
+      const fromHill = tmp.length();
+      const keepOut = A.hillRadius + A.antHillClearance;
+      if (fromHill < keepOut && fromHill > 1e-4) {
+        this.group.position.x =
+          this.island.hill.x + (tmp.x / fromHill) * keepOut;
+        this.group.position.z =
+          this.island.hill.z + (tmp.z / fromHill) * keepOut;
+        // Walked into it: go somewhere else rather than scrape round it.
+        this.pickTarget();
+      }
+    }
 
     // It stays on its island even while running for the hill.
     tmp.copy(this.group.position).sub(this.island.centre).setY(0);
