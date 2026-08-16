@@ -135,6 +135,20 @@ export class HoldInput {
   }
 }
 
+/**
+ * How to tell this player to flap, in their own terms.
+ *
+ * A child on an iPad is told to tap and someone at a laptop is told about the
+ * space bar; being told about the wrong one is worse than being told nothing.
+ * `pointer: coarse` is the question that actually matters — a laptop with a
+ * touchscreen still has a keyboard in front of it and a mouse under the hand.
+ */
+export function flapInstruction(): string {
+  const touch =
+    typeof matchMedia === "function" && matchMedia("(pointer: coarse)").matches;
+  return touch ? "Tap the screen to fly up!" : "Press the space bar to fly up!";
+}
+
 const HOLD_KEYS = new Set([
   " ",
   // What older browsers call the same two keys.

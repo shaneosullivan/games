@@ -271,6 +271,24 @@ export function createLairScene(rng: Rng): LairScene {
     /** Is this gate itself the bottom half of a stair? */
     const wasStair = stairing;
 
+    /**
+     * Is this one a pillar — a tall spike from the floor and nothing above it?
+     *
+     * The way through every other gate is somewhere in the middle of the cave.
+     * This one puts it hard against the roof and gives her a long climb to get
+     * there, which is the one thing the rest of the run never asks for.
+     *
+     * Not on a stair, whose two gates are already doing something particular,
+     * and not near the mouth.
+     */
+    const pillar =
+      !wasStair &&
+      !startsStair &&
+      progress > LAIR.pillarsFrom &&
+      rng.next() < LAIR.pillarChanceEnd * progress;
+    /** Where the way through was before this gate moved it. */
+    const cameFrom = centre;
+
     // Where the opening can sit without pinching against floor or roof.
     const lo = floorY + LAIR.gapMargin + gap / 2;
     const hi = ceilingY - LAIR.gapMargin - gap / 2;
@@ -300,6 +318,24 @@ export function createLairScene(rng: Rng): LairScene {
       swing = -swing;
       centre += swing * rng.range(reach * 0.65, reach) * room;
     }
+
+    if (pillar) {
+      // Room to climb in, then the way through hard against the roof.
+      //
+      // The extra distance is the point. Flat out she rises at about half her
+      // flap speed, so a gate at the ceiling right behind a low one is a wall
+      // rather than a climb; given half again the usual run at it, the top of
+      // the cave is somewhere she can actually get to. The clamp is the
+      // safety net — it only bites if she was very low indeed.
+      x += spacing * (LAIR.pillarRunUp - 1);
+      const climbTime = (spacing * LAIR.pillarRunUp) / LAIR.speed;
+      const reachable =
+        cameFrom + (LAIR.flapSpeed / 2) * climbTime * LAIR.pillarClimbShare;
+      centre = Math.min(hi, Math.max(centre, reachable));
+      // Coming down from up there is the next gate's business, and it will:
+      // the alternation always turns the other way.
+      swing = 1;
+    }
     if (startsStair) {
       // Leave room to drop into. Nothing else about a stair is special: it is
       // an ordinary gate with an ordinary opening, and the one after it is an
@@ -321,8 +357,14 @@ export function createLairScene(rng: Rng): LairScene {
     // you know what it is varying from. Both halves of a stair are pairs, so
     // that what you are flying down through is plainly two offset gates.
     const roll = rng.next();
-    let shape =
-      wasStair || startsStair || i < LAIR.pairsToStart || roll < LAIR.pairChance
+    let shape = pillar
+      ? // Floor only: what makes a pillar is the open roof above it. A pair
+        // here would be a gate near the ceiling with a lid on it.
+        "floor"
+      : wasStair ||
+          startsStair ||
+          i < LAIR.pairsToStart ||
+          roll < LAIR.pairChance
         ? "pair"
         : roll < LAIR.pairChance + (1 - LAIR.pairChance) / 2
           ? "floor"
@@ -336,13 +378,17 @@ export function createLairScene(rng: Rng): LairScene {
 
     /** A spike or a rock, chosen per obstacle so a pair can be one of each. */
     const pick = (): {kind: LairObstacle["kind"]; halfWidth: number} =>
-      // Slim ones through a stair: they stand close together and a pair of
-      // wide rocks a stair's length apart reads as one lump of cave.
-      wasStair || startsStair
-        ? {kind: "spike", halfWidth: LAIR.stairSpikeHalfWidth}
-        : rng.next() < 0.5
-          ? {kind: "spike", halfWidth: LAIR.spikeHalfWidth}
-          : {kind: "rock", halfWidth: LAIR.rockHalfWidth};
+      // A pillar is a stalagmite: a dome stretched to twenty units reads as a
+      // wall, and the point of this one is that it is a tall pointed thing.
+      pillar
+        ? {kind: "spike", halfWidth: LAIR.spikeHalfWidth}
+        : // Slim ones through a stair: they stand close together and a pair of
+          // wide rocks a stair's length apart reads as one lump of cave.
+          wasStair || startsStair
+          ? {kind: "spike", halfWidth: LAIR.stairSpikeHalfWidth}
+          : rng.next() < 0.5
+            ? {kind: "spike", halfWidth: LAIR.spikeHalfWidth}
+            : {kind: "rock", halfWidth: LAIR.rockHalfWidth};
 
     const obstacles: Array<LairObstacle> = [];
     let gapBottom = floorY;

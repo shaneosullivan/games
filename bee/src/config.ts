@@ -777,6 +777,25 @@ export const LAIR = {
    * compulsory either way — just a fairer one to read at speed.
    */
   stairSpikeHalfWidth: 1.6,
+  /**
+   * Pillars: a tall stalagmite from the floor with nothing above it, so the
+   * only way past is hard against the roof.
+   *
+   * Every other gate leaves the way through somewhere in the middle of the
+   * cave. This is the one shape that asks for a long climb, which is why it is
+   * worth having and why there are not many of them.
+   *
+   * `pillarClimbShare` is how much of the climb she could actually manage in
+   * the distance available it will ask for — flat out she rises at about half
+   * her flap speed, and a gate that jumps to the roof right after a low one is
+   * a wall rather than a climb.
+   */
+  pillarsFrom: 0.2,
+  pillarChanceEnd: 0.55,
+  pillarClimbShare: 0.75,
+  /** How much more run-up than usual a pillar gets, to climb in. */
+  pillarRunUp: 1.5,
+
   /** How often a stair starts. Nothing at the mouth, ramping to this. */
   stairChanceEnd: 0.6,
   /** How far in before the first one can appear, as a fraction of the run. */

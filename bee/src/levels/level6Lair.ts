@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import * as THREETypes from "three";
 import {CAMERA, DOME, LAIR, LAIR_PALETTE} from "../config";
+import {flapInstruction} from "../core/holdInput";
 import {Rng} from "../core/rng";
 import {FIREWORK_PALETTE} from "../fx/particles";
 import {
@@ -175,7 +176,10 @@ export class LairLevel implements Level {
         target: this.scene.gates.length,
       },
     ]);
-    ctx.hud.setObjective("Into the cave…");
+    // How to play, in the words that suit whatever they are holding — they
+    // have a couple of seconds out here before anything happens, which is the
+    // only quiet moment in the level to read it.
+    ctx.hud.setObjective(flapInstruction());
     ctx.setObjectiveMarker(null);
   }
 
@@ -328,7 +332,7 @@ export class LairLevel implements Level {
       this.phase = "playing";
       this.phaseTime = 0;
       this.climb = 0;
-      ctx.hud.setObjective("Tap anywhere to flap!");
+      ctx.hud.setObjective(flapInstruction());
     }
   }
 
