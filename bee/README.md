@@ -57,7 +57,8 @@ touchscreen.
 | 6 — Level 4: Caramel Cottage (dance mat, then inside)        | done        |
 | 7 — Level 5: The Windy Woods (maze)                          | done        |
 | 8 — Level 6: The Bear's Lair (side-scroller)                 | done        |
-| 9 — Wall-clock day system                                    | not started |
+| 9 — Level 7: Silent Islands (Frogger)                        | done        |
+| 10 — Wall-clock day system                                   | not started |
 
 ## Levels
 
@@ -208,6 +209,30 @@ start much wider than they end and only narrow over the first ten, and the
 whole cave is generated from a fixed seed, so it is meant to be learned — the
 difficulty curve is getting further each time rather than anything the level
 does to you.
+
+**7 — Silent Islands.** Frogger, with the frogs on the other side of it. Eight
+streams run in alternate directions between two banks, carrying frogs on
+lilypads and alligators, and the bee crosses them a square at a time: share a
+stream with a frog and come within one square and its tongue has you; meet an
+alligator and it doesn't need a tongue. It opens on the ordinary 3D view from
+the near bank and the camera then lifts to look straight down at the board,
+which is where it stays — this is a game about a gap four squares away
+arriving in three seconds, and a shot that only showed the row she was on
+would hide the whole decision.
+
+Nothing here is flown. Four buttons replace the stick: up and down under the
+left thumb, where the pair that is asked for most can be found without
+looking, and left and right under the right. One press is one hop.
+
+The difficulty is a table, in `ISLANDS.lanes`, and it is measured rather than
+guessed. Riders are spread evenly round a loop wider than the board, a frog is
+two squares wide as an obstacle because it reaches one square either side, and
+what is left is the gap you hop into — so the time you get is
+`(wrapSpan / riders - 2) / speed` seconds. No lane leaves less than two of
+them, and the gaps tighten from 8 seconds on the first stream to about 2 on
+the last. Driven by an autopilot that plans, it crosses every time; driven by
+one that only presses forward, it crosses once in twenty-four goes and usually
+drowns on the second or third stream.
 
 **The puzzle art is a placeholder** — a hand-authored SVG in
 `src/assets/bearPuzzle.ts`. To use the real picture, drop the image into

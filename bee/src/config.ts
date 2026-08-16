@@ -1509,3 +1509,155 @@ export const PALETTE = {
   beeHead: 0x3a2b1a,
   wing: 0xeaf7ff,
 } as const;
+
+/**
+ * Level 7 — the Silent Islands.
+ *
+ * A board rather than a place: everything here is counted in squares, and a
+ * square is one hop. The world numbers below are the only ones in world units,
+ * and every other measurement is multiplied up by `square` when it is used, so
+ * making the board bigger or smaller moves the whole level together.
+ *
+ * The stream table is the level's difficulty, and it is written the way it
+ * plays: a stream that runs fast carries fewer riders, because the thing that
+ * kills you is not speed but the size of the gap between one danger and the
+ * next. See the note on `riders` for the arithmetic that keeps every stream
+ * crossable.
+ */
+export const ISLANDS = {
+  /** One hop, in world units. Everything on the board is measured in these. */
+  square: 4.2,
+  /** Columns across. Odd, so there is a middle square to start on. */
+  cols: 11,
+  /** Streams to cross, which is the length of the table below. */
+  streams: 8,
+  /** How high she flies over the water. */
+  flightHeight: 2.6,
+  /**
+   * The bee, sized for a board seen from directly above.
+   *
+   * Bigger than she is anywhere else in the game. The camera is a long way up
+   * and the board is forty units deep, and at her ordinary size she was a
+   * speck among lilypads — this puts her at about one square, which is also
+   * exactly the distance she moves, so what you see is what a hop is worth.
+   */
+  beeScale: 2.1,
+  /** One hop: quick enough to feel like a press, slow enough to read. */
+  hopTime: 0.2,
+  /** How high the hop arcs above her flying height. */
+  hopArc: 1.5,
+
+  /**
+   * How far a frog's tongue reaches, in squares.
+   *
+   * The rule the whole level is built on: share a stream with a frog and come
+   * within one square of it, and it has you. It makes each frog three squares
+   * of danger — its own and one either side — which is what the spacing in the
+   * table below has to leave room between.
+   */
+  strikeSquares: 1,
+  /** Tongue out, then the level says so. */
+  strikeReach: 0.3,
+  strikeHold: 0.45,
+  /** An alligator has no tongue; it has a mouth. Half its length, in squares. */
+  gatorHalf: 0.9,
+  /** Half the bee, in squares, for the alligator's mouth to close on. */
+  beeHalf: 0.22,
+
+  /**
+   * The loop each stream's riders travel round, in squares.
+   *
+   * Wider than the board so a rider leaves one side and is not back on the
+   * other for a while — the gap in the traffic has to be somewhere while it
+   * isn't in front of you.
+   */
+  wrapSpan: 17,
+
+  /**
+   * The streams, near bank first.
+   *
+   * `speed` is squares per second; `riders` is how many things ride it, of
+   * which `gators` are alligators. The three are traded off against each other
+   * on purpose, and the arithmetic is worth keeping straight because it is the
+   * whole difficulty of the level:
+   *
+   *   - riders are spread evenly round `wrapSpan`, so they sit
+   *     `wrapSpan / riders` squares apart;
+   *   - a frog reaches one square either side, so it is two squares wide as an
+   *     obstacle, not one (an alligator is a little less);
+   *   - what is left — `wrapSpan / riders - 2` squares — is the gap you hop
+   *     into, and it goes past at `speed` squares per second.
+   *
+   * So the time you get is `(wrapSpan / riders - 2) / speed` seconds, and no
+   * lane here leaves less than two of them: a hop takes a fifth of a second,
+   * and the rest is a child noticing. The table is measured, not guessed —
+   * a player who plans crosses every time, and one who only presses forward
+   * gets about two lanes in.
+   *
+   * It gets harder across the board rather than all at once: the first stream
+   * is nearly a free go, and the gaps tighten from there.
+   */
+  lanes: [
+    {speed: 0.45, riders: 3, gators: 0},
+    {speed: 0.6, riders: 4, gators: 1},
+    {speed: 1, riders: 3, gators: 1},
+    {speed: 0.7, riders: 5, gators: 1},
+    {speed: 1.25, riders: 3, gators: 1},
+    {speed: 0.8, riders: 4, gators: 1},
+    {speed: 1.6, riders: 3, gators: 1},
+    {speed: 0.95, riders: 4, gators: 2},
+  ],
+
+  /**
+   * The opening shot, before the camera goes up: back, up and to the side.
+   *
+   * Further back than the game's usual over-the-shoulder view, because she is
+   * drawn at more than twice her ordinary size here — sized for the board seen
+   * from overhead, which at the game's normal boom length filled half the
+   * screen with bee.
+   */
+  approachCamera: {back: 22, up: 9, side: 0},
+  /** How long she sits on the bank before the camera lifts. */
+  waitTime: 1.5,
+  /** The lift itself. */
+  riseTime: 2.4,
+  /** Looking down at the board: nearly overhead, but not so straight that the
+      shot loses which way is forward. */
+  boardPitch: 1.28,
+  /** How much of the screen the board fills once the camera is up. */
+  boardFill: 0.94,
+
+  /** Bursts when she reaches the far bank. */
+  winBursts: 7,
+  winBurstEvery: 0.22,
+} as const;
+
+export const ISLANDS_PALETTE = {
+  background: 0x8fd6ef,
+  fog: 0xbde8f4,
+  /** The streams, alternating so one lane reads as separate from the next. */
+  water: 0x4aa3d8,
+  waterAlt: 0x3d91c6,
+  foam: 0xd3eefb,
+  bank: 0x86c96b,
+  bankDark: 0x63ad55,
+  sand: 0xe6d9a8,
+  rock: 0x9a9384,
+  reed: 0x4e9a45,
+  lily: 0x3f8f46,
+  lilyDark: 0x2f7a3b,
+  /* Brighter than its own lilypad, or the frog is a bump on a leaf rather
+     than the thing you are watching. */
+  frog: 0x9ade63,
+  frogDark: 0x4e9a45,
+  frogBelly: 0xdff0b8,
+  eye: 0xfdfdf5,
+  pupil: 0x1d1a12,
+  tongue: 0xe86a8a,
+  /* Light enough to read against the water from directly above: the first
+     draft was a dark green that went to a black sliver at this distance. */
+  gator: 0x7f9c52,
+  gatorDark: 0x5e7a3a,
+  gatorBelly: 0xdde3a4,
+  tooth: 0xfdfdf5,
+} as const;

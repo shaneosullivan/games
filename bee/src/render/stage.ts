@@ -115,6 +115,26 @@ export const LAIR_ENV: EnvironmentSettings = {
   sunOffset: [6, 20, 26],
 };
 
+/**
+ * The Silent Islands: open water under an open sky.
+ *
+ * The brightest environment in the game, on purpose — it is played from
+ * directly above, where fog and gloom would only make the board harder to
+ * read, and the danger is all in what is on the water rather than in the light.
+ */
+export const ISLANDS_ENV: EnvironmentSettings = {
+  background: 0x8fd6ef,
+  fogColor: 0xbde8f4,
+  fogNear: 70,
+  fogFar: 210,
+  hemiSky: 0xffffff,
+  hemiGround: 0x7fb2c9,
+  hemiIntensity: 1.5,
+  sunColor: 0xfff6de,
+  sunIntensity: 1.05,
+  sunOffset: [10, 26, 10],
+};
+
 export interface Stage {
   renderer: THREE.WebGLRenderer;
   scene: THREE.Scene;

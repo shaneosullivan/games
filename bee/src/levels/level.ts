@@ -14,10 +14,11 @@ import type {CottageScene} from "../render/geometry/cottage";
 import type {CottageInside} from "../render/geometry/cottageInside";
 import type {HiveSite} from "../render/geometry/world";
 import type {Hud} from "../ui/hud";
+import type {HopButtons} from "../core/hopButtons";
 
 /** Which set of scenery is on screen. */
 export type EnvironmentName =
-  "meadow" | "hive" | "cottage" | "inside" | "woods" | "lair";
+  "meadow" | "hive" | "cottage" | "inside" | "woods" | "lair" | "islands";
 
 /** Playable volume and camera framing, which differ per level. */
 export interface FlightSettings {
@@ -85,6 +86,17 @@ export interface GameContext {
    * Game, so what the Game keeps is somewhere to put it.
    */
   lair: THREE.Group;
+  /**
+   * The container the Silent Islands is built into — the same arrangement as
+   * `woods` and `lair`: the board belongs to level 7, and what the Game keeps
+   * is somewhere to put it.
+   */
+  islands: THREE.Group;
+  /**
+   * The four hop buttons. Level 7's only control, and the only level that
+   * shows them — every other level is switched out of them by the Game.
+   */
+  hopButtons: HopButtons;
   inside: CottageInside;
   honeyJar: DanglingLoad;
   /** Small pollen motes. */
@@ -231,6 +243,16 @@ export interface Level {
   /** Shown on the level-complete card. */
   readonly completionTitle: string;
   readonly completionBody: string;
+  /**
+   * Shown on the try-again card, for a level you can fail.
+   *
+   * Optional, and the default is the Bear's Lair's — it was the first level
+   * with a fail state and its words were written into the card itself. A level
+   * that can be failed some other way has to say so, or it tells the player
+   * they bumped into a rock in a place that has no rocks.
+   */
+  readonly failTitle?: string;
+  readonly failBody?: string;
   /**
    * True if there is nothing to carry on to. The completion card then offers
    * the menu instead of "Keep flying" — at the end of the last level, leaving

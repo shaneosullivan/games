@@ -1631,3 +1631,79 @@ body {
     transform: translate(-50%, -50%) scale(1.06);
   }
 }
+
+/* ---------- the hop buttons (level 7) ---------- */
+
+/*
+ * Up and down on the left, left and right on the bottom right.
+ *
+ * Both pads clear the --ui-* insets, like everything else anchored to an edge:
+ * that strip is exactly where the maze's turn buttons became untappable on an
+ * iPad. Bigger than the turn buttons, because these are tapped rather than
+ * held, and a tap that misses a held control corrects itself in a moment while
+ * a tap that misses this one costs a hop.
+ */
+.hoppad-root.hidden {
+  display: none;
+}
+
+.hoppad {
+  position: absolute;
+  display: flex;
+  gap: 16px;
+  pointer-events: auto;
+  touch-action: none;
+}
+
+/* Under the left thumb, stacked, because forward is asked for far more often
+   than sideways and should be the pair that needs no looking for. */
+.hoppad-updown {
+  flex-direction: column;
+  left: calc(var(--safe-l) + var(--ui-left) + 22px);
+  bottom: calc(var(--safe-b) + var(--ui-bottom) + 26px);
+}
+
+.hoppad-leftright {
+  right: calc(var(--safe-r) + var(--ui-right) + 22px);
+  bottom: calc(var(--safe-b) + var(--ui-bottom) + 26px);
+}
+
+.hop-btn {
+  width: 88px;
+  height: 88px;
+  border-radius: 50%;
+  border: 2px solid var(--stroke);
+  background: var(--panel-strong);
+  color: #fff;
+  font-size: 34px;
+  line-height: 1;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+  -webkit-tap-highlight-color: transparent;
+  touch-action: none;
+}
+
+/* Pressed is a class rather than :active, because the press is taken on
+   pointerdown and the finger may well have moved off the button by the time
+   the hop is over — the flash has to say "that counted", not "you are still
+   touching this". */
+.hop-btn.pressed,
+.hop-btn:active {
+  transform: scale(0.93);
+  background: rgba(255, 209, 92, 0.55);
+}
+
+@media (max-width: 560px), (max-height: 480px) {
+  .hop-btn {
+    width: 72px;
+    height: 72px;
+    font-size: 28px;
+  }
+
+  .hoppad {
+    gap: 12px;
+  }
+}

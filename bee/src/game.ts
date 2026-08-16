@@ -6,6 +6,7 @@ import {watchInput} from "./core/controlLog";
 import {Joystick, type StickInput} from "./core/input";
 import {ThrottleStick} from "./core/throttleStick";
 import {TurnButtons} from "./core/turnButtons";
+import {HopButtons} from "./core/hopButtons";
 import {HoldInput} from "./core/holdInput";
 import {GameLoop} from "./core/loop";
 import {Rng} from "./core/rng";
@@ -21,6 +22,7 @@ import {WaspLevel} from "./levels/level3Wasp";
 import {CottageLevel} from "./levels/level4Cottage";
 import {MazeLevel} from "./levels/level5Maze";
 import {LairLevel} from "./levels/level6Lair";
+import {IslandsLevel} from "./levels/level7Islands";
 import type {
   EnvironmentName,
   FlightSettings,
@@ -53,6 +55,7 @@ import {
   HIVE_ENV,
   INSIDE_ENV,
   LAIR_ENV,
+  ISLANDS_ENV,
   MEADOW_ENV,
   WOODS_ENV,
   type Stage,
@@ -82,6 +85,8 @@ export class Game {
   private readonly altitude: AltitudeStick;
   /** Swaps in for the altitude slider under tank steering. */
   private readonly turnButtons: TurnButtons;
+  /** Four buttons in two corners — level 7's only control. */
+  private readonly hopButtons: HopButtons;
   /** ...and this for the thumbstick: forward and back, nothing else. */
   private readonly throttle: ThrottleStick;
   /** What the throttle looks like to the flight model. */
@@ -99,6 +104,8 @@ export class Game {
   private readonly woodsGroup = new THREE.Group();
   /** Where level 6 builds its cave. Empty otherwise, like the woods. */
   private readonly lairGroup = new THREE.Group();
+  /** Where level 7 builds its board of streams — same arrangement again. */
+  private readonly islandsGroup = new THREE.Group();
   /** "Tap to flap" — level 6's only control. */
   private readonly hold = new HoldInput();
   private readonly interior: HiveInterior;
@@ -177,6 +184,10 @@ export class Game {
     this.lairGroup.visible = false;
     this.stage.scene.add(this.lairGroup);
 
+    // --- silent islands (level 7) ---
+    this.islandsGroup.visible = false;
+    this.stage.scene.add(this.islandsGroup);
+
     // --- hive interior (level 2) ---
     this.interior = createHiveInterior(rng);
     this.queen.group.position.copy(this.interior.queenPosition);
@@ -217,6 +228,7 @@ export class Game {
     this.stick = new Joystick(uiLayer);
     this.altitude = new AltitudeStick(uiLayer, this.bee.desiredHeight);
     this.turnButtons = new TurnButtons(uiLayer);
+    this.hopButtons = new HopButtons(uiLayer);
     this.throttle = new ThrottleStick(uiLayer);
 
     this.puzzle = createSlidePuzzle(uiLayer, () =>
@@ -296,6 +308,8 @@ export class Game {
       cottage: this.cottage,
       woods: this.woodsGroup,
       lair: this.lairGroup,
+      islands: this.islandsGroup,
+      hopButtons: this.hopButtons,
       inside: this.inside,
       honeyJar: this.honeyJar,
       bringHoney: () => {
@@ -521,12 +535,16 @@ export class Game {
     {number: 4, name: "Caramel Cottage"},
     {number: 5, name: "The Windy Woods"},
     {number: 6, name: "The Bear's Lair"},
+    {number: 7, name: "Silent Islands"},
   ];
 
   private static readonly LAST_LEVEL = Game.LEVELS.length;
 
   private createLevel(n: number): Level {
-    if (n >= 6) {
+    if (n >= 7) {
+      return new IslandsLevel();
+    }
+    if (n === 6) {
       return new LairLevel();
     }
     if (n === 5) {
@@ -576,6 +594,9 @@ export class Game {
     this.audio.setThreat(0);
     // Flight is the default; a level turns it off in enter() if it wants taps.
     this.setFlightControls(true);
+    // Level 7's buttons belong to level 7. It turns them on itself once its
+    // opening shot is over.
+    this.hopButtons.setVisible(false);
     this.level = this.createLevel(clamped);
     this.completeScreen.setText(
       this.level.completionTitle,
@@ -644,6 +665,7 @@ export class Game {
     this.interior.group.visible = name === "hive";
     this.woodsGroup.visible = name === "woods";
     this.lairGroup.visible = name === "lair";
+    this.islandsGroup.visible = name === "islands";
     this.inside.group.visible = name === "inside";
     this.stage.setEnvironment(
       name === "hive"
@@ -654,9 +676,11 @@ export class Game {
             ? WOODS_ENV
             : name === "lair"
               ? LAIR_ENV
-              : name === "cottage"
-                ? COTTAGE_ENV
-                : MEADOW_ENV,
+              : name === "islands"
+                ? ISLANDS_ENV
+                : name === "cottage"
+                  ? COTTAGE_ENV
+                  : MEADOW_ENV,
     );
   }
 
@@ -949,6 +973,11 @@ export class Game {
 
     if (!wasFailed && this.level.failed) {
       this.running = false;
+      this.failScreen.setText(
+        this.level.failTitle ?? "Bonk!",
+        this.level.failBody ??
+          "You bumped into a rock. That happens to everybody — the cave is tricky. Want another go?",
+      );
       this.failScreen.show();
     }
 
