@@ -1741,6 +1741,14 @@ export const ISLANDS = {
     length: 3.1,
     /** How high on the pad it sits — the pad is 0.18 thick, drawn about zero. */
     sit: 0.09,
+    /**
+     * How far it throws itself forward as it strikes, in squares.
+     *
+     * Seen from directly overhead the tongue ends up underneath the bee's own
+     * body, so the lunge is what actually reads at this camera angle — the
+     * tongue alone is a strike you are told about rather than one you watch.
+     */
+    lunge: 0.3,
     yaw: Math.PI / 2,
     /** Idle plays from a different point per frog, or they breathe in step. */
     idleStagger: 1.7,

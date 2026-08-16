@@ -243,9 +243,26 @@ pad has to have its `uv` deleted first or `mergeGeometries` returns null and the
 pads silently vanish.
 
 The frog arrived rigged, with an armature and four animation clips it has no use
-for. Those were stripped out of the file, which halved it — 587 kB to 270 kB, 44
-nodes to 2 — and the tongue is drawn by the level instead, out of the mouth the
-model was measured for.
+for. Those were stripped out of the file — 587 kB to 270 kB, 44 nodes to 2 —
+with a one-off script rather than anything in the build.
+
+**Its 5,008 triangles are deliberate.** Seventeen frogs is 85k triangles, and
+decimating them is the obvious saving: cut to 30% they are 1,464 each and the
+board drops from 125k to 63k. It was tried and reverted. From the level's own
+top-down camera the simplified frog is indistinguishable, but the level opens
+on a low shot from the near bank, and at that angle a decimated frog loses its
+legs and its posture and becomes a green lozenge with eyes. The opening shot is
+the only place the player sees a frog properly, so it is the one that decides.
+If this ever needs revisiting, the numbers above are the trade and the ratio
+that still looked right was 0.5 on the body with the eyes left alone.
+
+The tongue is drawn by the level, out of the mouth the model was measured for —
+the centroid of its reddest material. It flicks rather than extends, and the
+frog lunges after it, because seen from directly overhead the tongue ends up
+underneath the bee's own body and the lunge is what actually reads. The lunge
+and the tongue's origin have to be worked out together: computing the tongue
+from the frog's un-lunged position left the frog a square ahead of its own
+tongue, which read as the tongue coming out of its back.
 
 **It is an errand, not a crossing.** Three babies wait on pedestals at the near
 bank, and she takes them over one at a time: one follows her out, dances on

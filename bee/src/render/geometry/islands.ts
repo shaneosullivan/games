@@ -326,6 +326,13 @@ export function createIslandsScene(rng: Rng): IslandsScene {
 
     strike(rider, at, extent) {
       riderPos(rider, tmp);
+      // The lunge first, and the tongue measured from where the lunge puts it.
+      // Worked out here and applied to both, because the two coming from
+      // different places is what made the tongue appear to trail out of the
+      // frog's back: the frog had moved and the tongue had not.
+      const lunge = Math.sign(rider.speed) * extent * sq * I.frogModel.lunge;
+      tmp.x += lunge;
+      rider.mesh.position.x = tmp.x;
       // Out of the frog's face. `mouth` is measured off the model itself and
       // is in the frog's own frame, so which way it faces decides which way
       // the tongue leaves it; until the model lands, half a body forward and
@@ -348,12 +355,6 @@ export function createIslandsScene(rng: Rng): IslandsScene {
       tip.visible = true;
       tip.position.lerpVectors(tmp, at, extent);
       tip.scale.setScalar(0.7 + extent * 0.5);
-
-      // And the frog goes with it. Seen from directly overhead the tongue ends
-      // up underneath the bee's own body, so without this the strike is a
-      // thing you are told about rather than a thing you watch: the lunge is
-      // what actually reads at this camera angle.
-      rider.mesh.position.x += Math.sign(rider.speed) * extent * sq * 0.3;
     },
 
     hideTongue() {
