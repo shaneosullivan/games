@@ -1023,10 +1023,17 @@ export const MAP_DRAW = {
    */
   /**
    * How far ink may sit from the route before it counts as wrong, in the
-   * artwork's pixels. A pen's width: ink that close is a hand following the
-   * line, not a hand wandering off it.
+   * artwork's pixels.
+   *
+   * Measured, because it is the number that decides whether the red bar means
+   * anything. A pen centred on the line still spills a pixel or two either
+   * side of it wherever the line narrows, and that must not read as a
+   * mistake — at 0 it scores 20% wrong. But every pixel of slack widens the
+   * route: at 10 the forgiven zone was half the sheet, and almost nothing a
+   * hand did could turn the bar red. At 4 a steady hand and an ordinary one
+   * both come out clean, and a hand wandering three pixels further is at 46%.
    */
-  strayTolerance: 10,
+  strayTolerance: 4,
   needRight: 90,
   allowWrong: 5,
   /** Alpha above which a pixel counts as drawn on. */
