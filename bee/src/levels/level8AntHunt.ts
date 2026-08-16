@@ -242,9 +242,8 @@ export class AntHuntLevel implements Level {
     this.world.update(dt);
     this.water.update(dt);
     this.islandTime += dt;
-    const pace = this.antPace();
     for (const ant of this.ants) {
-      ant.update(dt, pace);
+      ant.update(dt, this.antPace(ant.islandIndex));
     }
     this.updateNet(dt, ctx);
     this.updateInFlight(dt);
@@ -308,19 +307,27 @@ export class AntHuntLevel implements Level {
   }
 
   /**
-   * How fast this island's ants are running just now.
+   * How fast an island's ants are running just now.
    *
-   * Full pace for the first minute and then easing down to a floor by three,
-   * so the last ant on an island is always eventually catchable. See
-   * ANT_HUNT.antTire.
+   * Two things multiplied: what that island runs at to begin with — see
+   * ANT_HUNT.islandPace, which is the level's difficulty curve — and how much
+   * the island she is working has tired since she arrived on it.
+   *
+   * The tiring is asked of her island alone. It is a clock that starts when
+   * she lands, and an island she has not reached yet has no reason to be
+   * flagging.
    */
-  private antPace(): number {
+  private antPace(island: number): number {
+    const base = A.islandPace[island] ?? 1;
+    if (island !== this.island) {
+      return base;
+    }
     const {from, to, floor} = A.antTire;
     if (this.islandTime <= from) {
-      return 1;
+      return base;
     }
     const t = Math.min(1, (this.islandTime - from) / (to - from));
-    return 1 - (1 - floor) * t;
+    return base * (1 - (1 - floor) * t);
   }
 
   // ---- the hunt -----------------------------------------------------------
@@ -588,6 +595,7 @@ export class AntHuntLevel implements Level {
       const radius = A.islandRadius * Math.sqrt(rng.range(0.05, 0.75));
       const ant = new AntActor(
         kind,
+        index,
         island,
         rng,
         tmp.set(

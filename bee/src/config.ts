@@ -1866,6 +1866,16 @@ export const ANT_HUNT = {
    */
   antsPerIsland: 8,
   /**
+   * How fast each island's ants run, before anything else is applied.
+   *
+   * The first island is where a child learns what the net does and how far
+   * behind her it swings, so its ants amble; by the third they are running
+   * flat out. It is the only difficulty curve the level has — every island
+   * asks for the same eight pieces of cargo, so the ants themselves have to
+   * be what changes.
+   */
+  islandPace: [0.6, 0.8, 1],
+  /**
    * How the ants tire.
    *
    * The last ant on an island is the hard one: with every other ant emptied

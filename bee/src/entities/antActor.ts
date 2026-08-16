@@ -41,6 +41,8 @@ export class AntActor {
 
   constructor(
     readonly kind: CargoKind,
+    /** Which island it belongs to, so the level can pace each one its own way. */
+    readonly islandIndex: number,
     private readonly island: {centre: THREE.Vector3; hill: THREE.Vector3},
     private readonly rng: Rng,
     at: THREE.Vector3,
