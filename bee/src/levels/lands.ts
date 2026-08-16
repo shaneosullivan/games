@@ -35,7 +35,7 @@ export const LANDS: ReadonlyArray<Land> = [
     y: 0.544,
     levels: [1, 2, 3],
   },
-  {id: "islands", name: "Silent Islands", x: 0.826, y: 0.703, levels: [7]},
+  {id: "islands", name: "Silent Islands", x: 0.826, y: 0.703, levels: [7, 8]},
 ];
 
 /** Which land a level belongs to. */

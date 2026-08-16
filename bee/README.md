@@ -58,7 +58,8 @@ touchscreen.
 | 7 — Level 5: The Windy Woods (maze)                          | done        |
 | 8 — Level 6: The Bear's Lair (side-scroller)                 | done        |
 | 9 — Level 7: Silent Islands (Frogger)                        | done        |
-| 10 — Wall-clock day system                                   | not started |
+| 10 — Level 8: Ant Hunt (net chase)                           | done        |
+| 11 — Wall-clock day system                                   | not started |
 
 ## Levels
 
@@ -303,6 +304,35 @@ still, dodges when its own stops holding, and never looks more than one hop
 ahead — five errands in ten are finished, in 44 to 51 seconds. An autopilot that
 only presses forward survives one crossing in twelve, and the level asks for
 five of them.
+
+**8 — Ant Hunt.** The other level on the Silent Islands, opened by finishing
+the first. Three islands in a triangle, joined one to two and two to three by
+old wooden bridges with a gate across each, and no way back across the middle.
+Ants run about every island with a flower or a jar of honey on their backs, and
+a net hangs under the queen on a rope: fly the net into an ant and its cargo is
+hers, and the robbed ant runs for its hill and disappears down the hole. Fill
+the net and the gate opens, a baby comes and carries the whole netful away, and
+she gets an empty one when she lands on the next island. Three netfuls and the
+level is over.
+
+Two things carry it. The net swings rather than being strapped on — it is a
+`DanglingLoad`, the same simulation as the cottage's honey jar — so catching is
+a matter of leading an ant rather than flying at it, and a hard turn throws the
+mouth of the bag wide. And each island is sealed until its work is done, so
+there is never a moment where what to do next is somewhere else.
+
+**Containment is the level's own.** The flight model bounds the bee to one
+circle about a centre, and this is three circles with corridors between them, so
+`AntIslands.contain` clamps her by hand every frame after the flight model has
+moved her. It clamps to the shape she was last legitimately inside rather than
+to the nearest one: out over the water between two islands the far one can be
+the closer, and clamping to nearest teleported her across the very gap the gates
+exist to close.
+
+It opens on the whole place from above — three islands, two bridges, held for
+two seconds — and then falls in behind her. That shot is framed with
+`framedCameraEye` rather than a hand-placed height, because a height that held
+all three on a landscape iPad lost the far one on a portrait phone.
 
 **The puzzle art is a placeholder** — a hand-authored SVG in
 `src/assets/bearPuzzle.ts`. To use the real picture, drop the image into

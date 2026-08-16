@@ -23,6 +23,7 @@ import {CottageLevel} from "./levels/level4Cottage";
 import {MazeLevel} from "./levels/level5Maze";
 import {LairLevel} from "./levels/level6Lair";
 import {IslandsLevel} from "./levels/level7Islands";
+import {AntHuntLevel} from "./levels/level8AntHunt";
 import type {
   EnvironmentName,
   FlightSettings,
@@ -536,12 +537,16 @@ export class Game {
     {number: 5, name: "The Windy Woods"},
     {number: 6, name: "The Bear's Lair"},
     {number: 7, name: "Silent Islands"},
+    {number: 8, name: "Ant Hunt"},
   ];
 
   private static readonly LAST_LEVEL = Game.LEVELS.length;
 
   private createLevel(n: number): Level {
-    if (n >= 7) {
+    if (n >= 8) {
+      return new AntHuntLevel();
+    }
+    if (n === 7) {
       return new IslandsLevel();
     }
     if (n === 6) {

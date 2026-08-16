@@ -1796,3 +1796,154 @@ export const ISLANDS_PALETTE = {
   gatorBelly: 0xdde3a4,
   tooth: 0xfdfdf5,
 } as const;
+
+/**
+ * Level 8 — the Ant Hunt.
+ *
+ * Three islands in a triangle, joined the long way round: one to two, two to
+ * three, and no way back across the middle. Each is a room with a lid on it —
+ * the bridge out is gated until its island's work is done — so the level is
+ * three self-contained hunts rather than one big field, and the bee is never
+ * anywhere she has nothing to do.
+ *
+ * Distances are in world units and the islands are placed rather than
+ * generated: the first sits on the world origin, because that is where the
+ * game's camera rig and the opening shot expect to find her.
+ */
+export const ANT_HUNT = {
+  islandRadius: 17,
+  /** Centres, in order. The bee starts on the first. */
+  islands: [
+    {x: 0, z: 0},
+    {x: 52, z: 0},
+    {x: 26, z: -45},
+  ],
+  /** Which islands each bridge joins. The third is a dead end, deliberately. */
+  bridges: [
+    {from: 0, to: 1},
+    {from: 1, to: 2},
+  ],
+  bridgeHalfWidth: 2.6,
+  /** How far onto each island the bridge's planking runs. */
+  bridgeOverlap: 2,
+  /** Height of the island tops above the water. */
+  islandHeight: 2.2,
+
+  /** How high she flies here, and how far the camera sits back. */
+  minHeight: 3.2,
+  maxHeight: 11,
+  startHeight: 5,
+  cameraDistance: 15,
+  cameraHeight: 7.5,
+
+  /**
+   * The net, which is the thing that actually catches an ant.
+   *
+   * It hangs under her on a rope and swings, so a fast turn throws it wide —
+   * which is the skill of the level. Its radius is generous because a child is
+   * aiming a swinging bag at a running ant from a moving bee, and one of those
+   * three would have been enough.
+   */
+  net: {
+    ropeLength: 3.4,
+    gravity: 26,
+    damping: 0.02,
+    radius: 1.9,
+    /** How far up the rope the mouth of it sits. */
+    depth: 1.5,
+  },
+  /** She catches things with her own body too, not only the net. */
+  beeReach: 1.6,
+
+  /**
+   * The ants.
+   *
+   * Numbers per island, and each carries one piece of cargo. There are more
+   * ants than the quota so the last one is a chase rather than a clean-up: an
+   * island where every remaining ant is needed ends with a child cornering the
+   * one that is left.
+   */
+  antsPerIsland: 8,
+  cargoNeeded: 6,
+  antLength: 2.4,
+  antSpeed: 7.2,
+  antTurn: 3.2,
+  /** How long an ant holds a heading before picking a new one. */
+  antWander: [0.7, 2.2],
+  /** A robbed ant runs for its hill, and faster than it wandered. */
+  antFleeSpeed: 10.5,
+  /** How close to the hill's mouth counts as home. */
+  antHomeRadius: 1.6,
+  /** It shrinks into the hole rather than blinking out. */
+  antEnterTime: 0.45,
+  hillRadius: 3.4,
+  hillHeight: 1.9,
+
+  /** The cargo is carried on the ant's back, and rides above it. */
+  cargoLift: 1,
+  /** How long a caught piece of cargo takes to fly into the net. */
+  cargoFlyTime: 0.35,
+
+  /** The gate: how long the bar takes to swing open, in seconds. */
+  gateSwing: 0.9,
+
+  /** The baby who comes for a full net. */
+  handoff: {
+    /** Where it comes from and leaves to, relative to the island's centre. */
+    approach: 26,
+    height: 14,
+    /** In, take the net, and away. */
+    inTime: 1.4,
+    holdTime: 0.6,
+    outTime: 1.8,
+  },
+
+  /**
+   * The opening shot: the whole place from above, held, and then down behind
+   * her.
+   *
+   * The three islands and what joins them is the one thing a player has to
+   * understand here, and it cannot be seen from the flying camera — at her
+   * altitude the second island is a green smudge and the third is over the
+   * horizon. Two seconds of map is worth more than any amount of telling.
+   */
+  opening: {
+    /**
+     * How much of the screen the three islands fill, and from what angle.
+     *
+     * Framed by `framedCameraEye` rather than by putting the camera at a
+     * height that looked right: this is played on everything from a portrait
+     * phone to a landscape iPad, and a hand-placed shot that held all three
+     * islands on one of those lost the far one on the other.
+     */
+    fill: 0.82,
+    pitch: 1.02,
+    /** Held still, then the fall in behind her. */
+    holdTime: 2,
+    swoopTime: 2.6,
+  },
+
+  winBursts: 8,
+  winBurstEvery: 0.24,
+} as const;
+
+export const ANT_PALETTE = {
+  grass: 0x7fc45f,
+  grassDark: 0x5da046,
+  sand: 0xe8d9a6,
+  cliff: 0x9a8b6a,
+  rock: 0x9a9384,
+  hill: 0x8a6a3f,
+  hillDark: 0x6b5130,
+  hillHole: 0x2a1f12,
+  plank: 0xb98b4e,
+  plankDark: 0x8a6636,
+  rope: 0xd8c79a,
+  gate: 0xc2703a,
+  gateOpen: 0x9ad06f,
+  ant: 0x6b3a24,
+  antDark: 0x4a2716,
+  antShine: 0x8a5033,
+  net: 0xf3f7e8,
+  netRim: 0xcfa45e,
+} as const;

@@ -74,9 +74,10 @@ export class IslandsLevel implements Level {
   readonly completionBody =
     "Not one frog got you. The Silent Islands are yours.";
   /**
-   * The last level in the game, so its card offers the map rather than "keep
-   * flying" — the far bank is a strip of grass with nothing on it, and being
-   * left standing there is a dead end rather than a reward.
+   * The card offers the map rather than "keep flying": the far bank is a strip
+   * of grass with nothing left on it, and being left standing there is a dead
+   * end rather than a reward. The Ant Hunt is on the same land, and the map is
+   * how you get to it.
    */
   readonly finishesGame = true;
   readonly failTitle = "Snap!";
@@ -720,6 +721,11 @@ export class IslandsLevel implements Level {
   }
 
   private win(ctx: GameContext): void {
+    // Getting the whole brood across is what opens the Ant Hunt, the other
+    // level on these islands; the map comes up with it already selected.
+    ctx.save.mutate(d => {
+      d.level = 8;
+    });
     this.phase = "won";
     this.phaseTime = 0;
     this.bursts = 0;
