@@ -1381,7 +1381,10 @@ body {
   position: absolute;
   inset: 0;
   display: flex;
-  align-items: center;
+  /* Pinned to the top, not centred. Finishing the map adds a panel under the
+     drawing, and a centred card would push the canvas up by half of it at the
+     moment the player is still looking at what they drew. */
+  align-items: flex-start;
   justify-content: center;
   padding: 16px;
   background: rgba(20, 40, 60, 0.75);
@@ -1396,7 +1399,9 @@ body {
 
 .mapdraw-card {
   width: min(860px, 100%);
-  margin: auto 0;
+  /* Low enough to clear the level's title, and the same whatever is on the
+     card — see the note on the parent about why this isn't centred. */
+  margin: min(6vh, 48px) 0 auto;
   flex-shrink: 0;
   padding: 18px 20px 20px;
   border-radius: 22px;
@@ -1406,6 +1411,19 @@ body {
   color: #3d3226;
 }
 
+/* On a short screen the drawing takes most of the height, and the offset that
+   keeps the card clear of the title is the difference between the finish
+   button being on screen and being below the fold. */
+@media (max-height: 700px) {
+  .mapdraw-card {
+    margin-top: 10px;
+  }
+
+  .mapdraw {
+    padding: 8px;
+  }
+}
+
 .mapdraw-card h2 {
   margin: 0 0 4px;
   font-size: 26px;
@@ -1413,7 +1431,7 @@ body {
 
 .mapdraw-hint {
   margin: 0 0 12px;
-  font-size: 15px;
+  font-size: 18px;
   color: #7b6a55;
 }
 
@@ -1442,7 +1460,7 @@ body {
 
 .mapdraw-readout {
   margin: 0 0 12px;
-  font-size: 13px;
+  font-size: 17px;
   font-weight: 600;
   color: #7b6a55;
 }
@@ -1478,19 +1496,29 @@ body {
 
 .mapdraw-tools {
   display: flex;
-  gap: 10px;
+  gap: 16px;
   justify-content: center;
   margin-top: 14px;
 }
 
 .mapdraw-tool {
-  padding: 12px 22px;
+  /* Generous, because these are pressed by a child mid-drawing with a hand
+     already over the paper, and a press that misses reads as the game
+     ignoring them. Well past the 44px Apple asks for. */
+  min-height: 60px;
+  min-width: 160px;
+  padding: 14px 28px;
   border-radius: 999px;
   border: 2px solid #e2d8c6;
   background: #fff;
-  color: #7b6a55;
-  font: 600 16px/1 inherit;
+  color: #6b5a45;
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 22px;
+  line-height: 1;
   cursor: pointer;
+  /* No double-tap zoom and no 300ms wait on the press. */
+  touch-action: manipulation;
 }
 
 .mapdraw-tool.on {
@@ -1512,20 +1540,25 @@ body {
 }
 
 .mapdraw-done p {
-  margin: 0 0 10px;
-  font-size: 16px;
+  margin: 0 0 12px;
+  font-size: 19px;
   font-weight: 600;
   color: #2f6b2f;
 }
 
 .mapdraw-done button {
-  padding: 14px 30px;
+  min-height: 60px;
+  padding: 16px 34px;
   border-radius: 999px;
   border: none;
   background: linear-gradient(180deg, #ffd75e, #f7b32b);
   color: #4a2f07;
-  font: 700 17px/1 inherit;
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 22px;
+  line-height: 1;
   cursor: pointer;
+  touch-action: manipulation;
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.18);
 }
 
