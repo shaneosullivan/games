@@ -236,6 +236,13 @@ export interface Level {
    * five crossings, and losing three of them to one mistake is more than a
    * child will sit through twice. A level with one of these keeps whatever it
    * thinks is worth keeping; a level without one is rebuilt as before.
+   *
+   * **It must clear `failed` itself.** The Game raises the try-again card on
+   * that flag going from false to true, so a level that picks up again while
+   * still reporting failure never raises another one: the next death is
+   * silent, and the level sits there with its controls locked. A rebuilt level
+   * gets this for free by being a new object, which is exactly why the first
+   * one to implement this got it wrong.
    */
   retry?(ctx: GameContext): void;
   /**

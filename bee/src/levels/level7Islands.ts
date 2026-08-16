@@ -229,6 +229,14 @@ export class IslandsLevel implements Level {
    * again.
    */
   retry(ctx: GameContext): void {
+    // First, and the reason for the comment: the Game shows the try-again
+    // card on `failed` going from false to true. Leaving it set meant the
+    // *second* death raised no card at all — the level went quietly to "done"
+    // with the controls locked, and the bee sat frozen half-way through a hop
+    // with nothing to tap and nothing said.
+    this.failed = false;
+    this.complete = false;
+
     const carried = this.escorting;
     if (carried) {
       carried.state = "waiting";
