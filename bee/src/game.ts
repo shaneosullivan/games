@@ -983,12 +983,21 @@ export class Game {
 
     if (!wasComplete && this.level.complete) {
       this.running = false;
-      // Finishing a level points the save at the next one; unlocking it here
-      // rather than in each level means the menu is right even when nothing
-      // switches straight into it — which is how the maze hands back to the
-      // map with the Bear's Lair already open.
+      // Finishing a level opens the next one, whether or not the level that
+      // just ended remembered to say so.
+      //
+      // It used to unlock only what the save pointed at, and each level moved
+      // that pointer itself on completion. Level 6 didn't — it was the last
+      // level when it was written — so finishing the Bear's Lair left the
+      // Silent Islands locked and the only way in was to play the cave again.
+      // The pointer still decides which land the map opens on; what is
+      // *unlocked* is now simply the level after this one.
       this.save.mutate(d => {
-        d.maxLevel = Math.max(d.maxLevel, d.level);
+        d.maxLevel = Math.max(
+          d.maxLevel,
+          d.level,
+          Math.min(this.levelNumber + 1, Game.LAST_LEVEL),
+        );
       });
       this.save.flush();
       this.completeScreen.show();

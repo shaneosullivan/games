@@ -790,6 +790,11 @@ export class LairLevel implements Level {
     if (t >= 1) {
       this.phase = "done";
       this.complete = true;
+      // Getting the honey home is what opens the Silent Islands, the same way
+      // the maze opens this level: the map comes up with it already selected.
+      ctx.save.mutate(d => {
+        d.level = 7;
+      });
       ctx.bee.setScale(1);
       ctx.bee.object.visible = false;
       ctx.hud.setObjective("Home with the honey!");
