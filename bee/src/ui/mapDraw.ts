@@ -1,5 +1,6 @@
 import {MAP_DRAW} from "../config";
 import mapUrl from "../assets/cave/map.png";
+import eraserUrl from "../assets/cave/eraser.png";
 // Inlined rather than emitted beside the page: the game ships as one
 // self-contained index.html, and a worker in its own file would simply be
 // missing from it.
@@ -86,7 +87,13 @@ export function createMapDraw(
   const eraserButton = document.createElement("button");
   eraserButton.type = "button";
   eraserButton.className = "mapdraw-tool";
-  eraserButton.textContent = "🧽 Eraser";
+  // A picture of the thing rather than the emoji for it, which renders as a
+  // different object on every platform and as a sponge on this one.
+  const eraserIcon = document.createElement("img");
+  eraserIcon.className = "mapdraw-tool-icon";
+  eraserIcon.src = eraserUrl;
+  eraserIcon.alt = "";
+  eraserButton.append(eraserIcon, document.createTextNode("Eraser"));
   tools.append(penButton, eraserButton);
   card.appendChild(tools);
 

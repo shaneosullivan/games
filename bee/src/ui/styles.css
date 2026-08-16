@@ -1502,6 +1502,11 @@ body {
 }
 
 .mapdraw-tool {
+  /* The icon and its word sit on one line, centred together. */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
   /* Generous, because these are pressed by a child mid-drawing with a hand
      already over the paper, and a press that misses reads as the game
      ignoring them. Well past the 44px Apple asks for. */
@@ -1519,6 +1524,16 @@ body {
   cursor: pointer;
   /* No double-tap zoom and no 300ms wait on the press. */
   touch-action: manipulation;
+}
+
+/* Sized to the cap height of the label beside it, so the two read as one
+   piece rather than a picture with a word after it. */
+.mapdraw-tool-icon {
+  width: 28px;
+  height: 28px;
+  display: block;
+  /* The button is the target; the picture inside it must never be. */
+  pointer-events: none;
 }
 
 .mapdraw-tool.on {
