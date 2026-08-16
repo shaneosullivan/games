@@ -220,6 +220,22 @@ which is where it stays — this is a game about a gap four squares away
 arriving in three seconds, and a shot that only showed the row she was on
 would hide the whole decision.
 
+**It is an errand, not a crossing.** Three babies wait on pedestals at the near
+bank, and she takes them over one at a time: one follows her out, dances on
+arrival and goes to wait on a pedestal at the far end, and she then has to make
+the whole trip back for the next. Five crossings, and the way back is exactly as
+dangerous as the way out — which is where the level's difficulty lives, since
+one crossing you can get lucky with and five you cannot.
+
+The baby is played back from the queen's own trail rather than steered: it sits
+a square and a third back along the route she actually took, so it follows her
+_round_ a frog instead of cutting the corner across it. It is never in danger —
+only the queen is ever tested against the water — and a child watching a baby
+drift past a tongue has to be able to trust that. The offset is a distance
+rather than a delay because a delay collapses the moment she stops: half a
+second after she lands, half a second ago is where she is standing, and the baby
+ends up inside her.
+
 Nothing here is flown. Four buttons replace the stick: up and down under the
 left thumb, where the pair that is asked for most can be found without
 looking, and left and right under the right. One press is one hop.
@@ -230,9 +246,9 @@ two squares wide as an obstacle because it reaches one square either side, and
 what is left is the gap you hop into — so the time you get is
 `(wrapSpan / riders - 2) / speed` seconds. No lane leaves less than two of
 them, and the gaps tighten from 8 seconds on the first stream to about 2 on
-the last. Driven by an autopilot that plans, it crosses every time; driven by
-one that only presses forward, it crosses once in twenty-four goes and usually
-drowns on the second or third stream.
+the last. Driven by an autopilot that plans, a single crossing succeeds every time; driven
+by one that only presses forward, it survives one crossing in twenty-four and
+usually drowns on the second or third stream — and the level asks for five.
 
 **The puzzle art is a placeholder** — a hand-authored SVG in
 `src/assets/bearPuzzle.ts`. To use the real picture, drop the image into

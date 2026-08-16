@@ -1627,6 +1627,57 @@ export const ISLANDS = {
   /** How much of the screen the board fills once the camera is up. */
   boardFill: 0.94,
 
+  /**
+   * The brood she is there for.
+   *
+   * The level is five crossings, not one: she takes a baby over, comes back
+   * empty for the next, and so on. The way back is as dangerous as the way
+   * out, which is where the difficulty of the level now lives — one crossing
+   * you can get lucky with, five you cannot.
+   */
+  babies: 3,
+  /** Columns the pedestals stand on, at both ends. */
+  babyColumns: [3, 5, 7],
+  pedestalHeight: 1.6,
+  /** A baby is smaller than the queen, and flies a little lower. */
+  babyScale: 1.5,
+  babyDrop: 0.7,
+  /**
+   * How far behind the queen a baby flies, in squares.
+   *
+   * Distance along the path she actually took, not a time and not a direction:
+   *
+   *   - played back from her own trail, because a baby steering for itself
+   *     would cut the corner across water she had carefully gone round, and it
+   *     would read as the baby being in danger. It never is — the frogs and
+   *     the alligators are only ever tested against the queen;
+   *   - by distance rather than by delay, because a delay collapses the moment
+   *     she stops: half a second after she lands, half a second ago *is* where
+   *     she is standing, and the baby ends up sitting inside her.
+   *
+   * Measured on screen rather than chosen: at one square they read as a
+   * single long body from overhead, because the gap closes further still on
+   * the frames she is mid-hop. This is the next square back along her route
+   * and a third again — near enough to read as hers, far enough to see them
+   * as two.
+   */
+  followBehind: 1.35,
+  /**
+   * How quickly the baby closes on where it ought to be, in seconds.
+   *
+   * This is the "slight delay": the trail says where to be and this says how
+   * eagerly to get there, so it swings into each hop a beat after she does
+   * rather than moving in lockstep with her.
+   */
+  followEase: 0.13,
+  /** Joining her from the pedestal, and settling onto one at the far end. */
+  joinTime: 0.5,
+  settleTime: 0.9,
+  /** The dance it does on arriving, before it goes to wait. */
+  danceTime: 1.5,
+  danceSpins: 2,
+  danceBob: 1.1,
+
   /** Bursts when she reaches the far bank. */
   winBursts: 7,
   winBurstEvery: 0.22,

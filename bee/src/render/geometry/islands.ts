@@ -28,6 +28,14 @@ export interface IslandsScene {
   /** Middle of row `row`, in world z. Row 0 is the near bank, and row
       `streams + 1` is the far one. */
   rowZ(row: number): number;
+  /**
+   * Where a baby stands while it waits, on the bank behind the playing rows:
+   * three at the near end for the ones still to be taken across, three at the
+   * far end for the ones that made it. Tops of the pedestals, so a baby put
+   * here is standing on one rather than in one.
+   */
+  readonly nearPedestals: ReadonlyArray<THREE.Vector3>;
+  readonly farPedestals: ReadonlyArray<THREE.Vector3>;
   /** Put the tongue out from this frog towards a point, 0..1 extended. */
   strike(rider: Rider, at: THREE.Vector3, extent: number): void;
   hideTongue(): void;
@@ -92,6 +100,38 @@ export function createIslandsScene(rng: Rng): IslandsScene {
     const lip = new THREE.BoxGeometry(waterHalf * 2, 1.45, sq * 0.3);
     lip.translate(0, -0.7, rowZ(row) + (row === 0 ? -1 : 1) * sq * 0.35);
     still.push(paint(lip, P.sand));
+  }
+
+  // ---- the pedestals ------------------------------------------------------
+  //
+  // Three at each end, a row behind the squares that are played on: the near
+  // three are where the brood waits its turn, and the far three are what
+  // "across" looks like — an empty one is a baby still to fetch, and a full
+  // one is one she has already saved.
+  const nearPedestals: Array<THREE.Vector3> = [];
+  const farPedestals: Array<THREE.Vector3> = [];
+  for (const [row, into] of [
+    [-1, nearPedestals],
+    [I.streams + 2, farPedestals],
+  ] as const) {
+    for (const col of I.babyColumns) {
+      const x = columnX(col);
+      const z = rowZ(row);
+      const stone = new THREE.CylinderGeometry(
+        sq * 0.3,
+        sq * 0.36,
+        I.pedestalHeight,
+        10,
+      );
+      stone.translate(x, I.pedestalHeight / 2, z);
+      still.push(paint(stone, P.rock));
+      // A mossy cap, so the top reads as somewhere to stand rather than as the
+      // end of a post.
+      const cap = new THREE.CylinderGeometry(sq * 0.33, sq * 0.33, 0.22, 10);
+      cap.translate(x, I.pedestalHeight + 0.11, z);
+      still.push(paint(cap, P.lily));
+      into.push(new THREE.Vector3(x, I.pedestalHeight + 0.22, z));
+    }
   }
 
   // Reeds and rocks along both banks — the islands the place is named for.
@@ -212,6 +252,8 @@ export function createIslandsScene(rng: Rng): IslandsScene {
     riders,
     columnX,
     rowZ,
+    nearPedestals,
+    farPedestals,
 
     strike(rider, at, extent) {
       riderPos(rider, tmp);

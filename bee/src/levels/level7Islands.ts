@@ -2,6 +2,7 @@ import * as THREE from "three";
 import {ISLANDS as I, ISLANDS_PALETTE as P} from "../config";
 import type {Hop} from "../core/hopButtons";
 import {Rng} from "../core/rng";
+import {createBaby, type BabyModel} from "../render/geometry/bee";
 import {FIREWORK_PALETTE} from "../fx/particles";
 import {
   createIslandsScene,
@@ -10,7 +11,30 @@ import {
 } from "../render/geometry/islands";
 import type {GameContext, Level} from "./level";
 
-type Phase = "waiting" | "rising" | "playing" | "struck" | "won" | "done";
+type Phase =
+  "waiting" | "rising" | "playing" | "delivering" | "struck" | "won" | "done";
+
+/** What one of the brood is doing. */
+type BabyState = "waiting" | "joining" | "following" | "dancing" | "parked";
+
+interface Baby {
+  model: BabyModel;
+  state: BabyState;
+  /** Where it sits before it is fetched, and where it ends up. */
+  readonly home: THREE.Vector3;
+  readonly perch: THREE.Vector3;
+  /** How far through joining, dancing or settling it is, in seconds. */
+  time: number;
+  /** Where it set off from, for the two moves it makes on its own. */
+  readonly from: THREE.Vector3;
+}
+
+/** One position the queen has been, and how far she had flown to reach it. */
+interface Crumb {
+  /** Distance along her whole route, so the trail can be read backwards. */
+  along: number;
+  pos: THREE.Vector3;
+}
 
 const eye = new THREE.Vector3();
 const look = new THREE.Vector3();
@@ -19,6 +43,7 @@ const fromLook = new THREE.Vector3();
 const blend = new THREE.Vector3();
 const blendLook = new THREE.Vector3();
 const tmp = new THREE.Vector3();
+const tmpB = new THREE.Vector3();
 
 /** Forward is (sin yaw, cos yaw), so this faces her down the board at -z. */
 const FACING_ACROSS = Math.PI;
@@ -72,9 +97,20 @@ export class IslandsLevel implements Level {
   private hopFrom = new THREE.Vector3();
   private hopTo = new THREE.Vector3();
   private hopT = 1;
-  /** How far she has got, for the counter — her best row, not her current
-      one, so hopping back doesn't read as losing ground. */
-  private best = 0;
+  /** The brood, in the order she takes them across. */
+  private readonly babies: Array<Baby> = [];
+  /** Which one is with her, or null when she is on her way back. */
+  private escorting: Baby | null = null;
+  private delivered = 0;
+  /**
+   * Where she has been, newest last.
+   *
+   * The baby is played back from this rather than steered: it goes where she
+   * went, a fraction of a second later, so it follows her round a frog instead
+   * of cutting the corner across it.
+   */
+  private readonly trail: Array<Crumb> = [];
+  private trailTime = 0;
   private striker: Rider | null = null;
   private nextBurst = 0;
   private bursts = 0;
@@ -104,7 +140,6 @@ export class IslandsLevel implements Level {
 
     this.row = 0;
     this.col = (I.cols - 1) / 2;
-    this.best = 0;
     this.hopT = 1;
     this.striker = null;
     this.complete = false;
@@ -128,15 +163,52 @@ export class IslandsLevel implements Level {
     fromLook.copy(tmp);
     ctx.setCameraCinematic(fromEye, fromLook);
 
+    // The brood, waiting their turn on the near pedestals.
+    this.babies.length = 0;
+    this.escorting = null;
+    this.delivered = 0;
+    // A square and a half of route already behind her, running back towards
+    // the pedestals. Without it the first baby has nowhere to tuck in: the
+    // trail is a single point at the start, so "a square back along it" is the
+    // square she is standing on, and the baby appears inside her.
+    this.trail.length = 0;
+    this.trailTime = 0;
+    this.cell(0, (I.cols - 1) / 2, tmp);
+    for (let i = 6; i >= 0; i--) {
+      const back = (i / 6) * I.followBehind * 1.5 * I.square;
+      this.trail.push({
+        along: (6 - i) * ((I.followBehind * 1.5 * I.square) / 6),
+        pos: new THREE.Vector3(tmp.x, tmp.y, tmp.z + back),
+      });
+    }
+    for (let i = 0; i < I.babies; i++) {
+      const model = createBaby();
+      model.group.scale.setScalar(I.babyScale);
+      model.setGrowth(1);
+      const home = this.scene.nearPedestals[i].clone();
+      model.group.position.copy(home);
+      this.scene.group.add(model.group);
+      this.babies.push({
+        model,
+        state: "waiting",
+        home,
+        perch: this.scene.farPedestals[i].clone(),
+        time: 0,
+        from: new THREE.Vector3(),
+      });
+    }
+
     ctx.hud.setBanner(this.name);
-    ctx.hud.setObjective("Hop across the eight streams to the far bank.");
+    ctx.hud.setObjective(
+      "Lead each baby across the streams, then go back for the next.",
+    );
     ctx.hud.setCounters([
       {
-        key: "streams",
-        label: "Streams",
-        color: P.lily,
+        key: "babies",
+        label: "Babies",
+        color: P.frog,
         value: 0,
-        target: I.streams,
+        target: I.babies,
       },
     ]);
   }
@@ -160,8 +232,13 @@ export class IslandsLevel implements Level {
   update(dt: number, ctx: GameContext): void {
     this.phaseTime += dt;
     // Above every phase's early return: the water runs whatever the camera is
-    // doing, so the opening shot shows a board already in motion.
+    // doing, so the opening shot shows a board already in motion, and the
+    // brood is ticked wherever it is — a baby frozen mid-dance because the
+    // level moved on to another phase is exactly the kind of thing the Game
+    // has been caught by before.
     this.scene.update(dt);
+    this.dropCrumb(ctx, dt);
+    this.updateBabies(dt);
 
     switch (this.phase) {
       case "waiting":
@@ -172,6 +249,9 @@ export class IslandsLevel implements Level {
         break;
       case "playing":
         this.updatePlaying(dt, ctx);
+        break;
+      case "delivering":
+        this.updateDelivering(ctx);
         break;
       case "struck":
         this.updateStruck(ctx);
@@ -222,9 +302,12 @@ export class IslandsLevel implements Level {
     outEye: THREE.Vector3,
     outLook: THREE.Vector3,
   ): void {
-    const depth = (I.streams + 1) * I.square;
-    outLook.set(0, 0, -depth / 2);
-    const half = Math.max(((I.cols + 1) / 2) * I.square, depth / 2);
+    // From the near pedestals to the far ones, so both ends of the errand are
+    // in shot: the brood still waiting and the ones already saved.
+    const near = this.scene.rowZ(-1);
+    const far = this.scene.rowZ(I.streams + 2);
+    outLook.set(0, 0, (near + far) / 2);
+    const half = Math.max(((I.cols + 1) / 2) * I.square, (near - far) / 2);
     outEye.copy(ctx.framedCameraEye(outLook, half, I.boardPitch, I.boardFill));
   }
 
@@ -246,11 +329,14 @@ export class IslandsLevel implements Level {
       }
     }
 
-    // Reaching the far bank ends it, and has to be tested before the strike:
-    // arriving on the same frame as a tongue is a win, not a death.
-    if (this.row > I.streams) {
-      this.win(ctx);
+    // Reaching a bank is tested before the strike: arriving on the same frame
+    // as a tongue counts as having got there.
+    if (this.row > I.streams && this.escorting) {
+      this.deliver(ctx);
       return;
+    }
+    if (this.row === 0 && !this.escorting && this.delivered < I.babies) {
+      this.collect(ctx);
     }
 
     const striker = this.threat(ctx);
@@ -286,6 +372,185 @@ export class IslandsLevel implements Level {
     return null;
   }
 
+  // ---- the brood ----------------------------------------------------------
+
+  /** Remember where she is, and forget the route she has long since left. */
+  private dropCrumb(ctx: GameContext, dt: number): void {
+    this.trailTime += dt;
+    const last = this.trail[this.trail.length - 1];
+    const step = last ? last.pos.distanceTo(ctx.bee.position) : 0;
+    // Standing still adds nothing to the route, so the trail behind her keeps
+    // its length and the baby holds its square rather than closing on her.
+    if (last && step < 1e-4) {
+      return;
+    }
+    this.trail.push({
+      along: (last?.along ?? 0) + step,
+      pos: ctx.bee.position.clone(),
+    });
+    const total = this.trail[this.trail.length - 1].along;
+    const keep = I.followBehind * I.square * 2;
+    while (this.trail.length > 2 && total - this.trail[0].along > keep) {
+      this.trail.shift();
+    }
+  }
+
+  /** A square back along the route she took: where the baby belongs. */
+  private trailPoint(out: THREE.Vector3): THREE.Vector3 {
+    if (this.trail.length === 0) {
+      return out.set(0, I.flightHeight, 0);
+    }
+    const want =
+      this.trail[this.trail.length - 1].along - I.followBehind * I.square;
+    for (let i = this.trail.length - 1; i > 0; i--) {
+      const b = this.trail[i];
+      const a = this.trail[i - 1];
+      if (a.along <= want && want <= b.along) {
+        const span = b.along - a.along;
+        return out
+          .copy(a.pos)
+          .lerp(b.pos, span > 0 ? (want - a.along) / span : 1);
+      }
+    }
+    return out.copy(this.trail[0].pos);
+  }
+
+  /** The next baby leaves its pedestal and tucks in behind her. */
+  private collect(ctx: GameContext): void {
+    const baby = this.babies[this.delivered];
+    if (!baby || baby.state !== "waiting") {
+      return;
+    }
+    baby.state = "joining";
+    baby.time = 0;
+    baby.from.copy(baby.model.group.position);
+    this.escorting = baby;
+    ctx.hud.setCallout("Take her across!");
+    ctx.audio.collect(1);
+  }
+
+  /** She has got one over: it dances, then goes to wait on a far pedestal. */
+  private deliver(ctx: GameContext): void {
+    const baby = this.escorting;
+    if (!baby) {
+      return;
+    }
+    baby.state = "dancing";
+    baby.time = 0;
+    this.phase = "delivering";
+    this.phaseTime = 0;
+    this.delivered++;
+    this.escorting = null;
+    ctx.hopButtons.setVisible(false);
+    ctx.hud.setCount("babies", this.delivered, I.babies, true);
+    ctx.hud.setCallout(
+      this.delivered < I.babies ? "Now go back for the next one!" : null,
+    );
+    ctx.audio.quotaComplete();
+  }
+
+  /**
+   * Move whatever each baby is doing along.
+   *
+   * None of this is ever tested against a frog or an alligator: a baby is
+   * scenery with a story, and the only thing on the board that can be caught
+   * is the queen. A child watching a baby drift through a stream full of
+   * tongues has to be able to trust that.
+   */
+  private updateBabies(dt: number): void {
+    for (const baby of this.babies) {
+      baby.time += dt;
+      const g = baby.model.group;
+      switch (baby.state) {
+        case "waiting":
+        case "parked":
+          // Sitting still, but alive: a small wing-shuffle on the spot.
+          baby.model.animate(this.trailTime, 0.25);
+          break;
+        case "joining": {
+          const t = Math.min(1, baby.time / I.joinTime);
+          this.trailPoint(tmp);
+          tmp.y -= I.babyDrop;
+          g.position.copy(baby.from).lerp(tmp, ease(t));
+          baby.model.animate(this.trailTime, 1);
+          if (t >= 1) {
+            baby.state = "following";
+          }
+          break;
+        }
+        case "following": {
+          this.trailPoint(tmp);
+          tmp.y -= I.babyDrop;
+          // The slight delay: it closes on the square rather than appearing
+          // on it, so it swings into each hop a beat after she does.
+          tmp.lerp(g.position, Math.exp(-dt / I.followEase));
+          // Facing the way it is going, taken from the move it just made. A
+          // still baby keeps the heading it had, or it would snap to due north
+          // every time the queen stops.
+          tmpB.copy(tmp).sub(g.position).setY(0);
+          if (tmpB.lengthSq() > 1e-4) {
+            g.rotation.y = Math.atan2(tmpB.x, tmpB.z);
+          }
+          g.position.copy(tmp);
+          baby.model.animate(this.trailTime, 1);
+          break;
+        }
+        case "dancing": {
+          // The dance, and then the flight to its own pedestal, which run one
+          // after the other off the same clock.
+          if (baby.time <= I.danceTime) {
+            const t = baby.time / I.danceTime;
+            g.rotation.y = t * Math.PI * 2 * I.danceSpins;
+            this.trailPoint(tmp);
+            g.position.set(
+              tmp.x,
+              I.flightHeight -
+                I.babyDrop +
+                Math.abs(Math.sin(t * Math.PI * 4)) * I.danceBob,
+              tmp.z,
+            );
+            baby.model.animate(this.trailTime, 1);
+            if (baby.time + dt > I.danceTime) {
+              baby.from.copy(g.position);
+            }
+            break;
+          }
+          const t = Math.min(1, (baby.time - I.danceTime) / I.settleTime);
+          g.position.copy(baby.from).lerp(baby.perch, ease(t));
+          // Up and over, so it arcs onto the pedestal rather than sliding to it.
+          g.position.y += Math.sin(Math.PI * t) * 1.4;
+          g.rotation.y = Math.PI * 2 * I.danceSpins * (1 - t);
+          baby.model.animate(this.trailTime, 1);
+          if (t >= 1) {
+            g.position.copy(baby.perch);
+            g.rotation.y = 0;
+            baby.state = "parked";
+          }
+          break;
+        }
+      }
+    }
+  }
+
+  /** The dance and the settle, with the board still running underneath. */
+  private updateDelivering(ctx: GameContext): void {
+    this.boardShot(ctx, eye, look);
+    ctx.setCameraCinematic(eye, look);
+    const busy = this.babies.some(b => b.state === "dancing");
+    if (busy) {
+      return;
+    }
+    if (this.delivered >= I.babies) {
+      this.win(ctx);
+      return;
+    }
+    // Back to it: she still has to get home for the next one.
+    this.phase = "playing";
+    this.phaseTime = 0;
+    ctx.hopButtons.setVisible(true);
+    ctx.hopButtons.clear();
+  }
+
   private startHop(hop: Hop, ctx: GameContext): void {
     const row = this.row + (hop === "up" ? 1 : hop === "down" ? -1 : 0);
     const col = this.col + (hop === "right" ? 1 : hop === "left" ? -1 : 0);
@@ -300,12 +565,8 @@ export class IslandsLevel implements Level {
     this.row = row;
     this.col = col;
     this.hopT = 0;
-    if (row > this.best) {
-      this.best = row;
-      ctx.hud.setCount("streams", Math.min(row, I.streams), I.streams, true);
-      // The first hop off the bank is the one that says the buttons work.
-      ctx.hud.setCallout(null);
-    }
+    // The first hop is the one that says the buttons work.
+    ctx.hud.setCallout(null);
     // Facing the way she is going, which on a board seen from above is the
     // only thing telling you which end of her is the front.
     ctx.bee.setYaw(
