@@ -328,6 +328,12 @@ autopilots on the same board: one that aims at where an ant is _going_ clears an
 island in ten seconds, and one that flies at where the ant _is_ takes six times
 as long. That gap is the whole game.
 
+**The islands get faster.** Every one of them asks for the same eight pieces of
+cargo, so the only thing that can carry a difficulty curve is the ants: they run
+at 60% on the first island, 80% on the second and flat out on the third
+(`ANT_HUNT.islandPace`). The first island is where a child works out what the net
+does and how far behind her it swings.
+
 **The island tires its ants, so the last one is always catchable.** With every
 other ant emptied there is nothing else to switch to, and a chaser can end up
 following one around for minutes: measured, the first seven ants took 41 seconds
