@@ -166,7 +166,10 @@ export function createMapDraw(
     // The worker keeps the route and measures against it; it answers with how
     // big it is, which is what turns pixels into percentages.
     void createImageBitmap(image).then(map => {
-      worker.postMessage({type: "map", map}, [map]);
+      worker.postMessage(
+        {type: "map", map, tolerance: MAP_DRAW.strayTolerance},
+        [map],
+      );
     });
   };
   image.src = mapUrl;
@@ -198,10 +201,15 @@ export function createMapDraw(
     // same units and can sit end to end.
     const rightShare = (rightPixels / routePixels) * 100;
     const wrongShare = (wrongPixels / routePixels) * 100;
-    // Never more than the bar: a really enthusiastic scribble can put down
-    // more stray ink than there is route.
-    const greenWidth = Math.min(100, rightShare);
-    const redWidth = Math.min(100 - greenWidth, wrongShare);
+    // The bar holds both, in proportion. A really enthusiastic scribble can
+    // put down more stray ink than there is route, and simply clipping the
+    // total would give the last of the bar to whichever colour was drawn
+    // first — a map traced perfectly and then scribbled all over would show
+    // as a bar of solid green.
+    const total = rightShare + wrongShare;
+    const squeeze = total > 100 ? 100 / total : 1;
+    const greenWidth = rightShare * squeeze;
+    const redWidth = wrongShare * squeeze;
     good.style.width = `${greenWidth}%`;
     bad.style.width = `${redWidth}%`;
     readout.textContent = `${Math.round(rightShare)}% of the way drawn${

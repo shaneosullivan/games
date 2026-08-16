@@ -1470,6 +1470,10 @@ body {
   position: absolute;
   inset: 0;
   cursor: crosshair;
+  /* Half-transparent, so the line you are tracing still shows through your own
+     ink. Drawing over the route with an opaque pen hides the very thing you are
+     following, and you lose your place. */
+  opacity: 0.5;
 }
 
 .mapdraw-tools {

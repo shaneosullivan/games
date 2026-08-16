@@ -1005,8 +1005,15 @@ export const LAIR = {
 export const MAP_DRAW = {
   /** How faint the route shows through underneath: something to trace. */
   guideOpacity: 0.5,
-  /** The pen, in the artwork's own pixels. The rubber is a multiple of it. */
-  penRadius: 10,
+  /**
+   * The pen, in the artwork's own pixels, and the rubber as a multiple of it.
+   *
+   * The route is drawn with strokes a median of 9 pixels thick, so a pen this
+   * size lays down a line about the width of the one it is tracing. Twice that
+   * — where this started — covered the route in one pass but put half its ink
+   * down either side of it, which counts against you.
+   */
+  penRadius: 5,
   rubber: 1.6,
   /**
    * What counts as finished: nine tenths of the route covered, and not much
@@ -1014,6 +1021,12 @@ export const MAP_DRAW = {
    *
    * Both are shares of the route's own size, so they can be shown as one bar.
    */
+  /**
+   * How far ink may sit from the route before it counts as wrong, in the
+   * artwork's pixels. A pen's width: ink that close is a hand following the
+   * line, not a hand wandering off it.
+   */
+  strayTolerance: 10,
   needRight: 90,
   allowWrong: 5,
   /** Alpha above which a pixel counts as drawn on. */
