@@ -270,7 +270,7 @@ far one if she was on her way back for the next baby, the near one if she still
 had one to take over. The baby she was carrying goes home to its pedestal, since
 it never arrived. That is `Level.retry`, which a level offers when starting again
 would throw away more than the mistake was worth; everything else in the game is
-short enough that starting again *is* the retry, and the Game rebuilds it.
+short enough that starting again _is_ the retry, and the Game rebuilds it.
 
 **It is an errand, not a crossing.** Three babies wait on pedestals at the near
 bank, and she takes them over one at a time: one follows her out, dances on
