@@ -187,6 +187,10 @@ export class IslandsLevel implements Level {
       model.setGrowth(1);
       const home = this.scene.nearPedestals[i].clone();
       model.group.position.copy(home);
+      // Facing the water, which is the way they are going and the way the
+      // queen is looking. Unturned they face the camera, so the three of them
+      // stood with their backs to the errand.
+      model.group.rotation.y = FACING_ACROSS;
       this.scene.group.add(model.group);
       this.babies.push({
         model,

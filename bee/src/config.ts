@@ -1639,8 +1639,15 @@ export const ISLANDS = {
   /** Columns the pedestals stand on, at both ends. */
   babyColumns: [3, 5, 7],
   pedestalHeight: 1.6,
-  /** A baby is smaller than the queen, and flies a little lower. */
-  babyScale: 1.5,
+  /**
+   * A baby is smaller than the queen, and flies a little lower.
+   *
+   * Measured against her rather than picked: at 1.5 a baby was two thirds of
+   * the queen's length and read as another adult following her about. This is
+   * a little under half of her, which is the difference between a grown bee
+   * and one of the brood.
+   */
+  babyScale: 1,
   babyDrop: 0.7,
   /**
    * How far behind the queen a baby flies, in squares.
