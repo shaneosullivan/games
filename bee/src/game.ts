@@ -64,6 +64,7 @@ import {
   createMessageScreen,
   type Overlay,
 } from "./ui/overlays";
+import {createMapDraw, type MapDraw} from "./ui/mapDraw";
 import {burstRainbow, createSlidePuzzle, type SlidePuzzle} from "./ui/puzzle";
 
 const WORLD_SEED = 20260811;
@@ -107,6 +108,8 @@ export class Game {
   private readonly wasp = new WaspActor();
   private readonly bear = new BearActor();
   private puzzle!: SlidePuzzle;
+  /** Level 6's drawing task. Built with the rest of the UI, shown on demand. */
+  private mapDraw!: MapDraw;
   private readonly puff = createPollenPuff();
   private readonly fireworks = createFireworks();
   private readonly beacon: THREE.Group;
@@ -219,6 +222,9 @@ export class Game {
     this.puzzle = createSlidePuzzle(uiLayer, () =>
       this.level.onPuzzleSolved?.(this.ctx),
     );
+    this.mapDraw = createMapDraw(uiLayer, () =>
+      this.level.onMapDrawn?.(this.ctx),
+    );
 
     this.flash = document.createElement("div");
     this.flash.className = "screen-flash";
@@ -260,6 +266,13 @@ export class Game {
       cameraPosition: this.stage.camera.position,
       framedCameraEye: (centre, halfWidth, pitch, fill) =>
         this.rig.framedEye(centre, halfWidth, pitch, fill),
+      showMapDraw: on => {
+        if (on) {
+          this.mapDraw.show();
+        } else {
+          this.mapDraw.hide();
+        }
+      },
       showPuzzle: on => {
         this.setSplit(on);
         if (on) {
@@ -551,6 +564,7 @@ export class Game {
     this.wasp.reset();
     this.bear.reset();
     this.setSplit(false);
+    this.mapDraw.hide();
     // A cutscene abandoned mid-wash — quitting to the menu from inside the
     // cottage — would otherwise leave the next level behind a white screen.
     this.setScreenFade(0);

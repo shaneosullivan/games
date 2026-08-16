@@ -146,6 +146,13 @@ export interface GameContext {
   ): THREE.Vector3;
   /** Split the screen and show the sliding puzzle, or put it away. */
   showPuzzle(on: boolean): void;
+  /**
+   * Put up the "draw the map" task, or take it away.
+   *
+   * The level is told through `onMapDrawn` when the player has finished it and
+   * asked to carry on — the same shape as the sliding puzzle.
+   */
+  showMapDraw(on: boolean): void;
   /** Rainbow confetti over the puzzle panel. */
   celebratePuzzle(): void;
   /** Move the honey jar into the meadow so it survives the scene change. */
@@ -216,6 +223,11 @@ export interface Level {
   resumeAfterCompletion(ctx: GameContext): void;
   /** Called when the sliding puzzle is completed, if this level uses one. */
   onPuzzleSolved?(ctx: GameContext): void;
+  /**
+   * Called when the map has been drawn well enough and the player has tapped
+   * to go on. Only level 6 has one.
+   */
+  onMapDrawn?(ctx: GameContext): void;
   /** Shown on the level-complete card. */
   readonly completionTitle: string;
   readonly completionBody: string;

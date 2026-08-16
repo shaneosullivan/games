@@ -978,6 +978,37 @@ export const LAIR = {
 } as const;
 
 /**
+ * "Draw the map" — the task at the end of the Bear's Lair.
+ *
+ * The queen has flown the whole cave and has to leave a map of it behind, and
+ * the player draws it rather than watching her draw it. See ui/mapDraw.ts.
+ */
+export const MAP_DRAW = {
+  /** How faint the route shows through underneath: something to trace. */
+  guideOpacity: 0.5,
+  /** The pen, in the artwork's own pixels. The rubber is a multiple of it. */
+  penRadius: 10,
+  rubber: 1.6,
+  /**
+   * What counts as finished: nine tenths of the route covered, and not much
+   * more than a twentieth of that again in ink that missed it.
+   *
+   * Both are shares of the route's own size, so they can be shown as one bar.
+   */
+  needRight: 90,
+  allowWrong: 5,
+  /** Alpha above which a pixel counts as drawn on. */
+  inkThreshold: 24,
+  /**
+   * Milliseconds between scores while a stroke is being drawn.
+   *
+   * Scoring reads three canvases the size of the artwork, which is too much to
+   * do on every pointermove; on letting go it always runs.
+   */
+  scoreEvery: 120,
+} as const;
+
+/**
  * The chamber at the end of the Bear's Lair, and the cut scene played in it.
  *
  * Nothing here is flown through or collided with — it is the one room in the
@@ -1058,26 +1089,10 @@ export const DOME = {
   /** Flying in from the corridor and settling into the room. */
   arriveTime: 3,
   /**
-   * The dance: she flies the shape of her own route through the cave, which
-   * leaves a glowing line behind her — a map for the next bee to follow.
-   * `danceSize` is how wide that route is drawn, in units.
+   * Where she waits while the map is drawn: to one side of the hoard, and how
+   * high she hovers over it.
    */
-  danceTime: 7,
-  danceSize: 26,
-  /**
-   * How far in front of the hoard the map hangs, toward the camera.
-   *
-   * Drawn on the hoard's own plane the middle of it disappears behind the pile
-   * — and the middle is the part with the shape in it.
-   */
-  danceStandoff: 11,
-  danceHeight: 11,
-  /** How high above the floor the drawn map hangs. */
-  /**
-   * How high the drawn map hangs. Above the hoard, which is seven tall and
-   * stands in the middle of the room — anything lower is half hidden behind
-   * the treasure.
-   */
+  arriveOffset: 13,
   danceFloor: 13,
   /** The brood arriving, in a burst each. */
   gatherTime: 2.6,
@@ -1166,10 +1181,6 @@ export const DOME = {
   jarHang: 0.85,
   jarSwing: 0.18,
   jarCarryScale: 0.5,
-  /** The map she draws: mote size, and how far apart they are laid. */
-  trailSize: 0.26,
-  trailSpacing: 0.85,
-  trailColor: 0xffe89a,
 } as const;
 
 /**
