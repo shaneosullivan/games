@@ -324,11 +324,20 @@ mouth of the bag wide. And each island is sealed until its work is done, so
 there is never a moment where what to do next is somewhere else.
 
 **The net is the level, and leading it is the skill.** Measured with two
-autopilots on the same board: one that flies at where an ant _is_ takes three
-minutes an island and sometimes far longer, and one that aims at where the ant
-is _going_ clears an island in ten seconds. That gap is the whole game. If it
-proves too much for a child, `ANT_HUNT.antsPerIsland` is the lever — it is both
-how many ants there are and how many the gate wants.
+autopilots on the same board: one that aims at where an ant is _going_ clears an
+island in ten seconds, and one that flies at where the ant _is_ takes six times
+as long. That gap is the whole game.
+
+**The island tires its ants, so the last one is always catchable.** With every
+other ant emptied there is nothing else to switch to, and a chaser can end up
+following one around for minutes: measured, the first seven ants took 41 seconds
+between them and the eighth took another 327. So the ants slow down the longer
+the queen has been on the island — nothing at all for the first minute, then
+easing to 40% of their pace by the third and staying there. The clock is per
+island and starts again on arrival. The same chase now ends at 126 seconds
+instead of 368, and skilled play is untouched: it clears an island inside the
+first minute, so the assist never engages at all. `ANT_HUNT.antTire` is the
+curve.
 
 **The sea ripples for about the cost of a still one.** `render/geometry/water.ts`
 is one plane with its waves — three crossing swells — summed in the _vertex
