@@ -6,7 +6,7 @@ Static web games plus the generated gallery that publishes them. See
 ## Layout
 
 ```
-bee/            Bee a Queen. Self-contained npm project, own deps, own dev server.
+bee/            Bee Quest. Self-contained npm project, own deps, own dev server.
   src/config.ts     every tunable number in the game
   src/core/         loop, input, save, audio, rng, zoom lock, viewport fit, update check
   src/render/       stage, materials, camera rig, procedural geometry

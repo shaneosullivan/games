@@ -56,7 +56,7 @@ export interface IslandsScene {
 const tmp = new THREE.Vector3();
 
 /**
- * The Silent Islands: eight streams, and a bee who has to get across them.
+ * Bee vs Frog: eight streams, and a bee who has to get across them.
  *
  * A board, drawn as a place. Every position is a whole number of squares, and
  * the only things that move continuously are the streams themselves and what

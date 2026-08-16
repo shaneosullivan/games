@@ -8,16 +8,16 @@ thing deploys as a folder.
 
 ```
 .
-├── bee/          Bee a Queen — a 3D bee game for iPad (TypeScript + Three.js)
+├── bee/          Bee Quest — a 3D bee game for iPad (TypeScript + Three.js)
 ├── site/         the gallery that lists the games and publishes them
 └── README.md     you are here
 ```
 
 ## The games
 
-| Game                             | What it is                                                                                                                              |
-| -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| [**Bee a Queen**](bee/README.md) | Fly a bee, found a hive, feed the brood, see off a wasp, and get the honey home past a bear. Four levels. Built for a child on an iPad. |
+| Game                           | What it is                                                                                                                                                                  |
+| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [**Bee Quest**](bee/README.md) | Fly a bee, found a hive, feed the brood, see off a wasp, get the honey home past a bear, hop a river of frogs and net the ants. Eight levels. Built for a child on an iPad. |
 
 The gallery also links out to native apps on the App Store (Mazers, Super
 Bubbly, Kidz Fun Art). Those aren't in this repo — they're listed by hand in

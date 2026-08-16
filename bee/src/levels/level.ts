@@ -87,7 +87,7 @@ export interface GameContext {
    */
   lair: THREE.Group;
   /**
-   * The container the Silent Islands is built into — the same arrangement as
+   * The container the island levels are built into — the same arrangement as
    * `woods` and `lair`: the board belongs to level 7, and what the Game keeps
    * is somewhere to put it.
    */
@@ -232,7 +232,7 @@ export interface Level {
    *
    * Offered by the level, not decided by the Game: most levels here are short
    * enough that starting again *is* the retry, and rebuilding them is both
-   * simpler and what the player expects. The Silent Islands is not — it is
+   * simpler and what the player expects. Bee vs Frog is not — it is
    * five crossings, and losing three of them to one mistake is more than a
    * child will sit through twice. A level with one of these keeps whatever it
    * thinks is worth keeping; a level without one is rebuilt as before.

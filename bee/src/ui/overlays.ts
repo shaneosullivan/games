@@ -135,7 +135,7 @@ export function createCodenameScreen(
   card.appendChild(createHomeLink());
 
   const h1 = document.createElement("h1");
-  h1.textContent = existing ? "Where to?" : "Bee a Queen";
+  h1.textContent = existing ? "Where to?" : "Bee Quest";
   const p = document.createElement("p");
   p.textContent = existing
     ? levels.length > 1

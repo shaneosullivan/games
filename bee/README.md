@@ -1,4 +1,4 @@
-# Bee a Queen
+# Bee Quest
 
 A touch-native 3D bee game for iPad. TypeScript + Three.js + Vite, served as a
 fullscreen web app.
@@ -57,7 +57,7 @@ touchscreen.
 | 6 — Level 4: Caramel Cottage (dance mat, then inside)        | done        |
 | 7 — Level 5: The Windy Woods (maze)                          | done        |
 | 8 — Level 6: The Bear's Lair (side-scroller)                 | done        |
-| 9 — Level 7: Silent Islands (Frogger)                        | done        |
+| 9 — Level 7: Bee vs Frog (Frogger)                           | done        |
 | 10 — Level 8: Ant Hunt (net chase)                           | done        |
 | 11 — Wall-clock day system                                   | not started |
 
@@ -211,7 +211,7 @@ whole cave is generated from a fixed seed, so it is meant to be learned — the
 difficulty curve is getting further each time rather than anything the level
 does to you.
 
-**7 — Silent Islands.** Frogger, with the frogs on the other side of it. Eight
+**7 — Bee vs Frog.** Frogger, with the frogs on the other side of it. Eight
 streams run in alternate directions between two banks, carrying frogs on
 lilypads and alligators, and the bee crosses them a square at a time. A frog's
 tongue only goes out of the front of its face, so it catches what is in front of

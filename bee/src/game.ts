@@ -536,7 +536,7 @@ export class Game {
     {number: 4, name: "Caramel Cottage"},
     {number: 5, name: "The Windy Woods"},
     {number: 6, name: "The Bear's Lair"},
-    {number: 7, name: "Silent Islands"},
+    {number: 7, name: "Bee vs Frog"},
     {number: 8, name: "Ant Hunt"},
   ];
 

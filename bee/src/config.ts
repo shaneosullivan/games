@@ -1511,7 +1511,7 @@ export const PALETTE = {
 } as const;
 
 /**
- * Level 7 — the Silent Islands.
+ * Level 7 — Bee vs Frog.
  *
  * A board rather than a place: everything here is counted in squares, and a
  * square is one hop. The world numbers below are the only ones in world units,

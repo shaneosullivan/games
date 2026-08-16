@@ -52,7 +52,7 @@ const ease = (t: number): number =>
   t < 0.5 ? 2 * t * t : 1 - (1 - t) * (1 - t) * 2;
 
 /**
- * Level 7 — the Silent Islands.
+ * Level 7 — Bee vs Frog.
  *
  * Frogger, with the frogs on the other side of it. Eight streams run in
  * alternate directions between two banks, carrying lilypads and alligators,
@@ -69,10 +69,10 @@ const ease = (t: number): number =>
  * `enter`. What replaces them is four buttons; see core/hopButtons.ts.
  */
 export class IslandsLevel implements Level {
-  readonly name = "Silent Islands";
+  readonly name = "Bee vs Frog";
   readonly completionTitle = "Across the water!";
   readonly completionBody =
-    "Not one frog got you. The Silent Islands are yours.";
+    "Not one frog got you, and the whole brood is across the water.";
   /**
    * The card offers the map rather than "keep flying": the far bank is a strip
    * of grass with nothing left on it, and being left standing there is a dead
