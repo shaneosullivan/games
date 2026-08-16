@@ -11,6 +11,7 @@ import {DanglingLoad} from "../entities/danglingLoad";
 import {FIREWORK_PALETTE} from "../fx/particles";
 import {createBaby, type BabyModel} from "../render/geometry/bee";
 import {createAntIslands, type AntIslands} from "../render/geometry/antIslands";
+import {createWater, type Water} from "../render/geometry/water";
 import {vertexToon} from "../render/materials";
 import type {GameContext, Level} from "./level";
 
@@ -66,6 +67,7 @@ export class AntHuntLevel implements Level {
   complete = false;
 
   private world!: AntIslands;
+  private water!: Water;
   private phase: Phase = "hunting";
   private phaseTime = 0;
 
@@ -106,6 +108,8 @@ export class AntHuntLevel implements Level {
     const rng = new Rng(0xa27_ba11);
     this.world = createAntIslands(rng);
     ctx.islands.add(this.world.group);
+    this.water = createWater();
+    this.world.group.add(this.water.mesh);
 
     this.antGeometry = createAntGeometry();
     this.antMaterial = vertexToon();
@@ -194,6 +198,7 @@ export class AntHuntLevel implements Level {
     ctx.hud.setCallout(null);
     ctx.islands.remove(this.world.group);
     this.world.dispose();
+    this.water.dispose();
     this.antGeometry.dispose();
     this.antMaterial.dispose();
     // The net and everything that belongs to it live in the Game's island
@@ -232,6 +237,7 @@ export class AntHuntLevel implements Level {
     // Above every phase: the world's gates, the ants and anything in the air
     // keep moving whatever the level is otherwise doing.
     this.world.update(dt);
+    this.water.update(dt);
     for (const ant of this.ants) {
       ant.update(dt);
     }

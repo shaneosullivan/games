@@ -1947,3 +1947,50 @@ export const ANT_PALETTE = {
   net: 0xf3f7e8,
   netRim: 0xcfa45e,
 } as const;
+
+/**
+ * The sea the islands stand in.
+ *
+ * Animated entirely in the vertex shader — see render/geometry/water.ts — so
+ * every number here is baked into the shader source once at build time and
+ * nothing but the clock changes after that.
+ *
+ * `segments` is the only cost worth watching: it is the whole triangle budget
+ * of the water, and the swell needs about four of them per wavelength to look
+ * like a curve rather than a fold. The shortest wave below is 14 units and the
+ * spacing that follows from these two numbers is 3, which is comfortably
+ * inside that.
+ */
+export const WATER = {
+  size: 420,
+  segments: 140,
+  /** Below the islands' grass, so their sandy rims stand out of it. */
+  level: -1.6,
+  colour: 0x2f86bd,
+  /**
+   * The two blues the surface is tinted between, by wave height.
+   *
+   * Doing this in colour as well as in shape is what makes the ripples read
+   * from a camera that sits low: the swell is a third of a unit over a
+   * wavelength of thirty, which is too gentle a slope to cross a band of the
+   * toon ramp on its own.
+   */
+  trough: 0x2a6f9e,
+  crest: 0x6fb9de,
+  /** How sharply it goes from one to the other across a wave. */
+  crestContrast: 1.4,
+  /**
+   * Three crossing swells, whose wavelengths share no common multiple: a
+   * surface that repeats is the thing that gives cheap water away.
+   */
+  waves: [
+    {direction: [1, 0.35], length: 34, height: 0.34},
+    {direction: [-0.4, 1], length: 21, height: 0.2},
+    {direction: [0.7, -0.9], length: 14, height: 0.12},
+  ],
+  /** How fast each of them travels. */
+  speeds: [1.1, 1.7, 2.4],
+  /** The ring of surf around each island, which hides the waterline. */
+  foamWidth: 2.2,
+  foamColour: 0xdff1fb,
+} as const;

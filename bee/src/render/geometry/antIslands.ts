@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import {mergeGeometries} from "three/examples/jsm/utils/BufferGeometryUtils.js";
-import {ANT_HUNT as A, ANT_PALETTE as P} from "../../config";
+import {ANT_HUNT as A, ANT_PALETTE as P, WATER} from "../../config";
 import type {Rng} from "../../core/rng";
 import {paint, vertexToon} from "../materials";
 
@@ -83,6 +83,22 @@ export function createAntIslands(rng: Rng): AntIslands {
     );
     base.translate(centre.x, -A.islandHeight - 2.3, centre.z);
     still.push(paint(base, P.cliff));
+
+    // A ring of surf at the waterline.
+    //
+    // Cheap, static, and doing the job the waves can't: a rippling plane cuts
+    // through an island in a hard line, and that line is what gives the whole
+    // thing away. A band of foam sits over it. It floats a little above the
+    // crests on purpose — at this size, water that laps *over* the ring reads
+    // as the ring being underwater rather than as surf.
+    const foam = new THREE.RingGeometry(
+      A.islandRadius - 0.3,
+      A.islandRadius + WATER.foamWidth,
+      36,
+    );
+    foam.rotateX(-Math.PI / 2);
+    foam.translate(centre.x, WATER.level + 0.42, centre.z);
+    still.push(paint(foam, WATER.foamColour));
 
     // ---- the ant hill ----
     //

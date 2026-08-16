@@ -330,6 +330,28 @@ is _going_ clears an island in ten seconds. That gap is the whole game. If it
 proves too much for a child, `ANT_HUNT.antsPerIsland` is the lever — it is both
 how many ants there are and how many the gate wants.
 
+**The sea ripples for about the cost of a still one.** `render/geometry/water.ts`
+is one plane with its waves — three crossing swells — summed in the _vertex
+shader_, so animating it costs one uniform write a frame on the CPU and nothing
+else. Measured on this machine: 0.04 ms a frame against a 16.7 ms budget, for
+39,200 triangles in one draw call. Three things are what make it work rather
+than wobble:
+
+- the normal is derived analytically from the same sines, so the toon ramp
+  bands across the swell instead of leaving it heaving and flatly lit;
+- the crests are _coloured_ by height as well as shaded, because a third of a
+  unit of swell over a thirty-unit wavelength is too gentle a slope to cross a
+  band of the ramp on its own, and from this level's low camera the sea looked
+  painted without it;
+- it is a patched `MeshToonMaterial`, not a shader of its own, so it takes the
+  scene's fog and lights and the horizon fades out instead of ending in a line.
+  That patch needs `customProgramCacheKey`, or three hands the same program to
+  the other 194 toon materials in the scene and the islands ripple too.
+
+The ring of foam at each waterline is ordinary static geometry, merged into the
+island. It is there because a wavy plane cuts an island in a hard line, and that
+line is what gives the whole thing away.
+
 **Containment is the level's own.** The flight model bounds the bee to one
 circle about a centre, and this is three circles with corridors between them, so
 `AntIslands.contain` clamps her by hand every frame after the flight model has
