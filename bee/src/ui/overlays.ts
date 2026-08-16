@@ -1,3 +1,4 @@
+import {onTap} from "../core/tap";
 import chofterUrl from "../assets/chofter.png";
 import mapUrl from "../assets/levelmap.jpg";
 import {LANDS, landForLevel, type Land} from "../levels/lands";
@@ -177,7 +178,7 @@ export function createCodenameScreen(
   nameChip.textContent = existing;
   nameChip.title = "Change your code name";
   nameChip.setAttribute("aria-label", `Code name ${existing}. Tap to change.`);
-  nameChip.addEventListener("click", () => {
+  onTap(nameChip, () => {
     nameChip.replaceWith(input);
     input.focus();
     input.select();
@@ -296,7 +297,7 @@ export function createCodenameScreen(
         }
 
         chip.append(num, text);
-        chip.addEventListener("click", () => {
+        onTap(chip, () => {
           chosen = choice.number;
           for (const c of chips) {
             c.classList.toggle("selected", c === chip);
@@ -321,11 +322,11 @@ export function createCodenameScreen(
       pin.setAttribute("aria-label", pin.title);
       pin.textContent = open ? "🐝" : "🔒";
       if (open) {
-        pin.addEventListener("click", () => selectLand(land));
+        onTap(pin, () => selectLand(land));
       } else {
         // Locked pins report themselves in their own line — overwriting the
         // land name would leave it contradicting the level list underneath.
-        pin.addEventListener("click", () => {
+        onTap(pin, () => {
           hint.textContent = built.length
             ? `🔒 ${land.name} — finish the levels before it to open this`
             : `🔒 ${land.name} — coming soon`;
@@ -348,7 +349,7 @@ export function createCodenameScreen(
     }
   }
 
-  start.addEventListener("click", () => {
+  onTap(start, () => {
     const name = sanitizeCodename(input.value).trim();
     if (!name) {
       return;
@@ -359,7 +360,7 @@ export function createCodenameScreen(
   const reset = document.createElement("button");
   reset.className = "ghost";
   reset.textContent = "Start a new hive (erases progress)";
-  reset.addEventListener("click", () => {
+  onTap(reset, () => {
     if (confirm("Erase your hive and start over?")) {
       onReset();
     }
@@ -437,12 +438,12 @@ export function createChoiceScreen(
 
   const primary = document.createElement("button");
   primary.textContent = primaryLabel;
-  primary.addEventListener("click", onPrimary);
+  onTap(primary, onPrimary);
 
   const secondary = document.createElement("button");
   secondary.className = "ghost";
   secondary.textContent = secondaryLabel;
-  secondary.addEventListener("click", onSecondary);
+  onTap(secondary, onSecondary);
 
   card.append(h1, p, primary, secondary);
   return {
@@ -470,7 +471,7 @@ export function createMessageScreen(
   p.textContent = body;
   const btn = document.createElement("button");
   btn.textContent = buttonLabel;
-  btn.addEventListener("click", onContinue);
+  onTap(btn, onContinue);
   card.append(h1, p, btn);
   return {
     root,

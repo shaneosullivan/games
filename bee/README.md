@@ -264,6 +264,14 @@ and the tongue's origin have to be worked out together: computing the tongue
 from the frog's un-lunged position left the frog a square ahead of its own
 tongue, which read as the tongue coming out of its back.
 
+**A death costs one crossing, not five.** Every baby already on a far pedestal
+stays there, and she starts the next go from the bank she was working from — the
+far one if she was on her way back for the next baby, the near one if she still
+had one to take over. The baby she was carrying goes home to its pedestal, since
+it never arrived. That is `Level.retry`, which a level offers when starting again
+would throw away more than the mistake was worth; everything else in the game is
+short enough that starting again *is* the retry, and the Game rebuilds it.
+
 **It is an errand, not a crossing.** Three babies wait on pedestals at the near
 bank, and she takes them over one at a time: one follows her out, dances on
 arrival and goes to wait on a pedestal at the far end, and she then has to make

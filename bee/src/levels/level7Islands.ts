@@ -167,20 +167,7 @@ export class IslandsLevel implements Level {
     this.babies.length = 0;
     this.escorting = null;
     this.delivered = 0;
-    // A square and a half of route already behind her, running back towards
-    // the pedestals. Without it the first baby has nowhere to tuck in: the
-    // trail is a single point at the start, so "a square back along it" is the
-    // square she is standing on, and the baby appears inside her.
-    this.trail.length = 0;
-    this.trailTime = 0;
-    this.cell(0, (I.cols - 1) / 2, tmp);
-    for (let i = 6; i >= 0; i--) {
-      const back = (i / 6) * I.followBehind * 1.5 * I.square;
-      this.trail.push({
-        along: (6 - i) * ((I.followBehind * 1.5 * I.square) / 6),
-        pos: new THREE.Vector3(tmp.x, tmp.y, tmp.z + back),
-      });
-    }
+    this.seedTrail(0, FACING_ACROSS);
     for (let i = 0; i < I.babies; i++) {
       const model = createBaby();
       model.group.scale.setScalar(I.babyScale);
@@ -225,6 +212,53 @@ export class IslandsLevel implements Level {
     ctx.bee.scripted = false;
     ctx.bee.setScale(1);
     ctx.bee.setCrown(false);
+  }
+
+  /**
+   * Another go, without losing the babies already across.
+   *
+   * The level is five crossings. Sending her back to the near bank with an
+   * empty far side after a mistake on the last leg is more than a child will
+   * sit through twice, so what is already done stays done: every baby on a far
+   * pedestal stays on it, and she starts the go from the bank she was working
+   * from. Caught on the way back for the next one, she restarts at the far
+   * bank — the trip she died on is the trip she repeats, and no more.
+   *
+   * The one thing that is given back is the baby she was carrying: it never
+   * arrived, so it goes home to its own pedestal and waits to be fetched
+   * again.
+   */
+  retry(ctx: GameContext): void {
+    const carried = this.escorting;
+    if (carried) {
+      carried.state = "waiting";
+      carried.model.group.position.copy(carried.home);
+      carried.model.group.rotation.y = FACING_ACROSS;
+    }
+    this.escorting = null;
+    this.striker = null;
+    this.scene.hideTongue();
+
+    // The bank she was working from: the far one if she was on her way back
+    // for the next baby, the near one if she still had one to take over.
+    const returning = !carried && this.delivered > 0;
+    this.row = returning ? I.streams + 1 : 0;
+    this.col = (I.cols - 1) / 2;
+    this.hopT = 1;
+    this.cell(this.row, this.col, tmp);
+    ctx.bee.teleport(tmp);
+    const facing = returning ? 0 : FACING_ACROSS;
+    ctx.bee.setYaw(facing);
+    this.seedTrail(this.row, facing);
+
+    this.phase = "playing";
+    this.phaseTime = 0;
+    ctx.hopButtons.setVisible(true);
+    ctx.hopButtons.clear();
+    ctx.hud.setCallout(
+      returning ? "Go back for the next one!" : "Take her across!",
+    );
+    ctx.hud.setCount("babies", this.delivered, I.babies);
   }
 
   resumeAfterCompletion(ctx: GameContext): void {
@@ -402,6 +436,28 @@ export class IslandsLevel implements Level {
   }
 
   // ---- the brood ----------------------------------------------------------
+
+  /**
+   * Lay a square and a half of route behind her before she has flown any.
+   *
+   * Without it the first baby has nowhere to tuck in: the trail is a single
+   * point, so "a square back along it" is the square she is standing on, and
+   * the baby appears inside her.
+   */
+  private seedTrail(row: number, facing: number): void {
+    this.trail.length = 0;
+    this.trailTime = 0;
+    this.cell(row, (I.cols - 1) / 2, tmp);
+    // Behind her means behind whichever way she is looking.
+    const back = facing === FACING_ACROSS ? 1 : -1;
+    const span = I.followBehind * 1.5 * I.square;
+    for (let i = 6; i >= 0; i--) {
+      this.trail.push({
+        along: ((6 - i) * span) / 6,
+        pos: new THREE.Vector3(tmp.x, tmp.y, tmp.z + (i / 6) * span * back),
+      });
+    }
+  }
 
   /** Remember where she is, and forget the route she has long since left. */
   private dropCrumb(ctx: GameContext, dt: number): void {
@@ -638,11 +694,16 @@ export class IslandsLevel implements Level {
     if (!this.striker) {
       return;
     }
-    // The tongue goes out, catches her, and holds while it reads. Eased hard
-    // out of the frog: a tongue is flicked, not extended.
+    // Eased hard out of the frog: a tongue is flicked, not extended.
     const t = Math.min(1, this.phaseTime / I.strikeReach);
     const out = 1 - (1 - t) * (1 - t) * (1 - t);
-    this.scene.strike(this.striker, ctx.bee.position, out);
+    // An alligator gets the lunge and no tongue: it hasn't got one, and it
+    // doesn't need one — it caught her in its mouth.
+    if (this.striker.kind === "gator") {
+      this.scene.lunge(this.striker, out);
+    } else {
+      this.scene.strike(this.striker, ctx.bee.position, out);
+    }
     if (this.phaseTime >= I.strikeReach + I.strikeHold) {
       this.scene.hideTongue();
       this.phase = "done";

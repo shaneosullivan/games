@@ -1,4 +1,5 @@
 import {MAP_DRAW} from "../config";
+import {onTap} from "../core/tap";
 import mapUrl from "../assets/cave/map.png";
 import eraserUrl from "../assets/cave/eraser.png";
 import markerUrl from "../assets/cave/marker.png";
@@ -395,43 +396,4 @@ export function createMapDraw(
       root.classList.add("hidden");
     },
   };
-}
-
-/**
- * A button press, taken as loosely as the glass allows.
- *
- * `click` is the strict reading of a tap: the finger has to go down and come
- * up on the same element without wandering, and on an iPad a slightly draggy
- * child's tap on a button beside a drawing surface fails all three. So the
- * press is taken the moment the finger lands, from whichever of the two event
- * families the browser chooses to deliver — and `click` stays wired up for the
- * keyboard, which is the only way some of these get pressed at all.
- *
- * Firing more than once costs nothing here: every one of these is a switch
- * being set to a value, not a thing being toggled, so two presses land the
- * same as one.
- */
-function onTap(button: HTMLElement, run: () => void): void {
-  const press = (e: Event): void => {
-    // A finger already on the glass may still be captured by the drawing
-    // canvas — an iPad that loses a `pointerup` (a palm, a notification, a
-    // screenshot) leaves it that way, and every later press is delivered to
-    // the canvas instead of to what was actually touched. Hand it back.
-    const captured = e.target as Element | null;
-    if (captured && "releasePointerCapture" in captured) {
-      const id = (e as PointerEvent).pointerId;
-      try {
-        if (typeof id === "number" && captured.hasPointerCapture(id)) {
-          captured.releasePointerCapture(id);
-        }
-      } catch {
-        // Nothing held it, which is the normal case.
-      }
-    }
-    e.preventDefault();
-    run();
-  };
-  button.addEventListener("pointerdown", press);
-  button.addEventListener("touchstart", press, {passive: false});
-  button.addEventListener("click", press);
 }

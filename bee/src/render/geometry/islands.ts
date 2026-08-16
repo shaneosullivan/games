@@ -40,6 +40,14 @@ export interface IslandsScene {
   readonly farPedestals: ReadonlyArray<THREE.Vector3>;
   /** Put the tongue out from this frog towards a point, 0..1 extended. */
   strike(rider: Rider, at: THREE.Vector3, extent: number): void;
+  /**
+   * Throw a rider at what it has caught, 0..1, without a tongue.
+   *
+   * What an alligator does. It has no tongue to put out — it takes things in
+   * its mouth — so all it gets is the lunge, which is the half of the strike
+   * that reads from overhead anyway.
+   */
+  lunge(rider: Rider, extent: number): void;
   hideTongue(): void;
   update(dt: number): void;
   dispose(): void;
@@ -323,6 +331,12 @@ export function createIslandsScene(rng: Rng): IslandsScene {
     rowZ,
     nearPedestals,
     farPedestals,
+
+    lunge(rider, extent) {
+      riderPos(rider, tmp);
+      rider.mesh.position.x =
+        tmp.x + Math.sign(rider.speed) * extent * sq * I.frogModel.lunge;
+    },
 
     strike(rider, at, extent) {
       riderPos(rider, tmp);

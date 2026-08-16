@@ -768,9 +768,15 @@ export class Game {
       "Back to the map",
       () => {
         this.failScreen.hide();
-        // Straight back in at the start: `switchLevel` re-enters the level,
-        // which builds itself fresh, so there is nothing to unwind here.
         this.running = true;
+        // A level that can pick up where it left off says so; see Level.retry.
+        // Everything else goes back in at the start, where `switchLevel`
+        // re-enters the level and it builds itself fresh, so there is nothing
+        // to unwind here.
+        if (this.level.retry) {
+          this.level.retry(this.ctx);
+          return;
+        }
         this.switchLevel(this.levelNumber);
       },
       () => {

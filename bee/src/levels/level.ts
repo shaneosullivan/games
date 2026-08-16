@@ -228,6 +228,17 @@ export interface Level {
   /** While true the level is driving the bee itself; ignore player input. */
   readonly controlsLocked: boolean;
   /**
+   * Pick up from a fail rather than start again, if this level can.
+   *
+   * Offered by the level, not decided by the Game: most levels here are short
+   * enough that starting again *is* the retry, and rebuilding them is both
+   * simpler and what the player expects. The Silent Islands is not — it is
+   * five crossings, and losing three of them to one mistake is more than a
+   * child will sit through twice. A level with one of these keeps whatever it
+   * thinks is worth keeping; a level without one is rebuilt as before.
+   */
+  retry?(ctx: GameContext): void;
+  /**
    * Called when the player dismisses the completion card and keeps playing.
    * Lets a level re-arm whatever it was offering so the ending can be
    * replayed, rather than leaving the world inert.
