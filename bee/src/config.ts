@@ -1009,11 +1009,13 @@ export const MAP_DRAW = {
    * The pen, in the artwork's own pixels, and the rubber as a multiple of it.
    *
    * The route is drawn with strokes a median of 9 pixels thick, so a pen this
-   * size lays down a line about the width of the one it is tracing. Twice that
-   * — where this started — covered the route in one pass but put half its ink
-   * down either side of it, which counts against you.
+   * size lays down a line a shade narrower than the one it is tracing. Twice
+   * that — where this started — covered the route in one pass but put half its
+   * ink down either side of it, which counts against you. Under the line is
+   * the better way round: the thick parts of the route take a second pass,
+   * which is work rather than a wall, and nothing spills.
    */
-  penRadius: 5,
+  penRadius: 4,
   rubber: 1.6,
   /**
    * What counts as finished: nine tenths of the route covered, and not much
