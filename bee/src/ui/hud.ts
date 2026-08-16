@@ -24,6 +24,8 @@ export class Hud {
   private readonly rows = new Map<string, CounterRow>();
   private readonly banner: HTMLDivElement;
   private readonly objective: HTMLDivElement;
+  /** The big "how to play" message across the middle; see setCallout. */
+  private readonly callout: HTMLDivElement;
   private readonly harvest: SVGSVGElement;
   private readonly harvestFill: SVGCircleElement;
   private readonly carry: HTMLDivElement;
@@ -113,7 +115,8 @@ export class Hud {
     // objective its own full-width line underneath.
     top.append(this.topLeft, this.banner, this.objective, topRight);
 
-    this.root.append(top, svg, this.carry);
+    this.callout = el("div", "hud-callout hidden", "");
+    this.root.append(top, svg, this.carry, this.callout);
     host.appendChild(this.root);
   }
 
@@ -141,6 +144,20 @@ export class Hud {
 
   setObjective(text: string): void {
     this.objective.textContent = text;
+  }
+
+  /**
+   * A big message across the middle of the screen, or null to take it away.
+   *
+   * For the one thing a player has to know before they can do anything at all
+   * — how to fly the Bear's Lair. The objective line at the top says the same
+   * words, and on a child's first go it is small enough to miss entirely.
+   * Nothing behind it is interactive while it is up, and it takes no pointer
+   * events itself, so tapping it is the same as tapping the screen.
+   */
+  setCallout(text: string | null): void {
+    this.callout.textContent = text ?? "";
+    this.callout.classList.toggle("hidden", !text);
   }
 
   setCount(key: string, value: number, target?: number, pop = false): void {

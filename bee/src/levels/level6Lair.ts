@@ -178,8 +178,10 @@ export class LairLevel implements Level {
     ]);
     // How to play, in the words that suit whatever they are holding — they
     // have a couple of seconds out here before anything happens, which is the
-    // only quiet moment in the level to read it.
+    // only quiet moment in the level to read it. Big, across the middle of the
+    // screen: the line at the top says the same thing and is easy to miss.
     ctx.hud.setObjective(flapInstruction());
+    ctx.hud.setCallout(flapInstruction());
     ctx.setObjectiveMarker(null);
   }
 
@@ -203,6 +205,7 @@ export class LairLevel implements Level {
     ctx.setCameraCinematic(null);
     ctx.bee.setClimb(0);
     ctx.showMapDraw(false);
+    ctx.hud.setCallout(null);
   }
 
   update(dt: number, ctx: GameContext): void {
@@ -333,6 +336,9 @@ export class LairLevel implements Level {
       this.phaseTime = 0;
       this.climb = 0;
       ctx.hud.setObjective(flapInstruction());
+      // She is flying now: the big one has done its job, and the line at the
+      // top carries it from here.
+      ctx.hud.setCallout(null);
     }
   }
 

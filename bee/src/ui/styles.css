@@ -1535,3 +1535,47 @@ body {
   display: block;
   pointer-events: none;
 }
+
+/*
+ * The big "how to play" message across the middle of the screen.
+ *
+ * For the one thing a player has to know before they can do anything at all.
+ * The objective line at the top carries the same words and is small enough for
+ * a child to miss on their first go. It takes no pointer events, so tapping it
+ * is tapping the screen — which, in the Bear's Lair, is the answer.
+ */
+.hud-callout {
+  position: absolute;
+  left: 50%;
+  top: 62%;
+  transform: translate(-50%, -50%);
+  max-width: min(88%, 620px);
+  padding: 18px 34px;
+  border-radius: 999px;
+  background: rgba(20, 16, 30, 0.72);
+  border: 3px solid #ffd75e;
+  color: #fff;
+  font-size: clamp(22px, 4.4vw, 34px);
+  font-weight: 800;
+  text-align: center;
+  text-shadow: 0 3px 10px rgba(0, 0, 0, 0.55);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+  pointer-events: none;
+  animation: callout-beat 1.5s ease-in-out infinite;
+}
+
+.hud-callout.hidden {
+  display: none;
+}
+
+/* A slow pulse: enough to catch the eye of someone who hasn't noticed it,
+   gentle enough not to nag once they have. */
+@keyframes callout-beat {
+  0%,
+  100% {
+    transform: translate(-50%, -50%) scale(1);
+  }
+  50% {
+    transform: translate(-50%, -50%) scale(1.06);
+  }
+}
