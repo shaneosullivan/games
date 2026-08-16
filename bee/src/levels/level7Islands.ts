@@ -474,7 +474,7 @@ export class IslandsLevel implements Level {
         case "joining": {
           const t = Math.min(1, baby.time / I.joinTime);
           this.trailPoint(tmp);
-          tmp.y -= I.babyDrop;
+          tmp.y = I.flightHeight - I.babyDrop;
           g.position.copy(baby.from).lerp(tmp, ease(t));
           baby.model.animate(this.trailTime, 1);
           if (t >= 1) {
@@ -484,7 +484,11 @@ export class IslandsLevel implements Level {
         }
         case "following": {
           this.trailPoint(tmp);
-          tmp.y -= I.babyDrop;
+          // Its own height, not hers. The trail carries the arc of every hop
+          // she has taken, so a baby that took its height from it rose with
+          // her and sat level with her tail rather than under it. She hops
+          // over it; it flies straight along beneath.
+          tmp.y = I.flightHeight - I.babyDrop;
           // The slight delay: it closes on the square rather than appearing
           // on it, so it swings into each hop a beat after she does.
           tmp.lerp(g.position, Math.exp(-dt / I.followEase));

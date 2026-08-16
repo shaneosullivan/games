@@ -1648,7 +1648,15 @@ export const ISLANDS = {
    * and one of the brood.
    */
   babyScale: 1,
-  babyDrop: 0.7,
+  /**
+   * How far below the queen the baby flies.
+   *
+   * It flies *under* her, not beside her: from overhead the two of them are
+   * one shape at rest, with a bit of baby showing out the back. Enough drop
+   * that the models never intersect — she is about two units deep and it is
+   * about one and a half.
+   */
+  babyDrop: 1.6,
   /**
    * How far behind the queen a baby flies, in squares.
    *
@@ -1662,21 +1670,21 @@ export const ISLANDS = {
    *     she stops: half a second after she lands, half a second ago *is* where
    *     she is standing, and the baby ends up sitting inside her.
    *
-   * Measured on screen rather than chosen: at one square they read as a
-   * single long body from overhead, because the gap closes further still on
-   * the frames she is mid-hop. This is the next square back along her route
-   * and a third again — near enough to read as hers, far enough to see them
-   * as two.
+   * Under her tail rather than a square back: at rest the baby is tucked in
+   * behind and below her and only its back end shows, which is what says it
+   * belongs to her. The gap it is actually seen at is not this number — see
+   * `followEase`, which is what lets it fall behind on a hop.
    */
-  followBehind: 1.35,
+  followBehind: 0.42,
   /**
    * How quickly the baby closes on where it ought to be, in seconds.
    *
-   * This is the "slight delay": the trail says where to be and this says how
-   * eagerly to get there, so it swings into each hop a beat after she does
-   * rather than moving in lockstep with her.
+   * This is the whole of the follow, visually. The trail says where it ought
+   * to be and this says how eagerly it gets there, and being slower than a hop
+   * is the point: she goes and it is left behind for a moment, then it catches
+   * up and tucks back under her while she waits for the next gap.
    */
-  followEase: 0.13,
+  followEase: 0.3,
   /** Joining her from the pedestal, and settling onto one at the far end. */
   joinTime: 0.5,
   settleTime: 0.9,
