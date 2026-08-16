@@ -86,7 +86,7 @@ export function createMapDraw(
   const eraserButton = document.createElement("button");
   eraserButton.type = "button";
   eraserButton.className = "mapdraw-tool";
-  eraserButton.textContent = "🧽 Rubber";
+  eraserButton.textContent = "🧽 Eraser";
   tools.append(penButton, eraserButton);
   card.appendChild(tools);
 
