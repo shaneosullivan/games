@@ -1524,3 +1524,14 @@ body {
   cursor: pointer;
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.18);
 }
+
+/* The tool's ring, on its own layer over the drawing. It must never take a
+   pointer event: everything still belongs to the sheet underneath. */
+.mapdraw-cursor {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: auto;
+  display: block;
+  pointer-events: none;
+}

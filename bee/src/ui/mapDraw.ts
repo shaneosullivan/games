@@ -69,7 +69,11 @@ export function createMapDraw(
   guide.className = "mapdraw-guide";
   const sheet = document.createElement("canvas");
   sheet.className = "mapdraw-sheet";
-  stack.append(guide, sheet);
+  // A third layer on top, for showing where the tool is about to land. It
+  // takes no pointer events — everything still goes to the sheet underneath.
+  const cursor = document.createElement("canvas");
+  cursor.className = "mapdraw-cursor";
+  stack.append(guide, sheet, cursor);
   card.appendChild(stack);
 
   // ---- the tools ----------------------------------------------------------
@@ -114,6 +118,8 @@ export function createMapDraw(
     erasing = rubber;
     penButton.classList.toggle("on", !rubber);
     eraserButton.classList.toggle("on", rubber);
+    // The old tool's ring is the wrong size for the new one.
+    hideCursor();
   };
   penButton.addEventListener("click", () => setTool(false));
   eraserButton.addEventListener("click", () => setTool(true));
@@ -143,7 +149,7 @@ export function createMapDraw(
 
   const image = new Image();
   image.onload = () => {
-    for (const canvas of [guide, sheet]) {
+    for (const canvas of [guide, sheet, cursor]) {
       canvas.width = image.width;
       canvas.height = image.height;
     }
@@ -212,6 +218,41 @@ export function createMapDraw(
     }
   }
 
+  // ---- where the tool is ---------------------------------------------------
+  //
+  // A ring showing what the tool would take or leave, drawn on its own layer
+  // so it can be wiped without touching the drawing underneath.
+  //
+  // The rubber gets one whenever it is down, because it is the one tool whose
+  // effect you cannot see until it has already happened — the pen leaves ink
+  // where it went, the rubber leaves nothing. Both get one on hover, which a
+  // mouse always has and some pens do.
+  function toolRadius(): number {
+    return MAP_DRAW.penRadius * (erasing ? MAP_DRAW.rubber : 1);
+  }
+
+  function showCursor(at: {x: number; y: number}): void {
+    const ctx = cursor.getContext("2d");
+    if (!ctx) {
+      return;
+    }
+    ctx.clearRect(0, 0, cursor.width, cursor.height);
+    ctx.beginPath();
+    ctx.arc(at.x, at.y, toolRadius(), 0, Math.PI * 2);
+    ctx.fillStyle = erasing
+      ? "rgba(255, 255, 255, 0.55)"
+      : "rgba(0, 0, 0, 0.12)";
+    ctx.fill();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = erasing ? "#e2513c" : "#3d3226";
+    ctx.stroke();
+  }
+
+  function hideCursor(): void {
+    const ctx = cursor.getContext("2d");
+    ctx?.clearRect(0, 0, cursor.width, cursor.height);
+  }
+
   // ---- the pen ------------------------------------------------------------
   const drawing = new Map<number, {x: number; y: number}>();
   /** Scoring is not cheap, so it runs on a rest rather than on every move. */
@@ -260,6 +301,11 @@ export function createMapDraw(
     const p = at(e);
     drawing.set(e.pointerId, p);
     dab(p, p);
+    if (erasing) {
+      showCursor(p);
+    } else {
+      hideCursor();
+    }
     try {
       sheet.setPointerCapture(e.pointerId);
     } catch {
@@ -270,12 +316,21 @@ export function createMapDraw(
   sheet.addEventListener("pointermove", e => {
     const last = drawing.get(e.pointerId);
     if (!last) {
+      // Hovering: a mouse always is, and some pens report it before they
+      // touch. Both tools show the ring, so you can see what you are about to
+      // do rather than finding out afterwards.
+      if (e.buttons === 0) {
+        showCursor(at(e));
+      }
       return;
     }
     e.preventDefault();
     const p = at(e);
     dab(last, p);
     drawing.set(e.pointerId, p);
+    if (erasing) {
+      showCursor(p);
+    }
     if (performance.now() >= scoreDue) {
       scoreDue = performance.now() + MAP_DRAW.scoreEvery;
       score();
@@ -283,8 +338,22 @@ export function createMapDraw(
   });
   for (const type of ["pointerup", "pointercancel"]) {
     window.addEventListener(type, e => {
-      if (drawing.delete((e as PointerEvent).pointerId)) {
+      const pointer = e as PointerEvent;
+      if (drawing.delete(pointer.pointerId)) {
+        // A finger that lifts is gone; a mouse or a pen is still hovering
+        // there, so the ring stays where it is.
+        if (pointer.pointerType === "touch") {
+          hideCursor();
+        }
         score();
+      }
+    });
+  }
+  // Off the paper, no ring.
+  for (const type of ["pointerleave", "pointerout"]) {
+    sheet.addEventListener(type, () => {
+      if (drawing.size === 0) {
+        hideCursor();
       }
     });
   }
@@ -295,8 +364,8 @@ export function createMapDraw(
       solved = false;
       done.classList.add("hidden");
       setTool(false);
-      const ctx = sheet.getContext("2d");
-      ctx?.clearRect(0, 0, sheet.width, sheet.height);
+      sheet.getContext("2d")?.clearRect(0, 0, sheet.width, sheet.height);
+      hideCursor();
       good.style.width = "0%";
       bad.style.width = "0%";
       readout.textContent = "Nothing drawn yet";
