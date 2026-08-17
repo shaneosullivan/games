@@ -1657,8 +1657,21 @@ export const ISLANDS = {
   /** Looking down at the board: nearly overhead, but not so straight that the
       shot loses which way is forward. */
   boardPitch: 1.28,
-  /** How much of the screen the board fills once the camera is up. */
-  boardFill: 0.94,
+  /**
+   * How much of the screen the board fills once the camera is up, and how far
+   * up the screen it is pushed.
+   *
+   * The two go together, and both are about the buttons. They are big slabs in
+   * the bottom corners now — deliberately, so they can be found without
+   * looking — and a board framed to fill the glass put the near bank behind
+   * them, which is the row she starts on, returns to, and collects every baby
+   * from. So the board is framed a little smaller and aimed a little short of
+   * its own middle, which lifts it up the screen and leaves the bottom of the
+   * glass to the controls.
+   */
+  boardFill: 0.82,
+  /** Fraction of the board's depth to aim short by. */
+  boardLift: 0.16,
 
   /**
    * The brood she is there for.

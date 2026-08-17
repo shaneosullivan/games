@@ -353,7 +353,9 @@ export class IslandsLevel implements Level {
     // in shot: the brood still waiting and the ones already saved.
     const near = this.scene.rowZ(-1);
     const far = this.scene.rowZ(I.streams + 2);
-    outLook.set(0, 0, (near + far) / 2);
+    // Aimed short of the middle, which lifts the whole board up the screen and
+    // leaves the bottom of the glass to the buttons — see ISLANDS.boardLift.
+    outLook.set(0, 0, (near + far) / 2 + (near - far) * I.boardLift);
     const half = Math.max(((I.cols + 1) / 2) * I.square, (near - far) / 2);
     outEye.copy(ctx.framedCameraEye(outLook, half, I.boardPitch, I.boardFill));
   }
