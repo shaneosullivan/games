@@ -1673,9 +1673,34 @@ body {
   bottom: calc(var(--safe-b) + var(--ui-bottom));
 }
 
+/*
+ * The steering pair, in the opposite corner and built the same way: two
+ * rectangles making one block flush into the bottom-right of the glass, with
+ * only the corner facing the board rounded off. No gap between them — they
+ * are one slab with a line down it, so there is nowhere between them for a
+ * thumb to land on nothing.
+ */
 .hoppad-leftright {
-  right: calc(var(--safe-r) + var(--ui-right) + 22px);
-  bottom: calc(var(--safe-b) + var(--ui-bottom) + 26px);
+  right: calc(var(--safe-r) + var(--ui-right));
+  bottom: calc(var(--safe-b) + var(--ui-bottom));
+  gap: 0;
+}
+
+.hoppad-leftright .hop-btn {
+  width: 170px;
+  height: 190px;
+  border-radius: 0;
+  border-bottom: none;
+}
+
+/* The inner one carries the rounded corner, because it is the only corner of
+   the pair that faces into the play area. */
+.hoppad-leftright .hop-btn:first-child {
+  border-radius: 30px 0 0 0;
+}
+
+.hoppad-leftright .hop-btn:last-child {
+  border-right: none;
 }
 
 .hop-btn {
@@ -1742,6 +1767,11 @@ body {
     width: 150px;
     height: 118px;
     font-size: 48px;
+  }
+
+  .hoppad-leftright .hop-btn {
+    width: 110px;
+    height: 118px;
   }
 
   .hoppad {

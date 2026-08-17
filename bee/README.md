@@ -289,9 +289,18 @@ rather than a delay because a delay collapses the moment she stops: half a
 second after she lands, half a second ago is where she is standing, and the baby
 ends up inside her.
 
-Nothing here is flown. Four buttons replace the stick: up and down under the
-left thumb, where the pair that is asked for most can be found without
-looking, and left and right under the right. One press is one hop.
+Nothing here is flown, and the stick is replaced by three buttons — slabs in
+the two bottom corners, each flush to the edges of the glass with only the
+corner facing the board rounded off, so a thumb arriving from off the screen
+lands on one.
+
+The big one, bottom left, is the only way along the board: it points out to the
+far bank while she is carrying a baby and back again once she isn't, and the
+level says which by calling `setForward`. It was a pair, and a thumb reaching
+for the top half of a pair without looking finds the bottom half about as
+often — which on this board is a hop the wrong way into a stream. Left and
+right are one slab in the other corner with a line down it, and they only
+steer. One press is one hop.
 
 The difficulty is a table, in `ISLANDS.lanes`, and it is measured rather than
 guessed. Riders are spread evenly round a loop wider than the board, a frog is
