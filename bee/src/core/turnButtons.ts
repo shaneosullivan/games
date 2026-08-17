@@ -67,6 +67,15 @@ export class TurnButtons {
       this.keys.delete(e.key);
       this.sync();
     });
+    // A key released while the window is away never reports it, and a held
+    // turn would survive into whatever happens next. HoldInput has had this
+    // since the Bear's Lair; this control needed it just as much.
+    window.addEventListener("blur", () => this.release());
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "hidden") {
+        this.release();
+      }
+    });
     // A pointer released anywhere — dragged off the button, or off the screen
     // entirely — has to stop the turn, or she spins forever. On window rather
     // than on the button, so it arrives whether or not the press was captured.
@@ -101,9 +110,23 @@ export class TurnButtons {
   setVisible(visible: boolean): void {
     this.root.classList.toggle("hidden", !visible);
     if (!visible) {
-      this.held.clear();
-      this.sync();
+      this.release();
     }
+  }
+
+  /**
+   * Let go of everything.
+   *
+   * Keys as well as fingers, which is the whole point of it. The key listeners
+   * are on the window and live for the life of the game, so a key pressed in
+   * *another* level is in this set too — and a keyup that never arrives leaves
+   * a turn latched. Level 5 then starts with the bee spinning on the spot and
+   * nothing on screen to explain it, until the page is reloaded.
+   */
+  release(): void {
+    this.held.clear();
+    this.keys.clear();
+    this.sync();
   }
 
   private button(glyph: string, dir: number, label: string): HTMLButtonElement {

@@ -602,6 +602,12 @@ export class Game {
     // Level 7's buttons belong to level 7. It turns them on itself once its
     // opening shot is over.
     this.hopButtons.setVisible(false);
+    // And nothing anyone was holding in the level being left carries into the
+    // one being entered — see TurnButtons.release, and the maze that started
+    // with the bee turning on the spot because of a key pressed two levels
+    // earlier.
+    this.turnButtons.release();
+    this.hold.release();
     this.level = this.createLevel(clamped);
     this.completeScreen.setText(
       this.level.completionTitle,

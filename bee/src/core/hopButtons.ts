@@ -82,6 +82,16 @@ export class HopButtons {
     this.root.append(updown, leftright);
     host.appendChild(this.root);
 
+    // Nothing queued survives the window going away, for the same reason the
+    // maze's turn buttons let go of their keys: presses made in one place
+    // should not arrive somewhere else.
+    window.addEventListener("blur", () => this.clear());
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "hidden") {
+        this.clear();
+      }
+    });
+
     // The arrows and WASD, so it's playable at a laptop.
     window.addEventListener("keydown", e => {
       const hop = KEYS.get(e.key);
