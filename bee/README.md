@@ -380,6 +380,15 @@ two seconds — and then falls in behind her. That shot is framed with
 `framedCameraEye` rather than a hand-placed height, because a height that held
 all three on a landscape iPad lost the far one on a portrait phone.
 
+**On a phone the map is not drawn at all.** The task is tracing a route through
+artwork nine hundred pixels wide with a fingertip: on an iPad there is room for
+that, and on a phone the same panel is a third of the size with the same finger
+on it — the pen would be wider than the gaps between the lines. Rather than
+quietly make it easier there, the level skips the step and the queen simply
+remembers the way. `core/device.ts` decides, on the _short_ side of the screen
+because the game is played both ways up, and 600 sits in a wide gap: the largest
+phones are about 430 across and the smallest iPad is 744.
+
 **The puzzle art is a placeholder** — a hand-authored SVG in
 `src/assets/bearPuzzle.ts`. To use the real picture, drop the image into
 `src/assets/` and swap that module's export for an image import; `ui/puzzle.ts`

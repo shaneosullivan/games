@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import * as THREETypes from "three";
 import {CAMERA, DOME, LAIR, LAIR_PALETTE} from "../config";
+import {isPhone} from "../core/device";
 import {flapInstruction} from "../core/holdInput";
 import {Rng} from "../core/rng";
 import {FIREWORK_PALETTE} from "../fx/particles";
@@ -502,6 +503,20 @@ export class LairLevel implements Level {
     if (t >= 1) {
       this.phase = "drawing";
       this.phaseTime = 0;
+      /*
+       * On a phone the map is not drawn at all — she remembers the way.
+       *
+       * The task is tracing a route through artwork nine hundred pixels wide
+       * with a fingertip. On an iPad there is room for that; on a phone the
+       * same panel is a third of the size with the same finger on it, and the
+       * pen would be wider than the gaps between the lines. Rather than make
+       * it easier there and quietly different everywhere, the level skips it:
+       * the cave has already been flown, and this was the reward for it.
+       */
+      if (isPhone()) {
+        this.onMapDrawn(ctx);
+        return;
+      }
       // Over to the player: see ui/mapDraw.ts.
       ctx.showMapDraw(true);
       ctx.hud.setObjective("Draw the map!");

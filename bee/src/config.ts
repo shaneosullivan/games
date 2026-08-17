@@ -1478,6 +1478,24 @@ export const LEVELS = {
   waspSeconds: 30,
 } as const;
 
+/**
+ * What kind of thing this is being played on.
+ *
+ * The game is built for an iPad and works on a phone, and there is exactly one
+ * place so far where the difference has to change what happens rather than
+ * only how it is laid out — see core/device.ts.
+ */
+export const DEVICE = {
+  /**
+   * A screen whose short side is under this is a phone.
+   *
+   * The short side, because the game is played both ways up. 600 sits in a
+   * wide gap: the largest phones are around 430 CSS pixels across and the
+   * smallest iPad is 744, so nothing real is anywhere near the line.
+   */
+  phoneShortSide: 600,
+} as const;
+
 export const RENDER = {
   /** iPad Pro's native DPR will melt fill rate; 2 is plenty for this look. */
   maxPixelRatio: 2,
