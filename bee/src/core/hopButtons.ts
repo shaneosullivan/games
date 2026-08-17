@@ -7,10 +7,16 @@
  * which reads a whole circle of directions, and it rules out holding, which
  * would turn a board game into a flight.
  *
- * Split across two corners on purpose. Two hands hold an iPad, and up and down
- * are asked for far more often than left and right — so up and down go under
- * the left thumb where they can be found without looking, and the pair that
- * only steers goes under the right.
+ * Split across two corners on purpose. Two hands hold an iPad, and the way
+ * along the board is asked for far more often than sideways — so it goes under
+ * the left thumb and the pair that only steers goes under the right.
+ *
+ * The left is one button rather than two, and it is the reason for the split.
+ * A thumb reaching for the top half of a pair without looking finds the bottom
+ * half about as often, and on this board that is a hop the wrong way into a
+ * stream. There is only ever one way she is trying to go — out with a baby, or
+ * back for the next — so the button is that way, and the level says which by
+ * calling `setForward`. It cannot be missed and it cannot be misread.
  */
 export type Hop = "up" | "down" | "left" | "right";
 
@@ -42,6 +48,9 @@ export class HopButtons {
 
   private readonly root: HTMLDivElement;
   private readonly pads: Array<HTMLDivElement> = [];
+  /** The big one on the left, and whichever way it is currently pointing. */
+  private forward!: HTMLButtonElement;
+  private forwardHop: Hop = "up";
   /**
    * When each button last fired, so the same tap can't count twice.
    *
@@ -60,10 +69,9 @@ export class HopButtons {
 
     const updown = document.createElement("div");
     updown.className = "hoppad hoppad-updown ui-interactive";
-    updown.append(
-      this.button("▲", "up", "Hop forward"),
-      this.button("▼", "down", "Hop back"),
-    );
+    this.forward = this.button("▲", "up", "Hop forward");
+    this.forward.classList.add("hop-btn-big");
+    updown.append(this.forward);
     const leftright = document.createElement("div");
     leftright.className = "hoppad hoppad-leftright ui-interactive";
     leftright.append(
@@ -85,6 +93,27 @@ export class HopButtons {
     });
   }
 
+  /**
+   * Point the big button the way she needs to go.
+   *
+   * Called every frame by the level; only touches the DOM when the direction
+   * actually changes, which is twice a crossing.
+   */
+  setForward(hop: "up" | "down"): void {
+    if (hop === this.forwardHop) {
+      return;
+    }
+    this.forwardHop = hop;
+    this.forward.textContent = hop === "up" ? "▲" : "▼";
+    this.forward.setAttribute(
+      "aria-label",
+      hop === "up" ? "Hop forward" : "Hop back",
+    );
+    // A direction that changed under a thumb that was already pressing should
+    // not fire the old one; and a queued hop the other way is now wrong.
+    this.clear();
+  }
+
   setVisible(visible: boolean): void {
     this.root.classList.toggle("hidden", !visible);
     if (!visible) {
@@ -100,6 +129,7 @@ export class HopButtons {
   }
 
   private button(glyph: string, hop: Hop, label: string): HTMLButtonElement {
+    const isForward = hop === "up";
     const b = document.createElement("button");
     b.type = "button";
     b.className = "hop-btn ui-interactive";
@@ -119,7 +149,7 @@ export class HopButtons {
       e.preventDefault();
       b.classList.add("pressed");
       setTimeout(() => b.classList.remove("pressed"), 110);
-      this.push(hop);
+      this.push(isForward ? this.forwardHop : hop);
     };
 
     b.addEventListener("pointerdown", fire);

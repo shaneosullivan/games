@@ -1655,12 +1655,22 @@ body {
   touch-action: none;
 }
 
-/* Under the left thumb, stacked, because forward is asked for far more often
-   than sideways and should be the pair that needs no looking for. */
+/*
+ * Under the left thumb, and in the corner itself.
+ *
+ * No margin: it sits flush into the bottom-left of the screen, so the two
+ * edges of the glass are two edges of the button and a thumb arriving from
+ * anywhere below or to the left lands on it. That is the whole point of it —
+ * the way along the board is asked for constantly and should never need
+ * looking at. Which way it points is the level's business; see setForward.
+ *
+ * The insets are still respected, because "the corner of the screen" and "the
+ * corner of the app" are not the same place on an installed iPad app — see
+ * fitViewport.ts, and the maze's turn buttons that ended up in the gap.
+ */
 .hoppad-updown {
-  flex-direction: column;
-  left: calc(var(--safe-l) + var(--ui-left) + 22px);
-  bottom: calc(var(--safe-b) + var(--ui-bottom) + 26px);
+  left: calc(var(--safe-l) + var(--ui-left));
+  bottom: calc(var(--safe-b) + var(--ui-bottom));
 }
 
 .hoppad-leftright {
@@ -1669,13 +1679,13 @@ body {
 }
 
 .hop-btn {
-  width: 88px;
-  height: 88px;
+  width: 176px;
+  height: 176px;
   border-radius: 50%;
   border: 2px solid var(--stroke);
   background: var(--panel-strong);
   color: #fff;
-  font-size: 34px;
+  font-size: 58px;
   line-height: 1;
   display: grid;
   place-items: center;
@@ -1684,6 +1694,23 @@ body {
   backdrop-filter: blur(8px);
   -webkit-tap-highlight-color: transparent;
   touch-action: none;
+}
+
+/*
+ * The one on the left: a corner, not a circle.
+ *
+ * Two of its sides are the screen's own, so only the corner that faces into
+ * the play area is rounded, and the borders along the glass are dropped — a
+ * hairline down the edge of the screen reads as a rendering fault rather than
+ * as an edge.
+ */
+.hop-btn-big {
+  width: 250px;
+  height: 190px;
+  border-radius: 0 30px 0 0;
+  border-left: none;
+  border-bottom: none;
+  font-size: 76px;
 }
 
 /* Pressed is a class rather than :active, because the press is taken on
@@ -1696,11 +1723,25 @@ body {
   background: rgba(255, 209, 92, 0.55);
 }
 
-@media (max-width: 560px), (max-height: 480px) {
+/*
+ * Small screens, where the three of them together are wider than the glass.
+ *
+ * The sizes above are for the iPad this is built for. A phone held upright is
+ * 390 points across and the big button plus the pair plus their margins come
+ * to more than that, so they overlap — the buttons have to come down together
+ * rather than the pair being allowed to slide under the big one.
+ */
+@media (max-width: 700px), (max-height: 480px) {
   .hop-btn {
-    width: 72px;
-    height: 72px;
-    font-size: 28px;
+    width: 96px;
+    height: 96px;
+    font-size: 34px;
+  }
+
+  .hop-btn-big {
+    width: 150px;
+    height: 118px;
+    font-size: 48px;
   }
 
   .hoppad {

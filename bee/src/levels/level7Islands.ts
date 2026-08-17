@@ -364,6 +364,10 @@ export class IslandsLevel implements Level {
     this.boardShot(ctx, eye, look);
     ctx.setCameraCinematic(eye, look);
 
+    // The big button is whichever way she is trying to go: out with a baby, or
+    // back across for the next one. There is never a third answer.
+    ctx.hopButtons.setForward(this.escorting ? "up" : "down");
+
     // A hop in the air finishes before another is taken, so she can never be
     // between two squares in two directions at once.
     if (this.hopT < 1) {
