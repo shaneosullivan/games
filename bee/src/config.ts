@@ -2101,6 +2101,35 @@ export const ASCENT = {
 
   /** How fast she crosses the slope, and how far up and down she may roam. */
   moveSpeed: 30,
+
+  /**
+   * She flies to the finger. Nothing is drawn on the glass at all.
+   *
+   * `lead` is how far in front of the pointer she sits, in normalised device
+   * coordinates — she has to be *visible*, and a bee directly under a child's
+   * thumb is a bee nobody can see. Ahead means up the screen, which here is up
+   * the mountain, so it also puts her where she is shooting.
+   *
+   * She does not teleport: she moves at `moveSpeed` towards wherever the
+   * pointer is, so a finger flung across the glass leaves her trailing after
+   * it. That is the whole feel of the control — it is a bee being led, not a
+   * cursor being dragged.
+   */
+  pointer: {lead: 0.22},
+
+  /** She is drawn this much bigger here than in the meadow. */
+  beeScale: 1.45,
+
+  /**
+   * How much easier the foot of the mountain is than the summit.
+   *
+   * The mountain used to be seeded at one density the whole way up, which made
+   * the first ten seconds as busy as the last and gave a child no run at it.
+   * Everything that can hurt her is thinned to this fraction at the bottom and
+   * comes up to full by the top; what she collects is not, because rewards
+   * should not be scarce exactly when she is learning.
+   */
+  ramp: {from: 0.4, to: 1},
   /** Her window on the slope: how far ahead of and behind the camera's mark. */
   aheadLimit: 16,
   behindLimit: 10,
@@ -2192,6 +2221,14 @@ export const ASCENT = {
   /** Wasps: they come in trains, and clearing a whole train pays. */
   wasp: {
     speed: 20,
+    /**
+     * Drawn this much bigger than the meadow's wasp geometry.
+     *
+     * At natural size a wasp on the mountain is about a unit across and the
+     * camera stands thirty units off it — small enough to read as a fleck of
+     * dirt rather than as something coming for her.
+     */
+    scale: 1.8,
     perTrain: [4, 7],
     spacing: 2.6,
     hits: 1,
@@ -2262,9 +2299,21 @@ export const ASCENT = {
    * a field, and what says "you are climbing" is cloud passing at eye level
    * and below while the summit is still above you.
    */
-  clouds: 22,
-  cloudLow: 6,
-  cloudHigh: 66,
+  clouds: 40,
+  cloudLow: 18,
+  cloudHigh: 130,
+  /** How big a puff is, and how fast the wind pushes it across. */
+  cloudSize: [4, 11],
+  cloudDrift: [2, 6],
+  /**
+   * How long a stretch of sky the clouds are spread over, in units.
+   *
+   * They are recycled round this band as she climbs rather than being seeded
+   * over the whole fifteen hundred: forty clouds spread over the mountain is
+   * an empty sky, and forty spread over the few hundred units she can actually
+   * see is weather.
+   */
+  cloudBand: 380,
 
   /**
    * The edges of the playable strip.

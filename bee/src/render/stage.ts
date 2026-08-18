@@ -159,6 +159,8 @@ export const MOUNTAIN_ENV: EnvironmentSettings = {
 
 export interface Stage {
   renderer: THREE.WebGLRenderer;
+  /** The element that is drawn into — which is not always the whole window. */
+  canvas: HTMLCanvasElement;
   scene: THREE.Scene;
   camera: THREE.PerspectiveCamera;
   sun: THREE.DirectionalLight;
@@ -312,6 +314,7 @@ export function createStage(host: HTMLElement): Stage {
 
   return {
     renderer,
+    canvas,
     scene,
     camera,
     sun,

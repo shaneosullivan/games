@@ -8,6 +8,7 @@ import {ThrottleStick} from "./core/throttleStick";
 import {TurnButtons} from "./core/turnButtons";
 import {HopButtons} from "./core/hopButtons";
 import {HoldInput} from "./core/holdInput";
+import {PointerAim} from "./core/pointerAim";
 import {GameLoop} from "./core/loop";
 import {Rng} from "./core/rng";
 import {Save} from "./core/save";
@@ -114,6 +115,8 @@ export class Game {
   private readonly mountainGroup = new THREE.Group();
   /** "Tap to flap" — level 6's only control. */
   private readonly hold = new HoldInput();
+  /** Where the pointer is, for the level that flies to it. */
+  private readonly aim: PointerAim;
   private readonly interior: HiveInterior;
   private readonly queen = createQueen();
   private readonly babies: BabyRing;
@@ -236,6 +239,7 @@ export class Game {
       () => this.openMenu(),
     );
     this.stick = new Joystick(uiLayer);
+    this.aim = new PointerAim(this.stage.canvas);
     this.altitude = new AltitudeStick(uiLayer, this.bee.desiredHeight);
     this.turnButtons = new TurnButtons(uiLayer);
     this.hopButtons = new HopButtons(uiLayer);
@@ -335,6 +339,7 @@ export class Game {
       get holding() {
         return game.hold.held;
       },
+      aim: this.aim,
       inside: this.inside,
       honeyJar: this.honeyJar,
       bringHoney: () => {
@@ -636,6 +641,9 @@ export class Game {
     // earlier.
     this.turnButtons.release();
     this.hold.release();
+    // And she does not start a level flung at wherever the finger was when the
+    // last one's card was tapped.
+    this.aim.reset();
     this.level = this.createLevel(clamped);
     this.completeScreen.setText(
       this.level.completionTitle,

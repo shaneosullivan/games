@@ -15,6 +15,7 @@ import type {CottageInside} from "../render/geometry/cottageInside";
 import type {HiveSite} from "../render/geometry/world";
 import type {Hud} from "../ui/hud";
 import type {HopButtons} from "../core/hopButtons";
+import type {PointerAim} from "../core/pointerAim";
 
 /** Which set of scenery is on screen. */
 export type EnvironmentName =
@@ -135,6 +136,14 @@ export interface GameContext {
   readonly stick: {x: number; y: number; magnitude: number};
   /** True while anything at all is held on the screen — level 9's trigger. */
   readonly holding: boolean;
+  /**
+   * Where the pointer is on the canvas, in the same coordinates
+   * `projectToScreen` returns.
+   *
+   * Level 9's control: the bee flies to the finger rather than being leaned
+   * about by a stick. See core/pointerAim.ts.
+   */
+  readonly aim: PointerAim;
   inside: CottageInside;
   honeyJar: DanglingLoad;
   /** Small pollen motes. */

@@ -231,6 +231,17 @@ export function createMountain(rng: Rng): Mountain {
   // cloud tilted with the mountain reads as a lump of snow in mid-air.
   const cloudGeo = puff();
   const cloudMat = vertexToon();
+  /*
+   * Clouds are the one thing here that ignores the fog.
+   *
+   * The sky above the ridge is four hundred units away, which is exactly where
+   * this level's fog turns everything into the background — so the clouds were
+   * being painted the colour of the sky they were drawn against, and the first
+   * draft of this level looked like an empty blue dome. Fog on a white cloud
+   * only ever takes it away, and a real one holds its shape at that distance
+   * anyway.
+   */
+  cloudMat.fog = false;
   const clouds: Array<{mesh: THREE.Mesh; speed: number}> = [];
   for (let i = 0; i < A.clouds; i++) {
     const mesh = new THREE.Mesh(cloudGeo, cloudMat);
@@ -244,8 +255,17 @@ export function createMountain(rng: Rng): Mountain {
      * bury them in, because cloud passing below you is the thing that says how
      * high you have climbed.
      */
-    const along = rng.range(-A.climb - 80, 30);
-    const ground = -along * Math.sin(A.pitch);
+    const along = rng.range(-A.cloudBand, 40);
+    /*
+     * The ground under a cloud, from the cloud's *world* z.
+     *
+     * Tangent, not sine. The slope is tilted about x, so a point s up it is
+     * at world z = -s·cos(pitch) and world y = s·sin(pitch) — which in terms
+     * of z is -z·tan(pitch). Using the sine put every cloud six percent low,
+     * which over five hundred units of climb is thirty units, i.e. underneath
+     * the hillside they were supposed to be floating over.
+     */
+    const ground = -along * Math.tan(A.pitch);
     const far = rng.next() < 0.45;
     mesh.position.set(
       far
@@ -257,11 +277,19 @@ export function createMountain(rng: Rng): Mountain {
           : rng.range(A.cloudLow, A.cloudHigh)),
       along,
     );
-    mesh.scale.setScalar(rng.range(2.4, 6));
+    mesh.scale.setScalar(rng.range(A.cloudSize[0], A.cloudSize[1]));
+    // Each one turned a different way, so a sky of forty puffs built from one
+    // geometry doesn't read as forty copies of the same puff.
+    mesh.rotation.y = rng.range(0, Math.PI * 2);
     group.add(mesh);
     clouds.push({
       mesh,
-      speed: rng.range(1.4, 4.2) * (rng.next() < 0.5 ? -1 : 1),
+      // Half the wind goes one way and half the other. Clouds all drifting
+      // together read as the camera moving; clouds crossing each other read as
+      // weather.
+      speed:
+        rng.range(A.cloudDrift[0], A.cloudDrift[1]) *
+        (rng.next() < 0.5 ? -1 : 1),
     });
   }
 
@@ -293,9 +321,23 @@ export function createMountain(rng: Rng): Mountain {
         } else if (cloud.mesh.position.x < -190) {
           cloud.mesh.position.x = 190;
         }
-        // Recycled up the mountain as she climbs, so the sky never runs out.
-        if (cloud.mesh.position.z > -climbed + 60) {
-          cloud.mesh.position.z -= 320;
+        /*
+         * Recycled up the mountain as she climbs, so the sky never runs out.
+         *
+         * The threshold is *behind* the camera, not in front of it. It used to
+         * be sixty units up the slope from her, which meant every cloud in the
+         * game turned round and went back before it ever got near — the sky had
+         * weather on the horizon and nothing at all overhead. The camera stands
+         * about `climbed·cos(pitch)` down the world's z, and this is a little
+         * further back again, so a cloud gets to pass over her head first.
+         */
+        if (cloud.mesh.position.z > -climbed * Math.cos(A.pitch) + 80) {
+          cloud.mesh.position.z -= A.cloudBand;
+          // And it goes *up* with the mountain it is being moved over. Moved
+          // back without being raised, a recycled cloud kept the height it was
+          // born at and ended up inside the hillside — which is why the sky
+          // emptied out after the first few hundred units of the climb.
+          cloud.mesh.position.y += A.cloudBand * Math.tan(A.pitch);
         }
       }
       void tmp;

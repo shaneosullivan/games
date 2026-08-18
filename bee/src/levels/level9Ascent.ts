@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import {ASCENT as A, ASCENT_PALETTE as P} from "../config";
 import {Rng} from "../core/rng";
+import {aimInstruction} from "../core/pointerAim";
 import {
   createFoeKit,
   Seeds,
@@ -163,19 +164,23 @@ export class AscentLevel implements Level {
     ctx.bee.scripted = true;
     ctx.bee.setCrown(true);
     /*
-     * The first level's control, with two changes.
+     * Nothing on the glass at all.
      *
-     * The stick plants itself wherever a finger lands rather than only in its
-     * corner, because here the same finger both moves her and fires — asking a
-     * child to put it down in the right place first would cost them the shot.
-     * And no altitude slider: she flies at one height up the whole mountain,
-     * so it would be a control with nothing on the other end of it.
+     * She goes where the finger is — see `steer` — which leaves no stick to
+     * plant, no slider to reach for and no button to miss. It also settles
+     * what fires her seeds: she fires by herself, the whole way up. A trigger
+     * would have to be a second finger or a held mouse button on top of the
+     * steering, and neither is something to ask of a child playing this.
      */
-    ctx.setFlightControls(true, {altitude: false, anywhere: true});
+    ctx.setFlightControls(false);
+    ctx.aim.reset();
+    // Bigger than she is in the meadow: the camera stands thirty units off
+    // her here, and at her ordinary size she is a speck in her own level.
+    ctx.bee.setScale(A.beeScale);
     this.placeBee(ctx);
 
     ctx.hud.setBanner(this.name);
-    ctx.hud.setObjective("Up the mountain! Hold the screen to shoot.");
+    ctx.hud.setObjective("Up the mountain! She follows your finger.");
     ctx.hud.setCounters([
       {
         key: "moss",
@@ -186,7 +191,7 @@ export class AscentLevel implements Level {
       },
     ]);
     ctx.hud.setHealth(1);
-    ctx.hud.setCallout("Hold anywhere to shoot!");
+    ctx.hud.setCallout(aimInstruction());
   }
 
   exit(ctx: GameContext): void {
@@ -198,6 +203,7 @@ export class AscentLevel implements Level {
     this.kit.dispose();
     ctx.bee.scripted = false;
     ctx.bee.setCrown(false);
+    ctx.bee.setScale(1);
   }
 
   resumeAfterCompletion(): void {
@@ -238,28 +244,13 @@ export class AscentLevel implements Level {
     this.climbed += A.climbSpeed * dt;
     this.mercy = Math.max(0, this.mercy - dt);
 
-    // Her own movement: the stick leans her across and up the slope, on top of
-    // the climb that happens whether she likes it or not.
-    const stick = ctx.stick;
-    const across = this.acrossLimit(ctx);
-    this.playHalf = across;
-    this.x = THREE.MathUtils.clamp(
-      this.x + stick.x * A.moveSpeed * dt,
-      -across,
-      across,
-    );
-    this.ahead = THREE.MathUtils.clamp(
-      this.ahead - stick.y * A.moveSpeed * dt,
-      -A.behindLimit,
-      this.aheadLimit(ctx),
-    );
-    this.placeBee(ctx);
+    this.steer(dt, ctx);
 
-    // Holding the screen — the stick, or a key — is what makes her shoot, and
-    // which weapon she is carrying decides what comes out. See ASCENT.weapon.
+    // She fires the whole way up; which weapon she is carrying decides what
+    // comes out. See ASCENT.weapon.
     this.sinceShot += dt;
     const rate = A.seed.every / A.weapon.rate[this.weapon - 1];
-    if ((stick.magnitude > 0 || ctx.holding) && this.sinceShot >= rate) {
+    if (this.sinceShot >= rate) {
       this.sinceShot = 0;
       this.volley();
       ctx.audio.collect(0);
@@ -273,6 +264,115 @@ export class AscentLevel implements Level {
     if (this.climbed >= A.climb) {
       this.reachSummit(ctx);
     }
+  }
+
+  /**
+   * Fly her to the finger.
+   *
+   * Two halves. Where the pointer is pointing has to be turned into a place on
+   * the mountain, which `aimTarget` does; and then she is *walked* towards it
+   * at her own speed rather than put there. The second half is what makes the
+   * control feel like a bee and not a cursor — flick the finger across the
+   * screen and she comes after it, arriving a moment later.
+   *
+   * With no pointer yet — a laptop nobody has touched the mouse on, or the
+   * first frame of the level — she simply holds still. The alternative is
+   * assuming the middle of the screen, which drags her off her mark before the
+   * player has done anything at all.
+   */
+  private steer(dt: number, ctx: GameContext): void {
+    const across = this.acrossLimit(ctx);
+    const forward = this.aheadLimit(ctx);
+    this.playHalf = across;
+
+    if (ctx.aim.active) {
+      const want = this.aimTarget(ctx, ctx.aim.x, ctx.aim.y + A.pointer.lead);
+      const dx = THREE.MathUtils.clamp(want.x, -across, across) - this.x;
+      const dz =
+        THREE.MathUtils.clamp(want.y, -A.behindLimit, forward) - this.ahead;
+      const gap = Math.hypot(dx, dz);
+      const step = A.moveSpeed * dt;
+      if (gap <= step || gap === 0) {
+        this.x += dx;
+        this.ahead += dz;
+      } else {
+        this.x += (dx / gap) * step;
+        this.ahead += (dz / gap) * step;
+      }
+    }
+
+    // The limits still apply when she isn't being steered: the screen changes
+    // shape under her when a phone is turned, and the mark she is measured
+    // against moves up the mountain every frame regardless.
+    this.x = THREE.MathUtils.clamp(this.x, -across, across);
+    this.ahead = THREE.MathUtils.clamp(this.ahead, -A.behindLimit, forward);
+    this.placeBee(ctx);
+  }
+
+  /**
+   * Where on the slope a point on the screen is — in her two coordinates,
+   * across and ahead.
+   *
+   * Solved rather than unprojected. Unprojecting a screen point gives a ray,
+   * and turning that ray into a place on the mountain means intersecting it
+   * with the plane she flies in, which is a tilted plane in another group's
+   * space: three or four transforms to keep straight, and every one of them a
+   * chance to get the mountain's pitch backwards, which has happened here
+   * before.
+   *
+   * Instead this asks the question the level can already answer — where does
+   * *this* point on the slope land on the screen? — and inverts it
+   * numerically. The map from (across, ahead) to screen is smooth and, over
+   * the few units she can be from her mark, near enough linear, so two
+   * Newton steps on a measured 2×2 Jacobian land within a fraction of a unit.
+   * Nine projections a frame, and it cannot be wrong about the geometry
+   * because it never assumes any.
+   */
+  private aimTarget(
+    ctx: GameContext,
+    ndcX: number,
+    ndcY: number,
+  ): {x: number; y: number} {
+    /** A half-unit probe, big enough to measure and small enough to be local. */
+    const h = 0.5;
+    let x = this.x;
+    let ahead = this.ahead;
+
+    for (let step = 0; step < 2; step++) {
+      const at = this.screenOf(ctx, x, ahead);
+      const ex = ndcX - at.x;
+      const ey = ndcY - at.y;
+      const byX = this.screenOf(ctx, x + h, ahead);
+      const byA = this.screenOf(ctx, x, ahead + h);
+      // Columns of the Jacobian: how the screen point moves per unit of each.
+      const a = (byX.x - at.x) / h;
+      const b = (byA.x - at.x) / h;
+      const c = (byX.y - at.y) / h;
+      const d = (byA.y - at.y) / h;
+      const det = a * d - b * c;
+      if (Math.abs(det) < 1e-6) {
+        break;
+      }
+      x += (ex * d - ey * b) / det;
+      ahead += (a * ey - c * ex) / det;
+      // Kept in the neighbourhood the linearisation is good for; the clamp in
+      // `steer` is the one that decides where she may actually be.
+      x = THREE.MathUtils.clamp(x, -A.halfWidth, A.halfWidth);
+      ahead = THREE.MathUtils.clamp(ahead, -A.behindLimit * 2, 60);
+    }
+    return {x, y: ahead};
+  }
+
+  /** Where a place on the slope lands on the screen, in NDC. */
+  private screenOf(
+    ctx: GameContext,
+    x: number,
+    ahead: number,
+  ): {x: number; y: number} {
+    tmp.set(x, A.flightHeight, -(this.climbed + ahead));
+    this.mountain.slope.localToWorld(tmp);
+    const p = ctx.projectToScreen(tmp);
+    return {x: p.x, y: p.y};
   }
 
   /**
@@ -473,25 +573,50 @@ export class AscentLevel implements Level {
       const from = this.spawnedTo;
       this.spawnedTo += 100;
       const at = (n: number) => Math.round(n + this.rng.range(-0.4, 0.6));
-      for (let i = 0; i < at(A.perHundred.rocks); i++) {
+      /*
+       * How hard this stretch of mountain is.
+       *
+       * Applied to the hazards only, and to how many rather than to what they
+       * do: a rock that hits for less is a rock that lies about itself, but a
+       * mountain with fewer of them on it is simply a gentler mountain. The
+       * flowers and the moss keep their own numbers — thinning the rewards at
+       * the bottom would take her weapon away exactly when she is learning
+       * the controls, which is the opposite of easier.
+       */
+      const hard = this.difficulty(from);
+      for (let i = 0; i < at(A.perHundred.rocks * hard); i++) {
         this.addRock(from);
       }
-      for (let i = 0; i < at(A.perHundred.waspTrains); i++) {
+      for (let i = 0; i < at(A.perHundred.waspTrains * hard); i++) {
         this.addTrain(from);
       }
-      for (let i = 0; i < at(A.perHundred.frogs); i++) {
+      for (let i = 0; i < at(A.perHundred.frogs * hard); i++) {
         this.addFrog(from);
       }
       for (let i = 0; i < at(A.perHundred.moss); i++) {
         this.addMoss(from);
       }
-      for (let i = 0; i < at(A.perHundred.cans); i++) {
+      for (let i = 0; i < at(A.perHundred.cans * hard); i++) {
         this.addCan(from);
       }
       for (let i = 0; i < at(A.flower.perHundred); i++) {
         this.addFlower(from);
       }
     }
+  }
+
+  /**
+   * How busy the mountain is this far up it: 0.4 at the foot, 1 at the summit.
+   *
+   * Squared on the way up, so the easy part is not a brief formality at the
+   * start but most of the first half — the curve is still under two thirds at
+   * the halfway mark and only steepens near the top, which is where the
+   * weapon she has been collecting flowers for is meant to start earning
+   * itself.
+   */
+  private difficulty(upTo: number): number {
+    const t = THREE.MathUtils.clamp(upTo / A.climb, 0, 1);
+    return A.ramp.from + (A.ramp.to - A.ramp.from) * t * t;
   }
 
   private place(foe: Foe, geo: THREE.BufferGeometry, scale = 1): Foe {
@@ -559,13 +684,15 @@ export class AscentLevel implements Level {
           group: new THREE.Group(),
           x: lane,
           z,
-          radius: 1.1,
+          // The body is drawn bigger, so what she has to fly around is too.
+          radius: 1.1 * A.wasp.scale,
           hits: A.wasp.hits,
           dead: false,
           train: id,
           speed: A.wasp.speed,
         },
         this.kit.wasp,
+        A.wasp.scale,
       );
       // Remembered on the group, so every wasp in a train flies the same
       // curve a beat apart — which is what makes it read as a formation.
@@ -875,7 +1002,11 @@ export class AscentLevel implements Level {
   /** A seed has arrived somewhere: is anything there? */
   private shoot(x: number, z: number, ctx: GameContext): boolean {
     for (const foe of this.foes) {
-      if (foe.dead || foe.kind === "moss") {
+      // The moss and the flowers are hers to collect, not to shoot. A flower
+      // carries no hits, so before this it died to the first seed that touched
+      // it — the weapon she was flying towards destroyed the thing that would
+      // have upgraded it.
+      if (foe.dead || foe.kind === "moss" || foe.kind === "flower") {
         continue;
       }
       if (Math.hypot(x - foe.x, z - foe.z) > foe.radius + A.seed.radius) {
