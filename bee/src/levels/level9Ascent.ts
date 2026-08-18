@@ -1,0 +1,736 @@
+import * as THREE from "three";
+import {ASCENT as A, ASCENT_PALETTE as P} from "../config";
+import {Rng} from "../core/rng";
+import {
+  createFoeKit,
+  Seeds,
+  type Foe,
+  type FoeKit,
+} from "../entities/slopeFoes";
+import {FIREWORK_PALETTE} from "../fx/particles";
+import {createMountain, type Mountain} from "../render/geometry/mountain";
+import type {GameContext, Level} from "./level";
+
+type Phase = "climbing" | "summit" | "sweep" | "done";
+
+const tmp = new THREE.Vector3();
+const eye = new THREE.Vector3();
+const look = new THREE.Vector3();
+const fromEye = new THREE.Vector3();
+const fromLook = new THREE.Vector3();
+
+const ease = (t: number): number =>
+  t < 0.5 ? 2 * t * t : 1 - (1 - t) * (1 - t) * 2;
+
+/**
+ * Level 9 — Up the Mouldy Mountain.
+ *
+ * 1942, flown up a mountainside. She climbs at a fixed rate and everything
+ * else comes down at her: rocks that tumble and bounce off the bumps, trains
+ * of wasps, frogs that sit still and lash with their tongues, and cans of
+ * pesticide that take some killing. Hold the screen and she spits seeds up the
+ * hill; hover over a patch of glowing moss and she lifts it.
+ *
+ * Two things about how it is built.
+ *
+ * Everything is in *slope space* — x across the hill, -z up it, y off the
+ * surface — inside one tilted group, so nothing here does trigonometry about
+ * the mountain's pitch. See render/geometry/mountain.ts.
+ *
+ * And she is scripted: the level writes her position, because 1942 is not a
+ * flight model. The stick says which way she is leaning and this moves her,
+ * which is what makes the controls feel immediate at the pace the screen is
+ * scrolling.
+ */
+export class AscentLevel implements Level {
+  readonly name = "Up the Mountain";
+  readonly completionTitle = "The summit!";
+  readonly completionBody =
+    "Snow, sky, and one enormous boulder. Nothing on that mountain stopped her.";
+  readonly failTitle = "Down she goes";
+  readonly failBody =
+    "The mountain got the better of you that time. The moss you gathered is still yours. Another go?";
+
+  /** The last level built so far, so its card offers the map. */
+  readonly finishesGame = true;
+
+  complete = false;
+  failed = false;
+
+  private mountain!: Mountain;
+  private kit!: FoeKit;
+  private seeds!: Seeds;
+  private phase: Phase = "climbing";
+  private phaseTime = 0;
+
+  /** How far up the mountain she has come. The level's clock. */
+  private climbed = 0;
+  /** Where she is on the slope, in slope space. */
+  private x = 0;
+  private z = 0;
+
+  private health = A.health;
+  private mercy = 0;
+  private moss = 0;
+  private sinceShot = 0;
+
+  private readonly foes: Array<Foe> = [];
+  /** Wasp trains still unbroken, by id, and how many of each are left. */
+  private readonly trains = new Map<number, number>();
+  private spawnedTo = 0;
+  private nextTrain = 1;
+  private rng = new Rng(0x9_04_17);
+
+  /** Tongues and sprays in flight, drawn as one shaft each. */
+  private readonly reaches: Array<{mesh: THREE.Mesh; foe: Foe}> = [];
+
+  private bursts = 0;
+  private nextBurst = 0;
+
+  get controlsLocked(): boolean {
+    return this.phase !== "climbing";
+  }
+
+  enter(ctx: GameContext): void {
+    ctx.setEnvironment("mountain");
+    this.rng = new Rng(0x9_04_17);
+    this.mountain = createMountain(this.rng);
+    ctx.mountain.add(this.mountain.group);
+
+    this.kit = createFoeKit();
+    this.seeds = new Seeds();
+    this.mountain.slope.add(this.seeds.mesh);
+
+    this.foes.length = 0;
+    this.reaches.length = 0;
+    this.trains.clear();
+    this.spawnedTo = 0;
+    this.nextTrain = 1;
+    this.climbed = 0;
+    this.x = 0;
+    this.z = 0;
+    this.health = A.health;
+    this.mercy = 0;
+    this.moss = 0;
+    this.sinceShot = 0;
+    this.phase = "climbing";
+    this.phaseTime = 0;
+    this.complete = false;
+    this.failed = false;
+    this.bursts = 0;
+    this.nextBurst = 0;
+
+    ctx.configureFlight({
+      boundsRadius: 4000,
+      minHeight: 0,
+      maxHeight: 60,
+      cameraDistance: A.camera.back,
+      cameraHeight: A.camera.up,
+    });
+    // She is placed by hand every frame; the flight model never sees her.
+    ctx.bee.scripted = true;
+    ctx.bee.setCrown(true);
+    ctx.setFlightControls(false);
+    this.placeBee(ctx);
+
+    ctx.hud.setBanner(this.name);
+    ctx.hud.setObjective("Up the mountain! Hold the screen to shoot.");
+    ctx.hud.setCounters([
+      {
+        key: "moss",
+        label: "Moss",
+        color: P.moss,
+        value: 0,
+        target: A.moss.needed,
+      },
+    ]);
+    ctx.hud.setHealth(1);
+    ctx.hud.setCallout("Hold anywhere to shoot!");
+  }
+
+  exit(ctx: GameContext): void {
+    ctx.hud.setCallout(null);
+    ctx.hud.setHealth(null);
+    ctx.mountain.remove(this.mountain.group);
+    this.mountain.dispose();
+    this.seeds.dispose();
+    this.kit.dispose();
+    ctx.bee.scripted = false;
+    ctx.bee.setCrown(false);
+  }
+
+  resumeAfterCompletion(): void {
+    // The summit is the end of the mountain; there is nothing to re-arm.
+  }
+
+  /** Another go, from the bottom, but the moss she gathered is hers. */
+  retry(ctx: GameContext): void {
+    const kept = this.moss;
+    this.exit(ctx);
+    this.enter(ctx);
+    this.moss = kept;
+    ctx.hud.setCount("moss", this.moss, A.moss.needed);
+  }
+
+  update(dt: number, ctx: GameContext): void {
+    this.phaseTime += dt;
+    this.mountain.update(dt, this.climbed);
+
+    switch (this.phase) {
+      case "climbing":
+        this.updateClimbing(dt, ctx);
+        break;
+      case "summit":
+        this.updateSummit(dt, ctx);
+        break;
+      case "sweep":
+        this.updateSweep(ctx);
+        break;
+      case "done":
+        break;
+    }
+  }
+
+  // ---- the climb ----------------------------------------------------------
+
+  private updateClimbing(dt: number, ctx: GameContext): void {
+    this.climbed += A.climbSpeed * dt;
+    this.mercy = Math.max(0, this.mercy - dt);
+
+    // Her own movement: the stick leans her across and up the slope, on top of
+    // the climb that happens whether she likes it or not.
+    const stick = ctx.stick;
+    this.x = THREE.MathUtils.clamp(
+      this.x + stick.x * A.moveSpeed * dt,
+      -A.halfWidth,
+      A.halfWidth,
+    );
+    this.z = THREE.MathUtils.clamp(
+      this.z + stick.y * A.moveSpeed * dt,
+      -A.aheadLimit,
+      A.behindLimit,
+    );
+    this.placeBee(ctx);
+
+    // Holding the screen — the stick, or a key — is what makes her shoot.
+    this.sinceShot += dt;
+    if (
+      (stick.magnitude > 0 || ctx.holding) &&
+      this.sinceShot >= A.seed.every
+    ) {
+      this.sinceShot = 0;
+      this.seeds.fire(this.x, this.slopeZ() - 1.5);
+      ctx.audio.collect(0);
+    }
+
+    this.spawn();
+    this.updateFoes(dt, ctx);
+    this.seeds.update(dt, (x, z) => this.shoot(x, z, ctx));
+    this.camera(ctx);
+
+    if (this.climbed >= A.climb) {
+      this.reachSummit(ctx);
+    }
+  }
+
+  /** Where she is up the mountain, in the slope's own z. */
+  private slopeZ(): number {
+    return -(this.climbed + this.z);
+  }
+
+  private placeBee(ctx: GameContext): void {
+    tmp.set(this.x, A.flightHeight, this.slopeZ());
+    this.mountain.slope.localToWorld(tmp);
+    ctx.bee.teleport(tmp);
+    // Facing up the hill, tipped with the slope.
+    ctx.bee.setYaw(Math.PI);
+  }
+
+  /** Behind her and above, looking up the mountain. */
+  private camera(ctx: GameContext): void {
+    tmp.set(this.x * 0.35, A.flightHeight, -this.climbed + A.camera.back);
+    this.mountain.slope.localToWorld(tmp);
+    eye.copy(tmp);
+    eye.y += A.camera.up;
+    tmp.set(this.x * 0.35, 0, -(this.climbed + 34));
+    this.mountain.slope.localToWorld(tmp);
+    look.copy(tmp);
+    ctx.setCameraCinematic(eye, look);
+  }
+
+  // ---- what is on the mountain -------------------------------------------
+
+  /**
+   * Stock the slope ahead of her.
+   *
+   * Seeded by how far up she has come rather than by a clock, so the mountain
+   * is the same mountain however fast she flies it — and so the numbers in
+   * ASCENT.perHundred mean what they say.
+   */
+  private spawn(): void {
+    const ahead = this.climbed + 190;
+    while (this.spawnedTo < ahead && this.spawnedTo < A.climb - 40) {
+      const from = this.spawnedTo;
+      this.spawnedTo += 100;
+      const at = (n: number) => Math.round(n + this.rng.range(-0.4, 0.6));
+      for (let i = 0; i < at(A.perHundred.rocks); i++) {
+        this.addRock(from);
+      }
+      for (let i = 0; i < at(A.perHundred.waspTrains); i++) {
+        this.addTrain(from);
+      }
+      for (let i = 0; i < at(A.perHundred.frogs); i++) {
+        this.addFrog(from);
+      }
+      for (let i = 0; i < at(A.perHundred.moss); i++) {
+        this.addMoss(from);
+      }
+      for (let i = 0; i < at(A.perHundred.cans); i++) {
+        this.addCan(from);
+      }
+    }
+  }
+
+  private place(foe: Foe, geo: THREE.BufferGeometry, scale = 1): Foe {
+    const mesh = new THREE.Mesh(geo, this.kit.material);
+    mesh.scale.setScalar(scale);
+    mesh.castShadow = true;
+    foe.group.add(mesh);
+    foe.group.position.set(foe.x, 0, foe.z);
+    this.mountain.slope.add(foe.group);
+    this.foes.push(foe);
+    return foe;
+  }
+
+  private acrossSlope(): number {
+    return this.rng.range(-A.halfWidth + 2, A.halfWidth - 2);
+  }
+
+  private addRock(from: number): void {
+    const size = Math.floor(this.rng.range(0, A.rock.sizes.length));
+    const radius = A.rock.sizes[size];
+    this.place(
+      {
+        kind: "rock",
+        group: new THREE.Group(),
+        x: this.acrossSlope(),
+        z: -(from + this.rng.range(60, 190)),
+        radius,
+        hits: A.rock.hits[size],
+        dead: false,
+        speed: this.rng.range(A.rock.speed[0], A.rock.speed[1]),
+        lift: 0,
+        rise: 0,
+      },
+      this.kit.rock,
+      radius,
+    );
+  }
+
+  private addTrain(from: number): void {
+    const id = this.nextTrain++;
+    const count = Math.round(
+      this.rng.range(A.wasp.perTrain[0], A.wasp.perTrain[1]),
+    );
+    this.trains.set(id, count);
+    // Each train flies its own shape across the slope as it comes down.
+    const lane = this.acrossSlope();
+    const sway = this.rng.range(6, 14);
+    const wavelength = this.rng.range(18, 34);
+    for (let i = 0; i < count; i++) {
+      const z = -(from + this.rng.range(120, 190)) - i * A.wasp.spacing;
+      const foe = this.place(
+        {
+          kind: "wasp",
+          group: new THREE.Group(),
+          x: lane,
+          z,
+          radius: 1.1,
+          hits: A.wasp.hits,
+          dead: false,
+          train: id,
+          speed: A.wasp.speed,
+        },
+        this.kit.wasp,
+      );
+      // Remembered on the group, so every wasp in a train flies the same
+      // curve a beat apart — which is what makes it read as a formation.
+      foe.group.userData.sway = sway;
+      foe.group.userData.wavelength = wavelength;
+      foe.group.userData.lane = lane;
+    }
+  }
+
+  private addFrog(from: number): void {
+    this.place(
+      {
+        kind: "frog",
+        group: new THREE.Group(),
+        x: this.acrossSlope(),
+        z: -(from + this.rng.range(80, 190)),
+        radius: 2,
+        hits: A.frog.hits,
+        dead: false,
+        next: this.rng.range(A.frog.every[0], A.frog.every[1]),
+        firing: 0,
+      },
+      this.kit.frog,
+    );
+  }
+
+  private addCan(from: number): void {
+    this.place(
+      {
+        kind: "can",
+        group: new THREE.Group(),
+        x: this.acrossSlope(),
+        z: -(from + this.rng.range(90, 190)),
+        radius: 2.2,
+        hits: A.pesticide.hits,
+        dead: false,
+        next: this.rng.range(A.pesticide.every[0], A.pesticide.every[1]),
+        firing: 0,
+      },
+      this.kit.can,
+    );
+  }
+
+  private addMoss(from: number): void {
+    this.place(
+      {
+        kind: "moss",
+        group: new THREE.Group(),
+        x: this.acrossSlope(),
+        z: -(from + this.rng.range(70, 190)),
+        radius: A.moss.radius,
+        hits: 0,
+        dead: false,
+        picked: 0,
+      },
+      this.kit.moss,
+    );
+  }
+
+  // ---- moving them --------------------------------------------------------
+
+  private updateFoes(dt: number, ctx: GameContext): void {
+    const beeZ = this.slopeZ();
+    for (let i = this.foes.length - 1; i >= 0; i--) {
+      const foe = this.foes[i];
+      if (foe.dead) {
+        continue;
+      }
+      switch (foe.kind) {
+        case "rock":
+          this.tumble(foe, dt);
+          break;
+        case "wasp":
+          this.flyWasp(foe, dt);
+          break;
+        case "frog":
+        case "can":
+          this.reach(foe, dt, ctx);
+          break;
+        case "moss":
+          this.pick(foe, dt, ctx);
+          break;
+      }
+
+      // Anything that has gone past her, behind the camera, is finished with.
+      if (foe.z > beeZ + A.camera.back + 30) {
+        this.retire(foe);
+        this.foes.splice(i, 1);
+        continue;
+      }
+      if (foe.kind !== "moss" && this.touching(foe, ctx)) {
+        this.hurt(ctx, foe.kind === "rock" ? A.damage.rock : A.damage.wasp);
+        if (foe.kind === "wasp") {
+          // A wasp that flies into her is spent.
+          this.kill(foe, ctx, false);
+        }
+      }
+    }
+  }
+
+  /** Down the hill, bouncing over anything in the way. */
+  private tumble(foe: Foe, dt: number): void {
+    foe.z += (foe.speed ?? 0) * dt;
+    foe.rise = (foe.rise ?? 0) - A.rock.gravity * dt;
+    foe.lift = Math.max(0, (foe.lift ?? 0) + (foe.rise ?? 0) * dt);
+    if ((foe.lift ?? 0) <= 0) {
+      foe.rise = 0;
+      // On the ground: does it meet a bump?
+      for (const bump of this.mountain.bumps) {
+        if (
+          Math.hypot(foe.x - bump.x, foe.z - bump.z) <
+          bump.radius + foe.radius * 0.5
+        ) {
+          foe.rise = A.rock.bounce;
+          foe.lift = 0.01;
+          foe.speed = (foe.speed ?? 0) * A.rock.bounceCost;
+          break;
+        }
+      }
+    }
+    foe.group.position.set(foe.x, foe.radius + (foe.lift ?? 0), foe.z);
+    // Rolling: it turns about the axis across its own travel.
+    foe.group.rotation.x += ((foe.speed ?? 0) / foe.radius) * dt;
+  }
+
+  /** Wasps fly their train's curve down the slope. */
+  private flyWasp(foe: Foe, dt: number): void {
+    foe.z += (foe.speed ?? 0) * dt;
+    const {sway = 0, wavelength = 24, lane = 0} = foe.group.userData;
+    foe.x = THREE.MathUtils.clamp(
+      lane + Math.sin((foe.z / wavelength) * Math.PI) * sway,
+      -A.halfWidth,
+      A.halfWidth,
+    );
+    foe.group.position.set(foe.x, A.flightHeight, foe.z);
+  }
+
+  /** Frogs and cans stand still and reach down the hill for her. */
+  private reach(foe: Foe, dt: number, ctx: GameContext): void {
+    foe.group.position.set(foe.x, 0, foe.z);
+    const isFrog = foe.kind === "frog";
+    const spec = isFrog ? A.frog : A.pesticide;
+    const beeZ = this.slopeZ();
+    const inRange = beeZ > foe.z && beeZ - foe.z < spec.reach;
+
+    if ((foe.firing ?? 0) > 0) {
+      foe.firing = (foe.firing ?? 0) - dt;
+      const length = isFrog ? beeZ - foe.z : A.pesticide.reach;
+      this.showReach(foe, length, isFrog);
+      // Anything in the shaft is hit, once, on the frame it lands.
+      const across = Math.abs(this.x - foe.x);
+      const hitWidth = isFrog ? A.frog.aim : A.pesticide.width;
+      if (across < hitWidth && beeZ > foe.z && beeZ - foe.z < spec.reach) {
+        this.hurt(ctx, isFrog ? A.damage.tongue : A.damage.spray);
+      }
+      if ((foe.firing ?? 0) <= 0) {
+        this.hideReach(foe);
+        foe.next = this.rng.range(spec.every[0], spec.every[1]);
+      }
+      return;
+    }
+
+    foe.next = (foe.next ?? 0) - dt;
+    if ((foe.next ?? 0) <= 0 && inRange) {
+      // Only if she is somewhere near its line; a tongue thrown sideways at
+      // nothing is a tongue you never learn to dodge.
+      if (
+        Math.abs(this.x - foe.x) <
+        (isFrog ? A.frog.aim * 2.4 : A.pesticide.width * 3)
+      ) {
+        foe.firing = isFrog ? A.frog.lashTime : A.pesticide.sprayTime;
+      } else {
+        foe.next = this.rng.range(spec.every[0], spec.every[1]);
+      }
+    }
+  }
+
+  private showReach(foe: Foe, length: number, isFrog: boolean): void {
+    let entry = this.reaches.find(r => r.foe === foe);
+    if (!entry) {
+      const mesh = new THREE.Mesh(
+        isFrog ? this.kit.tongue : this.kit.spray,
+        this.kit.material,
+      );
+      this.mountain.slope.add(mesh);
+      entry = {mesh, foe};
+      this.reaches.push(entry);
+    }
+    entry.mesh.visible = true;
+    entry.mesh.position.set(foe.x, isFrog ? 1.6 : 3.6, foe.z);
+    entry.mesh.scale.set(1, 1, Math.max(0.1, length));
+  }
+
+  private hideReach(foe: Foe): void {
+    const entry = this.reaches.find(r => r.foe === foe);
+    if (entry) {
+      entry.mesh.visible = false;
+    }
+  }
+
+  /** Moss is hovered over, like the meadow's flowers. */
+  private pick(foe: Foe, dt: number, ctx: GameContext): void {
+    foe.group.position.set(foe.x, 0.2, foe.z);
+    // A glow that breathes, so it reads as the one thing here worth having.
+    const pulse = 1 + Math.sin(this.phaseTime * 3 + foe.z) * 0.06;
+    foe.group.scale.setScalar(pulse);
+    const near =
+      Math.hypot(this.x - foe.x, this.slopeZ() - foe.z) < A.moss.radius;
+    if (!near) {
+      foe.picked = Math.max(0, (foe.picked ?? 0) - dt);
+      return;
+    }
+    foe.picked = (foe.picked ?? 0) + dt;
+    ctx.hud.setHarvest(Math.min(1, (foe.picked ?? 0) / A.moss.dwell));
+    if ((foe.picked ?? 0) >= A.moss.dwell) {
+      this.moss++;
+      ctx.hud.setCount("moss", this.moss, A.moss.needed, true);
+      ctx.hud.setHarvest(0);
+      ctx.audio.quotaComplete();
+      this.mountain.slope.localToWorld(tmp.set(foe.x, 1, foe.z));
+      ctx.puff.burst(tmp, {
+        color: [P.moss, P.mossGlow],
+        count: 16,
+        speed: 6,
+        ttl: 0.8,
+      });
+      this.kill(foe, ctx, false);
+    }
+  }
+
+  // ---- hitting and being hit ---------------------------------------------
+
+  /** A seed has arrived somewhere: is anything there? */
+  private shoot(x: number, z: number, ctx: GameContext): boolean {
+    for (const foe of this.foes) {
+      if (foe.dead || foe.kind === "moss") {
+        continue;
+      }
+      if (Math.hypot(x - foe.x, z - foe.z) > foe.radius + A.seed.radius) {
+        continue;
+      }
+      foe.hits -= A.seed.damage;
+      if (foe.hits <= 0) {
+        this.kill(foe, ctx, true);
+      } else {
+        // A flash of the surface, so a big rock reads as being worn down.
+        foe.group.position.x += this.rng.range(-0.2, 0.2);
+      }
+      return true;
+    }
+    return false;
+  }
+
+  private kill(foe: Foe, ctx: GameContext, spark: boolean): void {
+    foe.dead = true;
+    foe.group.visible = false;
+    this.hideReach(foe);
+    if (spark) {
+      this.mountain.slope.localToWorld(tmp.set(foe.x, foe.radius, foe.z));
+      ctx.puff.burst(tmp, {
+        color:
+          foe.kind === "wasp" ? [P.wasp, P.waspDark] : [P.rock, P.rockDark],
+        count: 14,
+        speed: 7,
+        ttl: 0.7,
+      });
+      ctx.audio.sting();
+    }
+    // The last wasp of a train pays for the whole train.
+    if (foe.kind === "wasp" && foe.train !== undefined) {
+      const left = (this.trains.get(foe.train) ?? 1) - 1;
+      this.trains.set(foe.train, left);
+      if (left === 0 && spark) {
+        this.moss += A.wasp.trainBonus;
+        ctx.hud.setCount("moss", this.moss, A.moss.needed, true);
+        ctx.hud.setCallout("Whole swarm! Bonus moss!");
+        window.setTimeout(() => ctx.hud.setCallout(null), 1400);
+      }
+    }
+  }
+
+  private retire(foe: Foe): void {
+    foe.group.removeFromParent();
+    const entry = this.reaches.findIndex(r => r.foe === foe);
+    if (entry >= 0) {
+      this.reaches[entry].mesh.removeFromParent();
+      this.reaches.splice(entry, 1);
+    }
+  }
+
+  private touching(foe: Foe, ctx: GameContext): boolean {
+    void ctx;
+    const height =
+      foe.kind === "rock" ? foe.radius + (foe.lift ?? 0) : A.flightHeight;
+    if (Math.abs(height - A.flightHeight) > 3.5 && foe.kind === "rock") {
+      // A rock in mid-bounce passes under her.
+      return false;
+    }
+    return Math.hypot(this.x - foe.x, this.slopeZ() - foe.z) < foe.radius + 1.4;
+  }
+
+  private hurt(ctx: GameContext, amount: number): void {
+    if (this.mercy > 0) {
+      return;
+    }
+    this.mercy = A.invulnerable;
+    this.health -= amount;
+    ctx.hud.setHealth(Math.max(0, this.health / A.health));
+    ctx.flashScreen();
+    ctx.audio.sting();
+    if (this.health <= 0) {
+      this.phase = "done";
+      this.failed = true;
+    }
+  }
+
+  // ---- the summit ---------------------------------------------------------
+
+  private reachSummit(ctx: GameContext): void {
+    this.phase = "summit";
+    this.phaseTime = 0;
+    this.bursts = 0;
+    this.nextBurst = 0;
+    ctx.hud.setCallout("The summit!");
+    ctx.hud.setObjective("The top of the Mouldy Mountain!");
+    fromEye.copy(ctx.cameraPosition);
+    this.mountain.slope.localToWorld(fromLook.set(0, 4, -(A.climb + 26)));
+  }
+
+  private updateSummit(dt: number, ctx: GameContext): void {
+    // She holds station by the boulder while it goes off around her.
+    this.x += (0 - this.x) * Math.min(1, dt * 2);
+    this.placeBee(ctx);
+    this.camera(ctx);
+
+    this.nextBurst -= dt;
+    if (this.nextBurst <= 0 && this.bursts < A.summit.bursts) {
+      this.nextBurst = A.summit.burstEvery;
+      this.bursts++;
+      this.mountain.slope.localToWorld(
+        tmp.set(
+          this.rng.range(-16, 16),
+          this.rng.range(6, 20),
+          -(A.climb + this.rng.range(6, 40)),
+        ),
+      );
+      ctx.fireworks.burst(tmp, {
+        color: FIREWORK_PALETTE,
+        count: 30,
+        speed: 12,
+        spherical: 1,
+        ttl: 1.8,
+        size: 0.9,
+      });
+      ctx.audio.levelComplete();
+    }
+    if (this.bursts >= A.summit.bursts && this.nextBurst <= 0) {
+      this.phase = "sweep";
+      this.phaseTime = 0;
+      ctx.hud.setCallout(null);
+    }
+  }
+
+  /** The closing shot: out and up, until the whole mountain is in frame. */
+  private updateSweep(ctx: GameContext): void {
+    const t = ease(Math.min(1, this.phaseTime / A.summit.sweepTime));
+    this.mountain.slope.localToWorld(look.set(0, 0, -(A.climb * 0.55)));
+    // Round and back, so it reads as a camera leaving rather than a zoom.
+    const angle = t * 1.1;
+    eye.set(
+      Math.sin(angle) * A.summit.sweepBack * t,
+      20 + A.summit.sweepUp * t,
+      Math.cos(angle) * A.summit.sweepBack * t + 40,
+    );
+    eye.z -= A.climb * 0.2 * t;
+    ctx.setCameraCinematic(eye, look);
+    if (t >= 1) {
+      this.phase = "done";
+      this.complete = true;
+    }
+  }
+}

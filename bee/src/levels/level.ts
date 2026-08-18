@@ -18,7 +18,14 @@ import type {HopButtons} from "../core/hopButtons";
 
 /** Which set of scenery is on screen. */
 export type EnvironmentName =
-  "meadow" | "hive" | "cottage" | "inside" | "woods" | "lair" | "islands";
+  | "meadow"
+  | "hive"
+  | "cottage"
+  | "inside"
+  | "woods"
+  | "lair"
+  | "islands"
+  | "mountain";
 
 /** Playable volume and camera framing, which differ per level. */
 export interface FlightSettings {
@@ -93,10 +100,25 @@ export interface GameContext {
    */
   islands: THREE.Group;
   /**
+   * The container the Mouldy Mountain is built into — the same arrangement as
+   * `woods`, `lair` and `islands`.
+   */
+  mountain: THREE.Group;
+  /**
    * The four hop buttons. Level 7's only control, and the only level that
    * shows them — every other level is switched out of them by the Game.
    */
   hopButtons: HopButtons;
+  /**
+   * The thumbstick, read directly.
+   *
+   * Level 9 is a shooter, not a flight: it writes the bee's position itself
+   * and wants the stick as a lean rather than as a request to the flight
+   * model. Everything else should leave this alone and use `configureFlight`.
+   */
+  readonly stick: {x: number; y: number; magnitude: number};
+  /** True while anything at all is held on the screen — level 9's trigger. */
+  readonly holding: boolean;
   inside: CottageInside;
   honeyJar: DanglingLoad;
   /** Small pollen motes. */

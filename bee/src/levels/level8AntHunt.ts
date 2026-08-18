@@ -62,6 +62,10 @@ export class AntHuntLevel implements Level {
   readonly completionTitle = "Every last one!";
   readonly completionBody =
     "Three islands, three netfuls, and the ants have nothing left to carry.";
+  /**
+   * The card offers the map: the Mouldy Mountain is a different land, and the
+   * map is how you get to it.
+   */
   readonly finishesGame = true;
 
   complete = false;
@@ -630,6 +634,10 @@ export class AntHuntLevel implements Level {
       ctx.audio.levelComplete();
     }
     if (this.bursts >= A.winBursts && this.nextBurst <= 0) {
+      // Emptying the islands is what opens the Mouldy Mountain.
+      ctx.save.mutate(d => {
+        d.level = 9;
+      });
       this.phase = "done";
       this.complete = true;
     }

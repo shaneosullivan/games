@@ -2068,3 +2068,144 @@ export const WATER = {
   foamWidth: 2.2,
   foamColour: 0xdff1fb,
 } as const;
+
+/**
+ * Level 9 — Up the Mouldy Mountain.
+ *
+ * 1942, flown up a mountainside. She climbs the slope, everything else comes
+ * down it, and holding the screen makes her spit seeds up the hill.
+ *
+ * The whole level is laid out in *slope space*: x across the hill, z up it
+ * (negative is further up), y above the surface. The slope's own tilt lives in
+ * one group rotation, so nothing below has to think in world axes — see
+ * render/geometry/mountain.ts.
+ */
+export const ASCENT = {
+  /** How steep the mountain is, in radians. */
+  pitch: 0.34,
+  /** How far across the playable strip is, either side of the middle. */
+  halfWidth: 26,
+  /** How far up the mountain the summit is. The whole level, in units. */
+  climb: 1500,
+  /** She climbs at this many units a second — the level's pace. */
+  climbSpeed: 26,
+  /** How high above the slope she flies. */
+  flightHeight: 3.4,
+
+  /** How fast she crosses the slope, and how far up and down she may roam. */
+  moveSpeed: 30,
+  /** Her window on the slope: how far ahead of and behind the camera's mark. */
+  aheadLimit: 16,
+  behindLimit: 10,
+
+  /** Camera: behind her, above her, and tilted down onto the slope. */
+  camera: {back: 22, up: 13, pitch: 0.5},
+
+  /** The seeds she spits. */
+  seed: {
+    speed: 90,
+    every: 0.14,
+    radius: 0.42,
+    /** How far up the slope one carries before it gives up. */
+    range: 90,
+    damage: 1,
+  },
+
+  /** Her health, and what things cost her. */
+  health: 12,
+  damage: {rock: 3, wasp: 2, tongue: 2, spray: 1},
+  /** Seconds of mercy after a hit, so one mistake isn't three. */
+  invulnerable: 1.1,
+
+  /** Rocks: how many are coming, how big, and how they bounce. */
+  rock: {
+    sizes: [1.4, 2.2, 3.2],
+    hits: [1, 2, 4],
+    speed: [16, 22],
+    /** Up-kick and speed lost when one crosses a bump. */
+    bounce: 9,
+    bounceCost: 0.55,
+    gravity: 34,
+  },
+
+  /** Wasps: they come in trains, and clearing a whole train pays. */
+  wasp: {
+    speed: 20,
+    perTrain: [4, 7],
+    spacing: 2.6,
+    hits: 1,
+    /** Extra moss for taking a whole train without missing one. */
+    trainBonus: 2,
+  },
+
+  /** Frogs sit still and lash at her from a distance. */
+  frog: {
+    hits: 3,
+    /** How far the tongue reaches, and how often it tries. */
+    reach: 26,
+    every: [1.8, 3.4],
+    lashTime: 0.45,
+    /** How near her line it has to be to bother. */
+    aim: 4.5,
+  },
+
+  /** Pesticide: stands still, sprays a long cloud, and is hard to kill. */
+  pesticide: {
+    hits: 9,
+    /** The cloud: how long it reaches and how long it lasts. */
+    reach: 34,
+    width: 4.5,
+    every: [2.6, 4.2],
+    sprayTime: 1.6,
+  },
+
+  /** Magic moss: hovered over rather than shot, like the meadow's flowers. */
+  moss: {
+    /** Seconds of hovering to lift a patch. */
+    dwell: 1.3,
+    radius: 3.4,
+    needed: 12,
+  },
+
+  /** How thickly things are seeded up the mountain, per hundred units. */
+  perHundred: {rocks: 3.2, waspTrains: 1.1, frogs: 1.2, moss: 1.6, cans: 0.8},
+
+  /** The summit: snow, a boulder, and the sweep that shows the mountain. */
+  summit: {
+    burstEvery: 0.26,
+    bursts: 10,
+    sweepTime: 5.5,
+    /** How far out and up the closing shot pulls. */
+    sweepBack: 210,
+    sweepUp: 150,
+  },
+
+  /** Clouds drift across for perspective, above and below her. */
+  clouds: 14,
+} as const;
+
+export const ASCENT_PALETTE = {
+  sky: 0x8ec9ee,
+  fog: 0xbfe0f2,
+  /* Lit from almost head-on, so the slope needs to be well up the ramp before
+     the toon shading drops it — the first draft rendered as near-black. */
+  slope: 0x9aad6a,
+  slopeDark: 0x7f9152,
+  mould: 0x8bbf4a,
+  mouldDark: 0x5f8f33,
+  rock: 0xa8a191,
+  rockDark: 0x86806f,
+  snow: 0xf3f8ff,
+  snowShade: 0xd6e4f2,
+  seed: 0xffd54a,
+  wasp: 0xf2c53d,
+  waspDark: 0x2a2318,
+  frog: 0x74c95c,
+  tongue: 0xe86a8a,
+  can: 0xc75b3a,
+  canDark: 0x8d3f28,
+  spray: 0xc9e6a8,
+  moss: 0x9cf06a,
+  mossGlow: 0xd9ffb0,
+  cloud: 0xffffff,
+} as const;

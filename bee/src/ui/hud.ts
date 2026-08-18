@@ -26,6 +26,9 @@ export class Hud {
   private readonly objective: HTMLDivElement;
   /** The big "how to play" message across the middle; see setCallout. */
   private readonly callout: HTMLDivElement;
+  /** The life meter and its bar; see setHealth. */
+  private readonly health: HTMLDivElement;
+  private readonly healthFill: HTMLDivElement;
   private readonly harvest: SVGSVGElement;
   private readonly harvestFill: SVGCircleElement;
   private readonly carry: HTMLDivElement;
@@ -109,7 +112,13 @@ export class Hud {
     // whatever a level calls itself.
     const top = el("div", "hud-top");
     const topRight = el("div", "hud-topright");
-    topRight.append(this.perf, buttons);
+    this.health = el("div", "hud-health hidden", "");
+    const healthLabel = el("div", "hud-health-label", "Life");
+    const healthTrack = el("div", "hud-health-track", "");
+    this.healthFill = el("div", "hud-health-fill", "");
+    healthTrack.append(this.healthFill);
+    this.health.append(healthLabel, healthTrack);
+    topRight.append(this.perf, buttons, this.health);
     // Banner and objective are their own grid items rather than one stacked
     // column, so a phone can put the title up beside the buttons and leave the
     // objective its own full-width line underneath.
@@ -155,6 +164,27 @@ export class Hud {
    * Nothing behind it is interactive while it is up, and it takes no pointer
    * events itself, so tapping it is the same as tapping the screen.
    */
+  /**
+   * The life meter, top right, or null to take it away.
+   *
+   * Its own element rather than another counter: the counters are a column on
+   * the left that says what you have collected, and this is the opposite — it
+   * is what you are losing, and it belongs where the eye goes when something
+   * hits you, which is the same corner as the buttons you are already using.
+   */
+  setHealth(fraction: number | null): void {
+    if (fraction === null) {
+      this.health.classList.add("hidden");
+      return;
+    }
+    this.health.classList.remove("hidden");
+    const clamped = Math.max(0, Math.min(1, fraction));
+    this.healthFill.style.width = `${clamped * 100}%`;
+    // Green, amber, red — the colour is what carries at a glance, mid-dodge.
+    this.healthFill.style.background =
+      clamped > 0.6 ? "#8fe36b" : clamped > 0.3 ? "#ffd257" : "#ff6b5e";
+  }
+
   setCallout(text: string | null): void {
     this.callout.textContent = text ?? "";
     this.callout.classList.toggle("hidden", !text);

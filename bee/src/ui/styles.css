@@ -1778,3 +1778,53 @@ body {
     gap: 12px;
   }
 }
+
+/* ---------- the life meter (level 9) ---------- */
+
+/*
+ * Under the home and mute buttons, in the corner the eye is already in.
+ *
+ * It is the one readout that matters while something is coming at you, so it
+ * is wide, high-contrast, and the fill changes colour rather than only length —
+ * at a glance, mid-dodge, the colour is what is actually read.
+ */
+.hud-health {
+  margin-top: 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--panel);
+  border: 1px solid var(--stroke);
+  border-radius: 999px;
+  padding: 6px 14px 6px 12px;
+  backdrop-filter: blur(8px);
+}
+
+.hud-health.hidden {
+  display: none;
+}
+
+.hud-health-label {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  opacity: 0.85;
+}
+
+.hud-health-track {
+  width: 116px;
+  height: 14px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.35);
+  overflow: hidden;
+}
+
+.hud-health-fill {
+  height: 100%;
+  width: 100%;
+  border-radius: 999px;
+  background: #8fe36b;
+  transition:
+    width 180ms ease-out,
+    background 240ms linear;
+}

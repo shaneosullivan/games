@@ -24,6 +24,7 @@ import {MazeLevel} from "./levels/level5Maze";
 import {LairLevel} from "./levels/level6Lair";
 import {IslandsLevel} from "./levels/level7Islands";
 import {AntHuntLevel} from "./levels/level8AntHunt";
+import {AscentLevel} from "./levels/level9Ascent";
 import type {
   EnvironmentName,
   FlightSettings,
@@ -57,6 +58,7 @@ import {
   INSIDE_ENV,
   LAIR_ENV,
   ISLANDS_ENV,
+  MOUNTAIN_ENV,
   MEADOW_ENV,
   WOODS_ENV,
   type Stage,
@@ -107,6 +109,8 @@ export class Game {
   private readonly lairGroup = new THREE.Group();
   /** Where level 7 builds its board of streams — same arrangement again. */
   private readonly islandsGroup = new THREE.Group();
+  /** And where level 9 builds its mountain. */
+  private readonly mountainGroup = new THREE.Group();
   /** "Tap to flap" — level 6's only control. */
   private readonly hold = new HoldInput();
   private readonly interior: HiveInterior;
@@ -189,6 +193,10 @@ export class Game {
     this.islandsGroup.visible = false;
     this.stage.scene.add(this.islandsGroup);
 
+    // --- mouldy mountain (level 9) ---
+    this.mountainGroup.visible = false;
+    this.stage.scene.add(this.mountainGroup);
+
     // --- hive interior (level 2) ---
     this.interior = createHiveInterior(rng);
     this.queen.group.position.copy(this.interior.queenPosition);
@@ -250,6 +258,8 @@ export class Game {
     // Captured for the getters below: inside an object literal `this` is the
     // literal, not the Game.
     const stage = this.stage;
+    // Captured for the getters below: an object literal cannot see `this`.
+    const game = this;
 
     this.ctx = {
       scene: this.stage.scene,
@@ -310,7 +320,14 @@ export class Game {
       woods: this.woodsGroup,
       lair: this.lairGroup,
       islands: this.islandsGroup,
+      mountain: this.mountainGroup,
       hopButtons: this.hopButtons,
+      get stick() {
+        return game.stick;
+      },
+      get holding() {
+        return game.hold.held;
+      },
       inside: this.inside,
       honeyJar: this.honeyJar,
       bringHoney: () => {
@@ -538,12 +555,16 @@ export class Game {
     {number: 6, name: "The Bear's Lair"},
     {number: 7, name: "Bee vs Frog"},
     {number: 8, name: "Ant Hunt"},
+    {number: 9, name: "Up the Mountain"},
   ];
 
   private static readonly LAST_LEVEL = Game.LEVELS.length;
 
   private createLevel(n: number): Level {
-    if (n >= 8) {
+    if (n >= 9) {
+      return new AscentLevel();
+    }
+    if (n === 8) {
       return new AntHuntLevel();
     }
     if (n === 7) {
@@ -677,6 +698,7 @@ export class Game {
     this.woodsGroup.visible = name === "woods";
     this.lairGroup.visible = name === "lair";
     this.islandsGroup.visible = name === "islands";
+    this.mountainGroup.visible = name === "mountain";
     this.inside.group.visible = name === "inside";
     this.stage.setEnvironment(
       name === "hive"
@@ -689,9 +711,11 @@ export class Game {
               ? LAIR_ENV
               : name === "islands"
                 ? ISLANDS_ENV
-                : name === "cottage"
-                  ? COTTAGE_ENV
-                  : MEADOW_ENV,
+                : name === "mountain"
+                  ? MOUNTAIN_ENV
+                  : name === "cottage"
+                    ? COTTAGE_ENV
+                    : MEADOW_ENV,
     );
   }
 

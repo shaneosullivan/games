@@ -135,6 +135,28 @@ export const ISLANDS_ENV: EnvironmentSettings = {
   sunOffset: [10, 26, 10],
 };
 
+/**
+ * The Mouldy Mountain: thin blue air, and haze in the distance.
+ *
+ * The fog is pushed a long way out because the level looks up a slope fifteen
+ * hundred units long and the summit has to be a thing on the horizon rather
+ * than a thing that appears.
+ */
+export const MOUNTAIN_ENV: EnvironmentSettings = {
+  background: 0x8ec9ee,
+  fogColor: 0xbfe0f2,
+  fogNear: 90,
+  fogFar: 420,
+  hemiSky: 0xffffff,
+  hemiGround: 0xb9c79a,
+  hemiIntensity: 1.9,
+  sunColor: 0xfff4dc,
+  sunIntensity: 1.25,
+  // Behind the camera and high, so the slope faces the light rather than
+  // being lit edge-on: tilted ground caught almost none of the first sun.
+  sunOffset: [18, 36, 40],
+};
+
 export interface Stage {
   renderer: THREE.WebGLRenderer;
   scene: THREE.Scene;
