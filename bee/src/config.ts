@@ -2405,7 +2405,7 @@ export const KATAMARI = {
    */
   pitch: 0.42,
   /** How long the descent is, in units. */
-  run: 4200,
+  run: 3600,
   /**
    * Flat grass at the bottom, and how far it runs past the finish.
    *
@@ -2422,7 +2422,7 @@ export const KATAMARI = {
    * about to roll around in.
    */
   halfWidth: 150,
-  wantHalfWidth: 38,
+  wantHalfWidth: 26,
   /** How near the edge of the screen the bee may get, in NDC. */
   edgeMargin: 0.82,
 
@@ -2467,8 +2467,15 @@ export const KATAMARI = {
   zoomEase: 0.7,
 
   ball: {
-    /** The summit boulder, before it has eaten anything. */
-    start: 2,
+    /**
+     * The summit boulder, before it has eaten anything.
+     *
+     * Not as small as it wants to be. Everything on the hill is sized against
+     * it, so a smaller boulder is a hill of smaller things — and at two units
+     * across, in a field seventy wide, the first minute of the level was
+     * threading a needle: you could barely touch anything at all.
+     */
+    start: 6,
     /** What counts as big enough at the bottom. Also the progress bar's end. */
     target: 24,
     /**
@@ -2478,10 +2485,16 @@ export const KATAMARI = {
      * sideways pull towards wherever the queen has got to — the tether is a
      * spring, so the ball leans after her rather than tracking her.
      */
-    gravity: 15,
+    /*
+     * Gravity against a drag, so it has a terminal speed rather than
+     * accelerating for the length of the hill. Thirty units a second, down
+     * from forty-seven: at the old pace there was no time to see something
+     * off to one side and decide to go and get it, which is the whole game.
+     */
+    gravity: 9.5,
     drag: 0.32,
     /** It never quite stops, so a bounce can't strand the level. */
-    minSpeed: 15,
+    minSpeed: 10,
     pull: 5.2,
     /** How fast it can be dragged across the hill, per second per unit off. */
     steerDamp: 2.6,
@@ -2493,7 +2506,7 @@ export const KATAMARI = {
      * add, so eating something half your size is an eighth of you — which is
      * the arithmetic that makes a katamari feel like one.
      */
-    growth: 0.9,
+    growth: 0.42,
     /**
      * How far ahead of the pace the ball is allowed to get.
      *
