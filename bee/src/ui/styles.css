@@ -915,6 +915,13 @@ body {
   box-shadow: none;
 }
 
+/* Not yet open. Still listed, still says what it is called, but plainly not
+   something you can pick — see the chip list in overlays.ts. */
+.card .level-chip.locked {
+  opacity: 0.55;
+  border-style: dashed;
+}
+
 .card .level-chip.selected {
   border-color: #f7b32b;
   background: #fffdf5;

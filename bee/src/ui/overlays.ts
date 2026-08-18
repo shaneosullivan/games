@@ -273,19 +273,31 @@ export function createCodenameScreen(
 
       row.replaceChildren();
       chips.length = 0;
+      /*
+       * Every level this land has, not only the ones that are open yet.
+       *
+       * A land with two levels where one is still locked used to show no list
+       * at all, because there was only one thing to choose between — so the
+       * Mouldy Mountain looked like a land with one level on it right up until
+       * the moment it had two. What is coming is worth seeing; it is padlocked
+       * and it cannot be picked, which is the same treatment the pins on the
+       * map itself get.
+       */
+      const all = levelsOf(land);
       // A single-level land needs no chips — the pin said it all.
-      if (playable.length < 2) {
+      if (all.length < 2) {
         return;
       }
 
-      for (const choice of playable) {
+      for (const choice of all) {
+        const locked = choice.number > unlocked;
         const chip = document.createElement("button");
-        chip.className = "level-chip";
+        chip.className = locked ? "level-chip locked" : "level-chip";
         chip.type = "button";
 
         const num = document.createElement("span");
         num.className = "level-chip-num";
-        num.textContent = String(choice.number);
+        num.textContent = locked ? "🔒" : String(choice.number);
 
         const text = document.createElement("span");
         text.className = "level-chip-text";
@@ -298,6 +310,11 @@ export function createCodenameScreen(
 
         chip.append(num, text);
         onTap(chip, () => {
+          if (locked) {
+            hint.textContent = `🔒 ${choice.name} — finish level ${choice.number - 1} to open this`;
+            return;
+          }
+          hint.textContent = "";
           chosen = choice.number;
           for (const c of chips) {
             c.classList.toggle("selected", c === chip);
