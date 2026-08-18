@@ -97,8 +97,9 @@ const page = `<!doctype html>
   .cap span { color: #8aa; }
   .empty { color: #567; padding: 40px; text-align: center; }
   canvas { display: block; width: 100%; height: 100%; }
-  .zoom { position: absolute; top: 6px; right: 6px; z-index: 2; background: #0009; color: #cdd6e0; border: 1px solid #345; border-radius: 5px; padding: 3px 9px; cursor: pointer; font-size: 15px; line-height: 1; }
-  .zoom:hover { background: #000d; border-color: #578; }
+  .tools { position: absolute; top: 6px; right: 6px; z-index: 2; display: flex; gap: 4px; }
+  .tool { background: #0009; color: #cdd6e0; border: 1px solid #345; border-radius: 5px; padding: 3px 9px; cursor: pointer; font-size: 15px; line-height: 1; }
+  .tool:hover { background: #000d; border-color: #578; }
   /* Maximised: hide the rest, blow this one up to fill the area. */
   .grid.has-max .cell { display: none; }
   .grid.has-max .cell.max { display: block; grid-column: 1 / -1; aspect-ratio: auto; height: calc(100vh - 46px); }
@@ -190,10 +191,17 @@ function add(m) {
   cap.className = "cap";
   cap.innerHTML = '<b>' + m.path + '</b> <span>· ' + m.size + ' · …</span>';
   el.appendChild(cap);
+  const tools = document.createElement("div");
+  tools.className = "tools";
+  // Pause / resume the turntable, so a model can be held still to inspect.
+  const pause = document.createElement("button");
+  pause.className = "tool";
+  pause.textContent = "⏸";
+  pause.title = "Pause";
   // Maximise / minimise: blow this cell up to fill the area, or drop back to
   // the grid. Only one is maximised at a time.
   const zoom = document.createElement("button");
-  zoom.className = "zoom";
+  zoom.className = "tool";
   zoom.textContent = "⛶";
   zoom.title = "Maximise";
   zoom.addEventListener("click", () => {
@@ -205,7 +213,8 @@ function add(m) {
     zoom.textContent = max ? "🗕" : "⛶";
     zoom.title = max ? "Minimise" : "Maximise";
   });
-  el.appendChild(zoom);
+  tools.append(pause, zoom);
+  el.appendChild(tools);
   grid.appendChild(el);
 
   const renderer = new THREE.WebGLRenderer({antialias: true, alpha: true});
@@ -225,6 +234,11 @@ function add(m) {
   controls.enableDamping = true;
   controls.autoRotate = true;
   controls.autoRotateSpeed = 1.2;
+  pause.addEventListener("click", () => {
+    controls.autoRotate = !controls.autoRotate;
+    pause.textContent = controls.autoRotate ? "⏸" : "▶";
+    pause.title = controls.autoRotate ? "Pause" : "Resume";
+  });
 
   const cell = {el, renderer, stop: false};
   cells.set(m.i, cell);
