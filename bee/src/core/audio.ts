@@ -204,6 +204,47 @@ export class Audio {
     );
   }
 
+  /**
+   * The bear, up on its hind legs.
+   *
+   * Its own oscillators rather than three `blip`s, because what makes a roar a
+   * roar is the pitch sagging as the breath runs out, and a blip holds one
+   * note. Two voices a fifth apart through a low-pass, so it reads as an
+   * animal rather than as a tone — and short, because it is a beat in a
+   * cutscene and not a threat the player has to live with.
+   */
+  roar(): void {
+    if (!this.ctx || !this.master) {
+      return;
+    }
+    const now = this.ctx.currentTime;
+    const filter = this.ctx.createBiquadFilter();
+    filter.type = "lowpass";
+    filter.frequency.setValueAtTime(900, now);
+    filter.frequency.exponentialRampToValueAtTime(280, now + 1.1);
+    const gain = this.ctx.createGain();
+    gain.gain.setValueAtTime(0, now);
+    gain.gain.linearRampToValueAtTime(0.34, now + 0.09);
+    gain.gain.setValueAtTime(0.34, now + 0.55);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 1.25);
+    filter.connect(gain).connect(this.master);
+
+    for (const [freq, drop, type] of [
+      [126, 62, "sawtooth"],
+      [84, 42, "square"],
+    ] as const) {
+      const osc = this.ctx.createOscillator();
+      osc.type = type;
+      osc.frequency.setValueAtTime(freq, now);
+      // Up into the shout, then sagging away under it.
+      osc.frequency.linearRampToValueAtTime(freq * 1.18, now + 0.16);
+      osc.frequency.exponentialRampToValueAtTime(drop, now + 1.2);
+      osc.connect(filter);
+      osc.start(now);
+      osc.stop(now + 1.3);
+    }
+  }
+
   levelComplete(): void {
     [392.0, 523.25, 659.25, 783.99, 1046.5, 1318.5].forEach((f, i) =>
       this.blip(f, i * 0.11, 0.6, 0.28),

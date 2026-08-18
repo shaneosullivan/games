@@ -2522,6 +2522,26 @@ export const KATAMARI = {
      * the ceiling; a poor one is nowhere near it and never notices it exists.
      */
     lead: 1.32,
+    /**
+     * How lopsided the ball is allowed to feel.
+     *
+     * Once it has eaten a goat, the thing rolling down the hill is not a
+     * sphere and should not move like one. It doesn't need a solver to say so:
+     * where the ground actually touches it is the furthest point in the
+     * direction of "down", which is a number the stuck items already know, and
+     * a ball riding up over a tree it swallowed sits higher and turns slower
+     * for as long as that tree is underneath it.
+     *
+     * `wobble` caps how far it may ride up, as a multiple of its own radius,
+     * because a ball with one enormous goat on it would otherwise pole-vault.
+     * `rock` is how hard its own lopsidedness pushes it along: a weight past
+     * the contact point pulls it into the hill, and behind it drags. `settle`
+     * is how quickly the ride height follows the shape, so a lump appearing
+     * under it is a heave rather than a jump.
+     */
+    wobble: 1.45,
+    rock: 12,
+    settle: 14,
     /** How much bigger than the ball a thing may be and still stick. */
     stickMargin: 1.02,
     /** Bouncing off something too big: speed kept, and how far it is shoved. */
@@ -2670,6 +2690,19 @@ export const KATAMARI = {
    * still be steered through it.
    */
   funnel: {from: 560, mouth: 78, banksPer100: 14},
+
+  /**
+   * The bear's warning: he rears up and paws the air as she comes into range.
+   *
+   * A beat, not an obstacle. The ball is held still for it — a cutscene the
+   * player is steering through is a cutscene they miss — and the camera goes
+   * in on him and comes back out to exactly where it was, so play resumes with
+   * the picture the player had before it started.
+   *
+   * `at` is how far before him it fires, in units. The three times are the
+   * push in, the hold on him, and the pull back out.
+   */
+  roar: {at: 340, in: 0.8, hold: 1.5, out: 0.8, standoff: 125, height: 42},
 
   /**
    * The cage behind the bear, and what happens to it.

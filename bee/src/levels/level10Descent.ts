@@ -8,7 +8,7 @@ import {
   type RollKit,
 } from "../entities/rollItems";
 import {FIREWORK_PALETTE} from "../fx/particles";
-import {createBear} from "../render/geometry/bear";
+import {createBear, type BearModel} from "../render/geometry/bear";
 import {
   createCage,
   createDescent,
@@ -19,7 +19,8 @@ import {createBaby, type BabyModel} from "../render/geometry/bee";
 import {solidToon} from "../render/materials";
 import type {GameContext, Level} from "./level";
 
-type Phase = "opening" | "rolling" | "smash" | "party" | "sweep" | "done";
+type Phase =
+  "opening" | "rolling" | "roar" | "smash" | "party" | "sweep" | "done";
 
 /** One line of the KATAMARI.items table. */
 interface ItemSpec {
@@ -54,7 +55,10 @@ const tmp2 = new THREE.Vector3();
 const eye = new THREE.Vector3();
 const look = new THREE.Vector3();
 const axis = new THREE.Vector3();
+const below = new THREE.Vector3();
+const lean = new THREE.Vector3();
 const spin = new THREE.Quaternion();
+const turn = new THREE.Quaternion();
 const UP = new THREE.Vector3(0, 1, 0);
 
 const ease = (t: number): number =>
@@ -124,6 +128,16 @@ export class DescentLevel implements Level {
   /** Everything eaten so far, as volume; the radius is derived from it. */
   private eaten = 0;
   /**
+   * The shape of the thing, as opposed to its size.
+   *
+   * `com` is where its weight actually is, in the spinning group's own frame,
+   * and `lift` is how far the ground is from its centre *in the direction it
+   * is currently leaning* — which is what a lumpy ball rides on. Both are the
+   * whole of the lumpy-rolling model; see `reshape` and `ride`.
+   */
+  private readonly com = new THREE.Vector3();
+  private lift: number = K.ball.start;
+  /**
    * The camera's idea of how big the ball is, which lags the truth.
    *
    * Eased rather than read straight, so the shot pulls out slowly over the
@@ -155,6 +169,10 @@ export class DescentLevel implements Level {
   private smashed = 0;
   /** Set when the bear turns her away, so the level ends the right way. */
   private blocked = 0;
+  /** The bear himself, for the moment he stands up. */
+  private bear!: BearModel;
+  /** Whether he has already had his moment; he only gets the one. */
+  private roared = false;
 
   get controlsLocked(): boolean {
     return this.phase !== "rolling";
@@ -210,6 +228,8 @@ export class DescentLevel implements Level {
     this.drift = 0;
     this.radius = K.ball.start;
     this.shown = K.ball.start;
+    this.com.set(0, 0, 0);
+    this.lift = K.ball.start;
     this.eaten = 0;
     this.caught = 0;
     this.bearCaught = false;
@@ -218,6 +238,7 @@ export class DescentLevel implements Level {
     this.shake = 0;
     this.smashed = 0;
     this.blocked = 0;
+    this.roared = false;
     this.failTitle = "Not quite big enough";
     this.failBody =
       "The ball reached the bottom too small to matter. Roll over more of the hillside on the way down — the little things first.";
@@ -304,6 +325,9 @@ export class DescentLevel implements Level {
         break;
       case "rolling":
         this.updateRolling(dt, ctx);
+        break;
+      case "roar":
+        this.updateRoar(ctx);
         break;
       case "smash":
         this.updateSmash(dt, ctx);
@@ -397,6 +421,7 @@ export class DescentLevel implements Level {
     const travelled = this.speed * dt;
     this.rolled += travelled;
 
+    this.ride(dt);
     this.shown += (this.radius - this.shown) * Math.min(1, K.zoomEase * dt);
     this.roll(travelled, this.drift * dt);
     this.spawn();
@@ -408,6 +433,13 @@ export class DescentLevel implements Level {
     this.shake = Math.max(0, this.shake - dt * 2);
     this.camera(ctx, 0);
     ctx.hud.setProgress("Ball", this.progress());
+
+    // He stands up as she comes into range — once, and only on the way to
+    // meeting him.
+    if (!this.roared && this.rolled > this.bearAt() - K.roar.at) {
+      this.beginRoar(ctx);
+      return;
+    }
 
     // Turned away by the bear: she rolls on for a moment so the player sees
     // what happened, and then the level is over.
@@ -452,8 +484,81 @@ export class DescentLevel implements Level {
     // Heading in slope space: downhill is -z.
     tmp.set(sideways / dist, 0, -down / dist);
     axis.copy(UP).cross(tmp).normalize();
-    spin.setFromAxisAngle(axis, dist / this.radius);
+    // Turned about whatever it is actually standing on, not about its radius.
+    // A ball riding over a swallowed tree is briefly a bigger wheel, and a
+    // bigger wheel turns less for the same ground covered.
+    spin.setFromAxisAngle(axis, dist / Math.max(0.5, this.lift));
     this.ballSpin.quaternion.premultiply(spin);
+  }
+
+  /**
+   * Where the weight is, in the spinning group's own frame.
+   *
+   * Recomputed whole rather than accumulated, because the core's own mass
+   * changes every time the ball grows and a running average would drift. It
+   * costs one pass over what has been eaten, on the frame something is eaten.
+   */
+  private reshape(): void {
+    // The core sits at the origin and weighs what a ball of its radius weighs;
+    // everything else weighs its own cube, which is the same currency the
+    // growth is counted in.
+    let mass = this.radius ** 3;
+    this.com.set(0, 0, 0);
+    for (const item of this.items) {
+      if (!item.stuck) {
+        continue;
+      }
+      const m = item.radius ** 3;
+      this.com.addScaledVector(item.group.position, m);
+      mass += m;
+    }
+    this.com.divideScalar(Math.max(0.001, mass));
+  }
+
+  /**
+   * How the shape of it rides, this frame.
+   *
+   * Two things come out of the same question — where does the ground touch it?
+   * The answer is its furthest point in the direction of "down", found by
+   * asking every lump on it, and it gives both the height it rides at and the
+   * wheel size it turns on. And because the weight is not at the middle any
+   * more, whichever way the weight is leaning pulls it along or holds it back.
+   *
+   * This is not a rigid-body simulation and cannot tip over or jam. It is the
+   * honest answer to "what is under it", which is most of what a lumpy ball
+   * looks like from the outside.
+   */
+  private ride(dt: number): void {
+    // Which way is down, in the ball's own turning frame.
+    turn.copy(this.ballSpin.quaternion).invert();
+    below.set(0, -1, 0).applyQuaternion(turn);
+
+    let reach = this.radius;
+    for (const item of this.items) {
+      if (!item.stuck) {
+        continue;
+      }
+      const out = item.group.position.dot(below) + item.radius;
+      if (out > reach) {
+        reach = out;
+      }
+    }
+    reach = Math.min(reach, this.radius * K.ball.wobble);
+    // Eased, so a lump coming under it is a heave and not a jump.
+    this.lift += (reach - this.lift) * Math.min(1, K.ball.settle * dt);
+
+    /*
+     * And its own weight, pushing it along or holding it back.
+     *
+     * The centre of mass is in the ball's frame, so it has to be turned back
+     * into the hill's to ask which way it is leaning. Past the contact point
+     * and it is falling into the hill; behind and it is being dragged up out
+     * of it — which is exactly the surge and drag of something lopsided
+     * rolling downhill.
+     */
+    lean.copy(this.com).applyQuaternion(this.ballSpin.quaternion);
+    this.speed += (-lean.z / Math.max(1, this.radius)) * K.ball.rock * dt;
+    this.speed = Math.max(K.ball.minSpeed, this.speed);
   }
 
   // ---- what is on the hill ------------------------------------------------
@@ -633,6 +738,7 @@ export class DescentLevel implements Level {
    */
   private addBear(): void {
     const model = createBear();
+    this.bear = model;
     const group = new THREE.Group();
     group.add(model.group);
     const box = new THREE.Box3().setFromObject(model.group);
@@ -653,6 +759,86 @@ export class DescentLevel implements Level {
       stuck: false,
       shove: 0,
     });
+  }
+
+  // ---- the bear's warning --------------------------------------------------
+
+  /** Where the bear stands, as a distance down the run. */
+  private bearAt(): number {
+    return K.run - K.bear.from;
+  }
+
+  /**
+   * He stands up.
+   *
+   * The ball is stopped for it rather than left rolling. A cutscene the player
+   * is still steering through is a cutscene they do not watch — and worse,
+   * they lose ground they cannot see themselves losing. It is under three
+   * seconds and it ends with the camera exactly where it started, so what they
+   * get back is the picture they had.
+   */
+  private beginRoar(ctx: GameContext): void {
+    this.roared = true;
+    this.phase = "roar";
+    this.phaseTime = 0;
+    this.speed = 0;
+    this.drift = 0;
+    ctx.audio.roar();
+  }
+
+  private updateRoar(ctx: GameContext): void {
+    const inTime = K.roar.in;
+    const holdTo = inTime + K.roar.hold;
+    const total = holdTo + K.roar.out;
+    const t = this.phaseTime;
+
+    /*
+     * Up on his hind legs, a swipe at the air, and down again.
+     *
+     * `rear` is a ramp up and back down over the whole beat and `swat` is a
+     * pair of paws inside it — the bear model takes both and does the rest.
+     * The swipes are timed to the middle so they land while he is at his full
+     * height rather than on the way up.
+     */
+    const rear =
+      t < inTime
+        ? ease(t / inTime)
+        : t < holdTo
+          ? 1
+          : 1 - ease((t - holdTo) / K.roar.out);
+    const swat =
+      t > inTime * 0.8 && t < holdTo
+        ? Math.max(0, Math.sin((t - inTime * 0.8) * 5.2))
+        : 0;
+    this.bear.animate(this.phaseTime * 4, 0, rear, swat);
+
+    // In on him, hold, and back out to the shot she had.
+    const push =
+      t < inTime
+        ? ease(t / inTime)
+        : t < holdTo
+          ? 1
+          : 1 - ease((t - holdTo) / K.roar.out);
+    // `camera` leaves the playing shot in `eye` and `look`, which is what is
+    // being lerped away from — the call it makes to the camera itself is
+    // immediately overwritten by the one below.
+    this.camera(ctx, 0);
+    this.hill.slope.localToWorld(
+      tmp.set(0, K.roar.height, -this.bearAt() + K.roar.standoff),
+    );
+    eye.lerp(tmp, push);
+    this.hill.slope.localToWorld(
+      tmp.set(0, K.bear.radius * 1.25, -this.bearAt()),
+    );
+    look.lerp(tmp, push);
+    ctx.setCameraCinematic(eye, look);
+
+    if (t >= total) {
+      this.bear.animate(0, 0, 0, 0);
+      this.phase = "rolling";
+      this.phaseTime = 0;
+      this.speed = K.ball.minSpeed;
+    }
   }
 
   // ---- the cage -----------------------------------------------------------
@@ -936,6 +1122,7 @@ export class DescentLevel implements Level {
     const room = Math.max(0, 1 - (this.radius / ceiling) ** 4);
     this.eaten += K.ball.growth * item.radius ** 3 * room;
     this.radius = Math.cbrt(K.ball.start ** 3 + this.eaten);
+    this.reshape();
     this.caught++;
     if (item.kind === "bear") {
       this.bearCaught = true;
@@ -1026,7 +1213,9 @@ export class DescentLevel implements Level {
     // the ground goes flat — see Descent.groundAt. Everything that stands on
     // the ground adds it, or the run-out drives the ball through the floor.
     const under = this.hill.groundAt(this.rolled);
-    this.ballRoot.position.set(this.x, this.radius + under, -this.rolled);
+    // On whatever it is standing on, which is only its radius while it is
+    // still round. See `ride`.
+    this.ballRoot.position.set(this.x, this.lift + under, -this.rolled);
     this.core.scale.setScalar(this.radius);
 
     // She flies ahead of the ball, clear of it by its own radius, so she is
@@ -1048,7 +1237,7 @@ export class DescentLevel implements Level {
     // The tether: a cylinder is built along its own y, so it is stood between
     // the two points by pointing its axis at one of them.
     tmp.set(this.beeX, beeY, beeZ);
-    tmp2.set(this.x, this.radius + under, -this.rolled);
+    tmp2.set(this.x, this.lift + under, -this.rolled);
     this.tether.position.copy(tmp).add(tmp2).multiplyScalar(0.5);
     const span = tmp.distanceTo(tmp2);
     this.tether.scale.set(1, Math.max(0.01, span), 1);
