@@ -291,11 +291,14 @@ export class AscentLevel implements Level {
   private steer(dt: number, ctx: GameContext): void {
     const across = this.acrossLimit(ctx);
     const forward = this.aheadLimit(ctx);
-    this.playHalf = across;
+    // What the foes are laid out against is a single half-width; take the
+    // narrower side so nothing is placed off the edge she can't reach.
+    this.playHalf = Math.min(across.left, across.right);
 
     if (ctx.aim.active) {
       const want = this.aimTarget(ctx, ctx.aim.x, ctx.aim.y + A.pointer.lead);
-      const dx = THREE.MathUtils.clamp(want.x, -across, across) - this.x;
+      const dx =
+        THREE.MathUtils.clamp(want.x, -across.left, across.right) - this.x;
       const dz =
         THREE.MathUtils.clamp(want.y, -A.behindLimit, forward) - this.ahead;
       const gap = Math.hypot(dx, dz);
@@ -312,7 +315,7 @@ export class AscentLevel implements Level {
     // The limits still apply when she isn't being steered: the screen changes
     // shape under her when a phone is turned, and the mark she is measured
     // against moves up the mountain every frame regardless.
-    this.x = THREE.MathUtils.clamp(this.x, -across, across);
+    this.x = THREE.MathUtils.clamp(this.x, -across.left, across.right);
     this.ahead = THREE.MathUtils.clamp(this.ahead, -A.behindLimit, forward);
     this.placeBee(ctx);
   }
@@ -429,11 +432,23 @@ export class AscentLevel implements Level {
    * upright shows nothing like that, so she flew straight off the side of the
    * glass and out of sight. Kept a little inside the edge, so she is never
    * half-cropped either.
+   *
+   * The two sides are measured separately, because the camera pans with her
+   * (`this.x * 0.35` in `camera`). Measured on one side only and mirrored, the
+   * pan made the range lopsided: sitting on the left, the camera has swung
+   * left, so the *right* edge is far out in world x and the left edge is close
+   * — and a single number taken off the right side then clamped the left to
+   * that same far figure, leaving her unable to reach the left edge at all.
    */
-  private acrossLimit(ctx: GameContext): number {
+  private acrossLimit(ctx: GameContext): {left: number; right: number} {
+    return {left: this.edgeReach(ctx, -1), right: this.edgeReach(ctx, 1)};
+  }
+
+  /** Units she can travel one way — `dir` +1 to the right, -1 to the left. */
+  private edgeReach(ctx: GameContext, dir: number): number {
     let limit = 4;
     for (let out = 4; out <= A.halfWidth; out += 0.5) {
-      tmp.set(out, A.flightHeight, this.slopeZ());
+      tmp.set(dir * out, A.flightHeight, this.slopeZ());
       this.mountain.slope.localToWorld(tmp);
       if (Math.abs(ctx.projectToScreen(tmp).x) > A.edgeMargin) {
         break;
