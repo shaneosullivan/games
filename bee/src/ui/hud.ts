@@ -26,6 +26,8 @@ export class Hud {
   private readonly objective: HTMLDivElement;
   /** The big "how to play" message across the middle; see setCallout. */
   private readonly callout: HTMLDivElement;
+  /** The top strip, which the callout has to sit clear of. */
+  private readonly top!: HTMLDivElement;
   /** The life meter and its bar; see setHealth. */
   private readonly health: HTMLDivElement;
   private readonly healthFill: HTMLDivElement;
@@ -115,6 +117,7 @@ export class Hud {
     // started at x=98. Laid out as columns they cannot collide at any width,
     // whatever a level calls itself.
     const top = el("div", "hud-top");
+    this.top = top;
     const topRight = el("div", "hud-topright");
     this.health = el("div", "hud-health hidden", "");
     const healthLabel = el("div", "hud-health-label", "Life");
@@ -138,6 +141,13 @@ export class Hud {
     for (const type of ["pointerdown", "touchstart", "keydown"]) {
       window.addEventListener(type, () => this.dismissCard(), {passive: true});
     }
+    // The bar above it changes height when the screen is turned, and a card
+    // measured against the old one either overlaps it or floats below it.
+    window.addEventListener("resize", () => {
+      if (!this.callout.classList.contains("hidden")) {
+        this.placeCallout();
+      }
+    });
     this.root.append(top, svg, this.carry, this.callout);
     host.appendChild(this.root);
   }
@@ -233,6 +243,26 @@ export class Hud {
     this.callout.classList.remove("going");
     this.callout.classList.toggle("hidden", !text);
     this.calloutAt = performance.now();
+    if (text) {
+      this.placeCallout();
+    }
+  }
+
+  /**
+   * Sit the card just under the top bar.
+   *
+   * Measured rather than given a percentage, because the bar is not a fixed
+   * height: the level's name wraps to two lines on a phone and there may or
+   * may not be a life meter and a progress meter stacked under the buttons.
+   * A percentage that clears all of that on a phone leaves a gap on an iPad.
+   */
+  private placeCallout(): void {
+    const above = this.top.getBoundingClientRect();
+    const host = this.root.getBoundingClientRect();
+    if (above.height === 0) {
+      return;
+    }
+    this.callout.style.top = `${above.bottom - host.top + 10}px`;
   }
 
   /** When the card went up, so the tap that opened the level can't close it. */

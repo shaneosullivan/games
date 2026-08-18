@@ -1603,22 +1603,39 @@ body {
  * a child to miss on their first go. It takes no pointer events, so tapping it
  * is tapping the screen — which, in the Bear's Lair, is the answer.
  */
+/*
+ * The "how to play this level" card.
+ *
+ * A strip under the top bar rather than a placard across the middle. It used
+ * to be a third of the height of a phone, sitting exactly where the game is —
+ * on the mountain it covered the bee, the ball she was towing and whatever was
+ * coming at her, which is a poor trade for a sentence you read once. Up here
+ * it is in the strip the player is already reading the level's name in, and
+ * nothing it covers is anything they have to see.
+ *
+ * `top` is set from JavaScript, because what it has to clear is the bar above
+ * it and that changes height when the title wraps. See `placeCallout`.
+ */
 .hud-callout {
   position: absolute;
   left: 50%;
-  top: 62%;
-  transform: translate(-50%, -50%);
-  max-width: min(88%, 620px);
-  padding: 18px 34px;
+  top: 22%;
+  transform: translateX(-50%);
+  /* Wide as its words, up to the width of the screen: an absolutely
+     positioned box shrinks to its longest word otherwise, which wrapped a
+     single short sentence onto two lines for no reason. */
+  width: max-content;
+  max-width: min(92%, 560px);
+  padding: 7px 18px;
   border-radius: 999px;
   background: rgba(20, 16, 30, 0.72);
-  border: 3px solid #ffd75e;
+  border: 2px solid #ffd75e;
   color: #fff;
-  font-size: clamp(22px, 4.4vw, 34px);
+  font-size: clamp(15px, 2.6vw, 21px);
   font-weight: 800;
   text-align: center;
-  text-shadow: 0 3px 10px rgba(0, 0, 0, 0.55);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.55);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
   pointer-events: none;
   animation: callout-beat 1.5s ease-in-out infinite;
 }
@@ -1632,7 +1649,7 @@ body {
 .hud-callout.going {
   animation: none;
   opacity: 0;
-  transform: translate(-50%, -50%) scale(0.86);
+  transform: translateX(-50%) scale(0.9);
   transition:
     opacity 0.45s ease,
     transform 0.45s ease;
@@ -1641,11 +1658,13 @@ body {
 /* On a phone it gets the width instead of the height. The card is a pill in
    the middle of the screen, and a narrow one turns four words into four lines
    — which covers the very thing it is explaining how to play. */
+/* On a phone it gets the width instead of the height: a narrow pill turns a
+   sentence into four lines, and four lines is a placard again. */
 @media (max-aspect-ratio: 1/1) {
   .hud-callout {
     max-width: 96%;
-    padding: 14px 22px;
-    font-size: clamp(19px, 5.6vw, 30px);
+    padding: 6px 14px;
+    font-size: clamp(14px, 3.4vw, 20px);
   }
 }
 
@@ -1654,10 +1673,10 @@ body {
 @keyframes callout-beat {
   0%,
   100% {
-    transform: translate(-50%, -50%) scale(1);
+    transform: translateX(-50%) scale(1);
   }
   50% {
-    transform: translate(-50%, -50%) scale(1.06);
+    transform: translateX(-50%) scale(1.05);
   }
 }
 
