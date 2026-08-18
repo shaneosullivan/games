@@ -2101,6 +2101,44 @@ export const ASCENT = {
   /** Camera: behind her, above her, and tilted down onto the slope. */
   camera: {back: 22, up: 13, pitch: 0.5},
 
+  /**
+   * The five weapons, and what a flower buys.
+   *
+   * One line per level, read straight: how fast she fires compared to the
+   * first weapon, how many streams, and whether they chase. Level 4 is the
+   * only one that spreads, and level 5 trades the spread back for seeds that
+   * pick a target and follow it.
+   */
+  weapon: {
+    rate: [1, 1.5, 1.5, 1.5, 1.5],
+    streams: [1, 1, 2, 3, 1],
+    /** How far apart level 3's two parallel streams sit. */
+    apart: 1.6,
+    /** How far off straight level 4's outer two lean, in radians. */
+    angle: 0.26,
+    /** From this level up, seeds chase — and how hard they can turn. */
+    homingFrom: 5,
+    homingTurn: 5.5,
+    /**
+     * How long a chasing seed flies straight before it starts to chase.
+     *
+     * It matters more than it sounds. A seed that turns the instant it leaves
+     * her is not aimed by anybody — the weapon plays itself, and where she
+     * points stops meaning anything. Flying straight for a moment first makes
+     * the shot hers: what she lines up is what it goes after, and the chase is
+     * the help it gives her afterwards rather than instead.
+     */
+    homingAfter: 0.22,
+    /** A locked seed turns this colour, and trails a flame this size. */
+    lockedColour: 0xff4a2a,
+    flameColour: 0xffb03a,
+    flameSize: 0.85,
+    /** How far ahead a homing seed will look for something to chase. */
+    homingRange: 70,
+  },
+  /** Flowers, which are what raise the weapon a level. */
+  flower: {perHundred: 1.1},
+
   /** The seeds she spits. */
   seed: {
     speed: 90,
@@ -2180,8 +2218,36 @@ export const ASCENT = {
     sweepUp: 150,
   },
 
-  /** Clouds drift across for perspective, above and below her. */
-  clouds: 14,
+  /**
+   * Clouds drift across for perspective.
+   *
+   * Banked in *layers* rather than scattered: a slope with nothing above it is
+   * a field, and what says "you are climbing" is cloud passing at eye level
+   * and below while the summit is still above you.
+   */
+  clouds: 22,
+  cloudLow: 6,
+  cloudHigh: 66,
+
+  /**
+   * The edges of the playable strip.
+   *
+   * The mountain used to end in a straight line with sky beyond it, which read
+   * as a green road rather than a mountainside. Now the strip is bounded by a
+   * ragged shoulder of rock and scrub, and in places the ground falls away
+   * entirely into a cliff — which is what says how high up she is.
+   */
+  edge: {
+    /** How far the shoulder wanders in and out, and how often. */
+    wander: 7,
+    wavelength: 90,
+    /** Bushes and boulders along it. */
+    bushesPerHundred: 7,
+    /** How often the edge gives way to a drop, and how long each one runs. */
+    cliffsPerThousand: 5,
+    cliffLength: [70, 150],
+    cliffDepth: 34,
+  },
 } as const;
 
 export const ASCENT_PALETTE = {

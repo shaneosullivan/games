@@ -19,6 +19,25 @@ const look = new THREE.Vector3();
 const fromEye = new THREE.Vector3();
 const fromLook = new THREE.Vector3();
 
+/**
+ * What each thing throws out when it dies.
+ *
+ * Its own colours, so what burst is readable from the burst itself — a wasp
+ * goes yellow and black, a rock goes grey, a can of pesticide throws its own
+ * red and a cloud of the green it was spraying.
+ */
+const DEBRIS: Record<
+  string,
+  {colours: ReadonlyArray<number>; count: number; speed: number}
+> = {
+  rock: {colours: [P.rock, P.rockDark, P.slopeDark], count: 16, speed: 8},
+  wasp: {colours: [P.wasp, P.waspDark], count: 14, speed: 9},
+  frog: {colours: [P.frog, P.tongue], count: 18, speed: 8},
+  can: {colours: [P.can, P.canDark, P.spray], count: 26, speed: 11},
+  moss: {colours: [P.moss, P.mossGlow], count: 16, speed: 6},
+  flower: {colours: [0xff6f9c, 0xffd84a], count: 22, speed: 8},
+};
+
 const ease = (t: number): number =>
   t < 0.5 ? 2 * t * t : 1 - (1 - t) * (1 - t) * 2;
 
@@ -77,7 +96,9 @@ export class AscentLevel implements Level {
    */
   private ahead = 0;
 
-  private health = A.health;
+  /** Which of the five weapons she is carrying; flowers raise it. */
+  private weapon = 1;
+  private health: number = A.health;
   private mercy = 0;
   private moss = 0;
   private sinceShot = 0;
@@ -109,7 +130,7 @@ export class AscentLevel implements Level {
 
     this.kit = createFoeKit();
     this.seeds = new Seeds();
-    this.mountain.slope.add(this.seeds.mesh);
+    this.mountain.slope.add(this.seeds.group);
 
     this.foes.length = 0;
     this.reaches.length = 0;
@@ -119,6 +140,7 @@ export class AscentLevel implements Level {
     this.climbed = 0;
     this.x = 0;
     this.ahead = 0;
+    this.weapon = 1;
     this.health = A.health;
     this.mercy = 0;
     this.moss = 0;
@@ -231,14 +253,13 @@ export class AscentLevel implements Level {
     );
     this.placeBee(ctx);
 
-    // Holding the screen — the stick, or a key — is what makes her shoot.
+    // Holding the screen — the stick, or a key — is what makes her shoot, and
+    // which weapon she is carrying decides what comes out. See ASCENT.weapon.
     this.sinceShot += dt;
-    if (
-      (stick.magnitude > 0 || ctx.holding) &&
-      this.sinceShot >= A.seed.every
-    ) {
+    const rate = A.seed.every / A.weapon.rate[this.weapon - 1];
+    if ((stick.magnitude > 0 || ctx.holding) && this.sinceShot >= rate) {
       this.sinceShot = 0;
-      this.seeds.fire(this.x, this.slopeZ() - 1.5);
+      this.volley();
       ctx.audio.collect(0);
     }
 
@@ -285,6 +306,62 @@ export class AscentLevel implements Level {
       this.limit = ahead;
     }
     return this.limit;
+  }
+
+  /**
+   * One pull of the trigger, in whichever shape this weapon fires.
+   *
+   * Two parallel streams, three in a fan, or one that chases — the numbers are
+   * a table in ASCENT.weapon, so what each level does is one line to read
+   * rather than a branch to follow.
+   */
+  private volley(): void {
+    const level = this.weapon - 1;
+    const nose = this.slopeZ() - 1.5;
+    const streams = A.weapon.streams[level];
+    const homing = this.weapon >= A.weapon.homingFrom;
+
+    if (streams === 2) {
+      // Level 3: two straight streams, side by side.
+      this.seeds.fire(this.x - A.weapon.apart / 2, nose);
+      this.seeds.fire(this.x + A.weapon.apart / 2, nose);
+      return;
+    }
+    if (streams === 3) {
+      // Level 4: one up the middle and two leaning out, covering a triangle.
+      this.seeds.fire(this.x, nose);
+      this.seeds.fire(this.x, nose, -A.weapon.angle);
+      this.seeds.fire(this.x, nose, A.weapon.angle);
+      return;
+    }
+    this.seeds.fire(this.x, nose, 0, homing ? this.acquire() : null);
+  }
+
+  /**
+   * Something for a chasing seed to follow.
+   *
+   * The nearest thing up the slope that can actually be killed — never moss or
+   * a flower, which are hers, and never something behind her, which would send
+   * the seed back down the mountain past her own ear.
+   */
+  private acquire(): Foe | null {
+    const from = this.slopeZ();
+    let best: Foe | null = null;
+    let bestD: number = A.weapon.homingRange;
+    for (const foe of this.foes) {
+      if (foe.dead || foe.kind === "moss" || foe.kind === "flower") {
+        continue;
+      }
+      if (foe.z > from) {
+        continue;
+      }
+      const d = Math.hypot(foe.x - this.x, foe.z - from);
+      if (d < bestD) {
+        bestD = d;
+        best = foe;
+      }
+    }
+    return best;
   }
 
   /** Where she is up the mountain, in the slope's own z. */
@@ -341,6 +418,9 @@ export class AscentLevel implements Level {
       }
       for (let i = 0; i < at(A.perHundred.cans); i++) {
         this.addCan(from);
+      }
+      for (let i = 0; i < at(A.flower.perHundred); i++) {
+        this.addFlower(from);
       }
     }
   }
@@ -465,6 +545,21 @@ export class AscentLevel implements Level {
     );
   }
 
+  private addFlower(from: number): void {
+    this.place(
+      {
+        kind: "flower",
+        group: new THREE.Group(),
+        x: this.acrossSlope(),
+        z: -(from + this.rng.range(70, 190)),
+        radius: 2.6,
+        hits: 0,
+        dead: false,
+      },
+      this.kit.flower,
+    );
+  }
+
   // ---- moving them --------------------------------------------------------
 
   private updateFoes(dt: number, ctx: GameContext): void {
@@ -487,6 +582,9 @@ export class AscentLevel implements Level {
           break;
         case "moss":
           this.pick(foe, dt, ctx);
+          break;
+        case "flower":
+          this.takeFlower(foe, ctx);
           break;
       }
 
@@ -636,6 +734,38 @@ export class AscentLevel implements Level {
     }
   }
 
+  /**
+   * Flowers are taken by flying into them, not by hovering.
+   *
+   * Moss is the thing you go out of your way for and it costs you time; a
+   * flower is a reward for being somewhere already, in the middle of a fight,
+   * and stopping to hover over one would be the opposite of what it is for.
+   */
+  private takeFlower(foe: Foe, ctx: GameContext): void {
+    foe.group.position.set(foe.x, 0, foe.z);
+    // Turning and bobbing, because a still flower on a hillside of scenery is
+    // scenery.
+    foe.group.rotation.y += 0.02;
+    foe.group.position.y = Math.sin(this.phaseTime * 2.4 + foe.z) * 0.25;
+    if (Math.hypot(this.x - foe.x, this.slopeZ() - foe.z) > foe.radius) {
+      return;
+    }
+    this.burst(ctx, foe, [0xff6f9c, 0xffd84a, P.mossGlow], 26, 9);
+    this.kill(foe, ctx, false);
+    if (this.weapon >= A.weapon.rate.length) {
+      // Already at the top: a flower is worth health instead, so it is never
+      // a thing you are sorry to see.
+      this.health = Math.min(A.health, this.health + 2);
+      ctx.hud.setHealth(this.health / A.health);
+      ctx.hud.setCallout("Patched up!");
+    } else {
+      this.weapon++;
+      ctx.hud.setCallout(`Weapon ${this.weapon}!`);
+    }
+    ctx.audio.quotaComplete();
+    window.setTimeout(() => ctx.hud.setCallout(null), 1200);
+  }
+
   // ---- hitting and being hit ---------------------------------------------
 
   /** A seed has arrived somewhere: is anything there? */
@@ -664,14 +794,11 @@ export class AscentLevel implements Level {
     foe.group.visible = false;
     this.hideReach(foe);
     if (spark) {
-      this.mountain.slope.localToWorld(tmp.set(foe.x, foe.radius, foe.z));
-      ctx.puff.burst(tmp, {
-        color:
-          foe.kind === "wasp" ? [P.wasp, P.waspDark] : [P.rock, P.rockDark],
-        count: 14,
-        speed: 7,
-        ttl: 0.7,
-      });
+      // Everything that dies goes off in its own colours, and the bigger it
+      // was the bigger the bang — a boulder bursting like a wasp reads as
+      // nothing having happened. See DEBRIS.
+      const kit = DEBRIS[foe.kind] ?? DEBRIS.rock;
+      this.burst(ctx, foe, kit.colours, kit.count, kit.speed);
       ctx.audio.sting();
     }
     // The last wasp of a train pays for the whole train.
@@ -685,6 +812,29 @@ export class AscentLevel implements Level {
         window.setTimeout(() => ctx.hud.setCallout(null), 1400);
       }
     }
+  }
+
+  /** A little explosion where something was, in its own colours. */
+  private burst(
+    ctx: GameContext,
+    foe: Foe,
+    colours: ReadonlyArray<number>,
+    count: number,
+    speed: number,
+  ): void {
+    this.mountain.slope.localToWorld(
+      tmp.set(foe.x, Math.max(1, foe.radius), foe.z),
+    );
+    // Scaled by how big the thing was, so a boulder throws more than a wasp.
+    const size = Math.min(2.4, Math.max(0.8, foe.radius * 0.7));
+    ctx.puff.burst(tmp, {
+      color: colours,
+      count: Math.round(count * size),
+      speed: speed * (0.7 + size * 0.3),
+      ttl: 0.55 + size * 0.2,
+      size: size * 0.8,
+      spherical: 0.8,
+    });
   }
 
   private retire(foe: Foe): void {

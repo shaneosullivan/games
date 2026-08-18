@@ -43,8 +43,16 @@ const tmp = new THREE.Vector3();
 export function createMountain(rng: Rng): Mountain {
   const group = new THREE.Group();
   const slope = new THREE.Group();
-  // Tilted so that "up the slope" is up the screen and away from the camera.
-  slope.rotation.x = -A.pitch;
+  /*
+   * Tilted so that "up the slope" is genuinely up.
+   *
+   * The sign matters beyond the picture. With it the other way the mountain
+   * *descended* in world space as she climbed it, which nothing on the slope
+   * could tell — everything there is relative — but the sky could: clouds are
+   * placed in world space, and every one of them ended up hundreds of units
+   * over the top of the screen.
+   */
+  slope.rotation.x = A.pitch;
   group.add(slope);
 
   const parts: Array<THREE.BufferGeometry> = [];
@@ -81,29 +89,116 @@ export function createMountain(rng: Rng): Mountain {
     parts.push(paint(mound, i % 3 === 0 ? P.mould : P.slopeDark));
   }
 
-  // ---- scenery ------------------------------------------------------------
+  // ---- the shoulders ------------------------------------------------------
   //
-  // Off to the sides, where nothing is played: it is there to say how fast she
-  // is climbing, which a bare slope cannot.
-  for (let i = 0; i < Math.round(A.climb / 9); i++) {
-    const side = rng.next() < 0.5 ? -1 : 1;
-    const x = side * rng.range(A.halfWidth + 1, A.halfWidth + 19);
-    const z = -rng.range(0, A.climb + 80);
+  // The mountain used to end in a straight line with sky beyond it, which read
+  // as a green road rather than a mountainside. The playable strip is the same
+  // width as ever — that is a gameplay promise — but the ground beyond it now
+  // wanders in and out, breaks into scrub and boulders, and in places gives
+  // way entirely to a drop.
+  //
+  // Where the cliffs are is decided first, so the shoulder can be built as one
+  // continuous thing that knows when to stop.
+  const cliffs: Array<{from: number; to: number; side: number}> = [];
+  const cliffCount = Math.round(
+    (A.climb / 1000) * A.edge.cliffsPerThousand * 2,
+  );
+  for (let i = 0; i < cliffCount; i++) {
+    const from = rng.range(80, A.climb - 200);
+    cliffs.push({
+      from,
+      to: from + rng.range(A.edge.cliffLength[0], A.edge.cliffLength[1]),
+      side: rng.next() < 0.5 ? -1 : 1,
+    });
+  }
+  const overACliff = (z: number, side: number): boolean =>
+    cliffs.some(c => c.side === side && -z > c.from && -z < c.to);
+
+  /** How far out the shoulder stands at this point, on this side. */
+  const shoulderAt = (z: number, side: number): number =>
+    A.halfWidth +
+    2 +
+    Math.sin((z / A.edge.wavelength) * Math.PI * 2 + side) * A.edge.wander +
+    Math.sin((z / (A.edge.wavelength * 0.37)) * Math.PI * 2) *
+      (A.edge.wander * 0.4);
+
+  for (const side of [-1, 1]) {
+    for (let z = 0; z > -(A.climb + 120); z -= 6) {
+      const snowy = -z > snowFrom;
+      const out = shoulderAt(z, side);
+      if (overACliff(z, side)) {
+        // A drop: the ground ends at the strip's edge and falls away.
+        const face = new THREE.BoxGeometry(3, A.edge.cliffDepth, 6.4);
+        face.translate(side * (A.halfWidth + 1.5), -A.edge.cliffDepth / 2, z);
+        parts.push(paint(face, P.rockDark));
+        // A lip of pale rock, so the edge itself is visible from above.
+        const lip = new THREE.BoxGeometry(4, 1.2, 6.4);
+        lip.translate(side * (A.halfWidth + 1), 0.2, z);
+        parts.push(paint(lip, snowy ? P.snowShade : P.rock));
+        continue;
+      }
+      // Otherwise the ground carries on out to the wandering shoulder.
+      const width = out - A.halfWidth;
+      const shelf = new THREE.BoxGeometry(width, 1.6, 6.4);
+      shelf.translate(side * (A.halfWidth + width / 2), -0.6, z);
+      parts.push(paint(shelf, snowy ? P.snow : P.slopeDark));
+    }
+  }
+
+  // ---- the flanks ---------------------------------------------------------
+  //
+  // Beyond the shoulder the mountain drops away. Without this the playable
+  // strip ends in a hard line with sky beside it, which reads as a road: the
+  // flank is what makes the ground she is flying over the *top* of something.
+  for (const side of [-1, 1]) {
+    for (let z = 0; z > -(A.climb + 120); z -= 24) {
+      const snowy = -z > snowFrom;
+      const out = shoulderAt(z, side);
+      const drop = new THREE.BoxGeometry(70, 3, 25);
+      // Rolled over so it falls away from the shoulder rather than sitting
+      // flat, and pushed out far enough that its top edge tucks under the
+      // shoulder it hangs from.
+      drop.rotateZ(side * 0.55);
+      drop.translate(side * (out + 30), -16, z);
+      parts.push(paint(drop, snowy ? P.snowShade : P.slopeDark));
+    }
+  }
+
+  // Bushes, boulders and tufts along the shoulders, thinning into snow.
+  const scrub = Math.round((A.climb / 100) * A.edge.bushesPerHundred * 2);
+  for (let i = 0; i < scrub; i++) {
+    const side = i % 2 === 0 ? -1 : 1;
+    const z = -rng.range(0, A.climb + 100);
+    if (overACliff(z, side)) {
+      continue;
+    }
+    const out = shoulderAt(z, side);
+    const x =
+      side * rng.range(A.halfWidth + 1.5, Math.max(A.halfWidth + 2, out));
     const snowy = -z > snowFrom;
-    if (rng.next() < 0.45) {
-      const stone = new THREE.DodecahedronGeometry(rng.range(0.8, 2.6), 0);
+    const roll = rng.next();
+    if (roll < 0.34) {
+      const stone = new THREE.DodecahedronGeometry(rng.range(0.9, 2.8), 0);
       stone.scale(1, 0.8, 1);
       stone.translate(x, 0.3, z);
       parts.push(paint(stone, snowy ? P.snowShade : P.rock));
-      continue;
+    } else if (roll < 0.72) {
+      // A bush: three overlapping blobs, mouldy green or snow-capped.
+      for (let b = 0; b < 3; b++) {
+        const r = rng.range(0.7, 1.5);
+        const blob = new THREE.SphereGeometry(r, 8, 6);
+        blob.scale(1.2, 0.85, 1.2);
+        blob.translate(x + rng.range(-1, 1), r * 0.6, z + rng.range(-1.4, 1.4));
+        parts.push(
+          paint(blob, snowy ? P.snow : b === 0 ? P.mouldDark : P.mould),
+        );
+      }
+    } else {
+      const h = rng.range(1.6, 4.4);
+      const tuft = new THREE.ConeGeometry(rng.range(0.5, 1.1), h, 6);
+      tuft.translate(x, h / 2, z);
+      parts.push(paint(tuft, snowy ? P.snow : P.mould));
     }
-    // Mouldy tufts, and up top they wear snow instead.
-    const h = rng.range(1.4, 4);
-    const tuft = new THREE.ConeGeometry(rng.range(0.5, 1.2), h, 6);
-    tuft.translate(x, h / 2, z);
-    parts.push(
-      paint(tuft, snowy ? P.snow : rng.next() < 0.5 ? P.mould : P.mouldDark),
-    );
   }
 
   // ---- the summit ---------------------------------------------------------
@@ -139,10 +234,28 @@ export function createMountain(rng: Rng): Mountain {
   const clouds: Array<{mesh: THREE.Mesh; speed: number}> = [];
   for (let i = 0; i < A.clouds; i++) {
     const mesh = new THREE.Mesh(cloudGeo, cloudMat);
+    /*
+     * Placed against the ground under them, not against sea level.
+     *
+     * The mountain rises as it goes back, so a cloud at a fixed world height
+     * would be overhead at the bottom and buried in the hillside at the top.
+     * Each one sits a little way above the slope beneath it instead — and some
+     * of them *below* that, out beyond the shoulder where there is nothing to
+     * bury them in, because cloud passing below you is the thing that says how
+     * high you have climbed.
+     */
+    const along = rng.range(-A.climb - 80, 30);
+    const ground = -along * Math.sin(A.pitch);
+    const far = rng.next() < 0.45;
     mesh.position.set(
-      rng.range(-160, 160),
-      rng.range(24, 78),
-      rng.range(-A.climb, 40),
+      far
+        ? rng.range(70, 230) * (rng.next() < 0.5 ? -1 : 1)
+        : rng.range(-90, 90),
+      ground +
+        (far
+          ? rng.range(-26, A.cloudHigh)
+          : rng.range(A.cloudLow, A.cloudHigh)),
+      along,
     );
     mesh.scale.setScalar(rng.range(2.4, 6));
     group.add(mesh);
