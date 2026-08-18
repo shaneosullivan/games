@@ -386,6 +386,10 @@ export class Game {
     ) {
       this.save.mutate(d => {
         d.maxLevel = Game.LAST_LEVEL;
+        d.completed = [];
+        for (let n = 1; n < Game.LAST_LEVEL; n++) {
+          d.completed.push(n);
+        }
         d.codename ||= "TESTER";
       });
     }
@@ -666,7 +670,7 @@ export class Game {
    * whatever the save says.
    */
   private syncCottageGate(): void {
-    const open = this.save.data.maxLevel >= 4 || this.levelNumber >= 4;
+    const open = this.save.unlockedThrough() >= 4 || this.levelNumber >= 4;
     this.cottage.setGateOpen(open);
     this.bee.bounds.minZ = open
       ? -Infinity
@@ -848,7 +852,7 @@ export class Game {
     uiLayer: HTMLElement,
     selected = this.save.data.level,
   ): void {
-    const unlocked = Math.min(this.save.data.maxLevel, Game.LAST_LEVEL);
+    const unlocked = Math.min(this.save.unlockedThrough(), Game.LAST_LEVEL);
 
     this.codenameScreen = createCodenameScreen(uiLayer, {
       existing: this.save.data.codename,
@@ -1052,6 +1056,7 @@ export class Game {
       // Silent Islands locked and the only way in was to play the cave again.
       // The pointer still decides which land the map opens on; what is
       // *unlocked* is now simply the level after this one.
+      this.save.markComplete(this.levelNumber);
       this.save.mutate(d => {
         d.maxLevel = Math.max(
           d.maxLevel,

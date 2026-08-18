@@ -12,6 +12,16 @@ export interface SaveData {
    * would otherwise throw away the unlock.
    */
   maxLevel: number;
+  /**
+   * Every level the player has actually *finished*, lowest first.
+   *
+   * The record of what has been done, as opposed to `maxLevel`, which only
+   * ever said how far they had got — and could not tell "in the middle of the
+   * cave" from "finished the cave", which is exactly the confusion that left
+   * the Silent Islands locked for anyone who had already beaten level 6. What
+   * is unlocked is computed from this; see `unlockedThrough`.
+   */
+  completed: Array<number>;
   pollen: Record<PollenKind, number>;
   /** Lifetime totals, kept separate so spending pollen doesn't erase progress stats. */
   gathered: Record<PollenKind, number>;
@@ -33,6 +43,7 @@ function blank(): SaveData {
     codename: "",
     level: 1,
     maxLevel: 1,
+    completed: [],
     pollen: {white: 0, yellow: 0, orange: 0},
     gathered: {white: 0, yellow: 0, orange: 0},
     updatedAt: Date.now(),
@@ -59,6 +70,23 @@ function read(): SaveData {
     // Saves written before the level picker existed have no maxLevel; the
     // level they were on is the best evidence of how far they got.
     merged.maxLevel = Math.max(1, parsed.maxLevel ?? 1, merged.level);
+
+    /*
+     * A save from before this list existed: everything below the furthest
+     * level reached has been finished, because finishing was the only way to
+     * reach it. The level they are *on* is not, which is the whole point of
+     * keeping the two apart.
+     */
+    if (!Array.isArray(parsed.completed)) {
+      merged.completed = [];
+      for (let n = 1; n < merged.maxLevel; n++) {
+        merged.completed.push(n);
+      }
+    } else {
+      merged.completed = parsed.completed
+        .filter(n => typeof n === "number" && Number.isFinite(n))
+        .sort((a, b) => a - b);
+    }
 
     /*
      * One-off: hand the Silent Islands to a save that finished the Bear's Lair
@@ -115,6 +143,37 @@ export class Save {
   mutate(fn: (d: SaveData) => void): void {
     fn(this.data);
     this.schedule();
+  }
+
+  /** Write down that a level has been finished. */
+  markComplete(n: number): void {
+    if (this.data.completed.includes(n)) {
+      return;
+    }
+    this.mutate(d => {
+      d.completed.push(n);
+      d.completed.sort((a, b) => a - b);
+    });
+  }
+
+  isComplete(n: number): boolean {
+    return this.data.completed.includes(n);
+  }
+
+  /**
+   * The highest level the player may pick, computed from what they have
+   * finished.
+   *
+   * One past the best level completed — and never less than how far they have
+   * reached, so a level abandoned halfway through is still there to go back
+   * to rather than being taken away from them.
+   */
+  unlockedThrough(): number {
+    let best = this.data.maxLevel;
+    for (const n of this.data.completed) {
+      best = Math.max(best, n + 1);
+    }
+    return Math.max(1, best);
   }
 
   hasProfile(): boolean {
