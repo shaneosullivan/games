@@ -230,6 +230,19 @@ function add(m) {
     gltf.scene.scale.setScalar(scale);
     gltf.scene.position.set(-centre.x * scale, -box.min.y * scale, -centre.z * scale);
     scene.add(gltf.scene);
+    // Frame the whole thing: pull the camera back to fit the model's bounding
+    // sphere (rotation-proof, and roomy enough to keep the +Z arrow in shot)
+    // so it reads in full without anyone reaching for the scroll wheel.
+    const sphere = new THREE.Box3()
+      .setFromObject(gltf.scene)
+      .getBoundingSphere(new THREE.Sphere());
+    const radius = Math.max(sphere.radius, 1.7);
+    const dist = (radius / Math.sin((35 * Math.PI) / 180 / 2)) * 1.15;
+    controls.target.copy(sphere.center);
+    cam.position
+      .copy(sphere.center)
+      .add(new THREE.Vector3(0.55, 0.4, 1).normalize().multiplyScalar(dist));
+    controls.update();
     cap.innerHTML = '<b>' + m.path + '</b> <span>· ' + m.size + ' · ' + Math.round(tris).toLocaleString() + ' tris</span>';
   }).catch(e => {
     cap.innerHTML = '<b>' + m.path + '</b> <span>· failed: ' + e.message + '</span>';
