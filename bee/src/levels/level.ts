@@ -250,6 +250,12 @@ export interface GameContext {
    */
   readonly cameraAspect: number;
   /**
+   * The camera's vertical field of view, in degrees. With the aspect, this is
+   * what turns "how much of the world is on the screen" into arithmetic rather
+   * than into a measurement that moves when the camera does.
+   */
+  readonly cameraFov: number;
+  /**
    * Turn the brood loose in the meadow, pouring out of `origin`. Moves the ring
    * out of the hive interior so it renders outdoors.
    */

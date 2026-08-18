@@ -315,6 +315,9 @@ export class Game {
       get cameraAspect() {
         return stage.camera.aspect;
       },
+      get cameraFov() {
+        return stage.camera.fov;
+      },
       takeTap: () => {
         const tapped = this.pendingTap !== null;
         this.pendingTap = null;

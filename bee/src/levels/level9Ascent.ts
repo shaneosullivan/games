@@ -117,9 +117,6 @@ export class AscentLevel implements Level {
   private nextBurst = 0;
   /** The forward limit, in units; see aheadLimit. */
   private limit: number = A.aheadLimit;
-  /** How far the camera has pulled back, and the screen it was worked out for. */
-  private zoom = 1;
-  private zoomFor = -1;
 
   get controlsLocked(): boolean {
     return this.phase !== "climbing";
@@ -287,18 +284,32 @@ export class AscentLevel implements Level {
    * on a phone would draw the bee as a speck.
    */
   private pullBack(ctx: GameContext): number {
-    if (this.zoomFor === ctx.cameraAspect) {
-      return this.zoom;
-    }
-    this.zoomFor = ctx.cameraAspect;
-    // How much of the mountain is visible right now, either side of her.
-    tmp.set(A.wantHalfWidth, A.flightHeight, this.slopeZ());
-    this.mountain.slope.localToWorld(tmp);
-    const at = Math.abs(ctx.projectToScreen(tmp).x);
-    // Screen offset falls off roughly with distance, so the ratio is the
-    // factor to move back by — clamped, and never closer than standard.
-    this.zoom = Math.min(A.camera.pullBack, Math.max(1, at / A.edgeMargin));
-    return this.zoom;
+    /*
+     * Worked out from the lens rather than by looking through it.
+     *
+     * Measuring the live camera and then moving it is a feedback loop: once it
+     * has pulled back the measurement says it no longer needs to, and the
+     * answer flips between the two every frame. Caching the first measurement
+     * is no better — on the frame a level starts, the camera is still wherever
+     * the last one left it.
+     *
+     * So: the visible half-width at distance d is d·tan(fov/2)·aspect, and the
+     * distance scales with the pull-back. Rearranged, this is exactly the
+     * factor that brings `wantHalfWidth` inside the screen's margin. It is 1
+     * on an iPad and about two on a phone held upright.
+     */
+    const camera = this.standingDistance();
+    const halfHeight = Math.tan((ctx.cameraFov * Math.PI) / 360);
+    const visible = camera * halfHeight * ctx.cameraAspect * A.edgeMargin;
+    return Math.min(
+      A.camera.pullBack,
+      Math.max(1, A.wantHalfWidth / Math.max(0.001, visible)),
+    );
+  }
+
+  /** How far the camera stands from her at the standard distance. */
+  private standingDistance(): number {
+    return Math.hypot(A.camera.back, A.camera.up);
   }
 
   /**
@@ -430,11 +441,18 @@ export class AscentLevel implements Level {
 
   /** Behind her and above, looking up the mountain. */
   private camera(ctx: GameContext): void {
-    tmp.set(this.x * 0.35, A.flightHeight, -this.climbed + A.camera.back);
+    // Far enough back that a playable width of mountain is on the screen; see
+    // pullBack, which is 1 on an iPad and retreats on a phone.
+    const zoom = this.pullBack(ctx);
+    tmp.set(
+      this.x * 0.35,
+      A.flightHeight,
+      -this.climbed + A.camera.back * zoom,
+    );
     this.mountain.slope.localToWorld(tmp);
     eye.copy(tmp);
-    eye.y += A.camera.up;
-    tmp.set(this.x * 0.35, 0, -(this.climbed + 34));
+    eye.y += A.camera.up * zoom;
+    tmp.set(this.x * 0.35, 0, -(this.climbed + 34 * zoom));
     this.mountain.slope.localToWorld(tmp);
     look.copy(tmp);
     ctx.setCameraCinematic(eye, look);
@@ -500,7 +518,7 @@ export class AscentLevel implements Level {
   }
 
   /** The half-width being played, kept up to date by the camera each frame. */
-  private playHalf = A.wantHalfWidth;
+  private playHalf: number = A.wantHalfWidth;
 
   private addRock(from: number): void {
     const size = Math.floor(this.rng.range(0, A.rock.sizes.length));
