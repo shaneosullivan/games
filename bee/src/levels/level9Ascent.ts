@@ -563,11 +563,23 @@ export class AscentLevel implements Level {
   }
 
   private placeBee(ctx: GameContext): void {
-    tmp.set(this.x, A.flightHeight, this.slopeZ());
+    tmp.set(this.x, this.flightY(this.x, this.ahead), this.slopeZ());
     this.mountain.slope.localToWorld(tmp);
     ctx.bee.teleport(tmp);
     // Facing up the hill, tipped with the slope.
     ctx.bee.setYaw(Math.PI);
+  }
+
+  /**
+   * How high off the slope she flies at a point — her ordinary flight height,
+   * except where the summit rises past it, where she lifts to stay clear of
+   * it. Continuous, so the final approach is a smooth crest rather than a
+   * step: the moment the cap or the boulder is taller than her flight height
+   * she starts rising, and the arrival dance carries on from there.
+   */
+  private flightY(x: number, ahead: number): number {
+    const crest = this.mountain.crestAt(x, -(this.climbed + ahead));
+    return Math.max(A.flightHeight, crest + A.summit.clearance);
   }
 
   /** Behind her and above, looking up the mountain. */
@@ -666,6 +678,23 @@ export class AscentLevel implements Level {
     return A.ramp.from + (A.ramp.to - A.ramp.from) * t * t;
   }
 
+  /**
+   * How many hits a thing spawned at `from` takes, given its base cost.
+   *
+   * One at the foot, up to ASCENT.toughness.to of its base at the summit, on
+   * the same squared curve as the density — so the reach of the upgraded seed
+   * meets something that can stand up to it near the top. Rounded and never
+   * below its base, so nothing is ever *easier* than the number that defines
+   * it.
+   */
+  private toughen(base: number, from: number): number {
+    const t = THREE.MathUtils.clamp(from / A.climb, 0, 1);
+    return Math.max(
+      base,
+      Math.round(base * (1 + (A.toughness.to - 1) * t * t)),
+    );
+  }
+
   private place(foe: Foe, geo: THREE.BufferGeometry, scale = 1): Foe {
     const mesh = new THREE.Mesh(geo, this.kit.material);
     mesh.scale.setScalar(scale);
@@ -702,7 +731,7 @@ export class AscentLevel implements Level {
         x: this.acrossSlope(),
         z: -(from + this.rng.range(60, 190)),
         radius,
-        hits: A.rock.hits[size],
+        hits: this.toughen(A.rock.hits[size], from),
         dead: false,
         speed: this.rng.range(A.rock.speed[0], A.rock.speed[1]),
         lift: 0,
@@ -733,7 +762,7 @@ export class AscentLevel implements Level {
           z,
           // The body is drawn bigger, so what she has to fly around is too.
           radius: 1.1 * A.wasp.scale,
-          hits: A.wasp.hits,
+          hits: this.toughen(A.wasp.hits, from),
           dead: false,
           train: id,
           speed: A.wasp.speed,
@@ -757,7 +786,7 @@ export class AscentLevel implements Level {
         x: this.acrossSlope(),
         z: -(from + this.rng.range(80, 190)),
         radius: 2,
-        hits: A.frog.hits,
+        hits: this.toughen(A.frog.hits, from),
         dead: false,
         next: this.rng.range(A.frog.every[0], A.frog.every[1]),
         firing: 0,
@@ -774,6 +803,9 @@ export class AscentLevel implements Level {
         x: this.acrossSlope(),
         z: -(from + this.rng.range(90, 190)),
         radius: 2.2,
+        // Not toughened with altitude like the rest: the can is already the
+        // tank of the mountain at nine hits, and scaling that up the climb
+        // makes a damage sponge rather than a harder shot.
         hits: A.pesticide.hits,
         dead: false,
         next: this.rng.range(A.pesticide.every[0], A.pesticide.every[1]),
@@ -1183,8 +1215,13 @@ export class AscentLevel implements Level {
     this.nextBurst = 0;
     this.summitRise = 0;
     // Where she is the instant she tops out, so the hover eases up from there
-    // rather than snapping to the perch.
-    this.summitFrom.set(this.x, A.flightHeight, this.slopeZ());
+    // rather than snapping to the perch. Her height is already lifted by the
+    // crest on the way in, so read that rather than the flat flight height.
+    this.summitFrom.set(
+      this.x,
+      this.flightY(this.x, this.ahead),
+      this.slopeZ(),
+    );
     ctx.hud.setCallout("The summit!");
     ctx.hud.setObjective("The top of the Mouldy Mountain!");
     fromEye.copy(ctx.cameraPosition);

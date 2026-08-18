@@ -2137,6 +2137,19 @@ export const ASCENT = {
    * should not be scarce exactly when she is learning.
    */
   ramp: {from: 0.4, to: 1},
+  /**
+   * How much harder each enemy is to kill at the summit than at the foot.
+   *
+   * The density ramp above thins *how many* hazards there are; this raises *how
+   * much killing* each one takes as she climbs — a wasp near the top wears two
+   * or three seeds where one did at the bottom. It exists because the seed now
+   * carries to the top of the screen (see seed.range): with that reach and a
+   * one-hit wasp the back half of the mountain cleared itself before anything
+   * arrived. Squared like the density, so the toll is on the hard end of the
+   * climb where the upgraded weapon is meant to be earning itself, not on the
+   * stretch where a child is still learning to steer.
+   */
+  toughness: {to: 2.6},
   /** Her window on the slope: how far ahead of and behind the camera's mark. */
   aheadLimit: 16,
   behindLimit: 10,
@@ -2267,7 +2280,7 @@ export const ASCENT = {
      * dirt rather than as something coming for her.
      */
     scale: 1.8,
-    perTrain: [4, 7],
+    perTrain: [5, 9],
     spacing: 2.6,
     hits: 1,
     /** Extra moss for taking a whole train without missing one. */
@@ -2317,8 +2330,14 @@ export const ASCENT = {
     needed: 12,
   },
 
-  /** How thickly things are seeded up the mountain, per hundred units. */
-  perHundred: {rocks: 3.2, waspTrains: 1.1, frogs: 1.2, moss: 1.6, cans: 0.8},
+  /**
+   * How thickly things are seeded up the mountain, per hundred units.
+   *
+   * Wasp trains are the biggest lever here and are deliberately the thickest
+   * hazard: they are the one a homing weapon is most satisfying against, and a
+   * mountain that reads as busy is mostly a mountain with wasps on it.
+   */
+  perHundred: {rocks: 3.6, waspTrains: 2.1, frogs: 1.6, moss: 1.6, cans: 1},
 
   /** The summit: snow, a boulder, and the sweep that shows the mountain. */
   summit: {
@@ -2343,6 +2362,15 @@ export const ASCENT = {
     danceBob: 3.2,
     danceRate: 3.4,
     danceSwing: 0.6,
+    /*
+     * How far above the snow cap and boulder she flies as she crests. The cap
+     * tops out around 13 and the boulder around 15, and she flew the climb at
+     * 3.4 — so without this she flies straight into the summit on the final
+     * approach, before the arrival rise ever begins. Applied continuously from
+     * the mountain's crestAt, so she lifts smoothly the moment the dome rises
+     * past her rather than at any one trigger line.
+     */
+    clearance: 5,
   },
 
   /**

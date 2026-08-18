@@ -19,6 +19,13 @@ export interface Mountain {
   readonly bumps: ReadonlyArray<Bump>;
   /** Where the ground is, in slope space, for anything that rolls on it. */
   heightAt(x: number, z: number): number;
+  /**
+   * The top of anything standing at the summit — the snow cap and the boulder
+   * — at a point in slope space, or -Infinity where neither covers it. The
+   * bee flies above this on her final approach so she crests the mountain
+   * rather than flying into it. See level9Ascent flightY.
+   */
+  crestAt(x: number, z: number): number;
   /** Drift the clouds and creep the mould. */
   update(dt: number, climbed: number): void;
   dispose(): void;
@@ -204,14 +211,20 @@ export function createMountain(rng: Rng): Mountain {
   // ---- the summit ---------------------------------------------------------
   //
   // A rounded cap with one big boulder on it — the boulder is the next level,
-  // so it has to be the thing you see when you arrive.
-  const cap = new THREE.SphereGeometry(46, 18, 12);
-  cap.scale(1, 0.42, 1);
-  cap.translate(0, -6, -(A.climb + 34));
+  // so it has to be the thing you see when you arrive. Both are ellipsoids
+  // (the boulder near enough), so their tops are known in closed form; see
+  // domes and crestAt, which the bee climbs over on her way in.
+  const domes = {
+    cap: {y: -6, z: -(A.climb + 34), r: 46, ry: 46 * 0.42},
+    boulder: {y: 9, z: -(A.climb + 26), r: 6.5, ry: 6.5 * 0.86},
+  };
+  const cap = new THREE.SphereGeometry(domes.cap.r, 18, 12);
+  cap.scale(1, domes.cap.ry / domes.cap.r, 1);
+  cap.translate(0, domes.cap.y, domes.cap.z);
   parts.push(paint(cap, P.snow));
-  const boulder = new THREE.DodecahedronGeometry(6.5, 1);
-  boulder.scale(1, 0.86, 1);
-  boulder.translate(0, 9, -(A.climb + 26));
+  const boulder = new THREE.DodecahedronGeometry(domes.boulder.r, 1);
+  boulder.scale(1, domes.boulder.ry / domes.boulder.r, 1);
+  boulder.translate(0, domes.boulder.y, domes.boulder.z);
   parts.push(paint(boulder, P.rock));
 
   const merged = mergeGeometries(parts, false);
@@ -311,6 +324,21 @@ export function createMountain(rng: Rng): Mountain {
         }
       }
       return h;
+    },
+
+    crestAt(x, z) {
+      // The upper surface of an ellipsoid at (x, z): its centre height plus its
+      // vertical radius scaled by how far in from the rim the point is.
+      const top = (d: {
+        y: number;
+        z: number;
+        r: number;
+        ry: number;
+      }): number => {
+        const q = (x * x + (z - d.z) * (z - d.z)) / (d.r * d.r);
+        return q >= 1 ? -Infinity : d.y + d.ry * Math.sqrt(1 - q);
+      };
+      return Math.max(top(domes.cap), top(domes.boulder));
     },
 
     update(dt, climbed) {
