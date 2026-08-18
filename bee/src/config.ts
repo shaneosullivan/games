@@ -2250,6 +2250,15 @@ export const ASCENT = {
      */
     range: 340,
     damage: 1,
+    /*
+     * The trail is kept to this many pollen. Once a seed has this many fired
+     * after it, it fades out over `fadeTime` seconds rather than flying on to
+     * the range above — so the stream reads as a short comet tail behind her
+     * that renews itself, not a solid line all the way up the mountain. The
+     * range is still the backstop for the last few once she stops firing.
+     */
+    trail: 12,
+    fadeTime: 0.2,
   },
 
   /** Her health, and what things cost her. */
@@ -2295,9 +2304,11 @@ export const ASCENT = {
      * code: mrfrog.glb, painted in Blender and baked to vertex colours (see
      * scripts/glb-bake.mjs). `length` sizes it to sit in the radius-2 slot the
      * old hand-built frog filled, and `yaw` turns it to face down the mountain
-     * at her — measured in the running level, like the island models' yaws.
+     * at her. The model is authored facing +z, which is already downhill (the
+     * bee climbs -z and meets a foe from the +z side), so yaw is zero — half a
+     * turn had it facing up the mountain, showing the bee its back.
      */
-    model: {length: 4.4, yaw: Math.PI},
+    model: {length: 3.8, yaw: 0},
     /**
      * How far the tongue reaches, and how often it tries.
      *
@@ -2351,10 +2362,6 @@ export const ASCENT = {
   summit: {
     burstEvery: 0.26,
     bursts: 10,
-    sweepTime: 5.5,
-    /** How far out and up the closing shot pulls. */
-    sweepBack: 210,
-    sweepUp: 150,
     /*
      * The little arrival dance. She flew the whole way at flightHeight (3.4),
      * which is *inside* the snow cap once it rises past her at the top — the

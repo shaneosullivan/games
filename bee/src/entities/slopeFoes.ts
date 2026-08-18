@@ -298,12 +298,18 @@ export class Seeds {
   private readonly shot: Array<Shot> = [];
   private readonly from: Array<number> = [];
   private readonly live: Array<boolean> = [];
+  /** Fire order, so a seed knows how many were loosed after it. */
+  private readonly seq: Array<number> = [];
+  /** Seconds into its fade-out, or -1 while it is still full size. */
+  private readonly fadeT: Array<number> = [];
+  /** How many seeds have ever been fired; the yardstick for `seq`. */
+  private fired = 0;
+  private readonly fadeScale = new THREE.Vector3();
 
   private readonly matrix = new THREE.Matrix4();
   private readonly quat = new THREE.Quaternion();
   /** No rotation: the seeds are little balls. */
   private readonly still = new THREE.Quaternion();
-  private readonly scale = new THREE.Vector3(1, 1, 1);
   private readonly flameScale = new THREE.Vector3();
   private readonly at = new THREE.Vector3();
   private readonly aim = new THREE.Vector3();
@@ -335,6 +341,8 @@ export class Seeds {
       this.z.push(0);
       this.from.push(0);
       this.live.push(false);
+      this.seq.push(0);
+      this.fadeT.push(-1);
       this.shot.push({vx: 0, vz: -A.seed.speed, target: null, age: 0});
     }
     this.hideAll();
@@ -375,6 +383,8 @@ export class Seeds {
     this.z[i] = z;
     this.from[i] = z;
     this.live[i] = true;
+    this.seq[i] = this.fired++;
+    this.fadeT[i] = -1;
     const shot = this.shot[i];
     shot.vx = Math.sin(angle) * A.seed.speed;
     shot.vz = -Math.cos(angle) * A.seed.speed;
@@ -425,7 +435,20 @@ export class Seeds {
       this.x[i] += shot.vx * dt;
       this.z[i] += shot.vz * dt;
 
+      // The tail keeps to A.seed.trail pollen: once that many have been fired
+      // after this one, it shrinks away over fadeTime rather than flying on.
+      const behind = this.fired - 1 - this.seq[i];
+      if (behind >= A.seed.trail && this.fadeT[i] < 0) {
+        this.fadeT[i] = 0;
+      }
+      let fade = 1;
+      if (this.fadeT[i] >= 0) {
+        this.fadeT[i] += dt;
+        fade = 1 - this.fadeT[i] / A.seed.fadeTime;
+      }
+
       if (
+        fade <= 0 ||
         Math.abs(this.from[i] - this.z[i]) > A.seed.range ||
         hit(this.x[i], this.z[i])
       ) {
@@ -442,7 +465,7 @@ export class Seeds {
       }
 
       this.at.set(this.x[i], A.flightHeight * 0.7, this.z[i]);
-      this.matrix.compose(this.at, this.still, this.scale);
+      this.matrix.compose(this.at, this.still, this.fadeScale.setScalar(fade));
       this.mesh.setMatrixAt(i, this.matrix);
       this.mesh.setColorAt(i, chasing ? this.locked : this.plain);
 
@@ -461,7 +484,7 @@ export class Seeds {
         this.aim.set(backX, 0, backZ);
         this.quat.setFromUnitVectors(UP, this.aim);
         const flicker =
-          A.weapon.flameSize * (0.75 + Math.sin(shot.age * 40) * 0.25);
+          A.weapon.flameSize * fade * (0.75 + Math.sin(shot.age * 40) * 0.25);
         this.flameScale.set(flicker, flicker * 1.4, flicker);
         this.matrix.compose(this.at, this.quat, this.flameScale);
       } else {

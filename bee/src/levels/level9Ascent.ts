@@ -14,7 +14,7 @@ import {loadPreparedModel} from "../render/geometry/islandModels";
 import frogUrl from "../assets/islands/mrfrog.glb";
 import type {GameContext, Level} from "./level";
 
-type Phase = "climbing" | "summit" | "sweep" | "done";
+type Phase = "climbing" | "summit" | "done";
 
 const tmp = new THREE.Vector3();
 const eye = new THREE.Vector3();
@@ -260,9 +260,6 @@ export class AscentLevel implements Level {
         break;
       case "summit":
         this.updateSummit(dt, ctx);
-        break;
-      case "sweep":
-        this.updateSweep(ctx);
         break;
       case "done":
         break;
@@ -1297,29 +1294,18 @@ export class AscentLevel implements Level {
       });
       ctx.audio.levelComplete();
     }
-    if (this.bursts >= A.summit.bursts && this.nextBurst <= 0) {
-      this.phase = "sweep";
-      this.phaseTime = 0;
-      ctx.hud.setCallout(null);
-    }
-  }
-
-  /** The closing shot: out and up, until the whole mountain is in frame. */
-  private updateSweep(ctx: GameContext): void {
-    const t = ease(Math.min(1, this.phaseTime / A.summit.sweepTime));
-    this.mountain.slope.localToWorld(look.set(0, 0, -(A.climb * 0.55)));
-    // Round and back, so it reads as a camera leaving rather than a zoom.
-    const angle = t * 1.1;
-    eye.set(
-      Math.sin(angle) * A.summit.sweepBack * t,
-      20 + A.summit.sweepUp * t,
-      Math.cos(angle) * A.summit.sweepBack * t + 40,
-    );
-    eye.z -= A.climb * 0.2 * t;
-    ctx.setCameraCinematic(eye, look);
-    if (t >= 1) {
-      this.phase = "done";
+    // Once the fireworks are spent the level is won — on the dancing bee, held
+    // where she is. There used to be a closing shot that pulled the camera out
+    // and up to take in the whole mountain; it wasn't much to look at, so the
+    // ending simply stays with her at the top while the card comes up, and she
+    // keeps dancing behind it.
+    if (
+      this.bursts >= A.summit.bursts &&
+      this.nextBurst <= 0 &&
+      !this.complete
+    ) {
       this.complete = true;
+      ctx.hud.setCallout(null);
     }
   }
 }
