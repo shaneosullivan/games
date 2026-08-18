@@ -173,6 +173,13 @@ export class DescentLevel implements Level {
   private bear!: BearModel;
   /** Whether he has already had his moment; he only gets the one. */
   private roared = false;
+  /**
+   * How far the babies have come up to the glass, 0..1.
+   *
+   * Eased rather than switched, so they drift up to the camera and settle
+   * back rather than snapping to attention the frame the shot swings.
+   */
+  private peek = 0;
 
   get controlsLocked(): boolean {
     return this.phase !== "rolling";
@@ -239,6 +246,7 @@ export class DescentLevel implements Level {
     this.smashed = 0;
     this.blocked = 0;
     this.roared = false;
+    this.peek = 0;
     this.failTitle = "Not quite big enough";
     this.failBody =
       "The ball reached the bottom too small to matter. Roll over more of the hillside on the way down — the little things first.";
@@ -789,7 +797,8 @@ export class DescentLevel implements Level {
   private updateRoar(ctx: GameContext): void {
     const inTime = K.roar.in;
     const holdTo = inTime + K.roar.hold;
-    const total = holdTo + K.roar.out;
+    const orbitTo = holdTo + K.roar.orbit;
+    const total = orbitTo + K.roar.out;
     const t = this.phaseTime;
 
     /*
@@ -805,36 +814,63 @@ export class DescentLevel implements Level {
         ? ease(t / inTime)
         : t < holdTo
           ? 1
-          : 1 - ease((t - holdTo) / K.roar.out);
+          : t < orbitTo
+            ? 1 - ease((t - holdTo) / K.roar.orbit)
+            : 0;
     const swat =
       t > inTime * 0.8 && t < holdTo
         ? Math.max(0, Math.sin((t - inTime * 0.8) * 5.2))
         : 0;
     this.bear.animate(this.phaseTime * 4, 0, rear, swat);
 
-    // In on him, hold, and back out to the shot she had.
+    /*
+     * Three shots in one move: in on him, round behind him, and back out.
+     *
+     * The swing is what the beat is *for*. Standing in front of him he is a
+     * bear; taken round the side of him, the thing he is standing in front of
+     * comes into view, and the cage full of babies is the reason the player is
+     * on this hillside at all. The babies come up to the glass while it does.
+     */
+    const swing =
+      t < holdTo ? 0 : t < orbitTo ? ease((t - holdTo) / K.roar.orbit) : 1;
     const push =
       t < inTime
         ? ease(t / inTime)
-        : t < holdTo
+        : t < orbitTo
           ? 1
-          : 1 - ease((t - holdTo) / K.roar.out);
+          : 1 - ease((t - orbitTo) / K.roar.out);
+    this.peek += ((swing > 0.15 ? 1 : 0) - this.peek) * 0.06;
+
     // `camera` leaves the playing shot in `eye` and `look`, which is what is
     // being lerped away from — the call it makes to the camera itself is
     // immediately overwritten by the one below.
     this.camera(ctx, 0);
+    const angle = swing * K.roar.swing;
+    const out = K.roar.standoff + (K.roar.orbitOut - K.roar.standoff) * swing;
     this.hill.slope.localToWorld(
-      tmp.set(0, K.roar.height, -this.bearAt() + K.roar.standoff),
+      tmp.set(
+        Math.sin(angle) * out,
+        K.roar.height + (K.roar.riseTo - K.roar.height) * swing,
+        -this.bearAt() + Math.cos(angle) * out,
+      ),
     );
     eye.lerp(tmp, push);
+    // Looking at him to begin with, and at the cage behind him by the end.
     this.hill.slope.localToWorld(
-      tmp.set(0, K.bear.radius * 1.25, -this.bearAt()),
+      tmp.set(
+        0,
+        K.bear.radius * 1.25 + swing * K.cage.radius * 0.5,
+        // From him to the cage, which is further *down* the hill than he is.
+        -(this.bearAt() + swing * (this.cageAt() - this.bearAt())),
+      ),
     );
     look.lerp(tmp, push);
     ctx.setCameraCinematic(eye, look);
+    this.faceBabies();
 
     if (t >= total) {
       this.bear.animate(0, 0, 0, 0);
+      this.peek = 0;
       this.phase = "rolling";
       this.phaseTime = 0;
       this.speed = K.ball.minSpeed;
@@ -934,19 +970,81 @@ export class DescentLevel implements Level {
     }
   }
 
+  /**
+   * Fly the broken cage, and let it land.
+   *
+   * Each piece falls, turns, and stops when it reaches the grass — losing its
+   * spin and lying down rather than coming to rest on end. Without the landing
+   * they simply kept the velocity they were given: the smash ended with twenty
+   * iron bars hanging in the air, which is the one thing debris must never do.
+   *
+   * Still no collisions. They pass through each other and through the ball,
+   * and at the speed this plays nobody will ever see it.
+   */
+  private settlePieces(step: number): void {
+    for (const piece of this.cage.pieces) {
+      if (piece.velocity.lengthSq() === 0) {
+        continue;
+      }
+      piece.velocity.y -= K.cage.gravity * step;
+      piece.mesh.position.addScaledVector(piece.velocity, step);
+      piece.mesh.rotation.x += piece.spin.x * step;
+      piece.mesh.rotation.y += piece.spin.y * step;
+      piece.mesh.rotation.z += piece.spin.z * step;
+
+      const rest = 0.7;
+      if (piece.mesh.position.y > rest) {
+        continue;
+      }
+      piece.mesh.position.y = rest;
+      if (piece.velocity.y > -6) {
+        // Down and done: it lies flat and keeps whichever way it was pointing.
+        piece.velocity.set(0, 0, 0);
+        piece.spin.set(0, 0, 0);
+        piece.mesh.rotation.x = Math.PI / 2;
+        continue;
+      }
+      // One dead little bounce, and most of the slide taken out of it.
+      piece.velocity.set(
+        piece.velocity.x * 0.45,
+        -piece.velocity.y * 0.22,
+        piece.velocity.z * 0.45,
+      );
+      piece.spin.multiplyScalar(0.4);
+    }
+  }
+
+  /**
+   * The babies come to the front of the cage and look out of it.
+   *
+   * `lookAt` takes a world position and handles the two groups they are nested
+   * in, so this needs to know nothing about the slope. They are pulled towards
+   * the near face of the cage as well as turned, because a baby facing the
+   * camera from the far side of it is behind three bars.
+   */
+  private faceBabies(): void {
+    if (this.peek <= 0.001) {
+      return;
+    }
+    const near = K.cage.radius * 0.5;
+    for (const baby of this.babies) {
+      const at = baby.model.group.position;
+      at.z += (near + baby.r * 0.25 - at.z) * this.peek * 0.06;
+      // Each to its own height rather than all to one, so a dozen babies at
+      // the bars read as a crowd and not as a shelf.
+      const eyeLine = K.cage.radius * 0.32 + baby.r * 0.75;
+      at.y += (eyeLine - at.y) * this.peek * 0.05;
+      baby.model.group.lookAt(eye);
+    }
+  }
+
   private updateSmash(dt: number, ctx: GameContext): void {
     // Everything in here runs on its own slow clock; the camera pulls out on
     // the real one, so the shot keeps moving while the pieces hang.
     const slow = dt * K.cage.slowMo;
     this.smashed += slow;
 
-    for (const piece of this.cage.pieces) {
-      piece.velocity.y -= K.cage.gravity * slow;
-      piece.mesh.position.addScaledVector(piece.velocity, slow);
-      piece.mesh.rotation.x += piece.spin.x * slow;
-      piece.mesh.rotation.y += piece.spin.y * slow;
-      piece.mesh.rotation.z += piece.spin.z * slow;
-    }
+    this.settlePieces(slow);
 
     this.speed = Math.max(0, this.speed - K.ball.gravity * 0.5 * slow);
     const travelled = this.speed * slow;
@@ -1425,15 +1523,28 @@ export class DescentLevel implements Level {
     }
   }
 
-  /** The closing shot: out and up, until the whole descent is in frame. */
+  /**
+   * The closing shot: up and back off the wreckage, until the hill is behind it.
+   *
+   * Held on the cage rather than on the middle of the run. Aiming at the
+   * halfway mark pointed the camera back *up* the mountain from a position
+   * near the bottom of it, so the last thing the game showed was an empty
+   * field with everything that had just happened behind the lens.
+   */
   private updateSweep(ctx: GameContext): void {
+    // Whatever is still in the air when the smash ends finishes falling here,
+    // in real time rather than slowed, so nothing is left hanging.
+    this.settlePieces(1 / 60);
     const t = ease(Math.min(1, this.phaseTime / K.finish.sweepTime));
-    this.hill.slope.localToWorld(look.set(0, 0, -K.run * 0.55));
+    const at = this.cageAt();
+    this.hill.slope.localToWorld(
+      look.set(0, this.hill.groundAt(at) + K.cage.radius * 0.35, -at),
+    );
     this.hill.slope.localToWorld(
       tmp.set(
         0,
-        this.radius + this.hill.groundAt(this.rolled) + 20 + t * 150,
-        -this.rolled + 40 + t * 220,
+        this.hill.groundAt(at) + K.cage.radius + 20 + t * 190,
+        -at + K.cage.radius * 1.6 + t * 300,
       ),
     );
     eye.copy(tmp);

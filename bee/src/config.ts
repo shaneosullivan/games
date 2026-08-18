@@ -2702,7 +2702,28 @@ export const KATAMARI = {
    * `at` is how far before him it fires, in units. The three times are the
    * push in, the hold on him, and the pull back out.
    */
-  roar: {at: 340, in: 0.8, hold: 1.5, out: 0.8, standoff: 125, height: 42},
+  roar: {
+    at: 340,
+    /** The beats: push in, hold on him, swing round behind, pull back out. */
+    in: 0.7,
+    hold: 1.3,
+    orbit: 2,
+    out: 0.8,
+    standoff: 125,
+    height: 42,
+    /**
+     * How far round he is circled, how close it gets, and how high it rises.
+     *
+     * Not far round, and deliberately: the funnel's banks are seventy-eight
+     * units either side of him, and a camera swung a right angle out ends up
+     * behind a wall of rock looking at the back of it. It stays inside the
+     * mouth and goes *up* instead, which shows the cage over his shoulder
+     * rather than through the hillside.
+     */
+    swing: 0.72,
+    orbitOut: 92,
+    riseTo: 86,
+  },
 
   /**
    * The cage behind the bear, and what happens to it.
@@ -2736,7 +2757,14 @@ export const KATAMARI = {
     slowMo: 0.3,
     burst: 30,
     spin: 4,
-    gravity: 22,
+    /**
+     * Enough to bring the pieces down inside the shot.
+     *
+     * They land and stay landed: a bar that is still drifting when the phase
+     * ends hangs in the air for the rest of the game, which is exactly what
+     * the first version did. See `settlePieces`.
+     */
+    gravity: 40,
     time: 6.5,
   },
 
