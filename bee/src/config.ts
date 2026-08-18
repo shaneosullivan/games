@@ -2328,6 +2328,21 @@ export const ASCENT = {
     /** How far out and up the closing shot pulls. */
     sweepBack: 210,
     sweepUp: 150,
+    /*
+     * The little arrival dance. She flew the whole way at flightHeight (3.4),
+     * which is *inside* the snow cap once it rises past her at the top — the
+     * dome's crown stands about 13 above the slope and the boulder about 15.
+     * So on reaching the top she climbs clear of both and hovers over the snow,
+     * a couple of units downhill of the boulder, bobbing and twirling while the
+     * fireworks go off. perchY clears the cap; perchFront keeps her in front of
+     * the boulder (which sits at climb+26) so she reads against the sky.
+     */
+    rise: 1.4,
+    perchY: 24,
+    perchFront: 2,
+    danceBob: 3.2,
+    danceRate: 3.4,
+    danceSwing: 0.6,
   },
 
   /**

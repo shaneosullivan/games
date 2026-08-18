@@ -116,6 +116,10 @@ export class AscentLevel implements Level {
 
   private bursts = 0;
   private nextBurst = 0;
+  /** 0→1 as she climbs clear of the summit to her hover; see updateSummit. */
+  private summitRise = 0;
+  /** Where she was, in slope space, the instant she reached the top. */
+  private readonly summitFrom = new THREE.Vector3();
   /** The forward limit, in units; see aheadLimit. */
   private limit: number = A.aheadLimit;
 
@@ -570,6 +574,25 @@ export class AscentLevel implements Level {
     ctx.setCameraCinematic(eye, look);
   }
 
+  /**
+   * The hold on the dancing bee at the top.
+   *
+   * The climb camera looks at the slope (y=0); she is now hovering well above
+   * it, so the look is lifted toward the perch to keep her centred rather than
+   * clipped off the top of the screen while she dances.
+   */
+  private summitCamera(ctx: GameContext): void {
+    const zoom = this.pullBack(ctx);
+    tmp.set(0, A.flightHeight, -this.climbed + A.camera.back * zoom);
+    this.mountain.slope.localToWorld(tmp);
+    eye.copy(tmp);
+    eye.y += A.camera.up * zoom;
+    tmp.set(0, A.summit.perchY * 0.7, -(A.climb + 34 * zoom));
+    this.mountain.slope.localToWorld(tmp);
+    look.copy(tmp);
+    ctx.setCameraCinematic(eye, look);
+  }
+
   // ---- what is on the mountain -------------------------------------------
 
   /**
@@ -825,7 +848,11 @@ export class AscentLevel implements Level {
         this.foes.splice(i, 1);
         continue;
       }
-      if (foe.kind !== "moss" && this.touching(foe, ctx)) {
+      // Moss and flowers are hers to collect, not hazards — takeFlower and
+      // pick handle them above. Without this a flower upgrades her weapon and
+      // docks her health on the same frame she touches it.
+      const hers = foe.kind === "moss" || foe.kind === "flower";
+      if (!hers && this.touching(foe, ctx)) {
         this.hurt(ctx, foe.kind === "rock" ? A.damage.rock : A.damage.wasp);
         if (foe.kind === "wasp") {
           // A wasp that flies into her is spent.
@@ -1139,6 +1166,10 @@ export class AscentLevel implements Level {
     this.phaseTime = 0;
     this.bursts = 0;
     this.nextBurst = 0;
+    this.summitRise = 0;
+    // Where she is the instant she tops out, so the hover eases up from there
+    // rather than snapping to the perch.
+    this.summitFrom.set(this.x, A.flightHeight, this.slopeZ());
     ctx.hud.setCallout("The summit!");
     ctx.hud.setObjective("The top of the Mouldy Mountain!");
     fromEye.copy(ctx.cameraPosition);
@@ -1146,10 +1177,29 @@ export class AscentLevel implements Level {
   }
 
   private updateSummit(dt: number, ctx: GameContext): void {
-    // She holds station by the boulder while it goes off around her.
-    this.x += (0 - this.x) * Math.min(1, dt * 2);
-    this.placeBee(ctx);
-    this.camera(ctx);
+    // She climbs clear of the snow cap — which has risen past her flight height
+    // by now — and hovers over it, bobbing and twirling. Without this she sits
+    // at flightHeight and is buried inside the summit dome, out of sight.
+    this.summitRise = Math.min(1, this.summitRise + dt / A.summit.rise);
+    const e = ease(this.summitRise);
+    const t = this.phaseTime;
+    // The dance rides in with the climb, so she doesn't jerk on the first frame.
+    const bob = Math.sin(t * A.summit.danceRate) * A.summit.danceBob * e;
+    const targetZ = -(A.climb + A.summit.perchFront);
+    tmp.set(
+      this.summitFrom.x + (0 - this.summitFrom.x) * e,
+      this.summitFrom.y + (A.summit.perchY - this.summitFrom.y) * e + bob,
+      this.summitFrom.z + (targetZ - this.summitFrom.z) * e,
+    );
+    this.mountain.slope.localToWorld(tmp);
+    ctx.bee.teleport(tmp);
+    // Facing the boulder, twirling side to side, nose up in delight.
+    ctx.bee.setYaw(
+      Math.PI +
+        Math.sin(t * A.summit.danceRate * 1.3) * A.summit.danceSwing * e,
+    );
+    ctx.bee.setClimb(0.7 * e);
+    this.summitCamera(ctx);
 
     this.nextBurst -= dt;
     if (this.nextBurst <= 0 && this.bursts < A.summit.bursts) {
