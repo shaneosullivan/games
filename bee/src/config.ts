@@ -2290,6 +2290,14 @@ export const ASCENT = {
   /** Frogs sit still and lash at her from a distance. */
   frog: {
     hits: 3,
+    /*
+     * The frog is the one foe drawn from a model file rather than built in
+     * code: mrfrog.glb, painted in Blender and baked to vertex colours (see
+     * scripts/glb-bake.mjs). `length` sizes it to sit in the radius-2 slot the
+     * old hand-built frog filled, and `yaw` turns it to face down the mountain
+     * at her — measured in the running level, like the island models' yaws.
+     */
+    model: {length: 4.4, yaw: Math.PI},
     /**
      * How far the tongue reaches, and how often it tries.
      *

@@ -55,3 +55,29 @@ export function paint(
   geo.setAttribute("color", new THREE.BufferAttribute(arr, 3));
   return geo;
 }
+
+/**
+ * Keeps a model's own per-vertex colours instead of repainting it one flat
+ * tone — the path for a mesh painted in Blender and exported with COLOR_0.
+ *
+ * Same shape as what `paint` produces, so the two can be merged together: a
+ * de-indexed geometry carrying a plain Float32 RGB `color` attribute the toon
+ * material reads. Any alpha in the source is dropped, and the values are taken
+ * as-is because glTF's COLOR_0 is already in the linear space the material
+ * wants — the same space `paint` converts its sRGB hex into.
+ */
+export function carryColour(
+  source: THREE.BufferGeometry,
+): THREE.BufferGeometry {
+  const geo = source.index ? source.toNonIndexed() : source;
+  const src = geo.getAttribute("color");
+  const count = geo.attributes.position.count;
+  const arr = new Float32Array(count * 3);
+  for (let i = 0; i < count; i++) {
+    arr[i * 3] = src.getX(i);
+    arr[i * 3 + 1] = src.getY(i);
+    arr[i * 3 + 2] = src.getZ(i);
+  }
+  geo.setAttribute("color", new THREE.BufferAttribute(arr, 3));
+  return geo;
+}

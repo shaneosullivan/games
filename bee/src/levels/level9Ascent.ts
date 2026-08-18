@@ -10,6 +10,8 @@ import {
 } from "../entities/slopeFoes";
 import {FIREWORK_PALETTE} from "../fx/particles";
 import {createMountain, type Mountain} from "../render/geometry/mountain";
+import {loadPreparedModel} from "../render/geometry/islandModels";
+import frogUrl from "../assets/islands/mrfrog.glb";
 import type {GameContext, Level} from "./level";
 
 type Phase = "climbing" | "summit" | "sweep" | "done";
@@ -122,6 +124,8 @@ export class AscentLevel implements Level {
   private readonly summitFrom = new THREE.Vector3();
   /** The forward limit, in units; see aheadLimit. */
   private limit: number = A.aheadLimit;
+  /** False once the level is left, so a late model load doesn't touch the kit. */
+  private alive = false;
 
   get controlsLocked(): boolean {
     return this.phase !== "climbing";
@@ -136,6 +140,24 @@ export class AscentLevel implements Level {
     this.kit = createFoeKit();
     this.seeds = new Seeds();
     this.mountain.slope.add(this.seeds.group);
+
+    // The frog is a model, not a hand-built shape. It comes down asynchronously
+    // and swaps into the kit when it lands — frogs spawned before then wear the
+    // hand-built fallback, the same graceful swap the islands use. See
+    // islandModels.loadPreparedModel and slopeFoes.frogGeometry.
+    this.alive = true;
+    void loadPreparedModel(frogUrl, A.frog.model.length, A.frog.model.yaw)
+      .then(geo => {
+        if (!this.alive) {
+          geo.dispose();
+          return;
+        }
+        this.kit.frog.dispose();
+        this.kit.frog = geo;
+      })
+      .catch(() => {
+        // The hand-built frog is already in the kit and will do.
+      });
 
     this.foes.length = 0;
     this.reaches.length = 0;
@@ -203,6 +225,7 @@ export class AscentLevel implements Level {
   }
 
   exit(ctx: GameContext): void {
+    this.alive = false;
     ctx.hud.setCallout(null);
     ctx.hud.setHealth(null);
     ctx.mountain.remove(this.mountain.group);

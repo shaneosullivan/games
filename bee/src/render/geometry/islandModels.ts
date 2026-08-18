@@ -4,7 +4,7 @@ import {mergeGeometries} from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import crocUrl from "../../assets/islands/croc1.glb";
 import frogUrl from "../../assets/islands/frog1.glb";
 import {ISLANDS as I} from "../../config";
-import {paint} from "../materials";
+import {carryColour, paint} from "../materials";
 
 /**
  * The two bought-in models: a frog and a crocodile.
@@ -62,6 +62,24 @@ export function loadIslandModels(): Promise<IslandModels> {
     pending = load();
   }
   return pending;
+}
+
+/**
+ * Load one model file and hand back a single game-ready geometry.
+ *
+ * The same `prepare` the islands use, exposed for anywhere else that wants to
+ * drop a Blender model into the game: it comes back a known length, centred on
+ * the origin, standing on the ground, facing +x turned by `yaw`, and wearing
+ * whatever colours it was painted with — flat per part, or per vertex if it was
+ * baked that way (see scripts/glb-bake.mjs). Render it with `vertexToon()`.
+ */
+export async function loadPreparedModel(
+  url: string,
+  targetLength: number,
+  yaw: number,
+): Promise<THREE.BufferGeometry> {
+  const gltf = await new GLTFLoader().loadAsync(url);
+  return prepare(gltf.scene, targetLength, yaw).geometry;
 }
 
 async function load(): Promise<IslandModels> {
@@ -135,14 +153,22 @@ function prepare(
     ]) {
       geo.deleteAttribute(attribute);
     }
-    const painted = paint(geo, colour);
+    // A model painted in Blender arrives with its own per-vertex colours; keep
+    // them rather than flattening the part to a single material tone. A model
+    // built the old way — one flat material colour per part, no COLOR_0 — is
+    // painted that colour as before.
+    const painted = geo.getAttribute("color")
+      ? carryColour(geo)
+      : paint(geo, colour);
     if (!painted.attributes.normal) {
       painted.computeVertexNormals();
     }
     parts.push(painted);
 
     // Where this colour sits, for anyone who needs to find a part of the model
-    // afterwards — the mouth, in the frog's case.
+    // afterwards — the mouth, in the frog's case. Meaningful only for the flat
+    // path; a vertex-coloured part has no one colour, and nothing that reads
+    // this uses such a model.
     const position = painted.attributes.position;
     const sum = new THREE.Vector3();
     const v = new THREE.Vector3();
