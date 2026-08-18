@@ -1060,16 +1060,6 @@ export class CottageLevel implements Level {
       ctx.bee.setYaw(Math.atan2(tmp.x, tmp.z));
     }
   }
-
-  resumeAfterCompletion(ctx: GameContext): void {
-    if (this.phase !== "done") {
-      return;
-    }
-    this.complete = false;
-    ctx.hud.setObjective("Have a look around");
-    ctx.setFlightControls(true);
-    ctx.bee.scripted = false;
-  }
 }
 
 /** Smoothstep. */

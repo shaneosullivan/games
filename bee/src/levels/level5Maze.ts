@@ -456,15 +456,6 @@ export class MazeLevel implements Level {
       ctx.hud.setObjective("Out of the woods!");
     }
   }
-
-  resumeAfterCompletion(ctx: GameContext): void {
-    if (this.phase !== "done") {
-      return;
-    }
-    // Nothing left to find, so hand the woods back for a free fly-around.
-    this.complete = false;
-    ctx.hud.setObjective("Fly around the woods");
-  }
 }
 
 /** Face the bee down whichever corridor leaves the start cell. */

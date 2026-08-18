@@ -313,17 +313,4 @@ export class WaspLevel implements Level {
       });
     }
   }
-
-  resumeAfterCompletion(ctx: GameContext): void {
-    if (this.phase !== "done") {
-      return;
-    }
-    this.complete = false;
-    // The level is over: nothing to fly into, so no glow. Free flight with the
-    // brood swarming around, and 🏠 to move on.
-    ctx.hive.setGlow(false);
-    ctx.hud.setObjective("Fly around your meadow");
-    ctx.setObjectiveMarker(null);
-    ctx.audio.setThreat(0);
-  }
 }

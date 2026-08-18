@@ -235,10 +235,6 @@ export class AntHuntLevel implements Level {
     ctx.bee.setCrown(false);
   }
 
-  resumeAfterCompletion(): void {
-    // Nothing to re-arm: every ant on every island has been emptied.
-  }
-
   update(dt: number, ctx: GameContext): void {
     this.phaseTime += dt;
     // Above every phase: the world's gates, the ants and anything in the air

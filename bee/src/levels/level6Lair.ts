@@ -874,12 +874,4 @@ export class LairLevel implements Level {
       dome.centre.z + Math.sin(swing) * DOME.cameraBack,
     );
   }
-
-  resumeAfterCompletion(ctx: GameContext): void {
-    if (this.phase !== "done") {
-      return;
-    }
-    this.complete = false;
-    ctx.hud.setObjective("Out of the Bear's Lair");
-  }
 }

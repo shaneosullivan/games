@@ -337,17 +337,4 @@ export class RoyalChamberLevel implements Level {
         : "The babies are full for now",
     );
   }
-
-  resumeAfterCompletion(ctx: GameContext): void {
-    if (this.phase !== "done") {
-      return;
-    }
-    // Nothing left to feed, so just hand the chamber back for free flight.
-    this.complete = false;
-    ctx.hud.setObjective("Fly around your hive");
-    ctx.setObjectiveMarker(null);
-    ctx.bee.bounds.radius = INTERIOR.boundsRadius;
-    ctx.bee.bounds.sphereRadius = INTERIOR.boundsSphere;
-    ctx.bee.desiredHeight = Math.min(ctx.bee.desiredHeight, INTERIOR.maxHeight);
-  }
 }

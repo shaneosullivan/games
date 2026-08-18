@@ -324,25 +324,6 @@ export class FoundingLevel implements Level {
     });
   }
 
-  /**
-   * The player tapped "Keep flying" after the completion card. Re-arm the
-   * doorway so flying in works again — otherwise the finished hive just sits
-   * there and approaching it does nothing.
-   */
-  resumeAfterCompletion(ctx: GameContext): void {
-    if (this.phase !== "done") {
-      return;
-    }
-    this.phase = "ready";
-    this.complete = false;
-    ctx.hive.setGlow(true);
-    ctx.bee.scripted = false;
-    ctx.bee.object.visible = true;
-    ctx.bee.setScale(1);
-    ctx.bee.setCrown(true);
-    this.refreshObjective(ctx);
-  }
-
   // ---- shared -------------------------------------------------------------
 
   private refreshObjective(ctx: GameContext): void {

@@ -237,10 +237,6 @@ export class AscentLevel implements Level {
     ctx.bee.setScale(1);
   }
 
-  resumeAfterCompletion(): void {
-    // The summit is the end of the mountain; there is nothing to re-arm.
-  }
-
   /** Another go, from the bottom, but the moss she gathered is hers. */
   retry(ctx: GameContext): void {
     const kept = this.moss;

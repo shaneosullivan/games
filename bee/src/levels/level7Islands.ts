@@ -270,12 +270,6 @@ export class IslandsLevel implements Level {
     ctx.hud.setCount("babies", this.delivered, I.babies);
   }
 
-  resumeAfterCompletion(ctx: GameContext): void {
-    // Nothing to re-arm: the board has been crossed. Leave her on the far
-    // bank with the camera where it is.
-    ctx.hopButtons.setVisible(false);
-  }
-
   update(dt: number, ctx: GameContext): void {
     this.phaseTime += dt;
     // Above every phase's early return: the water runs whatever the camera is

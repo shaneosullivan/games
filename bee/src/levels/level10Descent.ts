@@ -316,10 +316,6 @@ export class DescentLevel implements Level {
     return Object.values(this.kit.shapes).includes(geo);
   }
 
-  resumeAfterCompletion(): void {
-    // The bottom of the mountain is the end of the game.
-  }
-
   retry(ctx: GameContext): void {
     this.exit(ctx);
     this.enter(ctx);

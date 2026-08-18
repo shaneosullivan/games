@@ -311,12 +311,6 @@ export interface Level {
    * one to implement this got it wrong.
    */
   retry?(ctx: GameContext): void;
-  /**
-   * Called when the player dismisses the completion card and keeps playing.
-   * Lets a level re-arm whatever it was offering so the ending can be
-   * replayed, rather than leaving the world inert.
-   */
-  resumeAfterCompletion(ctx: GameContext): void;
   /** Called when the sliding puzzle is completed, if this level uses one. */
   onPuzzleSolved?(ctx: GameContext): void;
   /**
