@@ -488,9 +488,14 @@ export class AscentLevel implements Level {
     const homing = this.weapon >= A.weapon.homingFrom;
 
     if (streams === 2) {
-      // Level 3: two straight streams, side by side.
-      this.seeds.fire(this.x - A.weapon.apart / 2, nose);
-      this.seeds.fire(this.x + A.weapon.apart / 2, nose);
+      // Two side by side: straight at level 3, and chasing at level 5.
+      const left = homing ? this.acquire() : null;
+      // The right-hand one takes a different target where there is one, so a
+      // pair of chasers spreads across the hill instead of both piling into
+      // the same wasp and leaving the one beside it alone.
+      const right = homing ? this.acquire(left) : null;
+      this.seeds.fire(this.x - A.weapon.apart / 2, nose, 0, left);
+      this.seeds.fire(this.x + A.weapon.apart / 2, nose, 0, right ?? left);
       return;
     }
     if (streams === 3) {
@@ -510,12 +515,15 @@ export class AscentLevel implements Level {
    * a flower, which are hers, and never something behind her, which would send
    * the seed back down the mountain past her own ear.
    */
-  private acquire(): Foe | null {
+  private acquire(except: Foe | null = null): Foe | null {
     const from = this.slopeZ();
     let best: Foe | null = null;
     let bestD: number = A.weapon.homingRange;
     for (const foe of this.foes) {
-      if (foe.dead || foe.kind === "moss" || foe.kind === "flower") {
+      if (foe.dead || foe === except) {
+        continue;
+      }
+      if (foe.kind === "moss" || foe.kind === "flower") {
         continue;
       }
       if (foe.z > from) {

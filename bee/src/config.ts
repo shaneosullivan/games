@@ -2093,9 +2093,16 @@ export const ASCENT = {
    */
   halfWidth: 26,
   /** How far up the mountain the summit is. The whole level, in units. */
-  climb: 1500,
-  /** She climbs at this many units a second — the level's pace. */
-  climbSpeed: 26,
+  climb: 1400,
+  /**
+   * She climbs at this many units a second — the level's pace.
+   *
+   * Down from twenty-six. Everything that comes at her closes at this plus its
+   * own speed, so this one number is most of the level's difficulty: at the old
+   * pace a rock appeared and arrived with about a second in between, which is
+   * not enough time for a child to see it, decide, and move.
+   */
+  climbSpeed: 20,
   /** How high above the slope she flies. */
   flightHeight: 3.4,
 
@@ -2163,7 +2170,13 @@ export const ASCENT = {
    */
   weapon: {
     rate: [1, 1.5, 1.5, 1.5, 1.5],
-    streams: [1, 1, 2, 3, 1],
+    /*
+     * The last weapon fires *two* chasing seeds rather than one. It is the
+     * thing four flowers and most of a mountain were spent on, and one seed at
+     * a time — however clever — did not feel like more than the three-stream
+     * fan it replaced.
+     */
+    streams: [1, 1, 2, 3, 2],
     /** How far apart level 3's two parallel streams sit. */
     apart: 1.6,
     /** How far off straight level 4's outer two lean, in radians. */
@@ -2186,7 +2199,7 @@ export const ASCENT = {
     flameColour: 0xffb03a,
     flameSize: 0.85,
     /** How far ahead a homing seed will look for something to chase. */
-    homingRange: 70,
+    homingRange: 150,
   },
   /**
    * Flowers, which are what raise the weapon a level.
@@ -2214,8 +2227,15 @@ export const ASCENT = {
     speed: 90,
     every: 0.14,
     radius: 0.42,
-    /** How far up the slope one carries before it gives up. */
-    range: 90,
+    /**
+     * How far up the slope one carries before it gives up.
+     *
+     * Far. Ninety units put it out at about a tenth of the way up the screen,
+     * so her shots winked out in mid-air just past her own nose; this carries
+     * them to where the hillside meets the sky, which is as far as anything on
+     * the ground can visibly go. The fog takes them before the range does.
+     */
+    range: 340,
     damage: 1,
   },
 
@@ -2229,7 +2249,7 @@ export const ASCENT = {
   rock: {
     sizes: [1.4, 2.2, 3.2],
     hits: [1, 2, 4],
-    speed: [16, 22],
+    speed: [13, 18],
     /** Up-kick and speed lost when one crosses a bump. */
     bounce: 9,
     bounceCost: 0.55,
@@ -2238,7 +2258,7 @@ export const ASCENT = {
 
   /** Wasps: they come in trains, and clearing a whole train pays. */
   wasp: {
-    speed: 20,
+    speed: 16,
     /**
      * Drawn this much bigger than the meadow's wasp geometry.
      *
