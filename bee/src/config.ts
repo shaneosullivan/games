@@ -2083,7 +2083,14 @@ export const WATER = {
 export const ASCENT = {
   /** How steep the mountain is, in radians. */
   pitch: 0.34,
-  /** How far across the playable strip is, either side of the middle. */
+  /**
+   * How far across the playable strip is, either side of the middle.
+   *
+   * This is the *world's* width — where rocks and frogs may be. How far *she*
+   * may go is narrower and is measured against the screen every frame, because
+   * on a phone held upright this strip is wider than the glass and she flew
+   * clean off the side of it. See `acrossLimit` in level9Ascent.ts.
+   */
   halfWidth: 26,
   /** How far up the mountain the summit is. The whole level, in units. */
   climb: 1500,
@@ -2098,8 +2105,24 @@ export const ASCENT = {
   aheadLimit: 16,
   behindLimit: 10,
 
-  /** Camera: behind her, above her, and tilted down onto the slope. */
-  camera: {back: 22, up: 13, pitch: 0.5},
+  /**
+   * How near the edge of the screen she may get, in normalised device
+   * coordinates: 1 is the very edge, so this keeps a margin of glass around
+   * her rather than letting her be cropped in half.
+   */
+  edgeMargin: 0.82,
+
+  /**
+   * Camera: behind her, above her, and tilted down onto the slope.
+   *
+   * `pullBack` is how far it may retreat to fit a decent width of mountain on
+   * a narrow screen — a phone held upright shows about four units either side
+   * of her at the standard distance, out of a strip that is twenty-six wide,
+   * which is neither playable nor fair against the same level on an iPad.
+   */
+  camera: {back: 22, up: 13, pitch: 0.5, pullBack: 2.4},
+  /** The width of mountain worth playing on, either side of the middle. */
+  wantHalfWidth: 15,
 
   /**
    * The five weapons, and what a flower buys.
@@ -2179,20 +2202,34 @@ export const ASCENT = {
   /** Frogs sit still and lash at her from a distance. */
   frog: {
     hits: 3,
-    /** How far the tongue reaches, and how often it tries. */
-    reach: 26,
+    /**
+     * How far the tongue reaches, and how often it tries.
+     *
+     * Short, and the drawn tongue never exceeds it. It used to be drawn all
+     * the way to wherever she was and to hit from twenty-six units, which read
+     * as a frog with a laser: there was no distance at which you were safe, so
+     * there was nothing to learn.
+     */
+    reach: 13,
     every: [1.8, 3.4],
     lashTime: 0.45,
     /** How near her line it has to be to bother. */
     aim: 4.5,
   },
 
-  /** Pesticide: stands still, sprays a long cloud, and is hard to kill. */
+  /** Pesticide: stands still, sprays a cloud of gas, and is hard to kill. */
   pesticide: {
     hits: 9,
-    /** The cloud: how long it reaches and how long it lasts. */
-    reach: 34,
-    width: 4.5,
+    /**
+     * How far the gas carries, how wide it spreads, and how long it hangs.
+     *
+     * A cloud, not a beam. It billows out of the nozzle over the first part of
+     * the spray and stops — the danger is standing in it, and you can be too
+     * far away for it to matter, which is the whole reason to keep your
+     * distance from a can rather than simply shooting it.
+     */
+    reach: 16,
+    width: 5.5,
     every: [2.6, 4.2],
     sprayTime: 1.6,
   },

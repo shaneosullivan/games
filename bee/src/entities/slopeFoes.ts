@@ -77,7 +77,7 @@ export function createFoeKit(): FoeKit {
     moss: mossGeometry(),
     flower: flowerGeometry(),
     tongue: reachGeometry(0.22, P.tongue),
-    spray: reachGeometry(1, P.spray),
+    spray: gasGeometry(),
     dispose() {
       for (const geo of [
         kit.rock,
@@ -236,6 +236,30 @@ function reachGeometry(radius: number, colour: number): THREE.BufferGeometry {
   geo.rotateX(Math.PI / 2);
   geo.translate(0, 0, 0.5);
   return paint(geo, colour);
+}
+
+/**
+ * A cloud of gas, built along +z from the origin and one unit long.
+ *
+ * Lumpy on purpose: a smooth tube is a beam whatever colour it is painted, and
+ * the thing that has to read here is that this is something billowing out of a
+ * nozzle and hanging in the air.
+ */
+function gasGeometry(): THREE.BufferGeometry {
+  const parts: Array<THREE.BufferGeometry> = [];
+  for (let i = 0; i < 9; i++) {
+    const t = (i + 0.5) / 9;
+    // Fatter towards the far end, like something spreading as it travels.
+    const r = 0.16 + t * 0.3;
+    const blob = new THREE.SphereGeometry(r, 7, 5);
+    blob.translate(
+      Math.sin(i * 2.3) * 0.14 * t,
+      Math.cos(i * 1.7) * 0.12 * t,
+      t,
+    );
+    parts.push(paint(blob, i % 2 === 0 ? P.spray : 0xdff3c4));
+  }
+  return merge(parts);
 }
 
 function merge(parts: Array<THREE.BufferGeometry>): THREE.BufferGeometry {

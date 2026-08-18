@@ -117,6 +117,9 @@ export class AscentLevel implements Level {
   private nextBurst = 0;
   /** The forward limit, in units; see aheadLimit. */
   private limit: number = A.aheadLimit;
+  /** How far the camera has pulled back, and the screen it was worked out for. */
+  private zoom = 1;
+  private zoomFor = -1;
 
   get controlsLocked(): boolean {
     return this.phase !== "climbing";
@@ -241,10 +244,12 @@ export class AscentLevel implements Level {
     // Her own movement: the stick leans her across and up the slope, on top of
     // the climb that happens whether she likes it or not.
     const stick = ctx.stick;
+    const across = this.acrossLimit(ctx);
+    this.playHalf = across;
     this.x = THREE.MathUtils.clamp(
       this.x + stick.x * A.moveSpeed * dt,
-      -A.halfWidth,
-      A.halfWidth,
+      -across,
+      across,
     );
     this.ahead = THREE.MathUtils.clamp(
       this.ahead - stick.y * A.moveSpeed * dt,
@@ -271,6 +276,52 @@ export class AscentLevel implements Level {
     if (this.climbed >= A.climb) {
       this.reachSummit(ctx);
     }
+  }
+
+  /**
+   * How far the camera has to retreat for a playable width to be visible.
+   *
+   * One number, worked out from the camera's own projection rather than from
+   * the aspect ratio directly, so it stays right whatever else changes about
+   * the shot. Capped, because a camera far enough back to fit the whole strip
+   * on a phone would draw the bee as a speck.
+   */
+  private pullBack(ctx: GameContext): number {
+    if (this.zoomFor === ctx.cameraAspect) {
+      return this.zoom;
+    }
+    this.zoomFor = ctx.cameraAspect;
+    // How much of the mountain is visible right now, either side of her.
+    tmp.set(A.wantHalfWidth, A.flightHeight, this.slopeZ());
+    this.mountain.slope.localToWorld(tmp);
+    const at = Math.abs(ctx.projectToScreen(tmp).x);
+    // Screen offset falls off roughly with distance, so the ratio is the
+    // factor to move back by — clamped, and never closer than standard.
+    this.zoom = Math.min(A.camera.pullBack, Math.max(1, at / A.edgeMargin));
+    return this.zoom;
+  }
+
+  /**
+   * How far across she may fly, in units — which is the edge of the screen.
+   *
+   * Measured, for the same reason and in the same way as the forward limit,
+   * and unlike that one this *does* change with the shape of the screen: the
+   * strip is twenty-six units either side of the middle and a phone held
+   * upright shows nothing like that, so she flew straight off the side of the
+   * glass and out of sight. Kept a little inside the edge, so she is never
+   * half-cropped either.
+   */
+  private acrossLimit(ctx: GameContext): number {
+    let limit = 4;
+    for (let out = 4; out <= A.halfWidth; out += 0.5) {
+      tmp.set(out, A.flightHeight, this.slopeZ());
+      this.mountain.slope.localToWorld(tmp);
+      if (Math.abs(ctx.projectToScreen(tmp).x) > A.edgeMargin) {
+        break;
+      }
+      limit = out;
+    }
+    return limit;
   }
 
   /**
@@ -436,9 +487,20 @@ export class AscentLevel implements Level {
     return foe;
   }
 
+  /**
+   * Somewhere across the slope to put something.
+   *
+   * Inside the width she can actually see and reach, not the width of the
+   * mountain: a rock that tumbles down eight units off the side of the screen
+   * is not an obstacle, it is a waste of a rock.
+   */
   private acrossSlope(): number {
-    return this.rng.range(-A.halfWidth + 2, A.halfWidth - 2);
+    const half = Math.max(6, this.playHalf);
+    return this.rng.range(-half, half);
   }
+
+  /** The half-width being played, kept up to date by the camera each frame. */
+  private playHalf = A.wantHalfWidth;
 
   private addRock(from: number): void {
     const size = Math.floor(this.rng.range(0, A.rock.sizes.length));
@@ -651,12 +713,23 @@ export class AscentLevel implements Level {
 
     if ((foe.firing ?? 0) > 0) {
       foe.firing = (foe.firing ?? 0) - dt;
-      const length = isFrog ? beeZ - foe.z : A.pesticide.reach;
+      // Never drawn further than it reaches. The tongue used to be drawn to
+      // wherever she was, however far that was, which is why a frog read as
+      // having a laser rather than a tongue.
+      const length = isFrog
+        ? Math.min(spec.reach, Math.max(2, beeZ - foe.z))
+        : // The gas billows out over the first part of the spray and then
+          // hangs there for the rest of it.
+          A.pesticide.reach *
+          Math.min(1, 1 - (foe.firing ?? 0) / A.pesticide.sprayTime + 0.25);
       this.showReach(foe, length, isFrog);
       // Anything in the shaft is hit, once, on the frame it lands.
+      // Only what the attack actually covers: within its width of the line,
+      // below it on the slope, and inside the length it has reached by now.
       const across = Math.abs(this.x - foe.x);
       const hitWidth = isFrog ? A.frog.aim : A.pesticide.width;
-      if (across < hitWidth && beeZ > foe.z && beeZ - foe.z < spec.reach) {
+      const down = beeZ - foe.z;
+      if (across < hitWidth && down > 0 && down < length) {
         this.hurt(ctx, isFrog ? A.damage.tongue : A.damage.spray);
       }
       if ((foe.firing ?? 0) <= 0) {
@@ -693,8 +766,21 @@ export class AscentLevel implements Level {
       this.reaches.push(entry);
     }
     entry.mesh.visible = true;
-    entry.mesh.position.set(foe.x, isFrog ? 1.6 : 3.6, foe.z);
-    entry.mesh.scale.set(1, 1, Math.max(0.1, length));
+    entry.mesh.position.set(foe.x, isFrog ? 1.6 : 3.2, foe.z);
+    if (isFrog) {
+      // A tongue: thin, and as long as it has reached.
+      entry.mesh.scale.set(1, 1, Math.max(0.1, length));
+      return;
+    }
+    // Gas: it swells sideways as well as forwards, and rolls as it goes, so
+    // it reads as a cloud coming at you rather than a bar being extended.
+    const grown = length / A.pesticide.reach;
+    entry.mesh.scale.set(
+      A.pesticide.width * (0.4 + grown * 0.6),
+      2.2 + grown * 2.6,
+      Math.max(0.1, length),
+    );
+    entry.mesh.rotation.z = this.phaseTime * 1.6;
   }
 
   private hideReach(foe: Foe): void {
