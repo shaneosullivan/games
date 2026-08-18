@@ -2563,7 +2563,7 @@ export const KATAMARI = {
    * also keeps the level honest: a ball that fills the screen sweeps up
    * everything in front of it without being steered at all.
    */
-  viewRadii: 3.4,
+  viewRadii: 4.3,
   /**
    * How fast the camera's idea of the ball's size catches up with the truth.
    *
@@ -2595,15 +2595,16 @@ export const KATAMARI = {
      */
     /*
      * Gravity against a drag, so it has a terminal speed rather than
-     * accelerating for the length of the hill. Thirty units a second, down
-     * from forty-seven: at the old pace there was no time to see something
-     * off to one side and decide to go and get it, which is the whole game.
+     * accelerating for the length of the hill — terminal is gravity/drag,
+     * about thirty-seven units a second. It was thirty, but the hill reads as
+     * a touch sluggish at that pace when there is room to move, so it is a
+     * quarter quicker now, the bee's own speed and the tether's pull with it.
      */
-    gravity: 9.5,
+    gravity: 11.9,
     drag: 0.32,
     /** It never quite stops, so a bounce can't strand the level. */
-    minSpeed: 10,
-    pull: 5.2,
+    minSpeed: 12.5,
+    pull: 6.5,
     /** How fast it can be dragged across the hill, per second per unit off. */
     steerDamp: 2.6,
     /**
@@ -2679,10 +2680,17 @@ export const KATAMARI = {
    */
   bee: {
     ahead: 12,
-    aheadPerRadius: 1.7,
+    /*
+     * She leads the ball, and pulls further ahead of and higher above it as it
+     * grows. Near the bottom the ball is four times its starting size, and at
+     * the old rates its front face and its crown had caught up with her — she
+     * was drawn sitting inside it. Both are steeper now so she stays clear of a
+     * big ball: out in front of it and riding above its top.
+     */
+    aheadPerRadius: 2.1,
     height: 7,
-    heightPerRadius: 1.9,
-    speed: 34,
+    heightPerRadius: 2.8,
+    speed: 42.5,
     scale: 2.2,
     scalePerRadius: 0.1,
   },
@@ -2696,7 +2704,7 @@ export const KATAMARI = {
    * lines.
    */
   items: {
-    perHundred: 5.5,
+    perHundred: 6.5,
     /**
      * How much clear ground there has to be between two things, in units.
      *
@@ -2704,8 +2712,13 @@ export const KATAMARI = {
      * dozen units apart down the hill, and two in neighbouring lanes read as a
      * heap from a camera looking along the slope. A placement that lands too
      * near something already there is simply tried again somewhere else.
+     *
+     * Widened from a dozen: the descent is quicker now and there is more to
+     * collect, and spacing the pickups further apart across the hill is what
+     * turns "roll straight down" into "roll around to gather them", which is
+     * the game.
      */
-    apart: 14,
+    apart: 20,
     /*
      * Every size on the hill is a *fraction of the ball you ought to have* by
      * the time you get there, rather than a number of units.
