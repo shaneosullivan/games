@@ -754,10 +754,15 @@ export class DescentLevel implements Level {
     const size = new THREE.Vector3();
     box.getSize(size);
     const spread = Math.max(size.x, size.z) / 2;
-    model.group.scale.multiplyScalar(K.bear.radius / Math.max(0.001, spread));
-    // Standing on the ground, facing up the hill at whatever is coming.
-    model.group.position.y = -K.bear.radius * 0.5;
-    group.position.set(0, K.bear.radius * 0.5, -(K.run - K.bear.from));
+    // Drawn `look` times his catch radius; see KATAMARI.bear.look.
+    model.group.scale.multiplyScalar(
+      (K.bear.radius * K.bear.look) / Math.max(0.001, spread),
+    );
+    // Stand him on the ground: measure the scaled model and drop its base to
+    // zero, rather than guessing the offset from the radius.
+    const scaled = new THREE.Box3().setFromObject(model.group);
+    model.group.position.y -= scaled.min.y;
+    group.position.set(0, 0, -(K.run - K.bear.from));
     this.hill.slope.add(group);
     this.items.push({
       kind: "bear",
@@ -995,13 +1000,20 @@ export class DescentLevel implements Level {
     }
     for (const piece of this.cage.pieces) {
       const at = piece.mesh.position;
-      // Away from the middle, and away from the ball, and upwards.
-      tmp.set(at.x, at.y * 0.35 + 4, at.z).normalize();
-      const force = K.cage.burst * this.rng.range(0.6, 1.4);
+      // Straight out from the cage's axis, hard, and launched upward — every
+      // bar, not just the high ones, so the whole thing bursts into the air
+      // instead of the low bars sliding along the grass. A bar dead on the
+      // axis is thrown a random way rather than nowhere.
+      const out = tmp.set(at.x, 0, at.z);
+      if (out.lengthSq() < 0.04) {
+        out.set(this.rng.range(-1, 1), 0, this.rng.range(-1, 1));
+      }
+      out.normalize();
+      const force = K.cage.burst * this.rng.range(0.85, 1.3);
       piece.velocity.set(
-        tmp.x * force,
-        tmp.y * force + this.rng.range(4, 16),
-        tmp.z * force - force * 0.5,
+        out.x * force,
+        K.cage.lift * this.rng.range(0.75, 1.3),
+        out.z * force,
       );
       piece.spin.set(
         this.rng.range(-K.cage.spin, K.cage.spin),
@@ -1033,8 +1045,14 @@ export class DescentLevel implements Level {
       piece.mesh.rotation.y += piece.spin.y * step;
       piece.mesh.rotation.z += piece.spin.z * step;
 
+      // Land it only once it is below the grass *and falling*. The bars are
+      // launched from the cage's own origin, which sits below this rest height,
+      // so a test on height alone caught every one of them on the first frame —
+      // moving up at fifty — and pinned it flat where it stood. That is the
+      // whole reason the cage "just lay there": it was grounded before it ever
+      // left. A rising piece flies on whatever its height.
       const rest = 0.7;
-      if (piece.mesh.position.y > rest) {
+      if (piece.mesh.position.y > rest || piece.velocity.y > 0) {
         continue;
       }
       piece.mesh.position.y = rest;

@@ -2794,7 +2794,14 @@ export const KATAMARI = {
    * is thirty-five, which only a run riding near the growth ceiling reaches. He
    * was twenty-seven, beatable by most decent runs — now he takes a great one.
    */
-  bear: {radius: 35, from: 300},
+  /*
+   * `radius` is what the ball is measured against — catch him only with a ball
+   * bigger than this. `look` renders him larger than that, because the ball has
+   * to *out-grow* him to win and a bear the exact size of the ball it loses to
+   * reads as small. Drawn a third bigger, he towers over her on the approach
+   * and still looks the beast he is at the moment she rolls over him.
+   */
+  bear: {radius: 35, look: 1.3, from: 300},
 
   /**
    * The hillside closes in on its way to the bear.
@@ -2881,16 +2888,18 @@ export const KATAMARI = {
     /** Coloured bursts thrown round the cage the moment it goes. */
     pops: 10,
     /**
-     * How hard the bars are flung from the point of contact.
+     * The shatter. `burst` is how hard each bar is flung straight out from the
+     * cage's axis; `lift` is the upward kick every bar gets on top of that.
      *
-     * Well up from thirty: the cage should shatter and throw its bars right
-     * out of the shot on impact, not tip over and settle. With the smash played
-     * slow, a high speed reads as an explosion held in the air rather than a
-     * blur. `gravity` and settlePieces still bring them down before the phase
-     * ends, just further out.
+     * The lift is the point. Thrown out flat, the low bars met the grass on the
+     * first frame and slid to a stop — the cage looked like it fell over. Every
+     * bar is now launched *up* as well, hard, so the whole thing bursts into
+     * the air and rains back down over the next second rather than tipping.
+     * With the smash in slow motion that reads as an explosion held in the air.
      */
-    burst: 78,
-    spin: 7,
+    burst: 88,
+    lift: 46,
+    spin: 10,
     /**
      * Enough to bring the pieces down inside the shot.
      *
