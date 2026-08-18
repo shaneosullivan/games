@@ -289,6 +289,7 @@ export class Game {
       setScreenFade: a => this.setScreenFade(a),
       setEnvironment: name => this.setEnvironment(name),
       setFogScale: k => this.stage.setFogScale(k),
+      setViewDistance: far => this.stage.setViewDistance(far),
       configureFlight: s => this.configureFlight(s),
       placeBee: (position, desiredHeight, yaw) =>
         this.placeBee(position, desiredHeight, yaw),
@@ -650,6 +651,8 @@ export class Game {
     // earlier.
     this.turnButtons.release();
     this.hold.release();
+    // A level that pushed the lens out doesn't get to leave it out.
+    this.stage.setViewDistance(null);
     // And she does not start a level flung at wherever the finger was when the
     // last one's card was tapped.
     this.aim.reset();

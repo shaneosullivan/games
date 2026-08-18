@@ -2394,18 +2394,50 @@ export const ASCENT_PALETTE = {
  * comparison *is* the rule of the game.
  */
 export const KATAMARI = {
-  /** Gentler than the climb — this one is about steering, not speed. */
-  pitch: 0.26,
+  /**
+   * Steeper than the climb, and it has to be.
+   *
+   * Going up, the slant is sold by the summit standing above you. Coming down
+   * there is nothing above you at all, so the only things that say "downhill"
+   * are the angle of the ground and being able to see the flat land waiting at
+   * the bottom of it — at a gentle quarter-radian the level read as another
+   * climb.
+   */
+  pitch: 0.42,
   /** How long the descent is, in units. */
-  run: 1800,
-  /** How wide the hillside is, and how much of it is worth showing. */
-  halfWidth: 30,
-  wantHalfWidth: 20,
+  run: 4200,
+  /**
+   * Flat grass at the bottom, and how far it runs past the finish.
+   *
+   * The point of it is not the ending, it is the *view*: from up the hill it
+   * is a floor a long way below, and a floor below you is the one thing that
+   * cannot be mistaken for a hill in front of you.
+   */
+  flat: 1600,
+  /**
+   * How wide the hillside is, and how much of it is worth showing.
+   *
+   * Far wider than the climb, which is a strip you dodge along. This one is a
+   * field you work: the whole point is rolling about it, so there has to be an
+   * about to roll around in.
+   */
+  halfWidth: 150,
+  wantHalfWidth: 38,
   /** How near the edge of the screen the bee may get, in NDC. */
   edgeMargin: 0.82,
 
   /** Behind the ball and above it, retreating as the ball grows. */
-  camera: {back: 26, up: 15, pullBack: 2.4},
+  /**
+   * The shot, as three numbers that scale together.
+   *
+   * `aim` is the one that is easy to get wrong: it is how far ahead of the
+   * ball the camera looks, as a fraction of how far behind it stands. Because
+   * it is a fraction, the *angle* of the shot is the same whether the ball is
+   * two units across or thirty — set as a distance instead, the camera tipped
+   * further and further towards straight-down as it retreated, and by the
+   * bottom of the hill the level was being played from a helicopter.
+   */
+  camera: {back: 26, up: 10.5, aim: 0.55},
   /**
    * How much further back the camera stands per unit of ball radius.
    *
@@ -2414,13 +2446,31 @@ export const KATAMARI = {
    * than to distance travelled, so the picture follows the thing that actually
    * changed.
    */
-  cameraPerRadius: 2.2,
+  /**
+   * How many ball-radii of hillside the shot tries to hold, either side.
+   *
+   * This is the whole camera. The distance is worked back from it every frame,
+   * so as the ball grows the picture pulls out to keep the same *relative*
+   * amount of hill in view — which is what a katamari looks like, and which
+   * also keeps the level honest: a ball that fills the screen sweeps up
+   * everything in front of it without being steered at all.
+   */
+  viewRadii: 3.4,
+  /**
+   * How fast the camera's idea of the ball's size catches up with the truth.
+   *
+   * The radius jumps every time the ball eats something, and a camera tied
+   * straight to it twitches backwards on every mouthful. This eases towards it
+   * instead, so what the player sees is a slow, continuous pulling-out over
+   * the whole descent.
+   */
+  zoomEase: 0.7,
 
   ball: {
     /** The summit boulder, before it has eaten anything. */
     start: 2,
     /** What counts as big enough at the bottom. Also the progress bar's end. */
-    target: 9,
+    target: 24,
     /**
      * How it rolls.
      *
@@ -2431,7 +2481,7 @@ export const KATAMARI = {
     gravity: 15,
     drag: 0.32,
     /** It never quite stops, so a bounce can't strand the level. */
-    minSpeed: 8,
+    minSpeed: 15,
     pull: 5.2,
     /** How fast it can be dragged across the hill, per second per unit off. */
     steerDamp: 2.6,
@@ -2443,11 +2493,26 @@ export const KATAMARI = {
      * add, so eating something half your size is an eighth of you — which is
      * the arithmetic that makes a katamari feel like one.
      */
-    growth: 0.3,
+    growth: 0.9,
+    /**
+     * How far ahead of the pace the ball is allowed to get.
+     *
+     * A katamari grows by a *fraction* of itself, which makes the whole thing
+     * a compound-interest problem: a rate a shade too low and the ball falls
+     * behind the hillside, everything becomes too big to eat, and it never
+     * recovers — six hundred bounces and a ball still the size it started.
+     * A shade too high and it eats the mountain by the halfway mark.
+     *
+     * So the rate is set generously and the runaway end is taken off instead:
+     * what an item is worth fades out as the ball approaches this multiple of
+     * the size a player on the pace would have. A good run rides just under
+     * the ceiling; a poor one is nowhere near it and never notices it exists.
+     */
+    lead: 1.32,
     /** How much bigger than the ball a thing may be and still stick. */
     stickMargin: 1.02,
     /** Bouncing off something too big: speed kept, and how far it is shoved. */
-    bounceCost: 0.45,
+    bounceCost: 0.22,
     bounceBack: 5,
   },
 
@@ -2461,7 +2526,25 @@ export const KATAMARI = {
   tether: {width: 0.34, colour: 0xffe27a},
 
   /** Where the queen flies: ahead of the ball, and above the ground. */
-  bee: {ahead: 11, height: 5.5, speed: 34, lead: 0.2},
+  /**
+   * Where the queen flies, and how big she is drawn.
+   *
+   * Everything here is measured against the ball rather than fixed, because
+   * the ball ends up fifteen times the size it started. She keeps ahead of it
+   * and above it by multiples of its radius, so she is never inside the thing
+   * she is towing and never behind it — and she is drawn bigger as the camera
+   * retreats, so she stays the same size on the glass instead of dwindling to
+   * a speck by the bottom of the hill.
+   */
+  bee: {
+    ahead: 12,
+    aheadPerRadius: 1.7,
+    height: 7,
+    heightPerRadius: 1.9,
+    speed: 34,
+    scale: 2.2,
+    scalePerRadius: 0.1,
+  },
 
   /**
    * What is scattered down the hill, and how big it is when you meet it.
@@ -2472,35 +2555,161 @@ export const KATAMARI = {
    * lines.
    */
   items: {
-    perHundred: 9,
+    perHundred: 5.5,
+    /**
+     * How much clear ground there has to be between two things, in units.
+     *
+     * Placed by lane alone they still bunched: consecutive items are only a
+     * dozen units apart down the hill, and two in neighbouring lanes read as a
+     * heap from a camera looking along the slope. A placement that lands too
+     * near something already there is simply tried again somewhere else.
+     */
+    apart: 14,
+    /*
+     * Every size on the hill is a *fraction of the ball you ought to have* by
+     * the time you get there, rather than a number of units.
+     *
+     * That one change is what makes the level balance itself. The ball is
+     * meant to run from `start` to `target` over the descent, so `pace` at any
+     * point is the size a player keeping up would be — and a goat at 1.05 of
+     * that is something you can only eat if you are ahead of the curve, while
+     * a flower at 0.22 is always food. Quoted in units instead, the two ends
+     * of the level need different numbers and the middle is a guess: the first
+     * draft had the hillside outgrow the ball by the halfway mark, and it
+     * bounced six hundred times on the way to the bottom.
+     */
     kinds: [
-      {kind: "flower", size: [0.8, 3.2], weight: 3},
-      {kind: "honey", size: [1.2, 4.6], weight: 2},
-      {kind: "bucket", size: [1.5, 5.4], weight: 2},
-      {kind: "rabbit", size: [1.9, 6.6], weight: 2},
-      {kind: "goat", size: [2.6, 8.4], weight: 1.4},
+      /*
+       * The two smallest kinds never grow past a size the boulder could have
+       * eaten on the day it set off. That is the way back for a player who has
+       * fallen behind: without it, a ball that misses the first stretch finds
+       * the whole hill too big for it and there is nothing it can ever eat
+       * again — which is not a difficulty curve, it is a dead end.
+       */
+      {kind: "flower", of: 0.22, max: 2.6, weight: 3},
+      {kind: "bush", of: 0.32, max: 5, weight: 2.4},
+      {kind: "honey", of: 0.42, weight: 1.8},
+      {kind: "bucket", of: 0.52, weight: 1.8},
+      {kind: "rabbit", of: 0.66, weight: 2},
+      {kind: "tree", of: 0.85, weight: 1.6},
+      {kind: "goat", of: 1.05, weight: 1.4},
     ],
+  },
+
+  /**
+   * The animals wander, and everything is laid out to be worked for.
+   *
+   * Two rules, one idea. Items are placed in *lanes* — the hillside is cut
+   * into strips across and each item takes the next strip along, so a run of
+   * them is a zigzag rather than a heap in the middle. And the rabbits and the
+   * goats walk, turning round when they reach the edge of the play, so what
+   * she is chasing has moved by the time she gets there.
+   *
+   * The point of both is the same: the level should be rolled *around* rather
+   * than rolled straight down.
+   */
+  wander: {
+    /** How fast a rabbit and a goat walk, in units a second. */
+    rabbit: [4, 9],
+    goat: [3, 7],
+    /** How high a rabbit hops, and how often. */
+    hop: 0.55,
+    hopRate: 3.4,
+    /** How many strips the width is cut into for placing things. */
+    lanes: 7,
+    /**
+     * How far an animal strays from where it started, in lane widths.
+     *
+     * It patrols its own patch rather than crossing the whole hill. Left to
+     * walk the full width they all end up turning round at the same two edges,
+     * and within half a minute the hillside has a herd at each side of it and
+     * nothing in the middle — which is the clustering the lanes were there to
+     * prevent in the first place.
+     */
+    patrol: 1.4,
   },
 
   /**
    * The bear, waiting at the bottom.
    *
    * The last obstacle and the biggest, and the only one placed by hand. He is
-   * a little under the target size, so a ball that is big enough to finish is
-   * big enough to take him with it — which is the ending the whole descent is
-   * for.
+   * half as big again as the largest thing on the hill, and bigger than a ball
+   * that has only done well enough to finish — so taking him is the reward for
+   * a run that ate the mountain rather than a thing that happens to everyone.
+   * The largest thing on the hill besides him is a goat of twenty-two, and a
+   * ball that only just qualifies to finish is twenty-four. So he is beatable
+   * by a run that worked the hillside and not by one that came straight down.
    */
-  bear: {radius: 8.4, from: 120},
+  bear: {radius: 27, from: 300},
+
+  /**
+   * The cage behind the bear, and what happens to it.
+   *
+   * The bear is not guarding the bottom of the hill, he is guarding this: a
+   * cage of baby bees, some way behind him. That is what makes him a wall
+   * rather than an obstacle — the ball either takes him with it and goes on to
+   * the cage, or it does not and the level is over.
+   */
+  cage: {
+    /** How far before the end it stands, and how big it is. */
+    from: 140,
+    radius: 62,
+    /**
+     * How much of the hill around the bear and the cage is left empty.
+     *
+     * He is the last thing in the game and he should be met alone. With the
+     * ordinary scattering running right up to him, the climax of the descent
+     * was a bear standing in a field of rabbits.
+     */
+    clearing: 620,
+    babies: 16,
+    /**
+     * The smash, played slowly.
+     *
+     * Slow motion because it is the last thing that happens in the game and it
+     * is over in a third of a second at full speed. The pieces are thrown out
+     * from the point of contact, they turn as they go, and the camera pulls
+     * away from the whole thing while they are still in the air.
+     */
+    slowMo: 0.3,
+    burst: 30,
+    spin: 4,
+    gravity: 22,
+    time: 6.5,
+  },
 
   /** The finish: how long the ball runs out, and the shot that follows it. */
   finish: {rollOut: 90, sweepTime: 6, burstEvery: 0.24, bursts: 14},
 
+  /**
+   * How far the fog is pushed out for this level, as a multiple.
+   *
+   * Much further than the climb, and not for prettiness. Going up, the fog is
+   * what hides the fact that the summit is fifteen hundred units away. Coming
+   * down, what has to be visible is the *bottom* — the flat green a long way
+   * below you is the only thing that says you are on a downhill rather than
+   * looking up another one — and at the climb's setting it was a white wall
+   * two hundred units in front of the ball.
+   */
+  fogScale: 4.5,
+  /** How far the camera can see here. The whole hill, and then some. */
+  viewDistance: 2600,
+
   /** Clouds, as on the way up — see ASCENT for what these mean. */
   clouds: 34,
-  cloudLow: 18,
+  /*
+   * Much higher than on the way up, and the reason is the direction.
+   *
+   * Climbing, the camera looks up at a hillside and the clouds are above and
+   * beyond it. Descending, it looks down one — so ground level a few hundred
+   * units ahead is well *below* the camera, and a cloud placed a little way
+   * above that ground sits in the middle of the hillside like a snowdrift.
+   * These are all above the player's own height, which is where sky is.
+   */
+  cloudLow: 90,
   /** How high a cloud has to be before it may hang over the run itself. */
-  cloudOver: 85,
-  cloudHigh: 150,
+  cloudOver: 150,
+  cloudHigh: 320,
   cloudSize: [4, 11],
   cloudDrift: [2, 6],
   cloudBand: 380,

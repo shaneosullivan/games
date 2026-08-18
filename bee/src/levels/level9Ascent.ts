@@ -114,7 +114,6 @@ export class AscentLevel implements Level {
   /** Tongues and sprays in flight, drawn as one shaft each. */
   private readonly reaches: Array<{mesh: THREE.Mesh; foe: Foe}> = [];
 
-  /** Whether the "slide your finger" card is still up; see level 10. */
   private bursts = 0;
   private nextBurst = 0;
   /** The forward limit, in units; see aheadLimit. */

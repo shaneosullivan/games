@@ -173,6 +173,16 @@ export interface Stage {
    * see much further than the level normally does.
    */
   setFogScale(scale: number): void;
+  /**
+   * How far the camera can see, in units, or null for the game's own setting.
+   *
+   * Every level but one is played from twenty or thirty units away and shares
+   * a far plane of four hundred. The descent's camera stands back by a
+   * multiple of the ball, which by the bottom is five hundred — and a ball
+   * beyond the far plane is not drawn at all, which looks exactly like a bug
+   * in the level rather than a lens that cannot see it.
+   */
+  setViewDistance(far: number | null): void;
   /** Dim the page behind a card, so the strip iOS keeps matches the scrim. */
   setPageDim(on: boolean): void;
   resize(): void;
@@ -312,9 +322,15 @@ export function createStage(host: HTMLElement): Stage {
     sunOffset.set(...env.sunOffset);
   }
 
+  function setViewDistance(far: number | null): void {
+    camera.far = far ?? CAMERA.far;
+    camera.updateProjectionMatrix();
+  }
+
   return {
     renderer,
     canvas,
+    setViewDistance,
     scene,
     camera,
     sun,

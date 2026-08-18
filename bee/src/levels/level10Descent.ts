@@ -9,16 +9,25 @@ import {
 } from "../entities/rollItems";
 import {FIREWORK_PALETTE} from "../fx/particles";
 import {createBear} from "../render/geometry/bear";
-import {createDescent, type Descent} from "../render/geometry/descent";
+import {
+  createCage,
+  createDescent,
+  type Cage,
+  type Descent,
+} from "../render/geometry/descent";
+import {createBaby, type BabyModel} from "../render/geometry/bee";
 import {solidToon} from "../render/materials";
 import type {GameContext, Level} from "./level";
 
-type Phase = "opening" | "rolling" | "party" | "sweep" | "done";
+type Phase = "opening" | "rolling" | "smash" | "party" | "sweep" | "done";
 
 /** One line of the KATAMARI.items table. */
 interface ItemSpec {
   kind: RollKind;
-  size: readonly [number, number];
+  /** Its size as a fraction of the ball a player on the pace would have. */
+  of: number;
+  /** A ceiling in units, for the kinds that stay small enough to rescue you. */
+  max?: number;
   weight: number;
 }
 
@@ -32,6 +41,12 @@ interface Item {
   stuck: boolean;
   /** How long it has been wobbling since it shrugged the ball off. */
   shove: number;
+  /** Animals only: how fast it is walking across the hill, and its own beat. */
+  walk?: number;
+  beat?: number;
+  /** Animals: where it started, and how far either side it patrols. */
+  home?: number;
+  range?: number;
 }
 
 const tmp = new THREE.Vector3();
@@ -75,8 +90,14 @@ export class DescentLevel implements Level {
   readonly completionTitle = "All the way down!";
   readonly completionBody =
     "One small boulder at the top, and half the mountain by the bottom. Even the bear came along.";
-  readonly failTitle = "Not quite big enough";
-  readonly failBody =
+  /*
+   * Not readonly, unlike every other level's: there are two ways to lose this
+   * one and they are not the same disappointment. Reaching the bottom small is
+   * a level you played badly; being turned away by the bear is a level you
+   * nearly won, and it should say so.
+   */
+  failTitle = "Not quite big enough";
+  failBody =
     "The ball reached the bottom too small to matter. Roll over more of the hillside on the way down — the little things first.";
 
   /** The last level in the game. */
@@ -102,6 +123,13 @@ export class DescentLevel implements Level {
   private radius: number = K.ball.start;
   /** Everything eaten so far, as volume; the radius is derived from it. */
   private eaten = 0;
+  /**
+   * The camera's idea of how big the ball is, which lags the truth.
+   *
+   * Eased rather than read straight, so the shot pulls out slowly over the
+   * whole descent instead of twitching backwards on every mouthful.
+   */
+  private shown: number = K.ball.start;
   private caught = 0;
   private bearCaught = false;
 
@@ -114,17 +142,19 @@ export class DescentLevel implements Level {
   /** How wide the play is on this screen, measured every frame. */
   private playHalf: number = K.wantHalfWidth;
 
-  /**
-   * Whether the "slide your finger" card is still up.
-   *
-   * It goes the moment they do it, or after a few seconds if they don't. A
-   * card in the middle of the screen is worth having on the first go and is
-   * in the way on every one after it, and the player themselves is the only
-   * reliable signal for which of those this is.
-   */
   private bursts = 0;
   private nextBurst = 0;
   private shake = 0;
+
+  /** The cage of babies behind the bear, and the babies in it. */
+  private cage!: Cage;
+  private babies: Array<{model: BabyModel; a: number; r: number; y: number}> =
+    [];
+  private cageGroup!: THREE.Group;
+  /** How long the smash has been playing, in its own slowed-down seconds. */
+  private smashed = 0;
+  /** Set when the bear turns her away, so the level ends the right way. */
+  private blocked = 0;
 
   get controlsLocked(): boolean {
     return this.phase !== "rolling";
@@ -132,6 +162,11 @@ export class DescentLevel implements Level {
 
   enter(ctx: GameContext): void {
     ctx.setEnvironment("mountain");
+    // The whole hill has to be visible from the top of it; see KATAMARI.fogScale.
+    ctx.setFogScale(K.fogScale);
+    // The camera ends up five hundred units back from a ball this size, and
+    // the game's own far plane is four hundred — see Stage.setViewDistance.
+    ctx.setViewDistance(K.viewDistance);
     this.rng = new Rng(0x10_04_22);
     this.hill = createDescent(this.rng);
     ctx.mountain.add(this.hill.group);
@@ -174,18 +209,25 @@ export class DescentLevel implements Level {
     this.speed = 0;
     this.drift = 0;
     this.radius = K.ball.start;
+    this.shown = K.ball.start;
     this.eaten = 0;
     this.caught = 0;
     this.bearCaught = false;
     this.bursts = 0;
     this.nextBurst = 0;
     this.shake = 0;
+    this.smashed = 0;
+    this.blocked = 0;
+    this.failTitle = "Not quite big enough";
+    this.failBody =
+      "The ball reached the bottom too small to matter. Roll over more of the hillside on the way down — the little things first.";
     this.phase = "opening";
     this.phaseTime = 0;
     this.complete = false;
     this.failed = false;
 
     this.addBear();
+    this.buildCage();
 
     ctx.configureFlight({
       boundsRadius: 4000,
@@ -196,7 +238,6 @@ export class DescentLevel implements Level {
     });
     ctx.bee.scripted = true;
     ctx.bee.setCrown(true);
-    ctx.bee.setScale(1.3);
     // Nothing on the glass, as on the way up: she goes where the finger goes.
     ctx.setFlightControls(false);
     ctx.aim.reset();
@@ -211,6 +252,8 @@ export class DescentLevel implements Level {
   }
 
   exit(ctx: GameContext): void {
+    ctx.setFogScale(1);
+    ctx.setViewDistance(null);
     ctx.hud.setCallout(null);
     ctx.hud.setProgress(null);
     ctx.mountain.remove(this.hill.group);
@@ -229,6 +272,8 @@ export class DescentLevel implements Level {
     (this.core.material as THREE.Material).dispose();
     this.tether.geometry.dispose();
     (this.tether.material as THREE.Material).dispose();
+    this.cage.dispose();
+    this.babies.length = 0;
     this.hill.dispose();
     this.kit.dispose();
     ctx.bee.scripted = false;
@@ -259,6 +304,9 @@ export class DescentLevel implements Level {
         break;
       case "rolling":
         this.updateRolling(dt, ctx);
+        break;
+      case "smash":
+        this.updateSmash(dt, ctx);
         break;
       case "party":
         this.updateParty(dt, ctx);
@@ -305,7 +353,16 @@ export class DescentLevel implements Level {
         -across,
         across,
       );
-      const step = K.bee.speed * dt;
+      /*
+       * She crosses the hill at a speed measured in *screens*, not in units.
+       *
+       * The shot pulls out as the ball grows, so by the bottom the playable
+       * width is three times what it was at the top. A fixed speed in units
+       * would mean she took three times as long to cross the same picture,
+       * and the control would go dead in the hand exactly when the level is
+       * asking the most of it.
+       */
+      const step = K.bee.speed * Math.max(1, across / K.wantHalfWidth) * dt;
       const gap = want - this.beeX;
       this.beeX += Math.abs(gap) <= step ? gap : Math.sign(gap) * step;
     }
@@ -327,13 +384,38 @@ export class DescentLevel implements Level {
     const travelled = this.speed * dt;
     this.rolled += travelled;
 
+    this.shown += (this.radius - this.shown) * Math.min(1, K.zoomEase * dt);
     this.roll(travelled, this.drift * dt);
     this.spawn();
+    this.retire();
+    this.walkAnimals(dt);
+    this.flyBabies(dt);
     this.collide(dt, ctx);
     this.place(ctx);
     this.shake = Math.max(0, this.shake - dt * 2);
     this.camera(ctx, 0);
     ctx.hud.setProgress("Ball", this.progress());
+
+    // Turned away by the bear: she rolls on for a moment so the player sees
+    // what happened, and then the level is over.
+    if (this.blocked > 0) {
+      this.blocked -= dt;
+      if (this.blocked <= 0) {
+        this.failTitle = "The bear won't budge";
+        this.failBody =
+          "He is bigger than your ball, so he simply will not stick — and behind him is a cage full of baby bees. Gather more on the mountain on the way down and come back for him.";
+        this.failed = true;
+        this.phase = "done";
+        ctx.hud.setCallout(null);
+        return;
+      }
+    }
+
+    // The cage. She has the bear, so nothing is in the way of it.
+    if (this.bearCaught && this.rolled + this.radius >= this.cageAt()) {
+      this.beginSmash(ctx);
+      return;
+    }
 
     if (this.rolled >= K.run) {
       this.reachBottom(ctx);
@@ -377,16 +459,69 @@ export class DescentLevel implements Level {
       this.spawnedTo += 100;
       const count = Math.round(K.items.perHundred + this.rng.range(-1.4, 1.4));
       for (let i = 0; i < count; i++) {
-        const z = from + this.rng.range(30, 130);
-        if (z > K.run - 30) {
+        // Spread evenly down the stretch rather than sprinkled over it: a
+        // hundred units with nothing in them followed by six things at once
+        // is a level you sit still for and then cannot steer through.
+        const z = from + ((i + this.rng.range(0.1, 0.9)) / count) * 100;
+        // Nothing in the bear's clearing: he is the last thing in the game
+        // and he is met alone. See KATAMARI.cage.clearing.
+        if (z > K.run - K.bear.from - K.cage.clearing) {
           continue;
         }
-        this.addItem(z);
+        this.addItem(z, this.lane++);
       }
     }
   }
 
-  private addItem(down: number): void {
+  /** Is there room here, or is something already standing in it? */
+  private clearOf(x: number, z: number, radius: number): boolean {
+    for (const item of this.items) {
+      if (item.stuck || Math.abs(item.z - z) > 90) {
+        continue;
+      }
+      if (
+        Math.hypot(item.x - x, item.z - z) <
+        item.radius + radius + K.items.apart
+      ) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /**
+   * Which strip across the hill the next item goes in.
+   *
+   * Counted rather than drawn at random, so consecutive items land in
+   * different lanes and a run of them is a zigzag she has to chase. Random
+   * placement clusters — that is what random does — and a cluster is one
+   * sweep of the finger rather than a hillside to work.
+   */
+  private lane = 0;
+
+  /**
+   * How big the ball ought to be this far down the hill.
+   *
+   * A straight line from the summit boulder to what counts as big enough at
+   * the bottom. Nothing enforces it — it is the yardstick everything on the
+   * hill is sized against, so that "can I eat this?" means "am I keeping up?"
+   */
+  private pace(down: number): number {
+    /*
+     * Measured against the *stocked* part of the hill, not the whole run.
+     *
+     * The last few hundred units are the bear's clearing and there is nothing
+     * to eat in them. Spreading the pace over the full length meant the ball
+     * ran out of food while the yardstick was still climbing, so it topped out
+     * a fifth under the size the level was designed around — and the bear,
+     * sized against the design, could not be beaten by anybody.
+     */
+    const stocked = K.run - K.bear.from - K.cage.clearing;
+    const t = THREE.MathUtils.clamp(down / stocked, 0, 1);
+    return K.ball.start + (K.ball.target - K.ball.start) * t;
+  }
+
+  private addItem(down: number, lane: number): void {
     // Weighted pick: the small things are commoner, so there is always
     // something a struggling ball can eat.
     const kinds = K.items.kinds as ReadonlyArray<ItemSpec>;
@@ -405,16 +540,15 @@ export class DescentLevel implements Level {
     }
 
     /*
-     * How big this one is, from how far down the hill it lies.
+     * How big this one is: its kind's fraction of the pace at this point.
      *
-     * The band is jittered by a fifth either way, so the hill isn't sorted:
-     * a run of items that all grow in lockstep gives the player nothing to
-     * read, whereas one unusually big goat among small ones is a decision.
+     * Jittered by a sixth either way, so the hill isn't sorted — a run of
+     * items all growing in lockstep gives the player nothing to read, whereas
+     * one unusually big goat among small ones is a decision.
      */
-    const t = THREE.MathUtils.clamp(down / K.run, 0, 1);
     const size =
-      (spec.size[0] + (spec.size[1] - spec.size[0]) * t) *
-      this.rng.range(0.82, 1.18);
+      Math.min(this.pace(down) * spec.of, spec.max ?? Infinity) *
+      this.rng.range(0.84, 1.16);
 
     const group = new THREE.Group();
     const mesh = new THREE.Mesh(this.kit.shapes[spec.kind], this.kit.material);
@@ -429,12 +563,37 @@ export class DescentLevel implements Level {
      * never learns was there. See `acrossLimit`.
      */
     const half = Math.max(8, this.playHalf) - size;
-    const x = this.rng.range(-half, half);
+    const lanes = K.wander.lanes;
+    /*
+     * The lane's own slot, plus a little slop so the lanes aren't visible as
+     * lanes, stepped by two each time so a run of items crosses the hill
+     * rather than sliding along it — and moved on again if it lands on top of
+     * something already there.
+     */
+    let x = 0;
+    for (let attempt = 0; attempt < 4; attempt++) {
+      const slot = (((lane + attempt * 3) * 2) % lanes) + 0.5;
+      x = THREE.MathUtils.clamp(
+        ((slot / lanes) * 2 - 1) * half +
+          this.rng.range(-half / lanes, half / lanes),
+        -half,
+        half,
+      );
+      if (this.clearOf(x, -down, size)) {
+        break;
+      }
+    }
     // Lifted by its own radius, because the shapes are built about their
     // centres — scaling one built standing on its feet would sink it.
     group.position.set(x, size * 0.92, -down);
     group.rotation.y = this.rng.range(0, Math.PI * 2);
     this.hill.slope.add(group);
+    const speed =
+      spec.kind === "rabbit"
+        ? K.wander.rabbit
+        : spec.kind === "goat"
+          ? K.wander.goat
+          : null;
     this.items.push({
       kind: spec.kind,
       group,
@@ -443,6 +602,12 @@ export class DescentLevel implements Level {
       radius: size,
       stuck: false,
       shove: 0,
+      walk: speed
+        ? this.rng.range(speed[0], speed[1]) * (this.rng.next() < 0.5 ? -1 : 1)
+        : undefined,
+      home: x,
+      range: (half / K.wander.lanes) * K.wander.patrol,
+      beat: this.rng.range(0, 6.28),
     });
   }
 
@@ -477,7 +642,217 @@ export class DescentLevel implements Level {
     });
   }
 
+  // ---- the cage -----------------------------------------------------------
+
+  /** Where the cage stands, as a distance down the run. */
+  private cageAt(): number {
+    return K.run - K.cage.from;
+  }
+
+  /**
+   * Stand the cage on the hill, with the babies flying about inside it.
+   *
+   * Built at the start rather than when she gets near it, because it is the
+   * thing she is coming down the mountain *for* — it should be visible from up
+   * the hill, over the bear's shoulder, long before she reaches it.
+   */
+  private buildCage(): void {
+    this.cage = createCage(K.cage.radius);
+    this.cageGroup = new THREE.Group();
+    this.cageGroup.add(this.cage.group);
+    this.cageGroup.position.set(0, 0, -this.cageAt());
+    this.hill.slope.add(this.cageGroup);
+
+    this.babies = [];
+    for (let i = 0; i < K.cage.babies; i++) {
+      const model = createBaby();
+      model.group.scale.setScalar(K.cage.radius * 0.13);
+      this.cageGroup.add(model.group);
+      this.babies.push({
+        model,
+        a: (i / K.cage.babies) * Math.PI * 2,
+        r: this.rng.range(K.cage.radius * 0.25, K.cage.radius * 0.72),
+        y: this.rng.range(K.cage.radius * 0.3, K.cage.radius * 1.15),
+      });
+    }
+  }
+
+  /**
+   * Fly the babies round inside the cage — and out of it, once it is open.
+   *
+   * The same code both times. What changes when the cage breaks is that their
+   * ring grows and rises without limit, so they spiral up and away rather than
+   * needing a second flight of their own.
+   */
+  private flyBabies(dt: number): void {
+    const out = this.phase === "smash" ? this.smashed : 0;
+    for (const baby of this.babies) {
+      baby.a += dt * (0.6 + baby.r * 0.02);
+      const r = baby.r + out * 12;
+      const y = baby.y + out * 9 + Math.sin(baby.a * 2.2) * 1.4;
+      baby.model.group.position.set(
+        Math.cos(baby.a) * r,
+        y,
+        Math.sin(baby.a) * r,
+      );
+      // Facing the way it is going, which round a circle is a quarter turn on
+      // from where it is.
+      baby.model.group.rotation.y = -baby.a + Math.PI / 2;
+      baby.model.animate(baby.a * 3, 1);
+    }
+  }
+
+  /**
+   * Break it open.
+   *
+   * Every piece is thrown out from where the ball met the cage, hardest at the
+   * front and hardest low down, with a turn on it. Nothing here is a
+   * simulation — the pieces never meet each other again — because what is
+   * being animated is one moment of it, played slowly.
+   */
+  private beginSmash(ctx: GameContext): void {
+    this.phase = "smash";
+    this.phaseTime = 0;
+    this.smashed = 0;
+    this.speed *= 0.35;
+    ctx.hud.setCallout("The babies are free!");
+    ctx.audio.levelComplete();
+    for (const piece of this.cage.pieces) {
+      const at = piece.mesh.position;
+      // Away from the middle, and away from the ball, and upwards.
+      tmp.set(at.x, at.y * 0.35 + 4, at.z).normalize();
+      const force = K.cage.burst * this.rng.range(0.6, 1.4);
+      piece.velocity.set(
+        tmp.x * force,
+        tmp.y * force + this.rng.range(4, 16),
+        tmp.z * force - force * 0.5,
+      );
+      piece.spin.set(
+        this.rng.range(-K.cage.spin, K.cage.spin),
+        this.rng.range(-K.cage.spin, K.cage.spin),
+        this.rng.range(-K.cage.spin, K.cage.spin),
+      );
+    }
+  }
+
+  private updateSmash(dt: number, ctx: GameContext): void {
+    // Everything in here runs on its own slow clock; the camera pulls out on
+    // the real one, so the shot keeps moving while the pieces hang.
+    const slow = dt * K.cage.slowMo;
+    this.smashed += slow;
+
+    for (const piece of this.cage.pieces) {
+      piece.velocity.y -= K.cage.gravity * slow;
+      piece.mesh.position.addScaledVector(piece.velocity, slow);
+      piece.mesh.rotation.x += piece.spin.x * slow;
+      piece.mesh.rotation.y += piece.spin.y * slow;
+      piece.mesh.rotation.z += piece.spin.z * slow;
+    }
+
+    this.speed = Math.max(0, this.speed - K.ball.gravity * 0.5 * slow);
+    const travelled = this.speed * slow;
+    this.rolled += travelled;
+    this.roll(travelled, 0);
+    this.flyBabies(dt);
+    this.place(ctx);
+
+    // Out and up over the whole thing, on the real clock.
+    const t = ease(Math.min(1, this.phaseTime / K.cage.time));
+    this.camera(ctx, t * 0.9);
+
+    this.nextBurst -= dt;
+    if (this.nextBurst <= 0) {
+      this.nextBurst = K.finish.burstEvery * 1.6;
+      this.hill.slope.localToWorld(
+        tmp.set(
+          this.rng.range(-K.cage.radius, K.cage.radius),
+          this.rng.range(6, K.cage.radius * 1.6),
+          -this.cageAt() + this.rng.range(-20, 20),
+        ),
+      );
+      ctx.fireworks.burst(tmp, {
+        color: FIREWORK_PALETTE,
+        count: 26,
+        speed: 11,
+        spherical: 1,
+        ttl: 2.2,
+        size: 0.9,
+      });
+    }
+
+    if (this.phaseTime >= K.cage.time) {
+      ctx.hud.setCallout(null);
+      this.phase = "sweep";
+      this.phaseTime = 0;
+    }
+  }
+
   // ---- eating and bouncing ------------------------------------------------
+
+  /**
+   * Walk the rabbits and the goats about.
+   *
+   * Only the ones near enough to be seen: the list is the whole hillside by
+   * the end and there is no reason to walk an animal four hundred units behind
+   * her. They turn round at the edge of the play rather than at the edge of
+   * the hill, so nothing she is chasing wanders somewhere she is not allowed
+   * to follow.
+   */
+  private walkAnimals(dt: number): void {
+    const z = -this.rolled;
+    const edge = Math.max(8, this.playHalf);
+    for (const item of this.items) {
+      if (item.stuck || item.walk === undefined) {
+        continue;
+      }
+      if (Math.abs(item.z - z) > 260) {
+        continue;
+      }
+      item.x += item.walk * dt;
+      // Turning back at the edge of its own patch, and at the edge of the
+      // play — whichever it meets first.
+      const home = item.home ?? 0;
+      const range = item.range ?? 10;
+      const low = Math.max(-edge + item.radius, home - range);
+      const high = Math.min(edge - item.radius, home + range);
+      if (item.x > high || item.x < low) {
+        item.walk = -item.walk;
+        item.x = THREE.MathUtils.clamp(item.x, low, high);
+      }
+      item.group.position.x = item.x;
+      // Facing the way it is going. The models are built looking down +z, so
+      // a quarter turn either way points them across the hill.
+      item.group.rotation.y = item.walk > 0 ? Math.PI / 2 : -Math.PI / 2;
+      if (item.kind === "rabbit") {
+        // Rabbits hop rather than walk, which at this distance is the only
+        // thing that tells them apart from the goats at a glance.
+        item.beat = (item.beat ?? 0) + dt * K.wander.hopRate;
+        const hop = Math.abs(Math.sin(item.beat)) * K.wander.hop;
+        item.group.position.y = item.radius * 0.92 + hop * item.radius;
+      }
+    }
+  }
+
+  /**
+   * Forget what is well behind her.
+   *
+   * The hill is four thousand units long and carries three hundred things;
+   * without this every one of them stays in the scene and in the collision
+   * loop for the rest of the level, on a device that is an iPad. Only what she
+   * has already gone past is dropped, and never anything stuck to the ball —
+   * that belongs to her now.
+   */
+  private retire(): void {
+    const behind = -this.rolled + this.radius + 140;
+    for (let i = this.items.length - 1; i >= 0; i--) {
+      const item = this.items[i];
+      if (item.stuck || item.z < behind) {
+        continue;
+      }
+      this.hill.slope.remove(item.group);
+      this.items.splice(i, 1);
+    }
+  }
 
   private collide(dt: number, ctx: GameContext): void {
     const z = -this.rolled;
@@ -498,12 +873,26 @@ export class DescentLevel implements Level {
       if (Math.abs(item.z - z) > item.radius + this.radius + 4) {
         continue;
       }
-      const gap = Math.hypot(item.x - this.x, item.z - z);
+      /*
+       * The bear is a wall, not an obstacle.
+       *
+       * Everything else on the hill is met where it happens to be standing and
+       * can be steered around. He cannot: he is what is between her and the
+       * cage, so he is met across the whole width of the play whatever line
+       * she came down. Otherwise the climax of the game is something a ball
+       * can miss by rolling wide of it.
+       */
+      const gap =
+        item.kind === "bear"
+          ? Math.abs(item.z - z)
+          : Math.hypot(item.x - this.x, item.z - z);
       if (gap > item.radius + this.radius) {
         continue;
       }
       if (item.radius <= this.radius * K.ball.stickMargin) {
         this.stick(item, ctx);
+      } else if (item.kind === "bear") {
+        this.turnedAway(item, ctx);
       } else {
         this.bounce(item, ctx, gap);
       }
@@ -528,7 +917,11 @@ export class DescentLevel implements Level {
       );
     }
 
-    this.eaten += K.ball.growth * item.radius ** 3;
+    // Worth less and less as the ball approaches the ceiling above the pace;
+    // see KATAMARI.ball.lead for why there is a ceiling at all.
+    const ceiling = this.pace(this.rolled) * K.ball.lead;
+    const room = Math.max(0, 1 - (this.radius / ceiling) ** 4);
+    this.eaten += K.ball.growth * item.radius ** 3 * room;
     this.radius = Math.cbrt(K.ball.start ** 3 + this.eaten);
     this.caught++;
     if (item.kind === "bear") {
@@ -587,6 +980,27 @@ export class DescentLevel implements Level {
     ctx.audio.sting();
   }
 
+  /**
+   * Too small for the bear.
+   *
+   * He shrugs the ball off and the level is over — not at once, because a card
+   * that appears on the same frame as the bump reads as a bug rather than as a
+   * consequence. She is knocked back, told why, and the fail card follows a
+   * couple of seconds later with the bear still on the screen.
+   */
+  private turnedAway(item: Item, ctx: GameContext): void {
+    if (this.blocked > 0) {
+      return;
+    }
+    this.blocked = 2.2;
+    item.shove = 1.2;
+    this.shake = 1;
+    this.speed *= 0.2;
+    this.rolled -= this.radius * 0.5;
+    ctx.hud.setCallout("Too small for the bear!");
+    ctx.audio.sting();
+  }
+
   private progress(): number {
     return (this.radius - K.ball.start) / (K.ball.target - K.ball.start);
   }
@@ -595,22 +1009,33 @@ export class DescentLevel implements Level {
 
   /** Put the ball, the queen and the line between them where they belong. */
   private place(ctx: GameContext): void {
-    this.ballRoot.position.set(this.x, this.radius, -this.rolled);
+    // Zero all the way down the hill and rising once past the finish, where
+    // the ground goes flat — see Descent.groundAt. Everything that stands on
+    // the ground adds it, or the run-out drives the ball through the floor.
+    const under = this.hill.groundAt(this.rolled);
+    this.ballRoot.position.set(this.x, this.radius + under, -this.rolled);
     this.core.scale.setScalar(this.radius);
 
     // She flies ahead of the ball, clear of it by its own radius, so she is
     // never inside the thing she is towing however big it gets.
-    const beeZ = -this.rolled - (K.bee.ahead + this.radius);
-    this.hill.slope.localToWorld(
-      tmp.set(this.beeX, K.bee.height + this.radius * 0.4, beeZ),
-    );
+    const beeAt =
+      this.rolled + K.bee.ahead + this.radius * K.bee.aheadPerRadius;
+    const beeZ = -beeAt;
+    const beeY =
+      K.bee.height +
+      this.radius * K.bee.heightPerRadius +
+      this.hill.groundAt(beeAt);
+    // Drawn bigger as the camera retreats, so she is the same size on the
+    // glass at the bottom of the hill as she was at the top.
+    ctx.bee.setScale(K.bee.scale * (1 + this.shown * K.bee.scalePerRadius));
+    this.hill.slope.localToWorld(tmp.set(this.beeX, beeY, beeZ));
     ctx.bee.teleport(tmp);
     ctx.bee.setYaw(Math.PI);
 
     // The tether: a cylinder is built along its own y, so it is stood between
     // the two points by pointing its axis at one of them.
-    tmp.set(this.beeX, K.bee.height + this.radius * 0.4, beeZ);
-    tmp2.set(this.x, this.radius, -this.rolled);
+    tmp.set(this.beeX, beeY, beeZ);
+    tmp2.set(this.x, this.radius + under, -this.rolled);
     this.tether.position.copy(tmp).add(tmp2).multiplyScalar(0.5);
     const span = tmp.distanceTo(tmp2);
     this.tether.scale.set(1, Math.max(0.01, span), 1);
@@ -626,9 +1051,12 @@ export class DescentLevel implements Level {
    */
   private acrossLimit(ctx: GameContext): number {
     let limit = 5;
-    for (let out = 5; out <= K.halfWidth; out += 0.5) {
+    // In strides rather than half-units: this walks out to a hundred and more
+    // by the bottom of the hill, and every step is a projection.
+    for (let out = 5; out <= K.halfWidth; out += 1.5) {
+      const at = this.rolled + K.bee.ahead;
       this.hill.slope.localToWorld(
-        tmp.set(out, K.bee.height, -this.rolled - K.bee.ahead),
+        tmp.set(out, K.bee.height + this.hill.groundAt(at), -at),
       );
       if (Math.abs(ctx.projectToScreen(tmp).x) > K.edgeMargin) {
         break;
@@ -648,7 +1076,9 @@ export class DescentLevel implements Level {
   private aimAcross(ctx: GameContext, ndcX: number): number {
     const z = -this.rolled - (K.bee.ahead + this.radius);
     const at = (x: number): number => {
-      this.hill.slope.localToWorld(tmp.set(x, K.bee.height, z));
+      this.hill.slope.localToWorld(
+        tmp.set(x, K.bee.height + this.hill.groundAt(-z), z),
+      );
       return ctx.projectToScreen(tmp).x;
     };
     let x = this.beeX;
@@ -670,63 +1100,68 @@ export class DescentLevel implements Level {
   /**
    * Behind the ball and above it, retreating as the ball grows.
    *
-   * `lift` runs the opening shot: at 1 the camera is well above and looking
-   * down on the boulder, at 0 it is in its playing position, and the opening
-   * eases between the two.
+   * `lift` runs the opening shot and the smash: at 1 the camera is well above
+   * and looking down on the whole thing, at 0 it is in its playing position.
    */
   private camera(ctx: GameContext, lift: number): void {
-    const zoom = this.pullBack(ctx);
-    const back = (K.camera.back + this.radius * K.cameraPerRadius) * zoom;
-    const up = (K.camera.up + this.radius * K.cameraPerRadius) * zoom;
+    const stand = this.standoff(ctx);
+    const back = K.camera.back * stand;
+    const up = K.camera.up * stand;
     // A knock is worth a shake, and a shake is worth about a unit.
     const jolt = this.shake * this.shake;
+    const under = this.hill.groundAt(this.rolled);
     this.hill.slope.localToWorld(
       tmp.set(
         this.x * 0.4 + Math.sin(this.phaseTime * 47) * jolt,
-        this.radius + up + lift * 30,
+        this.radius + under + up + lift * (30 + this.shown * 2),
         -this.rolled + back * (1 + lift * 0.6),
       ),
     );
     eye.copy(tmp);
     /*
-     * Looking just ahead of the ball, not far down the hill.
+     * Looking ahead of the ball by a fraction of how far back the camera is.
      *
-     * Where this point is decides where the ball sits on the screen, and the
-     * further ahead it is the lower the ball rides. At forty units it was half
-     * off the bottom edge of a phone; at twenty it sits in the lower third,
-     * with the hill it is about to hit above it — which is the part the player
-     * is actually reading.
+     * Where this point is decides where the ball sits on the screen and how
+     * steeply the shot tips. A fraction rather than a distance, so the framing
+     * is the same at every size the ball reaches — see KATAMARI.camera.aim.
      */
+    const aheadAt = this.rolled + back * K.camera.aim;
     this.hill.slope.localToWorld(
-      tmp.set(this.x * 0.4, this.radius * 0.5, -this.rolled - 20 * zoom),
+      tmp.set(
+        this.x * 0.4,
+        this.radius * 0.5 + this.hill.groundAt(aheadAt),
+        -aheadAt,
+      ),
     );
     look.copy(tmp);
     ctx.setCameraCinematic(eye, look);
   }
 
   /**
-   * How far the camera has to retreat for a playable width to be visible.
+   * How far back the camera has to stand, as a multiple of its base distance.
    *
-   * The same arithmetic as the climb, and for the same reason: the visible
-   * half-width at distance d is d·tan(fov/2)·aspect, so this is the factor
-   * that brings `wantHalfWidth` inside the screen's margin. Worked out from
-   * the lens rather than by looking through it, because measuring the camera
-   * and then moving it is a loop that flips between two answers every frame.
+   * Worked back from what the shot has to *contain* rather than set as a
+   * distance: the visible half-width at distance d is d·tan(fov/2)·aspect, so
+   * this is exactly the distance that holds `viewRadii` ball-radii of hill
+   * either side of her, or `wantHalfWidth` while the ball is still small.
+   *
+   * Doing it from the lens rather than by looking through it matters. A camera
+   * that measures what it can see and then moves is a feedback loop — once it
+   * has retreated the measurement says it needn't have — and the answer flips
+   * between two values every frame.
+   *
+   * It is why the descent needs no separate pull-back for phones: a narrow
+   * screen simply needs a bigger number out of the same arithmetic.
    */
-  private pullBack(ctx: GameContext): number {
-    const stand = Math.hypot(
-      K.camera.back + this.radius * K.cameraPerRadius,
-      K.camera.up + this.radius * K.cameraPerRadius,
-    );
+  private standoff(ctx: GameContext): number {
+    const want = Math.max(K.wantHalfWidth, this.shown * K.viewRadii);
     const visible =
-      stand *
       Math.tan((ctx.cameraFov * Math.PI) / 360) *
       ctx.cameraAspect *
       K.edgeMargin;
-    return Math.min(
-      K.camera.pullBack,
-      Math.max(1, K.wantHalfWidth / Math.max(0.001, visible)),
-    );
+    const need = want / Math.max(0.001, visible);
+    const base = Math.hypot(K.camera.back, K.camera.up);
+    return Math.max(1, need / base);
   }
 
   // ---- the bottom ---------------------------------------------------------
@@ -751,7 +1186,9 @@ export class DescentLevel implements Level {
   private updateParty(dt: number, ctx: GameContext): void {
     // It is still moving, and slowing: a katamari that stopped dead the
     // instant the level ended would throw away every bit of weight it earned.
-    this.speed = Math.max(0, this.speed - K.ball.gravity * 0.8 * dt);
+    // Slowly, so it gets right out onto the flat and rolls to a stop there
+    // rather than stopping on the last few feet of the hill.
+    this.speed = Math.max(0, this.speed - K.ball.gravity * 0.28 * dt);
     const travelled = this.speed * dt;
     this.rolled += travelled;
     this.roll(travelled, 0);
@@ -765,7 +1202,7 @@ export class DescentLevel implements Level {
       this.hill.slope.localToWorld(
         tmp.set(
           this.rng.range(-18, 18),
-          this.radius + this.rng.range(6, 22),
+          this.radius + this.hill.groundAt(this.rolled) + this.rng.range(6, 22),
           -this.rolled - this.rng.range(0, 40),
         ),
       );
@@ -791,7 +1228,11 @@ export class DescentLevel implements Level {
     const t = ease(Math.min(1, this.phaseTime / K.finish.sweepTime));
     this.hill.slope.localToWorld(look.set(0, 0, -K.run * 0.55));
     this.hill.slope.localToWorld(
-      tmp.set(0, this.radius + 20 + t * 150, -this.rolled + 40 + t * 220),
+      tmp.set(
+        0,
+        this.radius + this.hill.groundAt(this.rolled) + 20 + t * 150,
+        -this.rolled + 40 + t * 220,
+      ),
     );
     eye.copy(tmp);
     ctx.setCameraCinematic(eye, look);

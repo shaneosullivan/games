@@ -169,6 +169,8 @@ export interface GameContext {
    * `setEnvironment` resets it.
    */
   setFogScale(scale: number): void;
+  /** How far the camera can see; null puts it back to the game's own setting. */
+  setViewDistance(far: number | null): void;
   /** Re-bound the player and re-frame the camera for this level. */
   configureFlight(settings: FlightSettings): void;
   /** Drop the bee somewhere and settle the camera behind it immediately. */

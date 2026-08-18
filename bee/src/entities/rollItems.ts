@@ -15,7 +15,8 @@ import {paint, vertexToon} from "../render/materials";
  * scaling one doesn't sink it into the hillside — the level lifts each one by
  * its radius when it places it.
  */
-export type RollKind = "flower" | "honey" | "bucket" | "rabbit" | "goat";
+export type RollKind =
+  "flower" | "bush" | "honey" | "bucket" | "rabbit" | "goat" | "tree";
 
 export interface RollKit {
   material: THREE.Material;
@@ -27,6 +28,8 @@ export function createRollKit(): RollKit {
   const material = vertexToon();
   const shapes: Record<RollKind, THREE.BufferGeometry> = {
     flower: flower(),
+    bush: bush(),
+    tree: tree(),
     honey: honey(),
     bucket: bucket(),
     rabbit: rabbit(),
@@ -44,6 +47,9 @@ export function createRollKit(): RollKit {
   };
 }
 
+const LEAF = 0x4f9a3c;
+const LEAF_DARK = 0x3b7a2c;
+const BARK = 0x7a5433;
 const HONEY = 0xf0a52c;
 const GLASS = 0xdfe9ef;
 const WOOD = 0x9a6b3f;
@@ -70,6 +76,52 @@ function flower(): THREE.BufferGeometry {
   eye.scale(1, 0.5, 1);
   eye.translate(0, 0.5, 0);
   parts.push(paint(eye, 0xffd84a));
+  return merge(parts);
+}
+
+/** A round bush: three overlapping blobs, two shades. */
+function bush(): THREE.BufferGeometry {
+  const parts: Array<THREE.BufferGeometry> = [];
+  for (const [x, y, z, r, dark] of [
+    [0, 0, 0, 0.72, false],
+    [0.5, -0.16, 0.2, 0.52, true],
+    [-0.44, -0.1, -0.22, 0.46, false],
+    [0.06, 0.42, -0.24, 0.42, true],
+  ] as const) {
+    const blob = new THREE.SphereGeometry(r, 8, 6);
+    blob.scale(1, 0.86, 1);
+    blob.translate(x, y, z);
+    parts.push(paint(blob, dark ? LEAF_DARK : LEAF));
+  }
+  const stump = new THREE.CylinderGeometry(0.12, 0.16, 0.4, 6);
+  stump.translate(0, -0.72, 0);
+  parts.push(paint(stump, BARK));
+  return merge(parts);
+}
+
+/**
+ * A pine, built about its middle.
+ *
+ * Everything here is scaled by its radius and lifted by it, so a tree that
+ * stood on its own origin would be buried to the waist. Its trunk hangs below
+ * the centre and its canopy above, which also means it rolls convincingly once
+ * it is stuck to the ball: the mass is off to one side of where it is held.
+ */
+function tree(): THREE.BufferGeometry {
+  const parts: Array<THREE.BufferGeometry> = [];
+  const trunk = new THREE.CylinderGeometry(0.16, 0.24, 1.3, 7);
+  trunk.translate(0, -0.5, 0);
+  parts.push(paint(trunk, BARK));
+  const tiers = [
+    [0.05, 0.9, 0.8],
+    [0.5, 0.75, 0.72],
+    [0.95, 0.55, 0.62],
+  ] as const;
+  tiers.forEach(([y, r, h], i) => {
+    const tier = new THREE.ConeGeometry(r, h, 8);
+    tier.translate(0, y, 0);
+    parts.push(paint(tier, i % 2 === 0 ? LEAF : LEAF_DARK));
+  });
   return merge(parts);
 }
 
