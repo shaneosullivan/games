@@ -65,9 +65,17 @@ export class AscentLevel implements Level {
 
   /** How far up the mountain she has come. The level's clock. */
   private climbed = 0;
-  /** Where she is on the slope, in slope space. */
+  /** Where she is across the slope, and how far up it she has pushed. */
   private x = 0;
-  private z = 0;
+  /**
+   * Positive is further up the mountain than the camera's own mark.
+   *
+   * Not the stick's own sign: forward on the stick is *negative* everywhere in
+   * this game — the flight model reads `-stick.y` as forward — and taking it
+   * at face value here flew her down the slope towards the camera and off the
+   * bottom of the screen.
+   */
+  private ahead = 0;
 
   private health = A.health;
   private mercy = 0;
@@ -86,6 +94,8 @@ export class AscentLevel implements Level {
 
   private bursts = 0;
   private nextBurst = 0;
+  /** The forward limit, in units; see aheadLimit. */
+  private limit: number = A.aheadLimit;
 
   get controlsLocked(): boolean {
     return this.phase !== "climbing";
@@ -108,7 +118,7 @@ export class AscentLevel implements Level {
     this.nextTrain = 1;
     this.climbed = 0;
     this.x = 0;
-    this.z = 0;
+    this.ahead = 0;
     this.health = A.health;
     this.mercy = 0;
     this.moss = 0;
@@ -130,7 +140,16 @@ export class AscentLevel implements Level {
     // She is placed by hand every frame; the flight model never sees her.
     ctx.bee.scripted = true;
     ctx.bee.setCrown(true);
-    ctx.setFlightControls(false);
+    /*
+     * The first level's control, with two changes.
+     *
+     * The stick plants itself wherever a finger lands rather than only in its
+     * corner, because here the same finger both moves her and fires — asking a
+     * child to put it down in the right place first would cost them the shot.
+     * And no altitude slider: she flies at one height up the whole mountain,
+     * so it would be a control with nothing on the other end of it.
+     */
+    ctx.setFlightControls(true, {altitude: false, anywhere: true});
     this.placeBee(ctx);
 
     ctx.hud.setBanner(this.name);
@@ -205,10 +224,10 @@ export class AscentLevel implements Level {
       -A.halfWidth,
       A.halfWidth,
     );
-    this.z = THREE.MathUtils.clamp(
-      this.z + stick.y * A.moveSpeed * dt,
-      -A.aheadLimit,
-      A.behindLimit,
+    this.ahead = THREE.MathUtils.clamp(
+      this.ahead - stick.y * A.moveSpeed * dt,
+      -A.behindLimit,
+      this.aheadLimit(ctx),
     );
     this.placeBee(ctx);
 
@@ -233,9 +252,44 @@ export class AscentLevel implements Level {
     }
   }
 
+  /**
+   * How far up the slope she may fly, in units — which is half the screen.
+   *
+   * Measured rather than guessed: the rule is a screen rule ("she may not pass
+   * the middle") and the answer has to be in world units, so it is found by
+   * asking the camera where a few candidate distances actually land.
+   *
+   * Worked out every frame rather than cached. It costs a few dozen
+   * projections and it is always right: cached on the first frame it was
+   * measured against a camera that had not yet moved into position, and the
+   * answer was whatever the fallback happened to be.
+   *
+   * It does not vary with the shape of the screen, which is worth knowing
+   * before anyone tries to make it: three's field of view is the *vertical*
+   * one, so where the middle of the screen falls on the slope is the same on a
+   * wide iPad as on a tall phone — measured at aspects from 0.55 to 2.2, it is
+   * 18.5 units in every one of them.
+   */
+  private aheadLimit(ctx: GameContext): number {
+    this.limit = A.aheadLimit;
+    // Walk out from her in half-unit steps and stop at the last one still in
+    // the bottom half of the screen.
+    for (let ahead = 0; ahead <= 60; ahead += 0.5) {
+      tmp.set(this.x, A.flightHeight, -(this.climbed + ahead));
+      this.mountain.slope.localToWorld(tmp);
+      // Normalised device coordinates: +1 is the top of the screen, 0 the
+      // middle. A bee at the middle is exactly the limit.
+      if (ctx.projectToScreen(tmp).y >= 0) {
+        break;
+      }
+      this.limit = ahead;
+    }
+    return this.limit;
+  }
+
   /** Where she is up the mountain, in the slope's own z. */
   private slopeZ(): number {
-    return -(this.climbed + this.z);
+    return -(this.climbed + this.ahead);
   }
 
   private placeBee(ctx: GameContext): void {

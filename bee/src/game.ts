@@ -27,6 +27,7 @@ import {AntHuntLevel} from "./levels/level8AntHunt";
 import {AscentLevel} from "./levels/level9Ascent";
 import type {
   EnvironmentName,
+  FlightControls,
   FlightSettings,
   GameContext,
   Level,
@@ -260,6 +261,8 @@ export class Game {
     const stage = this.stage;
     // Captured for the getters below: an object literal cannot see `this`.
     const game = this;
+    /** Scratch for projectToScreen, which returns a shared vector. */
+    const screenPoint = new THREE.Vector3();
 
     this.ctx = {
       scene: this.stage.scene,
@@ -296,6 +299,7 @@ export class Game {
           this.mapDraw.hide();
         }
       },
+      projectToScreen: point => screenPoint.copy(point).project(stage.camera),
       showPuzzle: on => {
         this.setSplit(on);
         if (on) {
@@ -305,7 +309,7 @@ export class Game {
         }
       },
       celebratePuzzle: () => burstRainbow(this.puzzle.root),
-      setFlightControls: on => this.setFlightControls(on),
+      setFlightControls: (on, options) => this.setFlightControls(on, options),
       pickTap: objects => this.pickTap(objects),
       takePress: () => this.hold.takePress(),
       get cameraAspect() {
@@ -872,9 +876,13 @@ export class Game {
    * Hide the flight controls and stop the joystick listening, so a level that
    * wants taps on the world (the dance mat) isn't fighting a thumbstick.
    */
-  private setFlightControls(enabled: boolean): void {
+  private setFlightControls(enabled: boolean, options?: FlightControls): void {
     this.uiLayer.classList.toggle("no-flight", !enabled);
     this.stick.enabled = enabled;
+    // The altitude slider is hidden separately: level 9 wants the stick and
+    // has no use for height, and the two have always been one switch.
+    this.altitude.setVisible(enabled && (options?.altitude ?? true));
+    this.stick.anywhere = options?.anywhere ?? false;
   }
 
   /**

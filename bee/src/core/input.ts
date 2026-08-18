@@ -56,8 +56,21 @@ export class Joystick {
     window.addEventListener("keyup", this.onKey);
   }
 
-  /** Lower-left region of the screen owns the stick. */
+  /**
+   * Whether the stick will plant itself under a finger landing here.
+   *
+   * Normally the lower-left region owns it, so the right of the screen is free
+   * for the altitude slider and the world can be tapped. A level with nothing
+   * else on the glass can widen that to the whole screen — the mountain does,
+   * because there the same finger both moves her and fires, and asking a child
+   * to put it down in a particular corner first would lose them the shot.
+   */
+  anywhere = false;
+
   private inZone(x: number, y: number): boolean {
+    if (this.anywhere) {
+      return true;
+    }
     return x < window.innerWidth * 0.55 && y > window.innerHeight * 0.3;
   }
 

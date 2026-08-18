@@ -67,6 +67,22 @@ export interface FlightSettings {
   maxCameraZoom?: number;
 }
 
+/** What a level wants of the flying controls, beyond simply on or off. */
+export interface FlightControls {
+  /**
+   * Whether the altitude slider comes with the stick. Defaults to true;
+   * level 9 flies at one height and the slider would be a control with
+   * nothing on the other end of it.
+   */
+  altitude?: boolean;
+  /**
+   * Whether the stick plants itself wherever a finger lands, rather than only
+   * in its usual corner. Defaults to false. Level 9 sets it because the same
+   * finger moves her and fires, so every part of the screen has to work.
+   */
+  anywhere?: boolean;
+}
+
 export interface GameContext {
   scene: THREE.Scene;
   save: Save;
@@ -178,6 +194,14 @@ export interface GameContext {
     pitch: number,
     fill: number,
   ): THREE.Vector3;
+  /**
+   * Where a world point lands on the screen, in normalised device coordinates:
+   * -1 to 1 across and up, with 0,0 the middle. For a level whose rules are
+   * about the screen rather than the world — level 9 keeps the bee in the
+   * bottom half of it, and how far that is in units depends on the aspect.
+   * Returns a shared vector.
+   */
+  projectToScreen(point: THREE.Vector3): THREE.Vector3;
   /** Split the screen and show the sliding puzzle, or put it away. */
   showPuzzle(on: boolean): void;
   /**
@@ -194,8 +218,11 @@ export interface GameContext {
   /**
    * Show or hide the thumbstick and altitude slider. Levels that aren't about
    * flying (the dance mat) turn them off so taps reach the world instead.
+   *
+   * The options are for a level that wants the stick but not everything that
+   * usually comes with it — see FlightControls.
    */
-  setFlightControls(enabled: boolean): void;
+  setFlightControls(enabled: boolean, options?: FlightControls): void;
   /**
    * Consume this frame's screen tap, if any, and return the first of
    * `objects` under it. Null when nothing was tapped.
