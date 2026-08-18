@@ -812,12 +812,14 @@ export class Game {
           return;
         }
         this.running = true;
-        // Finishing a level bumps the save; if a next level exists, go there.
-        const next = this.save.data.level;
-        if (next > this.levelNumber && this.levelNumber < Game.LAST_LEVEL) {
-          this.switchLevel(next);
-        } else {
-          this.level.resumeAfterCompletion(this.ctx);
+        // Let the level re-arm itself for a free flight around what she just
+        // finished — the hive to buzz, the meadow to potter in. A level that
+        // has nothing to offer there (the summit of the mountain, say) stays
+        // `complete` when asked, and rather than leave the button doing
+        // nothing, that sends her back to the map with the next level waiting.
+        this.level.resumeAfterCompletion(this.ctx);
+        if (this.level.complete) {
+          this.showMenu(Math.min(this.levelNumber + 1, Game.LAST_LEVEL));
         }
       },
     );
@@ -957,8 +959,17 @@ export class Game {
     this.showMenu();
   }
 
-  /** Put the menu up, whatever else is on screen. */
-  private showMenu(): void {
+  /**
+   * Put the menu up, whatever else is on screen.
+   *
+   * `selected` is which level sits highlighted; by default the one they are on
+   * (or the save's, whichever is further). A caller that has just finished a
+   * level passes the next one, so the map opens ready to go on rather than on
+   * the level just cleared.
+   */
+  private showMenu(
+    selected = Math.max(this.levelNumber, this.save.data.level),
+  ): void {
     this.completeScreen.hide();
     this.running = false;
     this.audio.setThreat(0);
@@ -968,15 +979,9 @@ export class Game {
     // Nothing resumes from here — the menu always ends in a level switch — so
     // the backing track goes with the level it belonged to.
     this.audio.stopMusic();
-    // Drop the old card and rebuild it against current progress, defaulting to
-    // the level they're actually on rather than whatever the save last stored.
+    // Drop the old card and rebuild it against current progress.
     this.codenameScreen.root.remove();
-    // The furthest of the two: after finishing a level the save points at the
-    // next one, and that is what should be sitting selected on the map.
-    this.buildCodenameScreen(
-      this.uiLayer,
-      Math.max(this.levelNumber, this.save.data.level),
-    );
+    this.buildCodenameScreen(this.uiLayer, selected);
     this.codenameScreen.show();
   }
 
