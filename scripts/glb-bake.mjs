@@ -138,12 +138,15 @@ async function main() {
       const tmp = [0, 0];
       for (let i = 0; i < count; i++) {
         uv.getElement(i, tmp);
-        // Wrap the uv into 0–1, flip v (image origin is top-left), clamp to the
-        // texel grid.
+        // Wrap the uv into 0–1 and clamp to the texel grid. glTF's v origin is
+        // the top of the image, which is also PNG row zero — so v maps straight
+        // to the row with no flip. Flipping it (the first version did) samples
+        // the texture upside down: the body is green either way, so it looked
+        // almost right, but the eyes came out the wrong colour.
         const u = tmp[0] - Math.floor(tmp[0]);
-        const w = 1 - (tmp[1] - Math.floor(tmp[1]));
+        const v = tmp[1] - Math.floor(tmp[1]);
         const px = Math.min(width - 1, Math.max(0, Math.floor(u * width)));
-        const py = Math.min(height - 1, Math.max(0, Math.floor(w * height)));
+        const py = Math.min(height - 1, Math.max(0, Math.floor(v * height)));
         const at = (py * width + px) * 4;
         colours[i * 3] = srgbToLinear(data[at]);
         colours[i * 3 + 1] = srgbToLinear(data[at + 1]);
