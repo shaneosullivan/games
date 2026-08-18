@@ -803,22 +803,15 @@ export class Game {
       "Keep flying",
       () => {
         this.completeScreen.hide();
-        // The end of the road: back to the map rather than left flying around
-        // a finished level with nothing left to do in it. `showMenu`, not
-        // `openMenu` — this button has already decided, and must never be a
-        // press that appears to do nothing.
+        // Every level ends the same way: back to the map. A level that has one
+        // opens it with the *next* level already selected, so a finish flows
+        // straight into choosing where to go next; the last level, with nothing
+        // after it, opens the map where it is. `showMenu`, not `openMenu` — this
+        // button has decided, and must never be a press that appears to do
+        // nothing.
         if (this.level.finishesGame) {
           this.showMenu();
-          return;
-        }
-        this.running = true;
-        // Let the level re-arm itself for a free flight around what she just
-        // finished — the hive to buzz, the meadow to potter in. A level that
-        // has nothing to offer there (the summit of the mountain, say) stays
-        // `complete` when asked, and rather than leave the button doing
-        // nothing, that sends her back to the map with the next level waiting.
-        this.level.resumeAfterCompletion(this.ctx);
-        if (this.level.complete) {
+        } else {
           this.showMenu(Math.min(this.levelNumber + 1, Game.LAST_LEVEL));
         }
       },
