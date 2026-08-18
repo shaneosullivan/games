@@ -2889,17 +2889,18 @@ export const KATAMARI = {
     pops: 10,
     /**
      * The shatter. `burst` is how hard each bar is flung straight out from the
-     * cage's axis; `lift` is the upward kick every bar gets on top of that.
+     * cage's axis; `lift` is the upward kick on top of that.
      *
-     * The lift is the point. Thrown out flat, the low bars met the grass on the
-     * first frame and slid to a stop — the cage looked like it fell over. Every
-     * bar is now launched *up* as well, hard, so the whole thing bursts into
-     * the air and rains back down over the next second rather than tipping.
-     * With the smash in slow motion that reads as an explosion held in the air.
+     * Both are tuned so the bars fly out, come down, and stay down inside the
+     * smash itself rather than hanging. The lift arcs them just high enough to
+     * clear the ground and land within the phase — too high and they were still
+     * in the air, turning over, when the camera left. `spin` is kept low for
+     * the same reason: they should fly away and lie where they fall, not tumble
+     * like litter. The landing flattens whatever spin is left.
      */
     burst: 88,
-    lift: 46,
-    spin: 10,
+    lift: 26,
+    spin: 1.6,
     /**
      * Enough to bring the pieces down inside the shot.
      *
