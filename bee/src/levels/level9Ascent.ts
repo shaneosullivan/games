@@ -154,6 +154,10 @@ export class AscentLevel implements Level {
     this.bursts = 0;
     this.nextBurst = 0;
 
+    // Laid out now rather than as she climbs: where the upgrades are is the
+    // level's shape, and the whole mountain's worth is eight flowers.
+    this.plantFlowers();
+
     ctx.configureFlight({
       boundsRadius: 4000,
       minHeight: 0,
@@ -600,9 +604,6 @@ export class AscentLevel implements Level {
       for (let i = 0; i < at(A.perHundred.cans * hard); i++) {
         this.addCan(from);
       }
-      for (let i = 0; i < at(A.flower.perHundred); i++) {
-        this.addFlower(from);
-      }
     }
   }
 
@@ -753,19 +754,34 @@ export class AscentLevel implements Level {
     );
   }
 
-  private addFlower(from: number): void {
-    this.place(
-      {
-        kind: "flower",
-        group: new THREE.Group(),
-        x: this.acrossSlope(),
-        z: -(from + this.rng.range(70, 190)),
-        radius: 2.6,
-        hits: 0,
-        dead: false,
-      },
-      this.kit.flower,
-    );
+  /**
+   * Lay out every flower on the mountain, once, at the start.
+   *
+   * Placed rather than scattered, because which weapon she is carrying when
+   * is the shape of the level and not something to leave to a per-hundred
+   * rate. Each band carries a cap, so two flowers from the same band are
+   * still only one upgrade — see ASCENT.flower.
+   */
+  private plantFlowers(): void {
+    A.flower.bands.forEach((band, i) => {
+      for (let c = 0; c < A.flower.chances; c++) {
+        const at = band + (A.flower.spread * (c + 0.5)) / A.flower.chances;
+        const up = A.climb * at + this.rng.range(-20, 20);
+        this.place(
+          {
+            kind: "flower",
+            group: new THREE.Group(),
+            x: this.rng.range(-A.wantHalfWidth, A.wantHalfWidth),
+            z: -up,
+            radius: 2.6,
+            hits: 0,
+            dead: false,
+            cap: i + 2,
+          },
+          this.kit.flower,
+        );
+      }
+    });
   }
 
   // ---- moving them --------------------------------------------------------
@@ -984,7 +1000,8 @@ export class AscentLevel implements Level {
     }
     this.burst(ctx, foe, [0xff6f9c, 0xffd84a, P.mossGlow], 26, 9);
     this.kill(foe, ctx, false);
-    if (this.weapon >= A.weapon.rate.length) {
+    const cap = Math.min(foe.cap ?? A.weapon.rate.length, A.weapon.rate.length);
+    if (this.weapon >= cap) {
       // Already at the top: a flower is worth health instead, so it is never
       // a thing you are sorry to see.
       this.health = Math.min(A.health, this.health + 2);

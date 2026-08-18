@@ -40,6 +40,14 @@ export interface Foe {
   firing?: number;
   /** Moss: how much of its dwell has been served. */
   picked?: number;
+  /**
+   * Flowers: the highest weapon this one may leave her holding.
+   *
+   * The upgrade lives in the flower rather than in the bee, which is what
+   * makes "no fifth weapon before the top of the mountain" a fact about where
+   * things are placed rather than a rule someone has to remember to check.
+   */
+  cap?: number;
 }
 
 /** What a seed is doing: where it is going, and what it is chasing. */

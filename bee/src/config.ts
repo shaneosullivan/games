@@ -2188,8 +2188,26 @@ export const ASCENT = {
     /** How far ahead a homing seed will look for something to chase. */
     homingRange: 70,
   },
-  /** Flowers, which are what raise the weapon a level. */
-  flower: {perHundred: 1.1},
+  /**
+   * Flowers, which are what raise the weapon a level.
+   *
+   * Not scattered. Each of the four upgrades has a *band* of the mountain it
+   * lives in, and a flower can only raise her to the level its band is for —
+   * so the fifth weapon cannot be in her hands before seven tenths of the
+   * climb, however lucky she gets. Scattered at a flat rate, sixteen of them
+   * over the mountain meant the last weapon by the first quarter, and the
+   * four after that were a level with nothing left to earn.
+   *
+   * Two chances at each band rather than one, because missing a single flower
+   * on a hillside moving at twenty-six units a second should cost the player
+   * a stretch of the climb, not the rest of the game.
+   */
+  flower: {
+    bands: [0.08, 0.3, 0.5, 0.7],
+    chances: 2,
+    /** How much of the climb a band is spread over, as a fraction. */
+    spread: 0.13,
+  },
 
   /** The seeds she spits. */
   seed: {
