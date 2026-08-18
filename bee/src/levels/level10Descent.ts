@@ -245,6 +245,7 @@ export class DescentLevel implements Level {
     this.shake = 0;
     this.smashed = 0;
     this.blocked = 0;
+    this.frameZoom = 1;
     this.roared = false;
     this.peek = 0;
     this.failTitle = "Not quite big enough";
@@ -922,17 +923,31 @@ export class DescentLevel implements Level {
   private flyBabies(dt: number): void {
     const out = this.phase === "smash" ? this.smashed : 0;
     for (const baby of this.babies) {
-      baby.a += dt * (0.6 + baby.r * 0.02);
-      const r = baby.r + out * 12;
-      const y = baby.y + out * 9 + Math.sin(baby.a * 2.2) * 1.4;
+      /*
+       * Round and round inside the cage, and once it is open, out.
+       *
+       * The same code both times, with one number doing the work: their ring
+       * grows and rises without limit and they *speed up* as it does, so what
+       * was a slow circle inside the bars becomes a wide climbing spiral —
+       * which is what a bee that has just got out looks like. The bob on top
+       * of it is the loop.
+       */
+      const glee = 1 + out * 4;
+      baby.a += dt * (0.6 + baby.r * 0.02) * glee;
+      const r = baby.r + out * 16;
+      const y = baby.y + out * 13 + Math.sin(baby.a * 2.2) * (1.4 + out * 5);
       baby.model.group.position.set(
         Math.cos(baby.a) * r,
         y,
         Math.sin(baby.a) * r,
       );
       // Facing the way it is going, which round a circle is a quarter turn on
-      // from where it is.
-      baby.model.group.rotation.y = -baby.a + Math.PI / 2;
+      // from where it is, and tipped into the climb once it is out.
+      baby.model.group.rotation.set(
+        -Math.min(0.9, out * 0.8),
+        -baby.a + Math.PI / 2,
+        Math.sin(baby.a * 3) * out * 0.5,
+      );
       baby.model.animate(baby.a * 3, 1);
     }
   }
@@ -952,6 +967,32 @@ export class DescentLevel implements Level {
     this.speed *= 0.35;
     ctx.hud.setCallout("The babies are free!");
     ctx.audio.levelComplete();
+
+    /*
+     * Colour, thrown round the whole rim at once.
+     *
+     * The trickle of fireworks that follows is the celebration; this is the
+     * *impact*, and it has to land on the frame the bars start moving or the
+     * cage reads as falling over rather than as being hit by something.
+     */
+    for (let i = 0; i < K.cage.pops; i++) {
+      const a = (i / K.cage.pops) * Math.PI * 2;
+      this.hill.slope.localToWorld(
+        tmp.set(
+          Math.cos(a) * K.cage.radius,
+          this.rng.range(4, K.cage.radius),
+          -this.cageAt() + Math.sin(a) * K.cage.radius,
+        ),
+      );
+      ctx.puff.burst(tmp, {
+        color: FIREWORK_PALETTE,
+        count: 26,
+        speed: 16,
+        ttl: 1.3,
+        size: 1.4,
+        spherical: 1,
+      });
+    }
     for (const piece of this.cage.pieces) {
       const at = piece.mesh.position;
       // Away from the middle, and away from the ball, and upwards.
@@ -1043,6 +1084,8 @@ export class DescentLevel implements Level {
     // the real one, so the shot keeps moving while the pieces hang.
     const slow = dt * K.cage.slowMo;
     this.smashed += slow;
+    // The shot drifts back off it while it comes apart, on the real clock.
+    this.frameZoom += (K.cage.frame - this.frameZoom) * Math.min(1, dt * 1.6);
 
     this.settlePieces(slow);
 
@@ -1055,7 +1098,7 @@ export class DescentLevel implements Level {
 
     // Out and up over the whole thing, on the real clock.
     const t = ease(Math.min(1, this.phaseTime / K.cage.time));
-    this.camera(ctx, t * 0.9);
+    this.camera(ctx, t * 0.5);
 
     this.nextBurst -= dt;
     if (this.nextBurst <= 0) {
@@ -1404,9 +1447,26 @@ export class DescentLevel implements Level {
    * and looking down on the whole thing, at 0 it is in its playing position.
    */
   private camera(ctx: GameContext, lift: number): void {
+    /*
+     * How far back, and how much of that is height.
+     *
+     * The distance comes from what the shot has to hold; the *angle* comes
+     * from how big the ball is. A small ball gets a low shot looking down the
+     * hill, and a large one gets a higher one looking over its own shoulder,
+     * because past a certain size a flat camera behind a ball sees mostly ball
+     * — and standing further back does not help, since the ball grows in the
+     * frame at exactly the rate everything else shrinks.
+     */
     const stand = this.standoff(ctx);
-    const back = K.camera.back * stand;
-    const up = K.camera.up * stand;
+    const grown = THREE.MathUtils.clamp(
+      (this.shown - K.ball.start) / (K.ball.target - K.ball.start),
+      0,
+      1,
+    );
+    const angle =
+      K.camera.lowAngle + (K.camera.highAngle - K.camera.lowAngle) * grown;
+    const back = Math.cos(angle) * stand;
+    const up = Math.sin(angle) * stand;
     // A knock is worth a shake, and a shake is worth about a unit.
     const jolt = this.shake * this.shake;
     const under = this.hill.groundAt(this.rolled);
@@ -1459,10 +1519,18 @@ export class DescentLevel implements Level {
       Math.tan((ctx.cameraFov * Math.PI) / 360) *
       ctx.cameraAspect *
       K.edgeMargin;
-    const need = want / Math.max(0.001, visible);
-    const base = Math.hypot(K.camera.back, K.camera.up);
-    return Math.max(1, need / base);
+    // In units now, not a multiplier: the caller splits it into back and up.
+    const need = (want * this.frameZoom) / Math.max(0.001, visible);
+    return Math.max(Math.hypot(K.camera.back, K.camera.up), need);
   }
+
+  /**
+   * A temporary widening of the shot, for the smash.
+   *
+   * Eased rather than set, so the camera drifts back off the cage as it comes
+   * apart instead of cutting to a wider lens.
+   */
+  private frameZoom = 1;
 
   // ---- the bottom ---------------------------------------------------------
 

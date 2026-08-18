@@ -70,55 +70,107 @@ export function createDescent(rng: Rng): Descent {
   group.add(slope);
 
   const parts: Array<THREE.BufferGeometry> = [];
-  const length = K.run + 320;
-  /*
-   * Far wider than the play.
-   *
-   * The playable strip is a promise to the player, but the *ground* has no
-   * reason to stop where it does — and when it did, the level read as a green
-   * road with sky either side of it rather than as a hillside. Everything past
-   * the play is scenery she will never touch.
-   */
-  const wide = K.halfWidth * 2 + 520;
 
-  // ---- the ground ---------------------------------------------------------
-  const ground = new THREE.BoxGeometry(wide, 2, length);
-  ground.translate(0, -1, -length / 2 + 140);
-  parts.push(paint(ground, P.slope));
+  // ---- the mountain -------------------------------------------------------
+  //
+  // One surface, not three. A level valley floor, the mountain standing out of
+  // it, and the play running down its spine — because a hillside built as a
+  // slab that stops, with a separate rectangle of flat at the bottom, reads
+  // from up the run as a pale triangle in the distance rather than as ground.
+  //
+  // In slope space the play is the plane y = 0, so the valley floor is *below*
+  // it by however much mountain is left, and that is the whole shape:
+  //
+  //   floor(d) = (d - run)·tan(pitch)   — the level floor, seen from the slope
+  //   h(d)     = max(0, -floor(d))      — how high the hill stands here
+  //   y(x, d)  = floor(d) + h(d)·spine(|x|)
+  //
+  // where `spine` is 1 across the play and eases to 0 at the foot of the
+  // flanks. Past the end of the run h is zero and the whole thing is flat,
+  // which is what makes the join seamless: there is no join.
+  const tanPitch = Math.tan(K.pitch);
+  const spineHalf = K.halfWidth + 60;
+  const outTo = spineHalf + K.flank;
+  const floorAt = (down: number): number => (down - K.run) * tanPitch;
+  const standing = (down: number): number => Math.max(0, -floorAt(down));
+  const spine = (across: number): number => {
+    const a = Math.abs(across);
+    if (a <= spineHalf) {
+      return 1;
+    }
+    const t = Math.min(1, (a - spineHalf) / K.flank);
+    // Smoothstepped, so the shoulder rolls over rather than creasing.
+    return 1 - t * t * (3 - 2 * t);
+  };
 
-  /*
-   * The flat below the hill.
-   *
-   * Built in slope space like everything else, and tilted *back* by the
-   * mountain's own pitch so that it comes out level in the world. It is much
-   * wider than the run and carries on well past the finish, because its job is
-   * to be seen from the top: a floor a long way below you is the one thing
-   * that cannot be read as a hill in front of you.
-   */
-  const flat = new THREE.BoxGeometry(wide + 600, 2, K.flat);
-  flat.translate(0, -1, -K.flat / 2);
-  flat.rotateX(K.pitch);
-  flat.translate(0, 0, -K.run);
-  parts.push(paint(flat, P.slope));
+  /** The surface itself, for anything that has to stand on it. */
+  const surfaceAt = (across: number, down: number): number =>
+    floorAt(down) + standing(down) * spine(across);
 
-  // A few things standing on it, so it reads as ground rather than as a card
-  // laid at the end of the level.
-  for (let i = 0; i < 90; i++) {
-    const along = rng.range(20, K.flat - 40);
-    const across = rng.range(-(K.halfWidth + 260), K.halfWidth + 260);
-    const radius = rng.range(1.6, 4.4);
-    const bush = new THREE.SphereGeometry(radius, 8, 6);
-    bush.scale(1, 0.66, 1);
-    bush.translate(across, radius * 0.4, -along);
-    bush.rotateX(K.pitch);
-    bush.translate(0, 0, -K.run);
-    parts.push(paint(bush, i % 4 === 0 ? P.mould : P.slopeDark));
+  const columns = [
+    -outTo,
+    -(spineHalf + K.flank * 0.62),
+    -(spineHalf + K.flank * 0.28),
+    -spineHalf,
+    -K.halfWidth * 0.5,
+    0,
+    K.halfWidth * 0.5,
+    spineHalf,
+    spineHalf + K.flank * 0.28,
+    spineHalf + K.flank * 0.62,
+    outTo,
+  ];
+  const rows: Array<number> = [];
+  for (let d = -260; d <= K.run + K.valley; d += 70) {
+    rows.push(d);
   }
 
+  const verts: Array<number> = [];
+  const colours: Array<number> = [];
+  const indices: Array<number> = [];
+  const grass = new THREE.Color(P.slope).convertSRGBToLinear();
+  const flank = new THREE.Color(P.slopeDark).convertSRGBToLinear();
+  const stone = new THREE.Color(P.rock).convertSRGBToLinear();
+  for (let r = 0; r < rows.length; r++) {
+    for (let c = 0; c < columns.length; c++) {
+      const across = columns[c];
+      const down = rows[r];
+      const on = spine(across);
+      verts.push(across, floorAt(down) + standing(down) * on, -down);
+      // Green on the spine and on the floor, rock on the steep of the flanks
+      // — which is where a real hillside shows its bones.
+      const steep = standing(down) > 40 ? 1 - on : 0;
+      const tint = grass
+        .clone()
+        .lerp(flank, Math.min(1, steep * 1.6))
+        .lerp(stone, Math.max(0, steep - 0.45) * 1.4);
+      colours.push(tint.r, tint.g, tint.b);
+    }
+  }
+  for (let r = 0; r + 1 < rows.length; r++) {
+    for (let c = 0; c + 1 < columns.length; c++) {
+      const a = r * columns.length + c;
+      const b = a + 1;
+      const d = a + columns.length;
+      const e = d + 1;
+      // Wound so the faces look *up*. The other way round the whole mountain
+      // is invisible from above and nothing else about the scene changes,
+      // which is a confusing hour if you have not met it before.
+      indices.push(a, b, d, b, e, d);
+    }
+  }
+  const terrain = new THREE.BufferGeometry();
+  terrain.setAttribute("position", new THREE.Float32BufferAttribute(verts, 3));
+  terrain.setAttribute("color", new THREE.Float32BufferAttribute(colours, 3));
+  terrain.setIndex(indices);
+  terrain.computeVertexNormals();
+  parts.push(terrain.toNonIndexed());
+  terrain.dispose();
+
   // Snow over the top of the run, where she sets off from, laid slightly proud
-  // of the slab so the two faces can't z-fight along the join.
-  const snow = new THREE.BoxGeometry(wide, 2.1, 300);
-  snow.translate(0, -0.94, -10);
+  // of the surface so the two faces can't z-fight along the join.
+  const snow = new THREE.BoxGeometry(K.halfWidth * 2 + 90, 2.1, 300);
+  snow.translate(0, -0.9, -10);
   parts.push(paint(snow, P.snow));
 
   // ---- scenery ------------------------------------------------------------
@@ -162,8 +214,71 @@ export function createDescent(rng: Rng): Descent {
       ? new THREE.DodecahedronGeometry(radius, 0)
       : new THREE.SphereGeometry(radius, 8, 6);
     blob.scale(1, rock ? 0.8 : 0.72, 1);
-    blob.translate(side * out, radius * 0.3, z);
+    // On the surface, which out here is the flank falling away — anything
+    // placed on the old flat plane floated in the air over the drop.
+    blob.translate(side * out, surfaceAt(side * out, -z) + radius * 0.3, z);
     parts.push(paint(blob, rock ? P.rock : -z < 240 ? P.snowShade : P.mould));
+  }
+
+  // ---- the valley ---------------------------------------------------------
+  //
+  // What is at the bottom of the mountain, seen from the top of it for two
+  // minutes before she gets there. A pond, and woods around it: the flat
+  // needs something on it at a size the eye can measure, or a plain that big
+  // reads as a blank card rather than as distance.
+  const pond = {
+    x: rng.range(-300, -140),
+    down: K.run + rng.range(320, 520),
+    radius: rng.range(150, 210),
+  };
+  const water = new THREE.CircleGeometry(pond.radius, 30);
+  water.rotateX(-Math.PI / 2);
+  water.translate(pond.x, floorAt(pond.down) + 0.5, -pond.down);
+  parts.push(paint(water, POND));
+  // A rim of mud, standing a little proud of the water so the two can't
+  // z-fight along the shore.
+  const shore = new THREE.RingGeometry(pond.radius, pond.radius * 1.14, 30);
+  shore.rotateX(-Math.PI / 2);
+  shore.translate(pond.x, floorAt(pond.down) + 0.7, -pond.down);
+  parts.push(paint(shore, SHORE));
+
+  for (let i = 0; i < 220; i++) {
+    const x = rng.range(-outTo * 0.8, outTo * 0.8);
+    const down = K.run + rng.range(60, K.valley * 0.8);
+    // Not in the water, and not standing in the run-out either.
+    if (Math.hypot(x - pond.x, down - pond.down) < pond.radius * 1.25) {
+      continue;
+    }
+    if (Math.abs(x) < 90 && down < K.run + 260) {
+      continue;
+    }
+    const foot = floorAt(down);
+    if (rng.next() < 0.55) {
+      const height = rng.range(16, 34);
+      const trunk = new THREE.CylinderGeometry(
+        height * 0.055,
+        height * 0.08,
+        height * 0.4,
+        6,
+      );
+      trunk.translate(x, foot + height * 0.2, -down);
+      parts.push(paint(trunk, TRUNK));
+      for (let tier = 0; tier < 3; tier++) {
+        const cone = new THREE.ConeGeometry(
+          height * (0.32 - tier * 0.07),
+          height * 0.42,
+          8,
+        );
+        cone.translate(x, foot + height * (0.42 + tier * 0.2), -down);
+        parts.push(paint(cone, tier % 2 === 0 ? PINE : PINE_DARK));
+      }
+    } else {
+      const radius = rng.range(5, 13);
+      const bush = new THREE.SphereGeometry(radius, 8, 6);
+      bush.scale(1, 0.7, 1);
+      bush.translate(x, foot + radius * 0.45, -down);
+      parts.push(paint(bush, rng.next() < 0.4 ? P.mould : P.slopeDark));
+    }
   }
 
   // ---- the funnel ---------------------------------------------------------
@@ -202,6 +317,16 @@ export function createDescent(rng: Rng): Descent {
     }
   }
 
+  /*
+   * Every part has to agree about its attributes or the merge quietly returns
+   * null and the whole hillside disappears — which is exactly what happened
+   * when the terrain arrived: it is built by hand and has no texture
+   * coordinates, and every primitive shape has. Nothing here samples a
+   * texture, so the uvs go rather than being invented.
+   */
+  for (const part of parts) {
+    part.deleteAttribute("uv");
+  }
   const merged = mergeGeometries(parts, false);
   for (const part of parts) {
     part.dispose();
@@ -446,5 +571,10 @@ export function createCage(radius: number): Cage {
   };
 }
 
+const POND = 0x5fa8d3;
+const SHORE = 0xa08c63;
+const PINE = 0x3f7d3a;
+const PINE_DARK = 0x2f5f2c;
+const TRUNK = 0x6d4a2d;
 const CAGE_BAR = 0x8b93a0;
 const CAGE_BASE = 0xa2895f;

@@ -2413,7 +2413,20 @@ export const KATAMARI = {
    * is a floor a long way below, and a floor below you is the one thing that
    * cannot be mistaken for a hill in front of you.
    */
-  flat: 1600,
+  flat: 2600,
+  /**
+   * The mountain's flanks, and the valley they fall into.
+   *
+   * The hillside used to be a slab that simply stopped, with sky beyond it,
+   * and the flat at the bottom was a separate rectangle — which from up the
+   * run read as a big pale triangle in the distance rather than as the ground.
+   * Now the whole thing is one surface: a level valley floor, the mountain
+   * standing out of it, and the play running down its spine. `flank` is how
+   * far out the sides take to fall away, and `valley` is how far the floor
+   * runs before the fog has it.
+   */
+  flank: 900,
+  valley: 2600,
   /**
    * How wide the hillside is, and how much of it is worth showing.
    *
@@ -2437,7 +2450,24 @@ export const KATAMARI = {
    * further and further towards straight-down as it retreated, and by the
    * bottom of the hill the level was being played from a helicopter.
    */
-  camera: {back: 26, up: 10.5, aim: 0.55},
+  camera: {
+    back: 26,
+    up: 10.5,
+    aim: 0.55,
+    /**
+     * How steeply the shot looks down, in radians, small ball to large.
+     *
+     * The distance is worked out from `viewRadii`; this is how that distance is
+     * split between standing back and standing over. A small ball wants a low,
+     * flat shot down the hill. A large one cannot have it: at thirty units
+     * across it fills the bottom of the frame and hides the ground it is about
+     * to roll into, and no amount of pulling back fixes that — a flat camera
+     * behind a big ball sees the same amount of ball whatever the distance.
+     * Rising as it grows keeps the hill in front of it visible over the top.
+     */
+    lowAngle: 0.38,
+    highAngle: 0.78,
+  },
   /**
    * How much further back the camera stands per unit of ball radius.
    *
@@ -2755,6 +2785,10 @@ export const KATAMARI = {
      * away from the whole thing while they are still in the air.
      */
     slowMo: 0.3,
+    /** How much further back the shot stands for the smash itself. */
+    frame: 1.55,
+    /** Coloured bursts thrown round the cage the moment it goes. */
+    pops: 10,
     burst: 30,
     spin: 4,
     /**
@@ -2796,11 +2830,11 @@ export const KATAMARI = {
    * above that ground sits in the middle of the hillside like a snowdrift.
    * These are all above the player's own height, which is where sky is.
    */
-  cloudLow: 90,
+  cloudLow: 260,
   /** How high a cloud has to be before it may hang over the run itself. */
-  cloudOver: 150,
-  cloudHigh: 320,
-  cloudSize: [4, 11],
+  cloudOver: 340,
+  cloudHigh: 700,
+  cloudSize: [10, 26],
   cloudDrift: [2, 6],
-  cloudBand: 380,
+  cloudBand: 700,
 } as const;
