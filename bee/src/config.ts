@@ -2585,7 +2585,7 @@ export const KATAMARI = {
      */
     start: 6,
     /** What counts as big enough at the bottom. Also the progress bar's end. */
-    target: 24,
+    target: 28,
     /**
      * How it rolls.
      *
@@ -2615,7 +2615,7 @@ export const KATAMARI = {
      * add, so eating something half your size is an eighth of you — which is
      * the arithmetic that makes a katamari feel like one.
      */
-    growth: 0.42,
+    growth: 0.55,
     /**
      * How far ahead of the pace the ball is allowed to get.
      *
@@ -2630,7 +2630,7 @@ export const KATAMARI = {
      * the size a player on the pace would have. A good run rides just under
      * the ceiling; a poor one is nowhere near it and never notices it exists.
      */
-    lead: 1.32,
+    lead: 1.4,
     /**
      * How lopsided the ball is allowed to feel.
      *
@@ -2787,14 +2787,14 @@ export const KATAMARI = {
    * The bear, waiting at the bottom.
    *
    * The last obstacle and the biggest, and the only one placed by hand. He is
-   * half as big again as the largest thing on the hill, and bigger than a ball
-   * that has only done well enough to finish — so taking him is the reward for
-   * a run that ate the mountain rather than a thing that happens to everyone.
-   * The largest thing on the hill besides him is a goat of twenty-two, and a
-   * ball that only just qualifies to finish is twenty-four. So he is beatable
-   * by a run that worked the hillside and not by one that came straight down.
+   * bigger than a ball that has only done well enough to finish — so taking him
+   * is the reward for a run that ate the mountain rather than a thing that
+   * happens to everyone. A ball that only just qualifies to finish is `target`
+   * (twenty-eight); the biggest goat on the hill is a shade over that; and he
+   * is thirty-five, which only a run riding near the growth ceiling reaches. He
+   * was twenty-seven, beatable by most decent runs — now he takes a great one.
    */
-  bear: {radius: 27, from: 300},
+  bear: {radius: 35, from: 300},
 
   /**
    * The hillside closes in on its way to the bear.
@@ -2880,8 +2880,17 @@ export const KATAMARI = {
     frame: 1.55,
     /** Coloured bursts thrown round the cage the moment it goes. */
     pops: 10,
-    burst: 30,
-    spin: 4,
+    /**
+     * How hard the bars are flung from the point of contact.
+     *
+     * Well up from thirty: the cage should shatter and throw its bars right
+     * out of the shot on impact, not tip over and settle. With the smash played
+     * slow, a high speed reads as an explosion held in the air rather than a
+     * blur. `gravity` and settlePieces still bring them down before the phase
+     * ends, just further out.
+     */
+    burst: 78,
+    spin: 7,
     /**
      * Enough to bring the pieces down inside the shot.
      *
