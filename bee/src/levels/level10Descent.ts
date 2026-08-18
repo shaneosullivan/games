@@ -341,7 +341,17 @@ export class DescentLevel implements Level {
   // ---- the roll -----------------------------------------------------------
 
   private updateRolling(dt: number, ctx: GameContext): void {
-    const across = this.acrossLimit(ctx);
+    /*
+     * How far across she may be: the edge of the screen, or the funnel closing
+     * in on the bear, whichever is tighter.
+     *
+     * The same function the banks were built from, so the wall she can see is
+     * exactly the wall that is there — see Descent.corridorAt.
+     */
+    const across = Math.min(
+      this.acrossLimit(ctx),
+      this.hill.corridorAt(this.rolled),
+    );
     this.playHalf = across;
 
     // Where the queen has got to. She is flown exactly as level 9 is flown —
@@ -376,11 +386,14 @@ export class DescentLevel implements Level {
     this.speed = Math.max(K.ball.minSpeed, this.speed);
     this.drift += (this.beeX - this.x) * K.ball.pull * dt;
     this.drift -= this.drift * Math.min(1, K.ball.steerDamp * dt);
-    this.x = THREE.MathUtils.clamp(
-      this.x + this.drift * dt,
-      -K.halfWidth + this.radius,
-      K.halfWidth - this.radius,
+    // The ball is held inside the funnel too, less its own radius, so a
+    // full-sized one is walked back towards the middle rather than clipping
+    // through the bank it is leaning on.
+    const walls = Math.max(
+      this.radius * 0.6,
+      Math.min(K.halfWidth, this.hill.corridorAt(this.rolled)) - this.radius,
     );
+    this.x = THREE.MathUtils.clamp(this.x + this.drift * dt, -walls, walls);
     const travelled = this.speed * dt;
     this.rolled += travelled;
 

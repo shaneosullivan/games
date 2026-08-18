@@ -9,6 +9,15 @@ export interface Descent {
   /** Slope space: x across, -z *down* the hill, y off the surface. */
   slope: THREE.Group;
   /**
+   * How far either side of the middle the player may be, this far down.
+   *
+   * Infinite until the run starts closing in on the bear, then narrowing to
+   * the mouth. The banks that make it visible are built from this same
+   * function, so what the ground looks like and what the level allows cannot
+   * drift apart.
+   */
+  corridorAt(down: number): number;
+  /**
    * How high the ground stands in slope space this far down the run.
    *
    * Zero all the way down the hill, and then rising, because past the finish
@@ -33,6 +42,26 @@ export interface Descent {
  * Everything the level does is in that space and none of it knows the hill is
  * on a slant.
  */
+/**
+ * How far either side of the middle is playable, this far down the run.
+ *
+ * A free field until the last stretch, then a smooth narrowing to the mouth in
+ * front of the bear. Smoothstepped rather than linear so the walls appear to
+ * lean in and straighten out again rather than meeting the open hillside at a
+ * corner.
+ */
+function corridorAt(down: number): number {
+  const start = K.run - K.bear.from - K.funnel.from;
+  const end = K.run - K.bear.from;
+  if (down <= start) {
+    return Infinity;
+  }
+  const t = Math.min(1, (down - start) / Math.max(1, end - start));
+  const eased = t * t * (3 - 2 * t);
+  const open = K.wantHalfWidth + K.ball.target * K.viewRadii;
+  return open + (K.funnel.mouth - open) * eased;
+}
+
 export function createDescent(rng: Rng): Descent {
   const group = new THREE.Group();
   const slope = new THREE.Group();
@@ -137,6 +166,42 @@ export function createDescent(rng: Rng): Descent {
     parts.push(paint(blob, rock ? P.rock : -z < 240 ? P.snowShade : P.mould));
   }
 
+  // ---- the funnel ---------------------------------------------------------
+  //
+  // Banks of rock closing in on the bear. See KATAMARI.funnel — the shape is
+  // `corridorAt`, and the level clamps the ball to the same numbers, so the
+  // wall you can see is exactly the wall that is there.
+  const funnelStart = K.run - K.bear.from - K.funnel.from;
+  const funnelEnd = K.run - K.bear.from;
+  const banks = Math.round(
+    ((funnelEnd - funnelStart) / 100) * K.funnel.banksPer100,
+  );
+  for (let i = 0; i <= banks; i++) {
+    const down = funnelStart + ((funnelEnd - funnelStart) * i) / banks;
+    const out = corridorAt(down);
+    for (const side of [-1, 1]) {
+      const radius = rng.range(7, 13);
+      const rock = new THREE.DodecahedronGeometry(radius, 0);
+      rock.scale(1, 0.62, 1);
+      rock.translate(
+        side * (out + radius * 0.6) + rng.range(-2, 2),
+        radius * 0.25,
+        -down + rng.range(-6, 6),
+      );
+      parts.push(paint(rock, i % 3 === 0 ? P.rockDark : P.rock));
+      // Scrub behind the rocks, so the bank has depth rather than being a
+      // line of boulders on open grass.
+      const bush = new THREE.SphereGeometry(rng.range(4, 8), 8, 6);
+      bush.scale(1, 0.7, 1);
+      bush.translate(
+        side * (out + rng.range(16, 34)),
+        2,
+        -down + rng.range(-14, 14),
+      );
+      parts.push(paint(bush, i % 2 === 0 ? P.mould : P.slopeDark));
+    }
+  }
+
   const merged = mergeGeometries(parts, false);
   for (const part of parts) {
     part.dispose();
@@ -215,6 +280,8 @@ export function createDescent(rng: Rng): Descent {
   return {
     group,
     slope,
+
+    corridorAt,
 
     groundAt(down) {
       return down <= K.run ? 0 : (down - K.run) * tan;

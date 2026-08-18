@@ -2643,6 +2643,22 @@ export const KATAMARI = {
   bear: {radius: 27, from: 300},
 
   /**
+   * The hillside closes in on its way to the bear.
+   *
+   * A field four hundred units wide and a bear standing in the middle of it is
+   * a bear you can be nowhere near when you arrive, with nothing telling you
+   * so. So the last stretch is banked on both sides and narrows steadily to a
+   * mouth — a player off to one side is walked back to the middle by the shape
+   * of the ground rather than by a message, and arrives pointing at him.
+   *
+   * `from` is how far before the bear it starts closing, and it sits inside
+   * his clearing so nothing is ever fenced away from the player. `mouth` is
+   * the half-width at the bear himself, wide enough for a full-sized ball to
+   * still be steered through it.
+   */
+  funnel: {from: 560, mouth: 78, banksPer100: 14},
+
+  /**
    * The cage behind the bear, and what happens to it.
    *
    * The bear is not guarding the bottom of the hill, he is guarding this: a
