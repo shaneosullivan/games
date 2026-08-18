@@ -26,6 +26,7 @@ import {LairLevel} from "./levels/level6Lair";
 import {IslandsLevel} from "./levels/level7Islands";
 import {AntHuntLevel} from "./levels/level8AntHunt";
 import {AscentLevel} from "./levels/level9Ascent";
+import {DescentLevel} from "./levels/level10Descent";
 import type {
   EnvironmentName,
   FlightControls,
@@ -572,12 +573,16 @@ export class Game {
     {number: 7, name: "Bee vs Frog"},
     {number: 8, name: "Ant Hunt"},
     {number: 9, name: "Up the Mountain"},
+    {number: 10, name: "Down the Mountain"},
   ];
 
   private static readonly LAST_LEVEL = Game.LEVELS.length;
 
   private createLevel(n: number): Level {
-    if (n >= 9) {
+    if (n >= 10) {
+      return new DescentLevel();
+    }
+    if (n === 9) {
       return new AscentLevel();
     }
     if (n === 8) {

@@ -1620,6 +1620,28 @@ body {
   display: none;
 }
 
+/* Dismissed. It keeps its beat while it goes, so it reads as being let go of
+   rather than switched off. */
+.hud-callout.going {
+  animation: none;
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.86);
+  transition:
+    opacity 0.45s ease,
+    transform 0.45s ease;
+}
+
+/* On a phone it gets the width instead of the height. The card is a pill in
+   the middle of the screen, and a narrow one turns four words into four lines
+   — which covers the very thing it is explaining how to play. */
+@media (max-aspect-ratio: 1/1) {
+  .hud-callout {
+    max-width: 96%;
+    padding: 14px 22px;
+    font-size: clamp(19px, 5.6vw, 30px);
+  }
+}
+
 /* A slow pulse: enough to catch the eye of someone who hasn't noticed it,
    gentle enough not to nag once they have. */
 @keyframes callout-beat {

@@ -29,6 +29,10 @@ export class Hud {
   /** The life meter and its bar; see setHealth. */
   private readonly health: HTMLDivElement;
   private readonly healthFill: HTMLDivElement;
+  /** A second bar under the life meter, for a level that fills one up. */
+  private readonly progress: HTMLDivElement;
+  private readonly progressLabel: HTMLDivElement;
+  private readonly progressFill: HTMLDivElement;
   private readonly harvest: SVGSVGElement;
   private readonly harvestFill: SVGCircleElement;
   private readonly carry: HTMLDivElement;
@@ -118,13 +122,22 @@ export class Hud {
     this.healthFill = el("div", "hud-health-fill", "");
     healthTrack.append(this.healthFill);
     this.health.append(healthLabel, healthTrack);
-    topRight.append(this.perf, buttons, this.health);
+    this.progress = el("div", "hud-health hidden", "");
+    this.progressLabel = el("div", "hud-health-label", "");
+    const progressTrack = el("div", "hud-health-track", "");
+    this.progressFill = el("div", "hud-health-fill", "");
+    progressTrack.append(this.progressFill);
+    this.progress.append(this.progressLabel, progressTrack);
+    topRight.append(this.perf, buttons, this.health, this.progress);
     // Banner and objective are their own grid items rather than one stacked
     // column, so a phone can put the title up beside the buttons and leave the
     // objective its own full-width line underneath.
     top.append(this.topLeft, this.banner, this.objective, topRight);
 
     this.callout = el("div", "hud-callout hidden", "");
+    for (const type of ["pointerdown", "touchstart", "keydown"]) {
+      window.addEventListener(type, () => this.dismissCard(), {passive: true});
+    }
     this.root.append(top, svg, this.carry, this.callout);
     host.appendChild(this.root);
   }
@@ -185,9 +198,62 @@ export class Hud {
       clamped > 0.6 ? "#8fe36b" : clamped > 0.3 ? "#ffd257" : "#ff6b5e";
   }
 
+  /**
+   * A meter that fills, under the life meter. Null takes it away.
+   *
+   * The same furniture as the life bar and deliberately so: one bar in that
+   * corner already means "watch this", and a level that wants a second thing
+   * watched is better off borrowing the shape the player knows than inventing
+   * a new one somewhere else on the glass. What tells them apart is the
+   * direction of travel and the label.
+   */
+  setProgress(label: string | null, fraction = 0): void {
+    if (label === null) {
+      this.progress.classList.add("hidden");
+      return;
+    }
+    this.progress.classList.remove("hidden");
+    this.progressLabel.textContent = label;
+    const clamped = Math.max(0, Math.min(1, fraction));
+    this.progressFill.style.width = `${clamped * 100}%`;
+    this.progressFill.style.background = clamped >= 1 ? "#8fe36b" : "#ffd257";
+  }
+
+  /**
+   * The big card in the middle of the screen: how to play this level.
+   *
+   * It goes as soon as the player touches the screen, because at that point
+   * they are either doing the thing it asked for or they have decided not to,
+   * and either way it is now standing in front of the game. See `dismissCard`
+   * — the listener is here rather than in each level so that every card in the
+   * game behaves the same way.
+   */
   setCallout(text: string | null): void {
     this.callout.textContent = text ?? "";
+    this.callout.classList.remove("going");
     this.callout.classList.toggle("hidden", !text);
+    this.calloutAt = performance.now();
+  }
+
+  /** When the card went up, so the tap that opened the level can't close it. */
+  private calloutAt = 0;
+
+  private dismissCard(): void {
+    if (
+      this.callout.classList.contains("hidden") ||
+      this.callout.classList.contains("going") ||
+      performance.now() - this.calloutAt < 600
+    ) {
+      return;
+    }
+    this.callout.classList.add("going");
+    // Left in the DOM until the fade is over, then actually taken away, so a
+    // faded card can't be sitting invisibly over a level that has moved on.
+    window.setTimeout(() => {
+      if (this.callout.classList.contains("going")) {
+        this.callout.classList.add("hidden");
+      }
+    }, 500);
   }
 
   setCount(key: string, value: number, target?: number, pop = false): void {

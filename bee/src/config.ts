@@ -2361,3 +2361,129 @@ export const ASCENT_PALETTE = {
   mossGlow: 0xd9ffb0,
   cloud: 0xffffff,
 } as const;
+
+/**
+ * Level 10 — Down the Mouldy Mountain, with a snowball that isn't snow.
+ *
+ * Katamari Damacy on a hillside. The queen tows the summit's boulder down the
+ * mountain on a line of light; everything it touches that is smaller than it
+ * sticks to it and rolls on with it, and everything bigger than it knocks it
+ * back. So the level is one long negotiation with its own scale: what beat you
+ * a hundred units ago is what you eat a hundred units later.
+ *
+ * The sizes below are the whole design. They are quoted as radii in world
+ * units so they can be compared with the ball's radius directly, because that
+ * comparison *is* the rule of the game.
+ */
+export const KATAMARI = {
+  /** Gentler than the climb — this one is about steering, not speed. */
+  pitch: 0.26,
+  /** How long the descent is, in units. */
+  run: 1800,
+  /** How wide the hillside is, and how much of it is worth showing. */
+  halfWidth: 30,
+  wantHalfWidth: 20,
+  /** How near the edge of the screen the bee may get, in NDC. */
+  edgeMargin: 0.82,
+
+  /** Behind the ball and above it, retreating as the ball grows. */
+  camera: {back: 26, up: 15, pullBack: 2.4},
+  /**
+   * How much further back the camera stands per unit of ball radius.
+   *
+   * The shot has to hold both the ball and what is coming at it, and by the
+   * end the ball is five times the size it started. Tied to the radius rather
+   * than to distance travelled, so the picture follows the thing that actually
+   * changed.
+   */
+  cameraPerRadius: 2.2,
+
+  ball: {
+    /** The summit boulder, before it has eaten anything. */
+    start: 2,
+    /** What counts as big enough at the bottom. Also the progress bar's end. */
+    target: 9,
+    /**
+     * How it rolls.
+     *
+     * Gravity down the hill, a drag that gives it a terminal speed, and a
+     * sideways pull towards wherever the queen has got to — the tether is a
+     * spring, so the ball leans after her rather than tracking her.
+     */
+    gravity: 15,
+    drag: 0.32,
+    /** It never quite stops, so a bounce can't strand the level. */
+    minSpeed: 8,
+    pull: 5.2,
+    /** How fast it can be dragged across the hill, per second per unit off. */
+    steerDamp: 2.6,
+    /**
+     * What one item adds, as a multiple of its own volume.
+     *
+     * Volume, not radius: a ball that grew by a fixed step would double in
+     * size on its first mouthful and then never notice anything again. Cubes
+     * add, so eating something half your size is an eighth of you — which is
+     * the arithmetic that makes a katamari feel like one.
+     */
+    growth: 0.3,
+    /** How much bigger than the ball a thing may be and still stick. */
+    stickMargin: 1.02,
+    /** Bouncing off something too big: speed kept, and how far it is shoved. */
+    bounceCost: 0.45,
+    bounceBack: 5,
+  },
+
+  /**
+   * The line of light between the queen and the boulder.
+   *
+   * Not a rope — nothing here is under tension and there is no physics in it.
+   * It is drawn so the player can see what they are steering: without it the
+   * bee looks like she is flying away from a rock that happens to follow.
+   */
+  tether: {width: 0.34, colour: 0xffe27a},
+
+  /** Where the queen flies: ahead of the ball, and above the ground. */
+  bee: {ahead: 11, height: 5.5, speed: 34, lead: 0.2},
+
+  /**
+   * What is scattered down the hill, and how big it is when you meet it.
+   *
+   * Each kind grows as the run goes on — `size` is its radius at the top of
+   * the mountain and at the bottom — so the same rabbit that shrugged the ball
+   * off early is a mouthful later. The whole difficulty curve is these six
+   * lines.
+   */
+  items: {
+    perHundred: 9,
+    kinds: [
+      {kind: "flower", size: [0.8, 3.2], weight: 3},
+      {kind: "honey", size: [1.2, 4.6], weight: 2},
+      {kind: "bucket", size: [1.5, 5.4], weight: 2},
+      {kind: "rabbit", size: [1.9, 6.6], weight: 2},
+      {kind: "goat", size: [2.6, 8.4], weight: 1.4},
+    ],
+  },
+
+  /**
+   * The bear, waiting at the bottom.
+   *
+   * The last obstacle and the biggest, and the only one placed by hand. He is
+   * a little under the target size, so a ball that is big enough to finish is
+   * big enough to take him with it — which is the ending the whole descent is
+   * for.
+   */
+  bear: {radius: 8.4, from: 120},
+
+  /** The finish: how long the ball runs out, and the shot that follows it. */
+  finish: {rollOut: 90, sweepTime: 6, burstEvery: 0.24, bursts: 14},
+
+  /** Clouds, as on the way up — see ASCENT for what these mean. */
+  clouds: 34,
+  cloudLow: 18,
+  /** How high a cloud has to be before it may hang over the run itself. */
+  cloudOver: 85,
+  cloudHigh: 150,
+  cloudSize: [4, 11],
+  cloudDrift: [2, 6],
+  cloudBand: 380,
+} as const;

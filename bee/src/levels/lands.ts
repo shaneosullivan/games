@@ -28,7 +28,7 @@ export const LANDS: ReadonlyArray<Land> = [
     name: "The Mouldy Mountain",
     x: 0.717,
     y: 0.215,
-    levels: [9],
+    levels: [9, 10],
   },
   {id: "cottage", name: "Caramel Cottage", x: 0.491, y: 0.355, levels: [4]},
   {id: "woods", name: "The Windy Woods", x: 0.826, y: 0.304, levels: [5]},

@@ -71,8 +71,8 @@ export class AscentLevel implements Level {
   readonly failBody =
     "The mountain got the better of you that time. The moss you gathered is still yours. Another go?";
 
-  /** The last level built so far, so its card offers the map. */
-  readonly finishesGame = true;
+  /** There is one more level after this: the way back down. */
+  readonly finishesGame = false;
 
   complete = false;
   failed = false;
@@ -114,6 +114,7 @@ export class AscentLevel implements Level {
   /** Tongues and sprays in flight, drawn as one shaft each. */
   private readonly reaches: Array<{mesh: THREE.Mesh; foe: Foe}> = [];
 
+  /** Whether the "slide your finger" card is still up; see level 10. */
   private bursts = 0;
   private nextBurst = 0;
   /** The forward limit, in units; see aheadLimit. */
