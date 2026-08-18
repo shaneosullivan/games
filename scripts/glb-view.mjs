@@ -97,6 +97,11 @@ const page = `<!doctype html>
   .cap span { color: #8aa; }
   .empty { color: #567; padding: 40px; text-align: center; }
   canvas { display: block; width: 100%; height: 100%; }
+  .zoom { position: absolute; top: 6px; right: 6px; z-index: 2; background: #0009; color: #cdd6e0; border: 1px solid #345; border-radius: 5px; padding: 3px 9px; cursor: pointer; font-size: 15px; line-height: 1; }
+  .zoom:hover { background: #000d; border-color: #578; }
+  /* Maximised: hide the rest, blow this one up to fill the area. */
+  .grid.has-max .cell { display: none; }
+  .grid.has-max .cell.max { display: block; grid-column: 1 / -1; aspect-ratio: auto; height: calc(100vh - 46px); }
 </style>
 <script type="importmap">
 { "imports": { "three": "/three/build/three.module.js", "three/addons/": "/three/jsm/" } }
@@ -168,6 +173,10 @@ function remove(i) {
   if (!cell) return;
   cell.stop = true;
   cell.renderer.dispose();
+  // If the one being removed was maximised, drop the grid back to normal.
+  if (cell.el.classList.contains("max")) {
+    grid.classList.remove("has-max");
+  }
   cell.el.remove();
   cells.delete(i);
   refreshEmpty();
@@ -181,6 +190,22 @@ function add(m) {
   cap.className = "cap";
   cap.innerHTML = '<b>' + m.path + '</b> <span>· ' + m.size + ' · …</span>';
   el.appendChild(cap);
+  // Maximise / minimise: blow this cell up to fill the area, or drop back to
+  // the grid. Only one is maximised at a time.
+  const zoom = document.createElement("button");
+  zoom.className = "zoom";
+  zoom.textContent = "⛶";
+  zoom.title = "Maximise";
+  zoom.addEventListener("click", () => {
+    const max = el.classList.toggle("max");
+    grid.querySelectorAll(".cell.max").forEach(c => {
+      if (c !== el) c.classList.remove("max");
+    });
+    grid.classList.toggle("has-max", max);
+    zoom.textContent = max ? "🗕" : "⛶";
+    zoom.title = max ? "Minimise" : "Maximise";
+  });
+  el.appendChild(zoom);
   grid.appendChild(el);
 
   const renderer = new THREE.WebGLRenderer({antialias: true, alpha: true});
