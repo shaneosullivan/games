@@ -73,10 +73,24 @@ the game itself is put together.
 
 ## Adding a game
 
-Drop it in as a top-level folder with a `package.json` whose `build` script
-writes to `dist/`. The gallery will find it, build it, stage it at
-`/games/<folder>/`, and give it a card. A `card.png` and a `game.json` with a
-title and description make the card look deliberate rather than generated.
+The quick way is the scaffold:
+
+```bash
+node scripts/new-game.mjs "My Game"
+```
+
+It makes a `my-game/` folder that works like the bee: a `game.json`, the same
+TypeScript / Vite / formatting setup, a starter 3D scene (a red ball on a green
+field you move with a finger, WASD/arrows and space to jump), a `card.png`, a
+README and a CLAUDE.md — with its node modules installed. It starts life in the
+gallery's **In Development** section (`"status": "development"` in `game.json`);
+change that to `"published"` when it's ready and it moves to the main list.
+
+By hand, any top-level folder with a `package.json` whose `build` script writes
+to `dist/` will do. The gallery finds it, builds it, stages it at
+`/games/<folder>/`, and gives it a card. A `card.png` and a `game.json` with a
+title, description and status make the card look deliberate rather than
+generated.
 
 The details — card sizes, the `base: './'` requirement, the PWA and offline
 plumbing — are in [site/README.md](site/README.md).

@@ -130,7 +130,14 @@ const APP_STORE = [
 ];
 
 /** Folders that are never games, whatever they contain. */
-const IGNORED = new Set(["site", "node_modules", "docs", "dist"]);
+const IGNORED = new Set([
+  "site",
+  "node_modules",
+  "docs",
+  "dist",
+  "scripts",
+  "tmp",
+]);
 
 /** Where we'll look for a game's card image, in order of preference. */
 const CARD_PATHS = ["card.png", "assets/card.png", "public/card.png"];
@@ -160,6 +167,10 @@ function discoverGames() {
         pkg,
         title: meta.title ?? titleCase(name),
         description: meta.description ?? pkg?.description ?? "",
+        // A game is "development" until its game.json says "published"; that
+        // decides which section of the gallery it lands in. Anything unexpected
+        // is treated as still in development, which is the safe way to be wrong.
+        status: meta.status === "published" ? "published" : "development",
         buildable: Boolean(pkg?.scripts?.build),
         card:
           CARD_PATHS.map(p => path.join(dir, p)).find(p => fs.existsSync(p)) ??
@@ -633,8 +644,21 @@ function renderAppCard(app) {
 }
 
 function renderPage(games, logoFile) {
-  const cards = games.map(renderCard).join("\n");
-  const empty = `      <li class="empty">No games built yet. Add a folder with its own build, then run this again.</li>`;
+  const published = games.filter(g => g.status === "published");
+  const development = games.filter(g => g.status !== "published");
+  const cards = published.map(renderCard).join("\n");
+  const empty = `      <li class="empty">No games published yet. Add a folder with its own build, then run this again.</li>`;
+  // In-development games get their own section under the app-store list, plainly
+  // flagged, so an unfinished game can be reached for testing without sitting
+  // in the shelf of things that are meant to be played.
+  const inDevelopment = development.length
+    ? `
+      <h2 class="section-title">In Development</h2>
+      <p class="section-note section-warn">These are unfinished and buggy — here for testing, not really ready to play.</p>
+      <ul class="grid">
+${development.map(renderCard).join("\n")}
+      </ul>`
+    : "";
 
   return `<!doctype html>
 <html lang="en">
@@ -660,7 +684,7 @@ ${SW_REGISTER}
 
     <main>
       <ul class="grid">
-${games.length ? cards : empty}
+${published.length ? cards : empty}
       </ul>
 
       <h2 class="section-title">Also on the App Store</h2>
@@ -668,6 +692,7 @@ ${games.length ? cards : empty}
       <ul class="app-grid">
 ${APP_STORE.map(renderAppCard).join("\n")}
       </ul>
+${inDevelopment}
     </main>
 
     <footer>

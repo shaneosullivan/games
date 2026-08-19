@@ -316,6 +316,15 @@ footer {
   font-size: 15px;
 }
 
+/* The warning under the In Development heading: read it as a caution, not a
+ * caption. A left rule and a warmer colour so it doesn't blend into the notes. */
+.section-note.section-warn {
+  color: #b06a1b;
+  font-weight: 600;
+  border-left: 3px solid #e0902f;
+  padding-left: 10px;
+}
+
 /*
  * Narrower cards than the web games get, and laid out around a square icon
  * rather than a screenshot — these are links out, not things you can play
