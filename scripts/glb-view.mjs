@@ -16,6 +16,7 @@
 // so it needs no network and no install.
 
 import {createServer} from "node:http";
+import {execSync} from "node:child_process";
 import {readFile, readdir} from "node:fs/promises";
 import {statSync} from "node:fs";
 import {join, resolve, relative, sep} from "node:path";
@@ -351,9 +352,66 @@ const server = createServer(async (req, res) => {
 });
 
 const PORT = 4180;
-server.listen(PORT, () => {
+
+/**
+ * Kill whatever is holding the port, so a stale viewer can't block a relaunch.
+ * Returns true if it actually killed something.
+ */
+function freePort(port) {
+  let pids = [];
+  try {
+    pids = execSync(`lsof -ti tcp:${port}`, {
+      stdio: ["ignore", "pipe", "ignore"],
+    })
+      .toString()
+      .trim()
+      .split("\n")
+      .filter(Boolean);
+  } catch {
+    return false; // lsof exits non-zero when nothing is listening.
+  }
+  const killed = pids.filter(pid => Number(pid) !== process.pid);
+  for (const pid of killed) {
+    try {
+      process.kill(Number(pid), "SIGKILL");
+    } catch {
+      // Already gone between the lookup and the kill.
+    }
+  }
+  if (killed.length) {
+    console.log(`  freed port ${port} (was ${killed.join(", ")})`);
+  }
+  return killed.length > 0;
+}
+
+// Guarded because a `listen` that failed on EADDRINUSE leaves its callback on
+// the 'listening' event, and it fires again when the retry finally binds.
+let announced = false;
+function announce() {
+  if (announced) {
+    return;
+  }
+  announced = true;
   console.log(
     `\n  glb-view — ${models.length} model(s) under ${relative(process.cwd(), root) || "."}`,
   );
   console.log(`  http://localhost:${PORT}   (Ctrl-C to stop)\n`);
+}
+
+// If the kill hasn't released the socket yet, free it once more and retry.
+let retried = false;
+server.on("error", err => {
+  if (err.code === "EADDRINUSE" && !retried) {
+    retried = true;
+    console.log(`  port ${PORT} still busy — freeing and retrying…`);
+    freePort(PORT);
+    setTimeout(() => server.listen(PORT, announce), 400);
+    return;
+  }
+  throw err;
 });
+
+// A killed process doesn't release its socket instantly, so after a kill give
+// it a moment before binding; the retry above is only a backstop.
+const killed = freePort(PORT);
+setTimeout(() => server.listen(PORT, announce), killed ? 350 : 0);
