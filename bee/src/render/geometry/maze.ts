@@ -19,6 +19,7 @@ import {
   type Maze,
 } from "../../levels/maze";
 import {paint, solidToon, vertexToon} from "../materials";
+import {fadeInFront} from "../fadeInFront";
 import {createFlowerGeometry} from "./flower";
 import leaf1Url from "../../assets/leaf1.png";
 import leaf2Url from "../../assets/leaf2.png";
@@ -114,7 +115,11 @@ export function createMazeScene(maze: Maze, rng: Rng): MazeScene {
   // ---- the walls ---------------------------------------------------------
   const spots = wallTreeSpots(maze, originX, originZ, rng);
   const treeGeo = createMazeTree();
-  const treeFade = fadeInFront(vertexToon());
+  const treeFade = fadeInFront(vertexToon(), {
+    band: MAZE.fadeBand,
+    cutoff: MAZE.fadeCutoff,
+    cacheKey: "mazeFade",
+  });
   const trees = new THREE.InstancedMesh(
     treeGeo,
     treeFade.material,
@@ -140,7 +145,11 @@ export function createMazeScene(maze: Maze, rng: Rng): MazeScene {
   // ---- the hedge between the trunks --------------------------------------
   const bushSpots = wallBushSpots(maze, originX, originZ, rng);
   const bushGeo = createBush();
-  const bushFade = fadeInFront(vertexToon());
+  const bushFade = fadeInFront(vertexToon(), {
+    band: MAZE.fadeBand,
+    cutoff: MAZE.fadeCutoff,
+    cacheKey: "mazeFade",
+  });
   const bushes = new THREE.InstancedMesh(
     bushGeo,
     bushFade.material,
@@ -426,65 +435,6 @@ export function createMazeScene(maze: Maze, rng: Rng): MazeScene {
         material.map?.dispose();
         material.dispose();
       }
-    },
-  };
-}
-
-/**
- * Make a material dissolve anything that comes between the camera and the bee.
- *
- * In a maze the shot is forever half inside a hedge — the rig sits eight units
- * behind her and the corridors turn. Moving the camera to escape that means
- * moving it constantly; fading what's in the way leaves the shot where it
- * belongs and takes the obstruction out of it instead.
- *
- * The test is the fragment's own view depth against hers, handed in as
- * `fadeUpTo`. Distance from the eye alone can't do it: a bush blocking the
- * view and the bush standing next to her are both a few units off, so a range
- * wide enough to clear the first washes the whole maze out and one narrow
- * enough to spare the second leaves her hidden.
- *
- * Anything under the cutoff is discarded rather than drawn faint, because a
- * transparent fragment still writes depth and would hide the bee behind a
- * trunk you can see straight through.
- */
-function fadeInFront(material: THREE.Material): {
-  material: THREE.Material;
-  setDepth(d: number): void;
-} {
-  material.transparent = true;
-  let live: {value: number} = {value: 1e9};
-  material.onBeforeCompile = shader => {
-    shader.uniforms.fadeUpTo = live;
-    shader.uniforms.fadeBand = {value: MAZE.fadeBand};
-    shader.vertexShader = shader.vertexShader
-      .replace(
-        "#include <common>",
-        "#include <common>\nvarying float vEyeDist;",
-      )
-      .replace(
-        "#include <fog_vertex>",
-        "#include <fog_vertex>\nvEyeDist = -mvPosition.z;",
-      );
-    shader.fragmentShader = shader.fragmentShader
-      .replace(
-        "#include <common>",
-        "#include <common>\nvarying float vEyeDist;\nuniform float fadeUpTo;\nuniform float fadeBand;",
-      )
-      .replace(
-        "#include <dithering_fragment>",
-        `float nearFade = smoothstep(fadeUpTo - fadeBand, fadeUpTo, vEyeDist);
-         if (nearFade < ${MAZE.fadeCutoff}) discard;
-         gl_FragColor.a *= nearFade;
-         #include <dithering_fragment>`,
-      );
-  };
-  // Without its own key three hands both wall materials the same program.
-  material.customProgramCacheKey = () => "mazeFade";
-  return {
-    material,
-    setDepth(d) {
-      live.value = d;
     },
   };
 }

@@ -41,10 +41,6 @@ import {DanglingLoad} from "./entities/danglingLoad";
 import {Larder} from "./entities/larder";
 import {createCottage, type CottageScene} from "./render/geometry/cottage";
 import {
-  createCottageInside,
-  type CottageInside,
-} from "./render/geometry/cottageInside";
-import {
   createHiveInterior,
   type HiveInterior,
 } from "./render/geometry/hiveInterior";
@@ -58,7 +54,6 @@ import {
   createStage,
   COTTAGE_ENV,
   HIVE_ENV,
-  INSIDE_ENV,
   LAIR_ENV,
   ISLANDS_ENV,
   MOUNTAIN_ENV,
@@ -136,7 +131,6 @@ export class Game {
   private readonly fade: HTMLDivElement;
   private readonly uiLayer: HTMLDivElement;
   private readonly cottage: CottageScene;
-  private readonly inside: CottageInside;
   private readonly honeyJar: DanglingLoad;
   private readonly raycaster = new THREE.Raycaster();
   /** NDC of a tap waiting to be consumed by a level. */
@@ -171,20 +165,20 @@ export class Game {
     this.stage.scene.add(this.meadowGroup);
 
     // --- cottage (level 4) ---
+    // One open-fronted model is both the cottage and the room she flies into:
+    // the jar sits on its mantel and the honey is collected in the same space.
     this.cottage = createCottage(rng);
     this.cottage.group.visible = false;
     this.stage.scene.add(this.cottage.group);
 
-    // --- cottage interior (level 4, stage 2) ---
-    this.inside = createCottageInside();
-    this.inside.group.visible = false;
-    this.stage.scene.add(this.inside.group);
-    this.honeyJar = new DanglingLoad(this.inside.jar, {
+    this.honeyJar = new DanglingLoad(this.cottage.jar, {
       ropeLength: INSIDE.ropeLength,
       gravity: INSIDE.jarGravity,
       damping: INSIDE.jarDamping,
     });
-    this.inside.group.add(this.honeyJar.rope);
+    // The rope hangs in the group's identity root, like the jar it draws to —
+    // see the jar's placement in cottage.ts.
+    this.cottage.group.add(this.honeyJar.rope);
 
     // --- windy woods (level 5) ---
     this.woodsGroup.visible = false;
@@ -342,12 +336,11 @@ export class Game {
         return game.hold.held;
       },
       aim: this.aim,
-      inside: this.inside,
       honeyJar: this.honeyJar,
       bringHoney: () => {
         // The jar lives in the cottage scene; carry it across to the meadow so
         // it stays visible on the flight home.
-        this.meadowGroup.add(this.inside.jar);
+        this.meadowGroup.add(this.cottage.jar);
         this.meadowGroup.add(this.honeyJar.rope);
       },
       releaseBabies: origin => {
@@ -635,10 +628,15 @@ export class Game {
     // cottage — would otherwise leave the next level behind a white screen.
     this.setScreenFade(0);
     this.interior.group.add(this.babies.group);
-    // Put the honey back where it belongs before any level starts.
-    this.inside.group.add(this.inside.jar);
-    this.inside.group.add(this.honeyJar.rope);
-    this.inside.jar.visible = true;
+    // Put the honey back on the cottage mantel before any level starts — a run
+    // through level 4 reparents it to the bee and then the meadow.
+    this.cottage.group.add(this.cottage.jar);
+    this.cottage.group.add(this.honeyJar.rope);
+    this.cottage.jar.visible = true;
+    this.honeyJar.reset(this.cottage.jarRest);
+    // The halo only belongs on during the gather; keep it off everywhere else,
+    // including the meadow levels where the far cottage is on screen.
+    this.cottage.glow.mesh.visible = false;
     this.audio.setThreat(0);
     // Flight is the default; a level turns it off in enter() if it wants taps.
     this.setFlightControls(true);
@@ -726,23 +724,20 @@ export class Game {
     this.lairGroup.visible = name === "lair";
     this.islandsGroup.visible = name === "islands";
     this.mountainGroup.visible = name === "mountain";
-    this.inside.group.visible = name === "inside";
     this.stage.setEnvironment(
       name === "hive"
         ? HIVE_ENV
-        : name === "inside"
-          ? INSIDE_ENV
-          : name === "woods"
-            ? WOODS_ENV
-            : name === "lair"
-              ? LAIR_ENV
-              : name === "islands"
-                ? ISLANDS_ENV
-                : name === "mountain"
-                  ? MOUNTAIN_ENV
-                  : name === "cottage"
-                    ? COTTAGE_ENV
-                    : MEADOW_ENV,
+        : name === "woods"
+          ? WOODS_ENV
+          : name === "lair"
+            ? LAIR_ENV
+            : name === "islands"
+              ? ISLANDS_ENV
+              : name === "mountain"
+                ? MOUNTAIN_ENV
+                : name === "cottage"
+                  ? COTTAGE_ENV
+                  : MEADOW_ENV,
     );
   }
 
@@ -760,6 +755,10 @@ export class Game {
     this.stick.enabled = !tank;
     this.bee.bounds.radius = s.boundsRadius;
     this.bee.bounds.sphereRadius = s.boundsSphere ?? Infinity;
+    // Bounds sit about the world origin unless a level recentres them; the
+    // cottage interior does, since the house stands far to the north.
+    this.bee.bounds.centreX = s.boundsCentre?.x ?? 0;
+    this.bee.bounds.centreZ = s.boundsCentre?.z ?? 0;
     // The lane north is walled off or not by syncCottageGate, which runs after
     // the level has had its say; clear it here so nothing leaks between levels.
     this.bee.bounds.minZ = -Infinity;
@@ -1111,9 +1110,6 @@ export class Game {
     }
     if (this.interior.group.visible) {
       this.queen.animate(this.elapsed, 0, 0);
-    }
-    if (this.inside.group.visible) {
-      this.inside.update(this.elapsed);
     }
 
     // Keep the shadow frustum on the bee so 1024px of shadow map isn't wasted

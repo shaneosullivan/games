@@ -11,7 +11,6 @@ import type {ParticleBurst} from "../fx/particles";
 import type {HiveInterior} from "../render/geometry/hiveInterior";
 import type {DanglingLoad} from "../entities/danglingLoad";
 import type {CottageScene} from "../render/geometry/cottage";
-import type {CottageInside} from "../render/geometry/cottageInside";
 import type {HiveSite} from "../render/geometry/world";
 import type {Hud} from "../ui/hud";
 import type {HopButtons} from "../core/hopButtons";
@@ -19,14 +18,7 @@ import type {PointerAim} from "../core/pointerAim";
 
 /** Which set of scenery is on screen. */
 export type EnvironmentName =
-  | "meadow"
-  | "hive"
-  | "cottage"
-  | "inside"
-  | "woods"
-  | "lair"
-  | "islands"
-  | "mountain";
+  "meadow" | "hive" | "cottage" | "woods" | "lair" | "islands" | "mountain";
 
 /** Playable volume and camera framing, which differ per level. */
 export interface FlightSettings {
@@ -49,6 +41,13 @@ export interface FlightSettings {
    * dome; omit it and only the disc and the ceiling apply.
    */
   boundsSphere?: number;
+  /**
+   * Centre of the flight bounds, in world space. Omit for the game's usual
+   * disc about the world origin (the hive). The cottage interior sets it: the
+   * house stands at the far north of the meadow, so the room the bee flies in
+   * for the honey is bounded about the house, not the origin.
+   */
+  boundsCentre?: THREE.Vector3;
   minHeight: number;
   maxHeight: number;
   cameraDistance: number;
@@ -144,7 +143,6 @@ export interface GameContext {
    * about by a stick. See core/pointerAim.ts.
    */
   readonly aim: PointerAim;
-  inside: CottageInside;
   honeyJar: DanglingLoad;
   /** Small pollen motes. */
   puff: ParticleBurst;

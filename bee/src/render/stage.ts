@@ -60,20 +60,6 @@ export const COTTAGE_ENV: EnvironmentSettings = {
   sunOffset: [14, 24, 16],
 };
 
-/** Indoors at the cottage: lamplit, close, no sky. */
-export const INSIDE_ENV: EnvironmentSettings = {
-  background: 0x2b1d12,
-  fogColor: 0x3d2a19,
-  fogNear: 20,
-  fogFar: 60,
-  hemiSky: 0xffdcae,
-  hemiGround: 0x6b4a2a,
-  hemiIntensity: 0.95,
-  sunColor: 0xffe3bb,
-  sunIntensity: 0.5,
-  sunOffset: [3, 14, 5],
-};
-
 /**
  * The Windy Woods: an autumn wood, overcast and close.
  *

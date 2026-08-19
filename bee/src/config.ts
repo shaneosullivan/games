@@ -458,21 +458,6 @@ export const DANCE = {
    */
   cameraPitch: 1.25,
   boardFill: 0.88,
-  /**
-   * And the shot once the door opens.
-   *
-   * The board framing is tight on nine squares; the doorway is 27 units behind
-   * the mat and six up, so the whole of her flight into the house happened off
-   * the side of it. This opens out to hold the mat and the door together, and
-   * drops to a shallower angle because a door is a vertical thing — from the
-   * board's steep pitch you would be looking at the roof.
-   */
-  exitPitch: 0.72,
-  exitFill: 0.95,
-  /** Margin around the mat-to-door span, for the house standing above it. */
-  exitMargin: 1.5,
-  /** How fast the shot opens out. Over about a second, under the door swing. */
-  exitRate: 2.6,
 } as const;
 
 /**
@@ -1349,37 +1334,96 @@ export const COTTAGE = {
    * needs the room — at normal framing it fills the screen or sits off it.
    */
   chaseZoom: 3,
+
+  /**
+   * The house is a model now (house.glb), scaled up bodily from its ~1.9-unit
+   * authored width. At 22× it stands about 42 wide and 36 to the ridge — a hair
+   * bigger than the old built-from-boxes cottage, which read at 36 — so the mat
+   * framing and the bear's pull-back still hold. Sat in the yard with its wide
+   * opening at +Z, floor on the ground, centred in x/z.
+   */
+  modelScale: 22,
+  /**
+   * The centre of the wide front opening, in yard-local units — the threshold
+   * the bee crosses flying in. It sits a hair proud of the +Z face (z ≈ 17.8 at
+   * 22×). Tuned by eye against the model.
+   */
+  opening: {y: 14, z: 18.6},
+  /** Just inside the opening, where the bee settles after flying in. */
+  entry: {y: 12, z: 9},
+  /**
+   * The shot that plays her in once the dance is passed: pulled out and dropped
+   * to sit behind the bee, so the cottage fills the view ahead of her as she
+   * flies in. All relative to the bee — `back`/`up` place the eye behind and
+   * above her, `ahead`/`lookY` aim it forward and down at the house — and eased
+   * toward each frame at `rate`, so unlocking is a smooth pull-back rather than
+   * a cut.
+   */
+  enterCam: {back: 26, up: 12, ahead: 18, lookY: 8, rate: 3},
+  /**
+   * The jar's rest on the mantel above the fire, in yard-local units. Measured
+   * against the model: the fireplace stands centre-back, its shelf (above the
+   * fire opening, beside the two painted figurines) tops out at y ≈ 16.27 and
+   * sits about 13.5 back from the yard origin. The jar's base is 0.7 below its
+   * own origin, so it rests at y ≈ 16.98.
+   */
+  mantel: {x: 0, y: 16.98, z: -13.5},
+  /**
+   * The roaring fire in the hearth below the mantel, in yard-local units. The
+   * fire opening sits centre-back, its mouth about y 8–14 and ~14 units back;
+   * the flames stand on the hearth floor and rise into it, and a warm point
+   * light above them throws changing light across the room. `light.*` is a
+   * three PointLight (colour, base intensity, reach, decay); the flicker rides
+   * on top of it.
+   */
+  fire: {
+    x: 0,
+    y: 8,
+    z: -14,
+    height: 5.2,
+    radius: 2.1,
+    sway: 0.35,
+    light: {colour: 0xff7a2a, intensity: 60, distance: 46, y: 3.5},
+  },
+  /**
+   * Free-flight inside the house while collecting the honey. Bounds are a small
+   * disc about the house centre (world z = yardOffsetZ), tight enough to keep
+   * her among the walls; heights span the ground floor under the roof.
+   */
+  interior: {
+    // The house is ~17.8 deep from centre to a wall. Keep her a few units off
+    // that — she still reaches the mantel (13.5 back) but stays ~4 clear of the
+    // walls, which is what lets the near-fade separate a wall she's facing away
+    // from (behind her, toward the camera) from the room in front of her. Right
+    // up against a wall the two sit at the same depth and can't be told apart.
+    boundsRadius: 14,
+    minHeight: 3,
+    maxHeight: 24,
+    cameraDistance: 16,
+    cameraHeight: 6,
+    pickupRadius: 6,
+  },
+  /**
+   * Fading a wall the camera has been pushed through while she flies the room —
+   * the same trick the Windy Woods plays on its hedges (see fadeInFront). The
+   * house dissolves anything between the eye and the bee: `margin` keeps a band
+   * just in front of her solid so she's never behind a hole, `band` is the depth
+   * it fades over, `cutoff` the alpha below which a fragment is dropped so a
+   * ghost wall can't hide her by still writing depth. margin+band is kept under
+   * her clearance to the wall (~4) so a wall she's turned from fully dissolves.
+   */
+  wallFade: {margin: 1.5, band: 2, cutoff: 0.06},
 } as const;
 
 /**
- * Level 4, stage 2: inside Caramel Cottage.
- *
- * A room you can actually fly around, with a jar of honey on the counter. Pick
- * it up and it hangs from the bee on a rope — see entities/danglingLoad.ts for the
- * pendulum that gives it weight.
+ * The honey jar of Caramel Cottage — collected off the mantel and carried home
+ * on a rope. It hangs from the bee via entities/danglingLoad.ts, the pendulum
+ * that gives it weight. (The cottage itself is a model now; its opening, mantel
+ * and interior flight live in COTTAGE above.)
  */
 export const INSIDE = {
-  /**
-   * Sized around the *camera*, not the bee: the chase rig sits behind and
-   * above, so the room has to be wider than boundsRadius + cameraDistance or
-   * the camera ends up embedded in a wall looking at nothing.
-   */
-  roomSize: 34,
-  roomHeight: 11,
-  counterHeight: 3.0,
+  /** The jar's own size, which the honey-jar geometry is built around. */
   jarHeight: 1.5,
-  /** Height of the framed picture's centre on the back wall. */
-  pictureHeight: 5.7,
-  /** Fly this close to take the jar. Generous: the counter is against the
-   *  back wall, just past where the bee is allowed to fly. */
-  pickupRadius: 3.2,
-
-  boundsRadius: 10.5,
-  minHeight: 1.2,
-  maxHeight: 7,
-  cameraDistance: 6.0,
-  cameraHeight: 3.4,
-
   /** Rope length from the bee's belly to the jar. Long enough that the jar
    *  hangs clear of the bee rather than covering her from a high camera. */
   ropeLength: 2.6,

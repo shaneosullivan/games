@@ -1,7 +1,10 @@
 import * as THREE from "three";
 import {mergeGeometries} from "three/examples/jsm/utils/BufferGeometryUtils.js";
-import {COTTAGE, DANCE, WORLD} from "../../config";
+import {COTTAGE, DANCE, INSIDE, WORLD} from "../../config";
 import type {Rng} from "../../core/rng";
+import {createGlowBubble, type GlowBubble} from "../glow";
+import {loadHouseModel} from "./houseModel";
+import {createHoneyJar} from "./honeyJar";
 import {paint, solidToon, vertexToon} from "../materials";
 
 export interface CottageScene {
@@ -20,27 +23,36 @@ export interface CottageScene {
   padColours: ReadonlyArray<number>;
   /** World centres of each pad. */
   padCentres: Array<THREE.Vector3>;
-  /** Swing the door open once the dance is passed. */
-  setDoorOpen(open: boolean): void;
   /** Swing the gate to the meadow. Shut until the cottage is unlocked. */
   setGateOpen(open: boolean): void;
-  /** Where the bee flies to once the door is open. */
+  /** Where the bee flies to on her way through the opening. */
   doorway: THREE.Vector3;
   /** The gap in the fence, and the way home to the meadow. */
   gate: THREE.Vector3;
+  /** The jar of honey on the mantel, reparented to the bee when picked up. */
+  jar: THREE.Group;
+  /** Where the jar rests on the mantel above the fire, in world space. */
+  jarRest: THREE.Vector3;
+  /** Force field around the jar; hidden once it's taken. */
+  glow: GlowBubble;
+  /** Just inside the opening, where the bee arrives after flying in. */
+  entryPosition: THREE.Vector3;
+  /**
+   * Fade any wall the camera has been pushed behind while she flies the room.
+   * Pass the camera-to-bee distance; pass null to leave the house solid (the
+   * default, and what every view but the interior gather wants).
+   */
+  setWallFade(cameraToBee: number | null): void;
   update(elapsed: number): void;
 }
 
-const GINGER = 0xe3a969;
-const GINGER_DARK = 0xc08247;
-const ICING = 0xfff6e8;
-
 /**
- * Caramel Cottage: a gingerbread house with an iced roof, sweets pressed into
- * the walls, and a dance mat laid out in front of the door.
+ * Caramel Cottage: an open-fronted gingerbread dollhouse (house.glb) with a
+ * dance mat laid out in front of its wide opening.
  *
- * The house faces +Z, so the mat sits at +Z of it and the bee approaches from
- * further out still.
+ * The house faces +Z, so the opening — and the mat in front of it — are at +Z,
+ * and the bee approaches from further out still. The same model is the outside
+ * of the cottage and the room she flies into for the honey.
  */
 export function createCottage(rng: Rng): CottageScene {
   const group = new THREE.Group();
@@ -97,58 +109,71 @@ export function createCottage(rng: Rng): CottageScene {
   const fence = createFence(gateZ, Math.sin(WORLD.laneGap) * gateRing);
   group.add(fence.group);
 
-  // ---- the house, at house scale -----------------------------------------
+  // ---- the house, as a model ---------------------------------------------
   //
-  // The house is modelled at a convenient size and then scaled up bodily. A
-  // bee is about 1.5 units long, so a cottage has to be tens of units tall to
-  // read as a building rather than a doll's house — everything below is
-  // authored in "house units" and multiplied by COTTAGE.houseScale.
-  const house = new THREE.Group();
-  house.scale.setScalar(COTTAGE.houseScale);
-  house.add(createHouse());
+  // An open-fronted dollhouse (house.glb): the same model is the outside of the
+  // cottage and the room the bee flies into for the honey. It loads
+  // asynchronously — the level is built synchronously and cannot wait — so an
+  // empty container goes in now and the model is dropped into it when ready.
+  // Nothing the level steers by depends on the mesh; the opening, the mantel
+  // and the mat are all fixed by config, so a late model only changes what is
+  // drawn, never where anything is.
+  const houseHolder = new THREE.Group();
+  yard.add(houseHolder);
+  // Set once the model resolves; until then setWallFade has nothing to drive.
+  let setModelFade: ((d: number) => void) | null = null;
+  loadHouseModel(COTTAGE.modelScale, {
+    band: COTTAGE.wallFade.band,
+    cutoff: COTTAGE.wallFade.cutoff,
+  })
+    .then(model => {
+      houseHolder.add(model.group);
+      setModelFade = model.setFadeDepth;
+    })
+    .catch(() => {
+      // A missing model is not fatal — the clearing, mat and jar still play.
+    });
 
-  const doorPivot = new THREE.Object3D();
-  // Hinge on the left edge of the doorway.
-  doorPivot.position.set(-0.95, 0, 2.02);
-  const door = new THREE.Mesh(
-    new THREE.BoxGeometry(1.9, 2.7, 0.16),
-    solidToon(0x7b4a22),
-  );
-  // Clear of the recess's front face (z = 2.12) for the same reason — the door
-  // used to end exactly on it.
-  door.position.set(0.95, 1.35, 0.26);
-  door.castShadow = true;
-  doorPivot.add(door);
-
-  const knob = new THREE.Mesh(
-    new THREE.SphereGeometry(0.12, 10, 8),
-    solidToon(0xffd75e),
-  );
-  // Proud of the door's own front face, which is at z = 0.34 in this frame.
-  knob.position.set(1.68, 1.35, 0.42);
-  doorPivot.add(knob);
-
-  // Icing trim around the doorway.
-  const frame = new THREE.Mesh(
-    new THREE.TorusGeometry(1.15, 0.1, 6, 20, Math.PI),
-    solidToon(ICING),
-  );
-  frame.position.set(0.95, 2.72, 0.02);
-  doorPivot.add(frame);
-
-  house.add(doorPivot);
-  yard.add(house);
+  const O = COTTAGE.opening;
 
   // ---- dance mat ---------------------------------------------------------
   const matCentre = new THREE.Vector3(0, 0, COTTAGE.matOffsetZ);
   const {mat, pads, padCentres, padColours} = createMat(matCentre);
   yard.add(mat);
 
-  let doorOpen = false;
-
   // Everything the level steers by is handed back in world space, so callers
   // never have to know the clearing is parked away from the origin.
   const toWorld = (v: THREE.Vector3) => v.clone().add(yard.position);
+
+  // ---- the honey jar on the mantel ---------------------------------------
+  // The jar and its halo live on the group's root, not in the offset yard: the
+  // DanglingLoad that flies it writes world-space positions, so its parent has
+  // to be an identity frame. Its rest is the mantel, in world space.
+  const jarRest = toWorld(
+    new THREE.Vector3(COTTAGE.mantel.x, COTTAGE.mantel.y, COTTAGE.mantel.z),
+  );
+  const jar = createHoneyJar();
+  jar.position.copy(jarRest);
+  group.add(jar);
+
+  const glow = createGlowBubble({
+    radius: INSIDE.jarHeight * 1.25,
+    squashY: 1.05,
+    hue: 0.11,
+    hueRate: 0.05,
+    saturation: 0.75,
+    lightness: 0.66,
+  });
+  glow.mesh.position.copy(jarRest);
+  // Hidden until the bee is inside for the honey — the cottage scene shows in
+  // the meadow too, and a glowing halo out at the far cottage would be a
+  // beacon on levels that have nothing to do with it. beginInside lights it.
+  glow.mesh.visible = false;
+  group.add(glow.mesh);
+
+  // ---- the fire in the hearth --------------------------------------------
+  const fire = createFire();
+  yard.add(fire.group);
 
   return {
     group,
@@ -156,144 +181,240 @@ export function createCottage(rng: Rng): CottageScene {
     pads,
     padColours,
     padCentres: padCentres.map(toWorld),
-    // Doorway centre in world units: (0, 1.35, 2.02) at house scale.
-    doorway: toWorld(
-      new THREE.Vector3(0, 1.35, 2.0).multiplyScalar(COTTAGE.houseScale),
+    // The opening's centre, where the bee crosses the threshold flying in.
+    doorway: toWorld(new THREE.Vector3(0, O.y, O.z)),
+    // Just inside the opening.
+    entryPosition: toWorld(
+      new THREE.Vector3(0, COTTAGE.entry.y, COTTAGE.entry.z),
     ),
     // Already world space: the gate never moved with the yard.
     gate: new THREE.Vector3(0, 3, gateZ),
-    setDoorOpen(open) {
-      doorOpen = open;
-    },
+    jar,
+    jarRest,
+    glow,
     setGateOpen(open) {
       fence.setOpen(open);
     },
+    setWallFade(cameraToBee) {
+      // Null (and everywhere but the interior gather) leaves the house solid:
+      // a depth behind the eye means nothing is ever counted as in front of her.
+      setModelFade?.(
+        cameraToBee === null ? -1e9 : cameraToBee - COTTAGE.wallFade.margin,
+      );
+    },
     update(elapsed) {
-      // Swing the door open, and let it settle with a little overshoot.
-      const target = doorOpen ? -1.9 : 0;
-      doorPivot.rotation.y += (target - doorPivot.rotation.y) * 0.06;
-      if (doorOpen) {
-        doorPivot.rotation.y += Math.sin(elapsed * 3) * 0.004;
-      }
+      glow.update(elapsed);
+      jar.getWorldPosition(glow.mesh.position);
+      fire.update(elapsed);
       fence.update();
     },
   };
 }
 
-/** The gingerbread house itself. */
-function createHouse(): THREE.Group {
-  const g = new THREE.Group();
-  const parts: Array<THREE.BufferGeometry> = [];
-  const push = (geo: THREE.BufferGeometry, color: number) =>
-    parts.push(paint(geo, color));
+/**
+ * A roaring fire in the hearth: a few layered flame cones from deep orange up
+ * to a white-hot core, unlit so they glow rather than take the room's shading,
+ * and a warm point light above them whose intensity flickers so the light it
+ * throws across the room is never still.
+ */
+function createFire(): {group: THREE.Group; update(elapsed: number): void} {
+  const group = new THREE.Group();
+  group.position.set(COTTAGE.fire.x, COTTAGE.fire.y, COTTAGE.fire.z);
 
-  // Walls
-  const walls = new THREE.BoxGeometry(7.2, 4.4, 6.2);
-  walls.translate(0, 2.2, -1);
-  push(walls, GINGER);
+  const {height: H, radius: R} = COTTAGE.fire;
+  // A cluster of overlapping tongues rather than concentric cones: the cooler
+  // reds flank and sit at the back, the hotter orange/yellow/white stand in
+  // front (higher z, toward the opening the camera watches from) so they aren't
+  // hidden inside the outer flame. Each licks upward at its own rate.
+  const layers = [
+    {
+      color: 0xff3a12,
+      r: R * 0.72,
+      h: H * 0.86,
+      x: -0.85,
+      z: -0.6,
+      freq: 8.5,
+      phase: 0,
+    }, // back-left red
+    {
+      color: 0xff3a12,
+      r: R * 0.66,
+      h: H * 0.8,
+      x: 0.85,
+      z: -0.6,
+      freq: 9.3,
+      phase: 1.1,
+    }, // back-right red
+    {color: 0xff7a1e, r: R * 0.7, h: H, x: 0, z: -0.15, freq: 11, phase: 2.0}, // central orange, tallest
+    {
+      color: 0xffc23a,
+      r: R * 0.48,
+      h: H * 0.72,
+      x: 0.15,
+      z: 0.55,
+      freq: 13.5,
+      phase: 2.6,
+    }, // front yellow
+    {
+      color: 0xfff0b4,
+      r: R * 0.26,
+      h: H * 0.48,
+      x: -0.1,
+      z: 0.85,
+      freq: 16,
+      phase: 3.9,
+    }, // hot core, frontmost
+  ];
+  const flames = layers.map(L => {
+    const geo = new THREE.ConeGeometry(L.r, L.h, 7);
+    // Base at the group origin so a flame grows from the hearth, not its middle.
+    geo.translate(0, L.h / 2, 0);
+    const material = new THREE.MeshBasicMaterial({color: L.color});
+    // Fire is a light source, not a lit surface — keep it off the tone map so
+    // it reads as a glow rather than being crushed with the rest of the scene.
+    material.toneMapped = false;
+    const mesh = new THREE.Mesh(geo, material);
+    mesh.position.set(L.x, 0, L.z);
+    group.add(mesh);
+    return {mesh, ox: L.x, freq: L.freq, phase: L.phase};
+  });
 
-  // Roof: a slab up each side meeting at a ridge.
-  //
-  // Eaves at (±3.9, 4.3), apex at (0, 6.6). Each slab is the line between
-  // them: 4.5 long, tilted 0.533 rad. The +X end of a right-hand slab is the
-  // low end, so it rotates *down* — get that sign wrong and the two slabs
-  // cross over the roof instead of meeting on it.
-  const PITCH = 0.533;
-  for (const sx of [-1, 1]) {
-    const slab = new THREE.BoxGeometry(4.9, 0.34, 7.1);
-    slab.rotateZ(-sx * PITCH);
-    slab.translate(sx * 1.95, 5.45, -1);
-    push(slab, ICING);
-  }
-  const ridge = new THREE.BoxGeometry(0.46, 0.34, 7.2);
-  ridge.translate(0, 6.62, -1);
-  push(ridge, ICING);
-
-  // Gable ends: proper triangles filling between the wall top and the roof.
-  const tri = new THREE.Shape();
-  tri.moveTo(-3.6, 0);
-  tri.lineTo(3.6, 0);
-  tri.lineTo(0, 2.16);
-  tri.closePath();
-  for (const z of [2.09, -4.39]) {
-    const gable = new THREE.ExtrudeGeometry(tri, {
-      depth: 0.2,
-      bevelEnabled: false,
+  // A fiery haze around the flames: soft additive glow billboards that stretch,
+  // drift and spin so the hot air around the fire is forever changing shape.
+  const hazeTex = makeGlowTexture();
+  const hazeSpecs = [
+    // A broad dim aura, then brighter cores — all hung in front of the flames
+    // (higher z, toward the opening) so the glow reads over them, not behind.
+    {
+      color: 0xff5a18,
+      scale: R * 5.0,
+      y: H * 0.45,
+      z: 1.4,
+      freq: 1.5,
+      phase: 0,
+      opacity: 0.4,
+    },
+    {
+      color: 0xff8a2a,
+      scale: R * 3.2,
+      y: H * 0.6,
+      z: 1.8,
+      freq: 2.3,
+      phase: 1.6,
+      opacity: 0.55,
+    },
+    {
+      color: 0xffb648,
+      scale: R * 2.4,
+      y: H * 0.3,
+      z: 2.1,
+      freq: 1.9,
+      phase: 3.1,
+      opacity: 0.6,
+    },
+  ];
+  const hazes = hazeSpecs.map(s => {
+    const material = new THREE.SpriteMaterial({
+      map: hazeTex,
+      color: s.color,
+      blending: THREE.AdditiveBlending,
+      transparent: true,
+      depthWrite: false,
+      opacity: s.opacity,
     });
-    gable.translate(0, 4.4, z);
-    push(gable, GINGER_DARK);
-  }
+    material.toneMapped = false;
+    const sprite = new THREE.Sprite(material);
+    sprite.position.set(0, s.y, s.z);
+    group.add(sprite);
+    return {
+      sprite,
+      base: s.scale,
+      y: s.y,
+      z: s.z,
+      freq: s.freq,
+      phase: s.phase,
+      opacity: s.opacity,
+    };
+  });
 
-  // Windows with icing frames.
-  for (const sx of [-1, 1]) {
-    const pane = new THREE.BoxGeometry(1.3, 1.3, 0.12);
-    pane.translate(sx * 2.3, 2.6, 2.06);
-    push(pane, 0xffe9a8);
-    const sill = new THREE.BoxGeometry(1.6, 0.16, 0.2);
-    sill.translate(sx * 2.3, 1.88, 2.1);
-    push(sill, ICING);
-  }
+  const {colour, intensity, distance, y} = COTTAGE.fire.light;
+  const light = new THREE.PointLight(colour, intensity, distance, 2);
+  light.position.set(0, y, 0);
+  group.add(light);
 
-  // Doorway recess, so the door reads as set into the wall.
-  //
-  // Its front face must not land *on* the wall's, which is at z = 2.1: two
-  // coplanar faces z-fight, and at this scale that shows up as brown lines
-  // flickering across the doorway. Sitting a hair proud of the wall reads the
-  // same and is unambiguous about which is in front.
-  const recess = new THREE.BoxGeometry(2.1, 2.8, 0.2);
-  recess.translate(0, 1.4, 2.02);
-  push(recess, 0x3a2412);
+  // A restless flicker: three sines that don't share a period, so it never
+  // settles into an obvious pulse. In [0, 1].
+  const flicker = (t: number): number =>
+    (Math.sin(t * 11.1) + Math.sin(t * 17.7 + 1.1) + Math.sin(t * 23.3 + 2.7)) /
+      6 +
+    0.5;
 
-  // Chimney.
-  const chimney = new THREE.BoxGeometry(0.9, 1.8, 0.9);
-  chimney.translate(-2.0, 6.4, -2.2);
-  push(chimney, GINGER_DARK);
+  return {
+    group,
+    update(elapsed) {
+      for (const f of flames) {
+        // Each flame licks upward at its own rate, swaying and leaning a touch.
+        const lick = 1 + Math.sin(elapsed * f.freq + f.phase) * 0.22;
+        const sway =
+          Math.sin(elapsed * f.freq * 0.6 + f.phase) * COTTAGE.fire.sway;
+        f.mesh.scale.set(1 + sway * 0.15, lick, 1 + sway * 0.15);
+        f.mesh.position.x = f.ox + sway;
+        f.mesh.rotation.z = -sway * 0.12;
+      }
+      for (const h of hazes) {
+        // Stretched unevenly in x and y, so the blob's outline keeps morphing.
+        const pulse = 1 + Math.sin(elapsed * h.freq + h.phase) * 0.2;
+        const sx =
+          h.base *
+          pulse *
+          (1 + Math.sin(elapsed * h.freq * 1.3 + h.phase) * 0.16);
+        const sy =
+          h.base *
+          pulse *
+          (1 + Math.cos(elapsed * h.freq * 1.1 + h.phase) * 0.2);
+        h.sprite.scale.set(sx, sy, 1);
+        h.sprite.position.x = Math.sin(elapsed * h.freq * 0.7 + h.phase) * 0.6;
+        h.sprite.position.y =
+          h.y + Math.sin(elapsed * h.freq * 0.9 + h.phase * 1.3) * 0.7;
+        h.sprite.material.rotation =
+          Math.sin(elapsed * h.freq * 0.5 + h.phase) * 0.5;
+        h.sprite.material.opacity =
+          h.opacity * (0.6 + 0.4 * flicker(elapsed + h.phase));
+      }
+      // The light rides the flicker so the whole room breathes with the fire.
+      light.intensity = intensity * (0.72 + 0.5 * flicker(elapsed));
+    },
+  };
+}
 
-  const merged = mergeGeometries(parts, false);
-  if (!merged) {
-    throw new Error("cottage: geometry merge failed");
-  }
-  merged.computeVertexNormals();
-  const house = new THREE.Mesh(merged, vertexToon());
-  house.castShadow = true;
-  house.receiveShadow = true;
-  g.add(house);
-
-  // Gumdrops pressed into the front wall — instanced, one draw call.
-  const sweetGeo = new THREE.SphereGeometry(0.22, 10, 8);
-  const sweets = new THREE.InstancedMesh(
-    paint(sweetGeo, 0xffffff),
-    vertexToon(),
-    18,
-  );
-  sweets.instanceColor = new THREE.InstancedBufferAttribute(
-    new Float32Array(18 * 3),
-    3,
-  );
-  const colours = [0xff5b8a, 0x5ecfff, 0x9be36b, 0xffd75e, 0xc98bff];
-  const m = new THREE.Matrix4();
-  const c = new THREE.Color();
-  for (let i = 0; i < 18; i++) {
-    const t = i / 18;
-    // A line of sweets along the eaves, and a couple beside the door.
-    const x = -3.2 + (i % 9) * 0.8;
-    const y = i < 9 ? 4.5 : 3.2;
-    const z = 2.08;
-    m.makeTranslation(x, y + (i < 9 ? 0 : 0), z);
-    sweets.setMatrixAt(i, m);
-    sweets.setColorAt(
-      i,
-      c.set(colours[i % colours.length]).convertSRGBToLinear(),
+/**
+ * A soft round glow, white fading to nothing, for tinting into fire haze. Drawn
+ * once on a canvas — a radial gradient is a couple of lines there and needs no
+ * asset file.
+ */
+function makeGlowTexture(): THREE.CanvasTexture {
+  const size = 128;
+  const canvas = document.createElement("canvas");
+  canvas.width = canvas.height = size;
+  const ctx = canvas.getContext("2d");
+  if (ctx) {
+    const g = ctx.createRadialGradient(
+      size / 2,
+      size / 2,
+      0,
+      size / 2,
+      size / 2,
+      size / 2,
     );
-    void t;
+    g.addColorStop(0, "rgba(255,255,255,1)");
+    g.addColorStop(0.45, "rgba(255,255,255,0.45)");
+    g.addColorStop(1, "rgba(255,255,255,0)");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, size, size);
   }
-  sweets.instanceMatrix.needsUpdate = true;
-  if (sweets.instanceColor) {
-    sweets.instanceColor.needsUpdate = true;
-  }
-  g.add(sweets);
-
-  return g;
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  return texture;
 }
 
 /** Signed difference between two angles, in (-PI, PI]. */

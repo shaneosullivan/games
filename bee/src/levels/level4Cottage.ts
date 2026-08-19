@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import {BEAR, CAMERA, COTTAGE, DANCE, FLIGHT, INSIDE, WORLD} from "../config";
+import {BEAR, CAMERA, COTTAGE, DANCE, FLIGHT, WORLD} from "../config";
 import {DanceMat} from "../entities/danceMat";
 import type {Music} from "../core/music";
 import {Rng} from "../core/rng";
@@ -30,20 +30,12 @@ const PAN_LOOK_FROM = new THREE.Vector3(0, 17, 0);
 /**
  * Coming back out of the cottage with the honey.
  *
- * This used to be a straight cut: one frame in the room, the next hanging over
- * the mat with a bear walking in. Now a white wash covers the change. It closes
- * over the last of her flight into the doorway, the scenery swaps behind it,
- * and it opens again on a wide shot of the front of the house with the bee
- * coming out of the door, jar swinging under her. The shot then arcs in and
- * lands exactly where the chase rig wants to sit, so handing control back is
+ * It is one open space, so there is no cut and no wash: she flies out of the
+ * same opening she flew in through, jar swinging under her, and the shot arcs in
+ * and lands exactly where the chase rig wants to sit, so handing control back is
  * invisible — the same trick the establishing pan above plays.
  */
-const LEAVE_TIME = 1.5;
-/** How much of the tail of that the wash takes to close over. */
-const LEAVE_FADE = 0.75;
-/** Seconds the wash takes to open again on the far side. */
-const EMERGE_FADE = 0.9;
-/** Her flight from the doorway out over the mat. */
+/** Her flight from the opening out over the mat. */
 const EMERGE_FLY = 3.4;
 /** The whole shot. The tail is the bear finishing its walk into frame. */
 const EMERGE_TIME = 5.4;
@@ -70,7 +62,6 @@ type Phase =
   | "entering"
   | "inside"
   | "carrying"
-  | "leaving"
   | "emerging"
   | "chased"
   | "delivering"
@@ -94,13 +85,12 @@ const HOMEWARD_PHASES: ReadonlySet<Phase> = new Set<Phase>([
   "delivering",
 ]);
 
-/** The phases played to the parked shot on the mat. */
-const MAT_PHASES: ReadonlySet<Phase> = new Set<Phase>([
-  "arriving",
-  "dancing",
-  "opening",
-  "entering",
-]);
+/**
+ * The phases played to the parked shot on the mat. Once the dance is passed the
+ * camera leaves this shot for the fly-in behind her (see updateEnterCamera), so
+ * "opening" and "entering" are not here.
+ */
+const MAT_PHASES: ReadonlySet<Phase> = new Set<Phase>(["arriving", "dancing"]);
 
 const tmp = new THREE.Vector3();
 const tmpB = new THREE.Vector3();
@@ -108,7 +98,6 @@ const tmpMob = new THREE.Vector3();
 const tmpOrbit = new THREE.Vector3();
 const panEye = new THREE.Vector3();
 const boardEye = new THREE.Vector3();
-const doorLook = new THREE.Vector3();
 const panLook = new THREE.Vector3();
 
 /**
@@ -142,8 +131,6 @@ export class CottageLevel implements Level {
   private orbit = 0;
 
   private mat: DanceMat | null = null;
-  /** 0 while the board is the shot, 1 once the open door is. */
-  private exitShot = 0;
   private music: Music | null = null;
   private rounds = 0;
 
@@ -155,6 +142,9 @@ export class CottageLevel implements Level {
   private readonly panTo = new THREE.Vector3();
   /** Where in the room she was when she turned for the door. */
   private readonly exitFrom = new THREE.Vector3();
+  /** The eased eye and target of the fly-in shot behind her; see onRoundFinished. */
+  private readonly enterEye = new THREE.Vector3();
+  private readonly enterLook = new THREE.Vector3();
 
   get controlsLocked(): boolean {
     // Stage 1 is tapped rather than flown; stage 2 hands flight back.
@@ -191,7 +181,6 @@ export class CottageLevel implements Level {
     });
     ctx.setFlightControls(false);
     ctx.setObjectiveMarker(null);
-    ctx.cottage.setDoorOpen(false);
 
     this.hover.copy(ctx.cottage.padCentres[CENTRE_PAD]).setY(DANCE.hoverHeight);
 
@@ -217,7 +206,6 @@ export class CottageLevel implements Level {
     this.hop = null;
     this.babiesOut = false;
     this.mat = null;
-    this.exitShot = 0;
     // Belt and braces: entering is a fresh start, whatever came before.
     this.music?.stop();
     this.music = null;
@@ -234,26 +222,16 @@ export class CottageLevel implements Level {
   }
 
   /**
-   * The parked shot outside the cottage, recomputed each frame.
+   * The parked shot over the mat, held while she dances.
    *
-   * Two framings, and which one is in force is decided by whether the door is
-   * open. While you're dancing it holds the board tight, and each frame rather
-   * than once so a rotate or a resize re-fits it — the position it returns is
-   * fixed for a given screen, so it's still a camera that doesn't move.
-   *
-   * The moment the lock springs it opens out to hold the mat and the doorway
-   * together. It has to: the door is 27 units behind the mat and six above it,
-   * so at the board's framing her whole flight into the house happened off the
-   * side of the screen.
+   * Recomputed each frame rather than once, so a rotate or a resize re-fits it —
+   * the position it returns is fixed for a given screen, so it's still a camera
+   * that doesn't move. Once the dance is passed the shot leaves the mat for the
+   * fly-in behind her; see updateEnterCamera.
    */
-  private holdMatCamera(dt: number, ctx: GameContext): void {
-    const wantsDoor = this.phase === "opening" || this.phase === "entering";
-    this.exitShot +=
-      ((wantsDoor ? 1 : 0) - this.exitShot) *
-      (1 - Math.exp(-DANCE.exitRate * dt));
-
-    const {matCentre, doorway} = ctx.cottage;
-    // Board first, and copied: framedCameraEye hands back a shared vector.
+  private holdMatCamera(ctx: GameContext): void {
+    const {matCentre} = ctx.cottage;
+    // Copied: framedCameraEye hands back a shared vector.
     boardEye.copy(
       ctx.framedCameraEye(
         matCentre,
@@ -262,23 +240,34 @@ export class CottageLevel implements Level {
         DANCE.boardFill,
       ),
     );
+    ctx.setCameraCinematic(boardEye, matCentre);
+  }
 
-    if (this.exitShot < 0.001) {
-      ctx.setCameraCinematic(boardEye, matCentre);
-      return;
-    }
-
-    // Halfway between the mat and the door, on the ground, framing far enough
-    // to hold both ends of the flight with the house above them.
-    doorLook.copy(matCentre).lerp(doorway, 0.5).setY(0);
-    const span = Math.abs(doorway.z - matCentre.z) / 2 + DANCE.exitMargin;
-    panEye.lerpVectors(
-      boardEye,
-      ctx.framedCameraEye(doorLook, span, DANCE.exitPitch, DANCE.exitFill),
-      this.exitShot,
-    );
-    panLook.lerpVectors(matCentre, doorLook, this.exitShot);
-    ctx.setCameraCinematic(panEye, panLook);
+  /**
+   * The fly-in, once the dance is passed: pull the shot out and drop it behind
+   * the bee, looking forward and down at the cottage, then hold that station
+   * behind her as she flies through the opening — so the house fills the view
+   * she's heading into rather than being watched from the side.
+   *
+   * Eased toward each frame from wherever the dance shot ended (set in
+   * onRoundFinished), which turns the change into a move, and the last position
+   * it settles on is close to where the interior follow rig wants to sit, so
+   * `beginInside` hands control back with barely a glide.
+   */
+  private updateEnterCamera(dt: number, ctx: GameContext): void {
+    const bee = ctx.bee.position;
+    const E = COTTAGE.enterCam;
+    // Eye behind and above her; target ahead of her and a touch down.
+    tmp.copy(bee);
+    tmp.y += E.up;
+    tmp.z += E.back;
+    panLook.copy(bee);
+    panLook.y += E.lookY;
+    panLook.z -= E.ahead;
+    const k = 1 - Math.exp(-E.rate * dt);
+    this.enterEye.lerp(tmp, k);
+    this.enterLook.lerp(panLook, k);
+    ctx.setCameraCinematic(this.enterEye, this.enterLook);
   }
 
   /**
@@ -321,15 +310,30 @@ export class CottageLevel implements Level {
     this.phaseTime += dt;
     this.updateHop(dt, ctx);
 
+    // While she flies the room the shot can end up shoved through a wall — she's
+    // up against it, facing away, and the boom has nowhere to go. Fade whatever
+    // stands between the eye and her, the way the Windy Woods fades its hedges.
+    // Every other phase leaves the house solid.
+    if (this.phase === "inside" || this.phase === "carrying") {
+      ctx.cottage.setWallFade(ctx.cameraPosition.distanceTo(ctx.bee.position));
+    } else {
+      ctx.cottage.setWallFade(null);
+    }
+
     // The run home is a corridor, not the open meadow.
     if (HOMEWARD_PHASES.has(this.phase)) {
       this.confineToLane(ctx);
     }
 
-    // Everything from the fly-in to going through the door is played to the
-    // one parked shot. `beginInside`'s configureFlight is what releases it.
+    // Arriving and dancing are played to the one parked shot over the mat.
     if (MAT_PHASES.has(this.phase)) {
-      this.holdMatCamera(dt, ctx);
+      this.holdMatCamera(ctx);
+    }
+    // Once the dance is passed the shot pulls out and drops behind her, so the
+    // cottage fills the view ahead as she flies in. `beginInside`'s
+    // configureFlight hands the follow rig back from here.
+    if (this.phase === "opening" || this.phase === "entering") {
+      this.updateEnterCamera(dt, ctx);
     }
     // Once the brood is out it flies itself, in every phase from here on —
     // without this they simply hang in the hive doorway where they hatched.
@@ -348,7 +352,7 @@ export class CottageLevel implements Level {
         this.updateDance(dt, ctx);
         break;
       case "opening":
-        // Let the door swing before she goes in.
+        // A beat for the shot to pull out behind her before she flies in.
         if (this.phaseTime > 1.4) {
           this.phase = "entering";
           this.phaseTime = 0;
@@ -363,9 +367,6 @@ export class CottageLevel implements Level {
         break;
       case "carrying":
         this.updateCarrying(ctx);
-        break;
-      case "leaving":
-        this.updateLeaving(ctx);
         break;
       case "emerging":
         this.updateEmerging(dt, ctx);
@@ -559,17 +560,26 @@ export class CottageLevel implements Level {
 
     this.phase = "opening";
     this.phaseTime = 0;
-    ctx.cottage.setDoorOpen(true);
     ctx.audio.levelComplete();
     ctx.flashScreen();
-    ctx.hud.setObjective("The lock springs open!");
+    ctx.hud.setObjective("You did it! In you go…");
+    // Start the fly-in shot from wherever the dance camera left off, so pulling
+    // out and dropping behind her reads as a move rather than a cut.
+    this.enterEye.copy(ctx.cameraPosition);
+    this.enterLook.copy(ctx.cottage.matCentre);
   }
 
-  /** Fly through the doorway once it's open, then cut to the room inside. */
+  /** Fly in through the wide opening; then hand control back inside. */
   private updateEntering(ctx: GameContext): void {
-    const t = Math.min(1, this.phaseTime / 1.6);
-    ctx.bee.position.lerpVectors(this.hover, ctx.cottage.doorway, ease(t));
-    ctx.bee.setScale(Math.max(0.001, 1 - t * t * 0.9));
+    const t = Math.min(1, this.phaseTime / 1.8);
+    // Straight in from the mat to just inside the opening — it is one space now,
+    // so no shrink into a doorway and no cut to a separate room.
+    ctx.bee.position.lerpVectors(
+      this.hover,
+      ctx.cottage.entryPosition,
+      ease(t),
+    );
+    ctx.bee.setYaw(Math.PI); // heading in, i.e. down -Z into the house
     if (t < 1) {
       return;
     }
@@ -579,48 +589,49 @@ export class CottageLevel implements Level {
 
   // ---- stage 2: inside the cottage ---------------------------------------
 
-  /** Hand control back and let the player fly the room. */
+  /** Hand control back and let the player fly to the mantel for the honey. */
   private beginInside(ctx: GameContext): void {
     this.phase = "inside";
     this.phaseTime = 0;
 
-    ctx.setEnvironment("inside");
+    // No scene swap — the same open-fronted model is the room. Just tighten the
+    // flight to a small disc about the house and pull the camera in.
     ctx.configureFlight({
-      boundsRadius: INSIDE.boundsRadius,
-      minHeight: INSIDE.minHeight,
-      maxHeight: INSIDE.maxHeight,
-      cameraDistance: INSIDE.cameraDistance,
-      cameraHeight: INSIDE.cameraHeight,
-      // The room is only half a unit wider than the boom already needs (see
-      // INSIDE.roomSize), so there is nothing here to widen the shot into.
-      maxCameraZoom: 1,
+      boundsRadius: COTTAGE.interior.boundsRadius,
+      boundsCentre: new THREE.Vector3(0, 0, COTTAGE.yardOffsetZ),
+      minHeight: COTTAGE.interior.minHeight,
+      maxHeight: COTTAGE.interior.maxHeight,
+      cameraDistance: COTTAGE.interior.cameraDistance,
+      cameraHeight: COTTAGE.interior.cameraHeight,
     });
-    ctx.honeyJar.reset(ctx.inside.jarRest);
-    ctx.inside.glow.mesh.visible = true;
-    ctx.placeBee(ctx.inside.entryPosition, 2.6);
+    ctx.honeyJar.reset(ctx.cottage.jarRest);
+    ctx.cottage.glow.mesh.visible = true;
+    // Facing the mantel (down -Z, deeper into the house) so the follow camera
+    // sits back by the opening and looks in at the fire, not out at the yard.
+    ctx.placeBee(ctx.cottage.entryPosition, COTTAGE.entry.y, Math.PI);
     ctx.bee.object.visible = true;
     ctx.bee.setScale(1);
     ctx.bee.scripted = false;
     ctx.setFlightControls(true);
 
     ctx.hud.setCounters([]);
-    ctx.hud.setObjective("Honey! Fly over and pick up the jar");
+    ctx.hud.setObjective("Honey! Fly up to the jar on the mantel");
     ctx.setObjectiveMarker(
-      tmp.copy(ctx.inside.jarRest).setY(ctx.inside.jarRest.y + 1.2),
+      tmp.copy(ctx.cottage.jarRest).setY(ctx.cottage.jarRest.y + 2),
     );
   }
 
   private updateInside(ctx: GameContext): void {
-    const jarPos = ctx.inside.jar.getWorldPosition(tmp);
-    if (ctx.bee.position.distanceTo(jarPos) > INSIDE.pickupRadius) {
+    const jarPos = ctx.cottage.jar.getWorldPosition(tmp);
+    if (ctx.bee.position.distanceTo(jarPos) > COTTAGE.interior.pickupRadius) {
       return;
     }
 
     ctx.honeyJar.pickUp(
       tmpB.copy(ctx.bee.position).setY(ctx.bee.position.y - 0.35),
     );
-    // The field was there to say "come and get this"; it has done its job.
-    ctx.inside.glow.mesh.visible = false;
+    // The halo was there to say "come and get this"; it has done its job.
+    ctx.cottage.glow.mesh.visible = false;
     ctx.audio.quotaComplete();
     ctx.puff.burst(jarPos, {
       color: [0xffb02e, 0xffe6a8, 0xfff6e8],
@@ -635,59 +646,29 @@ export class CottageLevel implements Level {
     this.phaseTime = 0;
   }
 
-  /** A moment to enjoy flying with it, then head for the door. */
+  /** A moment to enjoy flying with it, then head back out. */
   private updateCarrying(ctx: GameContext): void {
     if (this.phaseTime < 4) {
       return;
     }
-    this.phase = "leaving";
-    this.phaseTime = 0;
-    // From wherever in the room she happens to be. Lerping from a fixed point
-    // teleported her across the room on the first frame of the shot.
-    this.exitFrom.copy(ctx.bee.position);
+    this.beginEmerging(ctx);
     ctx.hud.setObjective("Home with it, then!");
   }
 
   // ---- stage 3: the bear ---------------------------------------------------
 
-  /** Out the door: shrink into the doorway from inside, and wash to white… */
-  private updateLeaving(ctx: GameContext): void {
-    const t = Math.min(1, this.phaseTime / LEAVE_TIME);
-    ctx.bee.scripted = true;
-    ctx.setFlightControls(false);
-    ctx.bee.position.lerpVectors(
-      this.exitFrom,
-      ctx.inside.entryPosition,
-      ease(t),
-    );
-    ctx.bee.setScale(Math.max(0.001, 1 - t * t * 0.9));
-    // The wash closes over the tail of the shrink, so it is already opaque
-    // when beginEmerging swaps the room for the yard.
-    ctx.setScreenFade(
-      ease((this.phaseTime - (LEAVE_TIME - LEAVE_FADE)) / LEAVE_FADE),
-    );
-    if (t < 1) {
-      return;
-    }
-    this.beginEmerging(ctx);
-  }
-
   /**
-   * …and back out through the front door, where the bear is waiting.
+   * Fly back out through the opening, where the bear is waiting.
    *
-   * Set up entirely behind the white wash: by the time it opens the scenery,
-   * the bee, the jar and the bear are all already in place, and what the player
-   * sees is a held shot of the house rather than a swap. From here to the hive
-   * there is no cut at all — the clearing stands at the north end of the same
-   * world, so the camera pulls back, the bear lumbers in from the left, and
-   * through the gate in the fence the hive is glowing at the far end of the
-   * lane home.
+   * One space now, so there is no wash and no scene swap: she simply flies out
+   * of the same house she flew into, the camera pulls back, the bear lumbers in
+   * from the left, and through the gate in the fence the hive is glowing at the
+   * far end of the lane home.
    */
   private beginEmerging(ctx: GameContext): void {
     this.phase = "emerging";
     this.phaseTime = 0;
 
-    ctx.setEnvironment("cottage");
     ctx.configureFlight({
       boundsRadius: COTTAGE.flightRadius,
       minHeight: FLIGHT.minHeight,
@@ -696,13 +677,14 @@ export class CottageLevel implements Level {
       cameraHeight: CAMERA.height,
     });
 
+    // From wherever in the house she happens to be, out through the opening.
+    this.exitFrom.copy(ctx.bee.position);
     // She ends the shot over the mat she danced on — dark now, its job done.
     this.mat?.reset();
     this.hover.copy(ctx.cottage.matCentre).setY(DANCE.hoverHeight + 2.5);
     // Where the shot has to land: the chase rig's resting place behind her.
     // Facing the gate is yaw 0, which puts the camera at -Z of her, i.e.
-    // between her and the house — the sign here is the opposite of the
-    // establishing pan's, which faces the other way.
+    // between her and the house.
     this.panTo
       .copy(this.hover)
       .add(
@@ -714,28 +696,17 @@ export class CottageLevel implements Level {
       );
 
     // Right back: a bear at this scale needs the room, and the gate and the
-    // lane beyond it have to be readable from the off. Set before placeBee,
-    // whose snap is what makes the new zoom take effect at once — the shot
-    // lands on a rest position computed at this zoom, so a rig still easing
-    // toward it would jump at the handover.
+    // lane beyond it have to be readable from the off.
     ctx.setCameraZoom(COTTAGE.chaseZoom);
 
-    // Start her in the doorway, at full size: she is coming out of the house,
-    // not fading up over the mat.
-    ctx.placeBee(ctx.cottage.doorway, ctx.cottage.doorway.y, 0);
-    ctx.bee.object.visible = true;
-    ctx.bee.setScale(1);
     ctx.bee.scripted = true;
     ctx.bee.setCrown(true);
     ctx.bee.setYaw(0); // facing the gate, and home
     ctx.setFlightControls(false);
 
-    // The jar comes with her — it is the whole point of the trip. Hung from
-    // her in the doorway so it is already swinging as she comes out.
+    // The jar is already on her rope from the mantel; carry it across to the
+    // meadow so it stays drawn on the flight home.
     ctx.bringHoney();
-    ctx.honeyJar.pickUp(
-      tmp.copy(ctx.cottage.doorway).setY(ctx.cottage.doorway.y - 0.35),
-    );
 
     // The hive is the destination and it says so, from this far off.
     ctx.hive.setProgress(1);
@@ -759,21 +730,23 @@ export class CottageLevel implements Level {
   }
 
   /**
-   * The wash opens on the house, she flies out of the door, and the camera
-   * arcs in behind her while the bear lumbers into frame.
+   * She flies out of the opening and the camera arcs in behind her while the
+   * bear lumbers into frame.
    */
   private updateEmerging(dt: number, ctx: GameContext): void {
     ctx.bear.update(dt, ctx.bee.position);
 
-    // Out of the doorway and down to her station over the mat, then bobbing
-    // there while the bear closes in.
-    const flight = ease(this.phaseTime / EMERGE_FLY);
-    ctx.bee.position.lerpVectors(ctx.cottage.doorway, this.hover, flight);
-    ctx.bee.position.y += Math.sin(this.phaseTime * 2.2) * 0.25 * flight;
-
-    // The wash opens over the first of it, so the very first thing on screen
-    // is the door with her in it.
-    ctx.setScreenFade(1 - ease(this.phaseTime / EMERGE_FADE));
+    // Out of the house to her station over the mat, a quadratic through the
+    // opening so she clears the wall rather than cutting the corner of it, then
+    // bobbing there while the bear closes in.
+    const f = ease(Math.min(1, this.phaseTime / EMERGE_FLY));
+    const finv = 1 - f;
+    ctx.bee.position
+      .copy(this.exitFrom)
+      .multiplyScalar(finv * finv)
+      .addScaledVector(ctx.cottage.doorway, 2 * finv * f)
+      .addScaledVector(this.hover, f * f);
+    ctx.bee.position.y += Math.sin(this.phaseTime * 2.2) * 0.25 * f;
 
     const u = ease(this.phaseTime / EMERGE_TIME);
     const inv = 1 - u;
@@ -786,7 +759,7 @@ export class CottageLevel implements Level {
         2 * inv * u,
       )
       .addScaledVector(this.panTo, u * u);
-    // Holds on the door while she comes out of it, then settles onto her.
+    // Holds on the opening while she comes out of it, then settles onto her.
     panLook.lerpVectors(
       ctx.cottage.doorway,
       ctx.bee.position,
@@ -798,7 +771,6 @@ export class CottageLevel implements Level {
     if (this.phaseTime < EMERGE_TIME) {
       return;
     }
-    ctx.setScreenFade(0);
     ctx.setCameraCinematic(null);
     this.beginChase(ctx);
   }
@@ -848,7 +820,7 @@ export class CottageLevel implements Level {
     ctx.setFlightControls(false);
     ctx.setCameraZoom(1.4);
     ctx.honeyJar.stow();
-    ctx.inside.jar.visible = false;
+    ctx.cottage.jar.visible = false;
     ctx.audio.quotaComplete();
     ctx.puff.burst(tmp.copy(ctx.hive.entrance), {
       color: [0xffb02e, 0xffe6a8, 0xfff6e8],

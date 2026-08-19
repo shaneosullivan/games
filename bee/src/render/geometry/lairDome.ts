@@ -3,7 +3,7 @@ import {mergeGeometries} from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import {DOME, LAIR, LAIR_PALETTE as P} from "../../config";
 import type {Rng} from "../../core/rng";
 import {paint, solidToon, vertexToon} from "../materials";
-import {createHoneyJar} from "./cottageInside";
+import {createHoneyJar} from "./honeyJar";
 
 export interface LairDome {
   group: THREE.Group;
