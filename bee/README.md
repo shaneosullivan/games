@@ -59,16 +59,19 @@ touchscreen.
 | 8 — Level 6: The Bear's Lair (side-scroller)                 | done        |
 | 9 — Level 7: Bee vs Frog (Frogger)                           | done        |
 | 10 — Level 8: Ant Hunt (net chase)                           | done        |
-| 11 — Wall-clock day system                                   | not started |
+| 11 — Level 9: Up the Mouldy Mountain (vertical shooter)      | done        |
+| 12 — Level 10: Down the Mountain (Katamari roll)             | done        |
+| 13 — Wall-clock day system                                   | not started |
 
 ## Levels
 
 The welcome screen is the world map (`assets/planning/levelmap.png`, downsized
 into `src/assets/`), with a pin on each land. Pins sit at fractions of the image
 so they track any scale — see `levels/lands.ts`. The Mellow Meadow holds levels
-1–3 and is always open; Caramel Cottage is level 4 and unlocks after level 3;
-the rest are padlocked or marked as still to come. Picking a land with more than
-one level shows those levels beside the map.
+1–3 and is always open; the Silent Islands hold 7–8 and the Mouldy Mountain 9–10;
+Caramel Cottage (4), the Windy Woods (5) and the Bear's Lair (6) are one level
+each. Each unlocks as you finish the one before it, and picking a land with more
+than one level shows those levels beside the map.
 
 Once you have a code name the screen is the map and little else — headed
 "Where to?", with the name reduced to a chip you can tap if you want to change
@@ -76,9 +79,13 @@ it. It is reached far more often mid-game than at the start, and every one of
 those times you are there to pick where to fly rather than to introduce
 yourself. A first-time player still gets the full name entry.
 
-Your current level is preselected, so plain "Continue" resumes. Choosing a level
-you've already completed replays it from the start (level 1 resets its flower
-counts), and your furthest unlock is kept either way.
+Finishing a level always returns here, with the next one already selected, so a
+finish flows straight into choosing where to go next; the last level, with
+nothing after it, opens the map where it is. What is unlocked is computed from
+the list of levels you have completed (`save.completed`, one past the best of
+them — see `unlockedThrough()`), so completing one never rewinds the unlock.
+Choosing a level you've already completed replays it from the start (level 1
+resets its flower counts).
 
 **1 — Sunny Meadow.** Gather 10 each of white rose, yellow flower and red
 flower. The hive on the branch grows with every collection. When it's whole it
@@ -186,9 +193,9 @@ disappears behind a wall stops being one exactly when you are far enough away
 to need it. It shows the next nine cells only — enough of a nudge to
 get going, not enough to solve it, which is why the other dead ends still have
 something to offer. The scent stays for the rest of the level. Reaching the
-glowing ring at the far corner finishes it, which opens the Bear's Lair — its
-completion card offers the map rather than "Keep flying", and the map comes up
-with the Lair already selected.
+glowing ring at the far corner finishes it and opens the Bear's Lair — and, as
+with every level, the completion card returns to the map with the next one, the
+Lair, already selected.
 
 **6 — The Bear's Lair.** Flappy Bird, played in the bee's own world: hold
 anywhere on the screen and she climbs, let go and she sinks, and she flies
@@ -223,11 +230,12 @@ which is where it stays — this is a game about a gap four squares away
 arriving in three seconds, and a shot that only showed the row she was on
 would hide the whole decision.
 
-**The frogs and the crocodiles are the only model files in the game.**
-`src/assets/islands/frog1.glb` and `croc1.glb` — everything else in the repo is
-generated in code, and what earns these the exception is that they are what you
-look at most in this level: hand-built lozenges are fine for water and banks and
-not for the animals trying to eat you.
+**The frogs and the crocodiles are model files, not built in code.**
+`src/assets/islands/frog1.glb` and `croc1.glb` — nearly everything else in the
+repo is generated in code, and what earns these the exception is that they are
+what you look at most in this level: hand-built lozenges are fine for water and
+banks and not for the animals trying to eat you. (There is one more model file,
+`mrfrog.glb`, the frog on the Mouldy Mountain — see level 9.)
 
 Both are put into the level's terms on load, by `render/geometry/islandModels.ts`
 rather than by hand: measured, scaled so the longest axis is the length the
@@ -235,6 +243,11 @@ level wants, stood on the ground, centred, and turned to face +x like every
 hand-built rider. The facing is measured too — the centroid of the frog's mouth
 material and of the white of the crocodile's teeth says where each one's head
 is. Guessing put the crocodiles broadside across the lanes, and then backwards.
+`prepare` is exposed as `loadPreparedModel(url, length, yaw)` for anywhere else
+that wants to drop a model in (level 9 uses it for its frog), and it keeps a
+model's own **per-vertex colours** (`COLOR_0`) when it has them, so a model
+painted in Blender and baked to vertex colours arrives painted rather than
+flattened to one material tone. The repo's `scripts/glb-*.mjs` do that baking.
 
 They also get baked: four flat-coloured primitives each, merged into one
 geometry with the colours in the vertices, because as loaded they cost five draw
@@ -405,6 +418,70 @@ only ever sees a URL. Shuffling walks the blank around with random legal moves
 rather than permuting the tiles: a random permutation of a 15-puzzle is
 unsolvable half the time.
 
+**9 — Up the Mouldy Mountain.** A vertical shooter, 1942 flown up a hillside.
+She climbs at a fixed rate and everything comes down at her: rocks that tumble
+and bounce off the bumps, trains of wasps, frogs that sit still and lash with
+their tongues, cans of pesticide that take some killing. She fires seeds the
+whole way up on her own — flowers she flies over raise the weapon a level, up to
+a last one that throws two homing streams, and magic moss is hovered over rather
+than shot (twelve of it finishes the objective). It all lives in _slope space_ —
+x across, -z up, y off the surface — inside one tilted group, so nothing in the
+level does trigonometry about the mountain's pitch; see
+`render/geometry/mountain.ts`.
+
+**Nothing is drawn on the glass.** She goes where your finger is, sitting a
+little ahead of it so she stays visible, and moves at her own speed — fling the
+finger across the screen and she trails after it. There is no fire button; she
+shoots by herself. The pointer is turned into a place on the slope by
+`aimTarget`, a Newton solve on a measured screen-space Jacobian rather than an
+unproject, because turning a ray into a point on a tilted plane in another
+group's space is three transforms and a chance to get the pitch backwards. Her
+left and right reach is measured _per side_ every frame, because the camera pans
+with her and the two edges of the screen sit at different world-x — measured on
+one side and mirrored, she could not reach the near edge.
+
+The hazards thicken and toughen the higher she climbs (`ASCENT.ramp` for how
+many, `ASCENT.toughness` for how many hits each takes), because the seed now
+carries to the top of the screen and a one-hit wasp near the summit would clear
+itself. The pollen trail is kept to a dozen: once that many seeds have been
+fired after one it fades out, so the stream reads as a comet tail rather than a
+line all the way up. The frog is a model, `mrfrog.glb`, loaded asynchronously
+and swapped into the foe kit when it lands, with a hand-built frog as the
+fallback until it does. At the top she climbs clear of the snow cap — she flew
+the climb below its crest, so without lifting she flew straight into it — and
+hovers over the summit bobbing and twirling while the fireworks go off, then the
+map, with Down the Mountain waiting.
+
+**10 — Down the Mountain.** Katamari Damacy on the hillside she has just
+climbed. The queen tows the summit boulder on a line of light; anything the ball
+touches that is smaller than the ball sticks to it and rolls on, and anything
+bigger knocks it back. Everything on the hill gets bigger the further down it
+lies, so the ball is always racing its own scale — and the last thing in the way
+is the bear from the Bear's Lair, guarding a cage of baby bees.
+
+**There is no physics engine.** A rolling _sphere_ is the one case that doesn't
+need one: the contact point is directly under the centre, so the spin is exactly
+distance-over-radius about an axis square to the travel, with nothing to tune.
+Once it is lumpy it rides a little higher and turns a little slower on whatever
+it has swallowed, worked out from the stuck items' own positions rather than a
+solver (`reshape` / `ride`). Sticking is reparenting: an eaten item is moved from
+the hillside into the ball's spinning group with its world transform preserved,
+so it lands where it was touched and costs nothing thereafter. It is in slope
+space like the climb; see `render/geometry/descent.ts`.
+
+The camera pulls out as the ball grows, holding a fixed number of ball-radii of
+hillside either side (`KATAMARI.viewRadii`), and rises as it goes so the hill in
+front of a big ball stays visible over the top of it. The queen leads the ball
+and is drawn further ahead of and higher above it as it grows, or a big ball is
+drawn over the top of her. The field funnels in towards the bear so a player off
+to one side is walked back to the middle by the shape of the ground. The bear
+rears up and roars in a quick held cinematic as she comes into range, drawn a
+third bigger than his catch radius so he towers rather than matching the ball
+that has to out-grow him. Roll over him with a big enough ball and you go on to
+smash the cage — the bars burst up and out and rain back down to lie where they
+fall — and the babies fly up to the glass; too small and he shrugs the ball off
+and the level ends the way it says on the card. `KATAMARI` is the whole of it.
+
 ## Building
 
 ```bash
@@ -444,10 +521,10 @@ Two things to know if you change the build:
 ```
 src/
   config.ts        every tunable number: flight, camera, quotas, palette
-  core/            loop (fixed 60Hz sim + interpolated render), input, save, audio, rng
-  render/          stage, toon materials, camera rig, procedural geometry
-  entities/        bee + wasp actors, flower field, baby ring
-  levels/          Level interface + the three levels
+  core/            loop (fixed 60Hz sim + interpolated render), input, save, audio, rng, pointer aim
+  render/          stage, toon materials, camera rig, procedural geometry, glb model loader
+  entities/        bee + wasp + baby actors, flower field, baby ring, slope foes, roll items
+  levels/          Level interface + the ten levels + the shared lands/map data
   fx/              shared particle pool (pollen motes, fireworks)
   ui/              HUD, overlays, stylesheet
   game.ts          wires it all together
@@ -455,10 +532,12 @@ src/
 
 Things worth knowing before changing anything:
 
-- **Almost all 3D assets are generated in code.** No .glb files, no rigs, no textures.
-  A bee is merged primitives with vertex colours; flowers are lathed petal
-  rings. Look in `src/render/geometry/`. Every prop is merged into a single
-  vertex-coloured mesh so the whole meadow is ~27 draw calls.
+- **Almost all 3D assets are generated in code** — no rigs, no textures, and
+  only three model files (the two Silent Islands animals and the Mouldy Mountain
+  frog). A bee is merged primitives with vertex colours; flowers are lathed
+  petal rings. Look in `src/render/geometry/`. Every prop is merged into a single
+  vertex-coloured mesh so the whole meadow is ~27 draw calls, and the loaded
+  models are baked down to the same one-mesh, vertex-coloured, toon-shaded form.
 - **The simulation is fixed-timestep** (`SIM.step`, 1/60s) with interpolated
   rendering, so flight feels identical on a 60Hz and a 120Hz display.
 - **Input is camera-relative**, and the camera's yaw slowly follows the bee's
@@ -470,12 +549,15 @@ Things worth knowing before changing anything:
   and `pagehide` because iPad Safari kills backgrounded tabs without warning.
   Level 1 progress reads from lifetime `gathered` totals, so pollen spent in
   later levels never rolls the level back.
-- **`level` and `maxLevel` are different things.** `level` is where you are;
-  `maxLevel` is the furthest you've ever reached, and it's what the welcome
-  screen's picker unlocks from. Replaying level 1 rewinds `level` and wipes
-  `gathered`, but must never lower `maxLevel` or the player loses the unlock.
-  Saves written before the picker existed have no `maxLevel`; `read()` back-fills
-  it from `level`.
+- **`level`, `maxLevel` and `completed` are three different things.** `level` is
+  where you are; `maxLevel` is the furthest you've ever reached; `completed` is
+  the set of levels actually finished. What the picker padlocks from is
+  `unlockedThrough()` — one past the best of `completed`, and never less than
+  `maxLevel` — so finishing a level out of order still opens the one after it,
+  and replaying an early one never takes an unlock away. Replaying level 1
+  rewinds `level` and wipes `gathered` but touches neither of the others. Saves
+  written before these existed synthesise them on `read()`: `maxLevel` from
+  `level`, and `completed` as `[1 .. maxLevel-1]`.
 - **The menu card is rebuilt every time it opens**, because the unlocked levels,
   the "play again" notes and the default selection all move as the player
   progresses. `openMenu()` guards on the menu already being visible rather than
@@ -582,10 +664,11 @@ Things worth knowing before changing anything:
   A level's `update()` must bail out as soon as its own code changes phase —
   level 2's last feed starts the celebration mid-`update()`, and the HUD work
   further down would otherwise immediately overwrite the celebration's banner.
-  Dismissing the card calls `level.resumeAfterCompletion()`, which drops the
-  level back to `ready` and clears `complete` so the hive can be flown into
-  again — without it the finished hive goes inert and approaching it does
-  nothing. Any future level needs to re-arm itself there too.
+  Dismissing the completion card always returns to the map (`showMenu`), with
+  the next level already selected. There is no fly-around-after-completion:
+  a level once used to re-arm itself for a free flight, but with every finish
+  going to the map that hook (`resumeAfterCompletion`) had no callers and is
+  gone. The save's `completed` list is what decides which levels are unlocked.
 - **The cottage clearing is part of the meadow's world**, parked at
   `COTTAGE.yardOffsetZ`, and the two are drawn together. That's what makes
   stage 3 a single flight rather than a cut — but it means bounds, fog, ground
