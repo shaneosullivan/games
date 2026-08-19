@@ -45,23 +45,22 @@ touchscreen.
 
 ## What's built
 
-| Phase                                                        | Status      |
-| ------------------------------------------------------------ | ----------- |
-| 0 — Scaffold, PWA, fullscreen iPad                           | done        |
-| 1 — Flight model, floating joystick, chase camera            | done        |
-| 2 — Procedural bee, three flower types, meadow, toon look    | done        |
-| 3 — Pollen collection, HUD, codename, save, Level 1 complete | done        |
-| 3b — Altitude control, hive force field, fly-in + fireworks  | done        |
-| 4 — Level 2: the Royal Chamber (queen, babies, feeding)      | done        |
-| 5 — Level 3: Wasp at the Hive                                | done        |
-| 6 — Level 4: Caramel Cottage (dance mat, then inside)        | done        |
-| 7 — Level 5: The Windy Woods (maze)                          | done        |
-| 8 — Level 6: The Bear's Lair (side-scroller)                 | done        |
-| 9 — Level 7: Bee vs Frog (Frogger)                           | done        |
-| 10 — Level 8: Ant Hunt (net chase)                           | done        |
-| 11 — Level 9: Up the Mouldy Mountain (vertical shooter)      | done        |
-| 12 — Level 10: Down the Mountain (Katamari roll)             | done        |
-| 13 — Wall-clock day system                                   | not started |
+| Phase                                                        | Status |
+| ------------------------------------------------------------ | ------ |
+| 0 — Scaffold, PWA, fullscreen iPad                           | done   |
+| 1 — Flight model, floating joystick, chase camera            | done   |
+| 2 — Procedural bee, three flower types, meadow, toon look    | done   |
+| 3 — Pollen collection, HUD, codename, save, Level 1 complete | done   |
+| 3b — Altitude control, hive force field, fly-in + fireworks  | done   |
+| 4 — Level 2: the Royal Chamber (queen, babies, feeding)      | done   |
+| 5 — Level 3: Wasp at the Hive                                | done   |
+| 6 — Level 4: Caramel Cottage (dance mat, then inside)        | done   |
+| 7 — Level 5: The Windy Woods (maze)                          | done   |
+| 8 — Level 6: The Bear's Lair (side-scroller)                 | done   |
+| 9 — Level 7: Bee vs Frog (Frogger)                           | done   |
+| 10 — Level 8: Ant Hunt (net chase)                           | done   |
+| 11 — Level 9: Up the Mouldy Mountain (vertical shooter)      | done   |
+| 12 — Level 10: Down the Mountain (Katamari roll)             | done   |
 
 ## Levels
 

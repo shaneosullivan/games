@@ -52,7 +52,7 @@ Feeding is colour-matched — each hungry baby's floating bubble names the polle
 it wants, and there are three pollen stores against the wall. Three feeds grows
 one baby up; six grown finishes the level. The 12-minute day is not used here;
 babies get hungry on a short real-time cooldown instead, so the level plays in
-one sitting. The day system is still open for a later level.
+one sitting.
 
 In challenge three a wasp comes to the hive. you are faster than the wasp. You have to fly in front of it and run away. After 30 seconds the wasp goes away and you can go back to your hive.
 

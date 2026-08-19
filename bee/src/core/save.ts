@@ -25,7 +25,7 @@ export interface SaveData {
   pollen: Record<PollenKind, number>;
   /** Lifetime totals, kept separate so spending pollen doesn't erase progress stats. */
   gathered: Record<PollenKind, number>;
-  /** Wall-clock ms of the last write; the day system will read this. */
+  /** Wall-clock ms of the last write. */
   updatedAt: number;
   /**
    * Whether this save has been through the Silent Islands grant below.
