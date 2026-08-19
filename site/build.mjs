@@ -680,7 +680,7 @@ ${SW_REGISTER}
   <body>
     <header class="hero">
       <div class="hero-title">
-        <img class="hero-logo" src="${logoFile}" alt="Chofter" width="320" height="118">
+        <img class="hero-logo" src="${logoFile}" alt="Chofter" title="Chofter" width="320" height="118">
         <h1>Games</h1>
       </div>
       <p>Little games, made for fun. Best on a tablet.</p>
