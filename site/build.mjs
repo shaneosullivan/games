@@ -681,6 +681,7 @@ ${APP_STORE.map(renderAppCard).join("\n")}
     <script>
 ${UPDATE_WATCH}
     </script>
+    <script async src="https://scripts.simpleanalyticscdn.com/latest.js"></script>
   </body>
 </html>
 `;
