@@ -224,7 +224,9 @@ function buildGame(game) {
 /** Copy the game's whole dist so multi-file games work too, not just bee. */
 function stageGame(game) {
   const dist = path.join(game.dir, "dist");
-  if (!fs.existsSync(path.join(dist, "index.html"))) return false;
+  if (!fs.existsSync(path.join(dist, "index.html"))) {
+    return false;
+  }
 
   const target = path.join(GAMES_OUT, game.name);
   fs.mkdirSync(target, {recursive: true});
@@ -306,7 +308,9 @@ const escapeHtml = s =>
 /** Stable pleasant hue per game, so card-less games still look deliberate. */
 function hueFor(name) {
   let h = 0;
-  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) % 360;
+  for (let i = 0; i < name.length; i++) {
+    h = (h * 31 + name.charCodeAt(i)) % 360;
+  }
   return h;
 }
 
@@ -721,7 +725,9 @@ console.log(
 
 if (!skipGames) {
   console.log("Building games…");
-  for (const game of games) buildGame(game);
+  for (const game of games) {
+    buildGame(game);
+  }
 } else {
   console.log("Skipping game builds (--skip-games)");
 }
@@ -805,7 +811,9 @@ fs.writeFileSync(
 
 // Each game gets its own manifest too, so adding a game straight to the home
 // screen installs *that game* full-screen rather than the gallery.
-for (const game of staged) installGame(game);
+for (const game of staged) {
+  installGame(game);
+}
 
 // The stamp every long-lived page polls for. Written last, so it can never
 // advertise a build that isn't fully staged.

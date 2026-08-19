@@ -6,6 +6,7 @@
   "description": "Little web games, and the static gallery that publishes them.",
   "scripts": {
     "build": "node site/build.mjs",
+    "new-game": "node scripts/new-game.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "eslint .",

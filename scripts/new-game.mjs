@@ -22,7 +22,11 @@ const templateDir = join(here, "new-game-template");
 
 const raw = process.argv[2];
 if (!raw) {
-  console.error("usage: node scripts/new-game.mjs <Name> [description…]");
+  console.error(
+    "Give the game a name. For example:\n" +
+      '  npm run new-game -- "My Game"\n' +
+      '  node scripts/new-game.mjs "My Game" [description…]',
+  );
   process.exit(1);
 }
 const title = raw.trim();

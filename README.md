@@ -76,7 +76,7 @@ the game itself is put together.
 The quick way is the scaffold:
 
 ```bash
-node scripts/new-game.mjs "My Game"
+npm run new-game -- "My Game"
 ```
 
 It makes a `my-game/` folder that works like the bee: a `game.json`, the same

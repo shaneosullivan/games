@@ -22,7 +22,7 @@ site/           the gallery. Zero dependencies, no build step of its own.
 
 Games don't share code. The gallery finds them by looking for top-level folders
 with a `build` script, so adding one is dropping a folder in — or running
-`node scripts/new-game.mjs "My Game"`, which scaffolds one that works like the
+`npm run new-game -- "My Game"`, which scaffolds one that works like the
 bee (starter 3D scene, same configs, `card.png`, README, `game.json`) and
 installs it. A game's `game.json` `status` is `"development"` (the gallery's In
 Development section) until it is changed to `"published"`.

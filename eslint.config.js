@@ -26,4 +26,25 @@ export default defineConfig([
       "@typescript-eslint/no-unused-vars": ["error", {argsIgnorePattern: "^_"}],
     },
   },
+  {
+    // The Node scripts in scripts/ are plain .mjs — same rules the TS files get
+    // (bar the TypeScript-only array-type), with Node's globals in scope.
+    files: ["**/*.mjs"],
+    languageOptions: {
+      ecmaVersion: "latest",
+      sourceType: "module",
+      globals: {
+        process: "readonly",
+        console: "readonly",
+        Buffer: "readonly",
+        __dirname: "readonly",
+        setTimeout: "readonly",
+        clearTimeout: "readonly",
+      },
+    },
+    rules: {
+      curly: ["error", "all"],
+      "no-unused-vars": ["error", {argsIgnorePattern: "^_"}],
+    },
+  },
 ]);
