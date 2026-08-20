@@ -276,7 +276,15 @@ export class Forest {
       if (along < -0.6 || along > b.length) {
         continue;
       }
-      if (Math.abs(-dx * b.dir.y + dz * b.dir.x) > TREE_BRANCH.boardAcross) {
+      // The allowance is an angle about the trunk, turned into a distance at
+      // whatever radius the caterpillar is actually clinging at — so getting
+      // onto a branch is the same job however big it has grown.
+      const cling = Math.hypot(pos.x - tree.x, pos.z - tree.z);
+      const allowed = Math.max(
+        TREE_BRANCH.boardAcrossMin,
+        cling * Math.sin(TREE_BRANCH.boardAngle),
+      );
+      if (Math.abs(-dx * b.dir.y + dz * b.dir.x) > allowed) {
         continue;
       }
       const at = Math.max(0, along);

@@ -357,6 +357,25 @@ export class Caterpillar {
       return;
     }
 
+    // Coming back along a branch toward its trunk, stop at the distance a
+    // climber hangs at rather than carrying on into the trunk itself.
+    //
+    // Otherwise the grab, which takes a moment to register, happens once the
+    // caterpillar is already well inside that radius — and taking hold of the
+    // trunk then snaps it back out to arm's length. A grown one jumps the best
+    // part of a unit, which reads as teleporting.
+    if (bough?.trunk) {
+      const t = bough.trunk;
+      const dx = this.position.x - t.x;
+      const dz = this.position.z - t.z;
+      const d = Math.hypot(dx, dz);
+      const cling = t.radius + this.radius;
+      if (d > 1e-4 && d < cling) {
+        this.position.x = t.x + (dx / d) * cling;
+        this.position.z = t.z + (dz / d) * cling;
+      }
+    }
+
     this.forest.collide(this.position, this.radius);
 
     // Stand on whatever is underneath, or fall to it.

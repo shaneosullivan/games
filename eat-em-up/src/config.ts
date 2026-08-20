@@ -160,8 +160,23 @@ export const TREE_BRANCH = {
    * happened to be climbing and made getting up a tree feel like it was
    * playing itself. You have to crawl onto a branch now, not past one.
    */
-  boardAcross: 0.5,
-  boardHeight: 0.45,
+  /**
+   * An angle round the trunk, not a distance.
+   *
+   * A distance is the wrong measure: the caterpillar clings at the trunk's
+   * radius plus its own, so as it grows it hangs further out, and the same
+   * sideways allowance covers a smaller and smaller slice of the trunk. Held
+   * to a fixed 0.5 a grown caterpillar could barely get onto a branch at all —
+   * one approach in twelve, at either size. As an angle it is the same job
+   * whatever size you are.
+   */
+  boardAngle: 0.42,
+  /** A floor on it, so a slim trunk is not impossible to board from. */
+  boardAcrossMin: 0.55,
+  /** And how far off the branch's height you may be. Wide enough that
+   *  climbing past a branch registers rather than being missed between two
+   *  frames. */
+  boardHeight: 0.62,
   /** The lowest a branch is ever hung: high enough that it can't be eaten
    *  from the ground, low enough to be seen from it. */
   lowest: 2.6,
