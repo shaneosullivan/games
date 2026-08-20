@@ -419,24 +419,33 @@ export class Forest {
       vertexToon(),
     );
     ground.rotation.x = -Math.PI / 2;
+    ground.receiveShadow = true;
     this.group.add(ground);
 
     // Scattered lighter patches, so the floor isn't one flat sheet of green.
     const patches: Array<THREE.BufferGeometry> = [];
-    for (let i = 0; i < 90; i++) {
+    for (let i = 0; i < WORLD.groundPatches; i++) {
       const a = this.rng.next() * Math.PI * 2;
       const r = Math.sqrt(this.rng.next()) * WORLD.radius;
       const size = this.rng.range(1.4, 4.2);
       const patch = new THREE.CircleGeometry(size, 7);
       patch.rotateX(-Math.PI / 2);
       // 0.02 proud of the floor: coplanar faces z-fight, and that flicker is
-      // far more obvious on a big flat area than the offset is.
-      patch.translate(Math.cos(a) * r, 0.02, Math.sin(a) * r);
+      // far more obvious on a big flat area than the offset is. Patches
+      // overlap each other too, so each gets its own storey — all 90 on one
+      // plane hatched the overlaps with exactly the flicker the 0.02 avoids.
+      patch.translate(
+        Math.cos(a) * r,
+        0.02 + i * WORLD.groundPatchStep,
+        Math.sin(a) * r,
+      );
       patches.push(paint(patch, this.rng.pick([0x7cb95f, 0x66a44c, 0x86c268])));
     }
     const merged = mergeGeometries(patches);
     if (merged) {
-      this.group.add(new THREE.Mesh(merged, vertexToon()));
+      const mesh = new THREE.Mesh(merged, vertexToon());
+      mesh.receiveShadow = true;
+      this.group.add(mesh);
     }
   }
 
@@ -487,7 +496,10 @@ export class Forest {
 
     const merged = mergeGeometries(parts);
     if (merged) {
-      this.group.add(new THREE.Mesh(merged, this.fade.material));
+      const mesh = new THREE.Mesh(merged, this.fade.material);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      this.group.add(mesh);
     }
     // The start bough is built before this Climbable exists, so it is pointed
     // at it here. Without this it belongs to no trunk, and climbing the start
@@ -789,7 +801,10 @@ export class Forest {
 
     const merged = mergeGeometries(parts);
     if (merged) {
-      this.group.add(new THREE.Mesh(merged, this.fade.material));
+      const mesh = new THREE.Mesh(merged, this.fade.material);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      this.group.add(mesh);
     }
   }
 
@@ -822,7 +837,10 @@ export class Forest {
     }
     const merged = mergeGeometries(parts);
     if (merged) {
-      this.group.add(new THREE.Mesh(merged, this.fade.material));
+      const mesh = new THREE.Mesh(merged, this.fade.material);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      this.group.add(mesh);
     }
   }
 }

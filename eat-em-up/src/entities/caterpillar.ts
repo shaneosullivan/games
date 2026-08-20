@@ -126,6 +126,8 @@ export class Caterpillar {
     for (let i = 0; i < CATERPILLAR.segmentsMax; i++) {
       const mesh = new THREE.Mesh(i % 2 === 0 ? light : dark, vertexToon());
       mesh.visible = false;
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
       this.group.add(mesh);
       this.segments.push(mesh);
       this.segCur.push(new THREE.Vector3());
@@ -133,6 +135,12 @@ export class Caterpillar {
     }
 
     const head = makeHead();
+    // Everything the caterpillar is made of throws a shadow: on the floor it
+    // is what puts the creature in the wood rather than on top of it.
+    head.group.traverse(o => {
+      o.castShadow = true;
+      o.receiveShadow = true;
+    });
     this.head = head.group;
     this.smile = head.smile;
     this.askingMouth = head.asking;
@@ -143,7 +151,9 @@ export class Caterpillar {
       // Hinged at the shoulder, so raising a leg is a rotation of the hinge
       // and never touches the position the render puts the pair at.
       const hinge = new THREE.Group();
-      hinge.add(new THREE.Mesh(legGeometry(), vertexToon()));
+      const limb = new THREE.Mesh(legGeometry(), vertexToon());
+      limb.castShadow = true;
+      hinge.add(limb);
       hinge.position.x = side * 1.05;
       this.legs.add(hinge);
       this.legHinges.push(hinge);

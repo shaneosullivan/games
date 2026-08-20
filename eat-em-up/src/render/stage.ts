@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import {CAMERA, WORLD} from "../config";
+import {CAMERA, SHADOW, WORLD} from "../config";
 
 /**
  * The renderer, the scene and the camera — everything that is about drawing
@@ -16,6 +16,10 @@ export class Stage {
     // a difference nobody can see on a toon-shaded scene.
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+    this.renderer.shadowMap.enabled = true;
+    // Soft edges: a hard-edged shadow map at this size shows its own pixels
+    // along the side of a trunk.
+    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     host.appendChild(this.renderer.domElement);
 
     this.scene.background = new THREE.Color(WORLD.skyColour);
@@ -39,6 +43,20 @@ export class Stage {
 
     const sun = new THREE.DirectionalLight(0xfff6e2, 1.45);
     sun.position.set(14, 26, 10);
+    sun.castShadow = true;
+    sun.shadow.mapSize.set(SHADOW.mapSize, SHADOW.mapSize);
+    sun.shadow.bias = SHADOW.bias;
+    sun.shadow.normalBias = SHADOW.normalBias;
+    // The sun never moves and the wood never grows, so one fixed frustum wide
+    // enough for the whole playable disc is all this ever needs.
+    const shadowCamera = sun.shadow.camera;
+    shadowCamera.left = -SHADOW.extent;
+    shadowCamera.right = SHADOW.extent;
+    shadowCamera.top = SHADOW.extent;
+    shadowCamera.bottom = -SHADOW.extent;
+    shadowCamera.near = SHADOW.near;
+    shadowCamera.far = SHADOW.far;
+    shadowCamera.updateProjectionMatrix();
     this.scene.add(sun);
 
     // A second, dimmer light from the opposite side. Without it the shaded

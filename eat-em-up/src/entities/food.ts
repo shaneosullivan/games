@@ -265,6 +265,11 @@ export class FoodField {
       // the instances is useless for culling and only risks popping it out of
       // view; frustum culling off is the cheaper, safer answer.
       mesh.frustumCulled = false;
+      // A little contact shadow is what stops a berry looking like it is
+      // hovering a finger's width off the leaf it sits on. Eaten instances are
+      // scaled to zero, so they take their shadow with them.
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
       const variant: Variant = {
         kind: geometries[v].kind,
         geometry: geometries[v].geometry,

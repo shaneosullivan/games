@@ -85,6 +85,14 @@ export const WORLD = {
   /** Trees are kept off the middle so the start branch has room. */
   treeInnerRadius: 9,
   bushes: 26,
+  /** Mottling on the floor, so it isn't one flat sheet of green. */
+  groundPatches: 90,
+  /**
+   * How much higher each ground patch sits than the last. The patches overlap
+   * one another, and coplanar faces z-fight — one plane for all 90 hatched
+   * every overlap with stripes.
+   */
+  groundPatchStep: 0.0015,
 } as const;
 
 /**
@@ -503,6 +511,31 @@ export const IDLE = {
   legRaise: 2.35,
   /** And how far apart they are held: splayed, not held to attention. */
   legSpread: 0.55,
+} as const;
+
+/**
+ * Cast shadows.
+ *
+ * One directional light casting into one map. The wood is the only thing worth
+ * shadowing and the sun never moves, so a single orthographic frustum covering
+ * the playable disc does the whole job.
+ */
+export const SHADOW = {
+  /** Map size. 2048 over a 120-unit frustum is about 17 texels a unit, which
+   *  holds up on a caterpillar as well as on a trunk. */
+  mapSize: 2048,
+  /** Half-width of the area the light covers. The playable disc is 44 across
+   *  and the trees lean their shadows well past it. */
+  extent: 62,
+  near: 1,
+  far: 150,
+  /**
+   * Pulls the shadow test off the surface. Without it a flat, sunlit floor
+   * stripes itself with its own shadow — and normalBias is what keeps the
+   * caterpillar's own round body from doing the same along its sides.
+   */
+  bias: -0.0004,
+  normalBias: 0.03,
 } as const;
 
 export const CAMERA = {
