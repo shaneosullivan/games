@@ -8,6 +8,7 @@ import {Stage} from "./render/stage";
 import {Forest} from "./entities/forest";
 import {FoodField} from "./entities/food";
 import {FallingLeaves} from "./entities/fallingLeaves";
+import {CrowShadow} from "./entities/crowShadow";
 import {Caterpillar} from "./entities/caterpillar";
 import {Ending} from "./entities/ending";
 import {Hud} from "./ui/hud";
@@ -42,6 +43,7 @@ export class Game {
   readonly forest: Forest;
   readonly food: FoodField;
   readonly leaves: FallingLeaves;
+  readonly crow: CrowShadow;
   readonly cat: Caterpillar;
   readonly ending: Ending;
   readonly hud: Hud;
@@ -87,10 +89,12 @@ export class Game {
     this.cat = new Caterpillar(this.forest);
     this.ending = new Ending(this.forest);
     this.leaves = new FallingLeaves(rng, this.forest);
+    this.crow = new CrowShadow(rng);
 
     this.stage.scene.add(this.forest.group);
     this.stage.scene.add(this.food.group);
     this.stage.scene.add(this.leaves.group);
+    this.stage.scene.add(this.crow.group);
     this.stage.scene.add(this.cat.group);
     this.stage.scene.add(this.ending.group);
 
@@ -209,6 +213,8 @@ export class Game {
     // seen rather than behind the player's back.
     this.viewForward.set(Math.sin(this.camYaw), 0, Math.cos(this.camYaw));
     this.leaves.update(dt, this.cat.position, this.viewForward);
+    // And once in a very long while, something goes over.
+    this.crow.update(dt, this.cat.position);
     this.hud.update(this.food.eaten);
   };
 

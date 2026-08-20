@@ -647,6 +647,36 @@ export const FALLING_LEAVES = {
   dropFromMax: 6,
 } as const;
 
+/**
+ * The crow's shadow, from the notes at the end of docs/plan-for-app.md.
+ *
+ * Only the shadow: a dark shape that slides across the forest floor and is
+ * gone. Nothing hunts you and nothing can be lost — the plan's ten seconds to
+ * hide, and being snatched, are not built.
+ *
+ * It is a rare thing on purpose. Somewhere between twenty and sixty-five
+ * minutes of play, which for most sittings means it never comes at all, and
+ * for a long one means it comes once, unannounced, and is not seen again.
+ */
+export const CROW = {
+  /** Seconds before the first shadow, and between them afterwards. */
+  minGap: 20 * 60,
+  maxGap: 65 * 60,
+  /** How long one pass takes, and how far it travels in that time. */
+  crossTime: 9,
+  travel: 110,
+  /** How big the shadow is on the ground. */
+  size: 3.6,
+  /** How near the caterpillar it passes, so it is actually seen. */
+  nearMiss: 7,
+  /** Laid just proud of the floor: coplanar with it, the two would z-fight. */
+  height: 0.05,
+  /** Dark, but a shadow rather than a hole. */
+  opacity: 0.32,
+  /** Wing beats a second. */
+  beatHz: 1.5,
+} as const;
+
 export const FOOD = {
   /** How close the mouth must be to swallow something. */
   biteRadius: 0.85,
