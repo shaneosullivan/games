@@ -661,10 +661,13 @@ export class Forest {
       parts.push(paint(tuft, this.rng.pick(CROWN_COLOURS)));
 
       if (reachable) {
-        // Resting on top of the bough, a little short of its tip — which is
+        // Resting on top of the bough, somewhere along its length — which is
         // exactly where the caterpillar's feet go when it crawls out here.
-        const inset = Math.max(0, length - TREE_BRANCH.fruitInset);
-        const t = inset / length;
+        const t = this.rng.range(
+          TREE_BRANCH.fruitAlongMin,
+          TREE_BRANCH.fruitAlongMax,
+        );
+        const inset = length * t;
         this.fruitSpots.push(
           new THREE.Vector3(
             start.x + dir.x * Math.cos(TREE_BRANCH.rise) * inset,

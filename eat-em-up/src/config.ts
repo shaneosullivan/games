@@ -45,7 +45,30 @@ export const FOOD_KINDS: ReadonlyArray<FoodKind> = [
  * empty wood rather than a game. The surplus means the end is always within
  * sight of something.
  */
-export const FOOD_SURPLUS = 1.35;
+export const FOOD_SURPLUS: Record<FoodKind, number> = {
+  leaf: 1.35,
+  flower: 1.35,
+  berry: 1.35,
+  grass: 1.35,
+  /**
+   * Fruit gets more, because most of it grows where it is hardest to get.
+   *
+   * Two thirds of it hangs on branches, so filling the quota means climbing
+   * trees and edging out along boughs. At the same surplus as everything else
+   * a player who found the climbing awkward could work the whole floor of the
+   * wood and still come up short.
+   */
+  fruit: 1.7,
+};
+
+/**
+ * The least there may ever be of anything, over and above its quota.
+ *
+ * A floor rather than a consequence of the surplus above: whatever those
+ * numbers are set to, the wood must always hold more of a thing than the game
+ * asks you to eat. Otherwise it cannot be finished at all.
+ */
+export const FOOD_SPARE = 10;
 
 export const WORLD = {
   /** Radius of the forest floor you can crawl on. */
@@ -189,7 +212,15 @@ export const TREE_BRANCH = {
    * reach: every branch fruit in the wood became uneatable at exactly the
    * point you need them to finish the game.
    */
-  fruitInset: 0.35,
+  /**
+   * Where along a branch its fruit sits, as a fraction of the branch's length.
+   *
+   * Spread rather than all at the tip: fruit only ever at the very end made
+   * every branch the same errand, and a bough with nothing on it until the
+   * last step is a dull thing to crawl along.
+   */
+  fruitAlongMin: 0.35,
+  fruitAlongMax: 0.92,
   /**
    * How near another branch has to be before the caterpillar will step across
    * to it, in units from its head.
@@ -342,9 +373,10 @@ export const CLIMB = {
    *  canopy, so climbing never puts the camera inside the leaves. */
   canopyClearance: 0.8,
   /** Climbing swaps to a lower camera looking up the trunk. Above the
-   *  caterpillar the view would be inside the crown. */
+   *  caterpillar the view would be inside the crown. It keeps the same
+   *  distance back as everywhere else, so taking hold of a tree does not zoom
+   *  the shot in and out again. */
   cameraDrop: 1.8,
-  cameraDistance: 8.5,
   /** Never let that camera go below this, or it ends up under the floor. */
   cameraFloor: 1.6,
 } as const;
@@ -668,6 +700,20 @@ export const FOOD = {
  * fly away.
  */
 export const ENDING = {
+  /**
+   * Making its own way to a branch before it changes.
+   *
+   * A caterpillar pupates hanging off something, not lying on a forest floor,
+   * so when the eating is done it takes itself to the nearest tree it can
+   * climb, goes up, gets out on a branch and changes there. The player has
+   * nothing to do at this point but watch, so it drives itself.
+   */
+  seekSpeed: 1,
+  /** How far out along the branch it walks before settling. */
+  seekOut: 1.6,
+  /** And a limit on the whole errand, after which it simply changes where it
+   *  stands. Better an odd-looking ending than one that never arrives. */
+  seekGiveUp: 40,
   curl: 1.6,
   chrysalis: 2.6,
   split: 1.9,

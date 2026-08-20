@@ -5,6 +5,7 @@ import {
   CLEARING,
   FOOD,
   FOOD_KINDS,
+  FOOD_SPARE,
   FOOD_SURPLUS,
   GOAL,
   FoodKind,
@@ -290,7 +291,13 @@ export class FoodField {
   }
 
   private count(kind: FoodKind): number {
-    return Math.round(GOAL[kind] * FOOD_SURPLUS);
+    // Never fewer than the quota plus a margin, whatever the surplus is set
+    // to: a wood holding less of something than the game asks for cannot be
+    // finished.
+    return Math.max(
+      Math.round(GOAL[kind] * FOOD_SURPLUS[kind]),
+      GOAL[kind] + FOOD_SPARE,
+    );
   }
 
   /** A point on open floor, clear of the start tree. */
@@ -485,7 +492,9 @@ export class FoodField {
       const j = this.rng.int(0, i);
       [tips[i], tips[j]] = [tips[j], tips[i]];
     }
-    const onBranches = Math.min(tips.length, Math.round(total * 0.6));
+    // Half on the branches rather than two thirds: the rest lies on the floor,
+    // so the quota is not gated on being good at climbing.
+    const onBranches = Math.min(tips.length, Math.round(total * 0.5));
     for (let i = 0; i < onBranches; i++) {
       const tip = tips[i];
       add(

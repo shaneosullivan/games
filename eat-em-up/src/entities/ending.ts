@@ -3,8 +3,10 @@ import {mergeGeometries} from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import {ENDING, WORLD} from "../config";
 import {paint, vertexToon} from "../render/materials";
 import {Caterpillar} from "./caterpillar";
+import type {Bough, Climbable, Forest} from "./forest";
 
-export type EndingPhase = "curl" | "chrysalis" | "split" | "fly" | "free";
+export type EndingPhase =
+  "seek" | "curl" | "chrysalis" | "split" | "fly" | "free";
 
 /**
  * The whole ending, which the plan makes the win condition: when you have
@@ -21,7 +23,7 @@ export type EndingPhase = "curl" | "chrysalis" | "split" | "fly" | "free";
 export class Ending {
   readonly group = new THREE.Group();
 
-  phase: EndingPhase = "curl";
+  phase: EndingPhase = "seek";
   /** Seconds spent in the current phase. */
   private elapsed = 0;
   private readonly centre = new THREE.Vector3();
@@ -39,7 +41,14 @@ export class Ending {
   heading = 0;
   private bob = 0;
 
-  constructor() {
+  /** The tree and branch it has set off for, once it has picked one. */
+  private target: {tree: Climbable; bough: Bough} | null = null;
+  /** How long it has been on the errand, so it cannot go on for ever. */
+  private seeking = 0;
+  /** Set once it is out on the branch and ready to change. */
+  private arrived = false;
+
+  constructor(private readonly forest: Forest) {
     for (const side of [-1, 1]) {
       const shell = new THREE.Mesh(chrysalisHalf(side), vertexToon());
       this.chrysalis.add(shell);
@@ -65,7 +74,7 @@ export class Ending {
 
   /** Where the butterfly is now, for the camera to watch. */
   get focus(): THREE.Vector3 {
-    if (this.phase === "curl") {
+    if (this.phase === "seek" || this.phase === "curl") {
       return this.centre;
     }
     return this.butterfly.visible
@@ -87,20 +96,36 @@ export class Ending {
     this.dir.set(0, 0, 0);
 
     switch (this.phase) {
+      case "seek":
+        this.centre.copy(cat.position);
+        this.seek(dt, cat);
+        break;
+
       case "curl": {
         // A circle that tightens as it goes, so the body winds into a coil
         // rather than lapping the same ring.
         const t = Math.min(1, this.elapsed / ENDING.curl);
-        this.spin += dt * (2.6 + t * 5.5);
-        const drive = 1 - t * 0.55;
-        this.dir
-          .set(Math.sin(this.spin), 0, Math.cos(this.spin))
-          .multiplyScalar(drive);
+        // On a branch it simply stops and gathers itself. The spiral is for
+        // the open floor: up here it would walk the caterpillar along the
+        // branch and off the end of it before the chrysalis ever formed.
+        if (this.forest.boughUnder(cat.position, cat.radius + 0.5)) {
+          this.dir.set(0, 0, 0);
+        } else {
+          this.spin += dt * (2.6 + t * 5.5);
+          const drive = 1 - t * 0.55;
+          this.dir
+            .set(Math.sin(this.spin), 0, Math.cos(this.spin))
+            .multiplyScalar(drive);
+        }
         this.centre.copy(cat.position);
         if (this.elapsed >= ENDING.curl) {
           this.enter("chrysalis");
           this.chrysalis.position.copy(cat.position);
-          this.chrysalis.position.y = cat.position.y + cat.radius * 0.6;
+          // Slung under the branch it is on, rather than sitting on top of it.
+          const bough = this.forest.boughUnder(cat.position, cat.radius + 0.5);
+          this.chrysalis.position.y = bough
+            ? cat.position.y - cat.radius * 1.4
+            : cat.position.y + cat.radius * 0.6;
           this.chrysalis.visible = true;
           this.chrysalis.scale.setScalar(0.001);
         }
@@ -194,6 +219,111 @@ export class Ending {
     }
 
     return this.dir;
+  }
+
+  /**
+   * Taking itself off to a branch to change on.
+   *
+   * Driven through the caterpillar's own controls rather than moved by hand —
+   * it walks to a tree, takes hold of it, climbs, steps onto a branch and
+   * edges out along it, using exactly the machinery the player uses. That way
+   * it cannot end up somewhere the game's own rules say is impossible.
+   */
+  private seek(dt: number, cat: Caterpillar): void {
+    this.seeking += dt;
+
+    // On a branch already? Walk a little way out along it and settle.
+    const bough = this.forest.boughUnder(cat.position, cat.radius + 0.5);
+    if (bough && !cat.climbing) {
+      const along =
+        (cat.position.x - bough.base.x) * bough.dir.x +
+        (cat.position.z - bough.base.z) * bough.dir.y;
+      const want = Math.min(
+        bough.length - 0.5,
+        bough.startAlong + ENDING.seekOut,
+      );
+      if (this.arrived || along >= want) {
+        this.arrived = true;
+        this.enter("curl");
+        return;
+      }
+      this.dir
+        .set(bough.dir.x, 0, bough.dir.y)
+        .multiplyScalar(ENDING.seekSpeed);
+      return;
+    }
+
+    if (this.seeking > ENDING.seekGiveUp) {
+      // Long enough. Change where it stands rather than never changing.
+      this.enter("curl");
+      return;
+    }
+
+    if (!this.target) {
+      this.target = this.pickBranch(cat);
+      if (!this.target) {
+        this.enter("curl");
+        return;
+      }
+    }
+    const {tree, bough: aim} = this.target;
+
+    if (cat.climbing) {
+      // Climbing takes the stick in screen axes: x goes round the trunk, z up
+      // and down it. Steer round to the branch's own bearing as it rises.
+      const here = Math.atan2(cat.position.z - tree.z, cat.position.x - tree.x);
+      const wanted = Math.atan2(aim.dir.y, aim.dir.x);
+      let turn = wanted - here;
+      while (turn > Math.PI) {
+        turn -= Math.PI * 2;
+      }
+      while (turn < -Math.PI) {
+        turn += Math.PI * 2;
+      }
+      // Line up under the branch first, then climb straight into it.
+      //
+      // Not both at once: steering round the trunk without climbing is what
+      // the climb reads as circling, and circling deliberately refuses to take
+      // a branch — so a caterpillar doing both hung there turning for ever.
+      const foot = cat.position.y - cat.radius;
+      const below = aim.base.y - 0.7;
+      let around = 0;
+      let climb = 1;
+      if (Math.abs(turn) > 0.15) {
+        around = THREE.MathUtils.clamp(turn * 1.5, -1, 1);
+        // Hold station below the branch while it turns.
+        climb = foot < below ? 1 : foot > below + 0.35 ? -1 : 0;
+      }
+      // Screen axes: up the screen is negative z.
+      this.dir.set(around, 0, -climb);
+      return;
+    }
+
+    // Still on the floor: walk at the tree until it takes hold of it.
+    this.dir
+      .set(tree.x - cat.position.x, 0, tree.z - cat.position.z)
+      .setY(0)
+      .normalize()
+      .multiplyScalar(ENDING.seekSpeed);
+  }
+
+  /** The nearest tree with a branch it can actually get onto. */
+  private pickBranch(cat: Caterpillar): {tree: Climbable; bough: Bough} | null {
+    let best: {tree: Climbable; bough: Bough} | null = null;
+    let bestDist = Infinity;
+    for (const bough of this.forest.boughs) {
+      const tree = bough.trunk;
+      // Only branches whose base is within a climb, on a tree in the wood.
+      if (!tree || bough.base.y > tree.climbTop) {
+        continue;
+      }
+      const d = Math.hypot(tree.x - cat.position.x, tree.z - cat.position.z);
+      if (d < bestDist) {
+        best = {tree, bough};
+        bestDist = d;
+      }
+    }
+    return best;
   }
 
   /**

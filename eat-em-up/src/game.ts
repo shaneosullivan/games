@@ -43,7 +43,7 @@ export class Game {
   readonly food: FoodField;
   readonly leaves: FallingLeaves;
   readonly cat: Caterpillar;
-  readonly ending = new Ending();
+  readonly ending: Ending;
   readonly hud: Hud;
 
   /** update() does nothing unless this is set, so the intro can hold the game
@@ -85,6 +85,7 @@ export class Game {
     this.forest = new Forest(rng);
     this.food = new FoodField(rng, this.forest);
     this.cat = new Caterpillar(this.forest);
+    this.ending = new Ending(this.forest);
     this.leaves = new FallingLeaves(rng, this.forest);
 
     this.stage.scene.add(this.forest.group);
@@ -348,7 +349,7 @@ export class Game {
     const backX = -Math.sin(this.camYaw);
     const backZ = -Math.cos(this.camYaw);
 
-    if (this.transforming && !this.flying) {
+    if (this.transforming && !this.flying && this.ending.phase !== "seek") {
       // Close in for the transformation, whatever size the caterpillar grew to.
       this.wantEye.set(
         focus.x + backX * ENDING.cameraDistance,
@@ -366,10 +367,15 @@ export class Game {
       // Climbing, the camera drops below the caterpillar and looks up the
       // trunk. Keeping it overhead would put it inside the crown, and the shot
       // would go dark exactly when the player most needs to see.
+      //
+      // It stays as far back as it is everywhere else, though. Climbing used
+      // to pull it in to a fixed short boom, which for a grown caterpillar
+      // meant the shot leaping from thirty-odd units out to eight and back
+      // again every time it took hold of a tree.
       this.wantEye.set(
-        focus.x + backX * CLIMB.cameraDistance,
+        focus.x + backX * distance,
         Math.max(CLIMB.cameraFloor, focus.y - CLIMB.cameraDrop),
-        focus.z + backZ * CLIMB.cameraDistance,
+        focus.z + backZ * distance,
       );
     } else {
       this.wantEye.set(
