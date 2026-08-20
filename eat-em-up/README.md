@@ -30,6 +30,8 @@ there is no control to find first.
 - **Crawl into a tree** — take hold of it and climb. Up and down the screen
   climbs the trunk, left and right go round it.
 - **Climb level with a branch** — step onto it, and crawl out along it.
+- **Wait a while** — it looks about, scratches, asks what you are waiting for,
+  and after a full minute of nothing, yawns at you.
 - **Crawl off the end or the side of a branch** — you do not fall. You hang by
   your tail and lower yourself. If your head reaches the ground you let go and
   carry on; if it does not, you just dangle. Push back to haul yourself up.
@@ -51,6 +53,11 @@ onto the forest floor.
   onto the branch, and edge out to the tip.
 - **Grass** fills one tall meadow, and is the one thing eaten only where your
   head actually touches it.
+
+Grass and fruit grow back five minutes after they are eaten; leaves, flowers
+and berries stay eaten, so the wood is still visibly emptied by a caterpillar
+working through it. Growing back puts food back in the wood, never progress
+back on the board.
 
 Growth is your progress toward the quotas, averaged, and anything past a quota
 stops counting — so mowing the whole meadow can never be more than a fifth of

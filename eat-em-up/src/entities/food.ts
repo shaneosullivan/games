@@ -28,6 +28,10 @@ interface Item {
   eaten: boolean;
   /** Counts down while an eaten item shrinks away. */
   vanish: number;
+  /** Counts down to this one growing back, or 0 if it never will. */
+  regrow: number;
+  /** Counts down while a regrown one swells back to full size. */
+  sprout: number;
 }
 
 interface Variant {
@@ -142,6 +146,9 @@ export class FoodField {
       if (dx * dx + dz * dz < r * r) {
         item.eaten = true;
         item.vanish = FOOD.vanish;
+        // Grass and fruit come back; the rest of the wood stays eaten.
+        item.regrow =
+          item.kind === "grass" || item.kind === "fruit" ? FOOD.regrowAfter : 0;
         this.eaten[item.kind]++;
         return item.kind;
       }
@@ -153,11 +160,23 @@ export class FoodField {
     this.clock += dt;
     for (const variant of this.variants) {
       for (const item of variant.items) {
+        if (item.eaten && item.regrow > 0) {
+          item.regrow -= dt;
+          if (item.regrow <= 0) {
+            // Back, and swelling into place rather than appearing whole.
+            item.eaten = false;
+            item.vanish = 0;
+            item.sprout = FOOD.sprout;
+          }
+        }
         if (item.eaten && item.vanish <= 0) {
           continue;
         }
         if (item.eaten) {
           item.vanish -= dt;
+        }
+        if (item.sprout > 0) {
+          item.sprout -= dt;
         }
         this.writeMatrix(variant, item);
       }
@@ -175,6 +194,11 @@ export class FoodField {
       if (item.vanish <= 0) {
         scale = 0;
       }
+    }
+    if (!item.eaten && item.sprout > 0) {
+      // Swells back from nothing over FOOD.sprout, easing out at the end.
+      const t = 1 - Math.max(0, item.sprout) / FOOD.sprout;
+      scale *= t * (2 - t);
     }
     const sway =
       Math.sin(this.clock * FOOD.swayRate + item.phase) * FOOD.swayAmount;
@@ -208,6 +232,8 @@ export class FoodField {
         phase: this.rng.next() * Math.PI * 2,
         eaten: false,
         vanish: 0,
+        regrow: 0,
+        sprout: 0,
       };
       placed[variant].push(item);
       this.items.push(item);

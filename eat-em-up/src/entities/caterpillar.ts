@@ -88,9 +88,11 @@ export class Caterpillar {
 
   private readonly segments: Array<THREE.Mesh> = [];
   private readonly head: THREE.Group;
-  /** The two mouths: the everyday smile, and the questioning one. */
+  /** Its three mouths: the everyday smile, the questioning line, and the
+   *  wide open one it yawns with. */
   private readonly smile: THREE.Mesh;
   private readonly askingMouth: THREE.Mesh;
+  private readonly yawnMouth: THREE.Mesh;
   /**
    * The two front legs, used only for the asking pose.
    *
@@ -134,6 +136,7 @@ export class Caterpillar {
     this.head = head.group;
     this.smile = head.smile;
     this.askingMouth = head.asking;
+    this.yawnMouth = head.yawn;
     this.group.add(this.head);
 
     for (const side of [-1, 1]) {
@@ -780,14 +783,35 @@ export class Caterpillar {
     return smoothstep(Math.min(rise, fall));
   }
 
+  /**
+   * How far into a yawn it is, 0 to 1, or 0 when it isn't yawning.
+   *
+   * Only after a long wait — see IDLE.yawnDelay — and eased at both ends so
+   * the mouth opens and closes rather than snapping.
+   */
+  private get yawning(): number {
+    if (this.still <= IDLE.yawnDelay || this.climbing || this.dangle) {
+      return 0;
+    }
+    const t = (this.still - IDLE.yawnDelay) % IDLE.yawnEvery;
+    if (t > IDLE.yawnFor) {
+      return 0;
+    }
+    const p = t / IDLE.yawnFor;
+    return smoothstep(Math.min(p / IDLE.yawnEase, (1 - p) / IDLE.yawnEase, 1));
+  }
+
   /** `alpha` is how far between the last two simulation steps we are. */
   render(alpha: number): void {
     const radius = this.radius;
     const idling = this.idling;
-    const ask = this.asking;
-    // The small idle movements give way to the big one rather than fighting it.
-    const fidget = idling * (1 - ask);
-    const scratch = this.scratching * (1 - ask);
+    const yawn = this.yawning;
+    // A yawn takes precedence over the question; the small movements give way
+    // to either rather than fighting them.
+    const ask = this.asking * (1 - yawn);
+    const big = Math.max(ask, yawn);
+    const fidget = idling * (1 - big);
+    const scratch = this.scratching * (1 - big);
     // Two waves of different lengths, so looking about never falls into an
     // obvious rhythm.
     const look =
@@ -804,11 +828,12 @@ export class Caterpillar {
     this.head.rotation.order = "YXZ";
     // Asking, it turns off its own heading and onto the camera.
     const toCamera = wrapAngle(this.cameraBearing - this.heading);
-    this.head.rotation.y = this.heading + look + toCamera * ask;
+    this.head.rotation.y = this.heading + look + toCamera * big;
     this.head.rotation.x =
       -Math.atan2(this.facing.y, Math.hypot(this.facing.x, this.facing.z)) +
       fidget * IDLE.nodAmount * Math.sin(this.still * IDLE.nodRate) -
-      ask * IDLE.askPitch;
+      ask * IDLE.askPitch -
+      yawn * IDLE.yawnPitch;
     // Tipped over into a scratch, always to the same side so it reads as one
     // movement rather than a wobble — and tipped again, the other way, into
     // the quizzical lean of the asking pose.
@@ -816,9 +841,15 @@ export class Caterpillar {
 
     // It stops smiling while it is asking. A smile and a raised eyebrow read
     // as pleased with itself; the question wants a small open mouth.
-    const questioning = ask > 0.25;
-    this.smile.visible = !questioning;
+    const yawning = yawn > 0.15;
+    const questioning = !yawning && ask > 0.25;
+    this.smile.visible = !yawning && !questioning;
     this.askingMouth.visible = questioning;
+    this.yawnMouth.visible = yawning;
+    if (yawning) {
+      // Opens and closes with the yawn, rather than appearing at full gape.
+      this.yawnMouth.scale.set(1, 0.35 + yawn * IDLE.yawnOpen, 1);
+    }
     this.head.scale.setScalar(radius * 1.16);
 
     const count = this.segmentCount;
@@ -1020,6 +1051,7 @@ function makeHead(): {
   group: THREE.Group;
   smile: THREE.Mesh;
   asking: THREE.Mesh;
+  yawn: THREE.Mesh;
 } {
   const group = new THREE.Group();
   const parts: Array<THREE.BufferGeometry> = [];
@@ -1063,9 +1095,11 @@ function makeHead(): {
   const smile = new THREE.Mesh(smileGeometry(), vertexToon());
   const asking = new THREE.Mesh(askingMouthGeometry(), vertexToon());
   asking.visible = false;
-  group.add(smile, asking);
+  const yawn = new THREE.Mesh(yawningMouthGeometry(), vertexToon());
+  yawn.visible = false;
+  group.add(smile, asking, yawn);
 
-  return {group, smile, asking};
+  return {group, smile, asking, yawn};
 }
 
 /** The everyday mouth: a torus tipped forward, most of it buried in the head
@@ -1076,6 +1110,20 @@ function smileGeometry(): THREE.BufferGeometry {
   smile.rotateX(0.24);
   smile.translate(0, -0.28, 0.95);
   return paint(smile, 0x7a2418);
+}
+
+/**
+ * The yawning mouth: a wide open one, built at its resting size and stretched
+ * open by the render.
+ *
+ * Its own mesh rather than the questioning line stretched, because a line has
+ * no inside to it — opening one only gives a thicker line.
+ */
+function yawningMouthGeometry(): THREE.BufferGeometry {
+  const mouth = new THREE.SphereGeometry(0.19, 10, 8);
+  mouth.scale(0.8, 1, 0.45);
+  mouth.translate(0, -0.32, 0.93);
+  return paint(mouth, 0x5e1a12);
 }
 
 /**

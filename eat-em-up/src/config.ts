@@ -395,6 +395,25 @@ export const IDLE = {
   scratchSegments: 2,
 
   /**
+   * The yawn.
+   *
+   * Kept for a player who has really left it alone — a full fifty seconds,
+   * long after the looking about, the scratching and the asking have all had
+   * their turn. It looks straight at you, tips its head back and opens wide,
+   * which is about as plain a "still here, then?" as a caterpillar can manage.
+   */
+  yawnDelay: 50,
+  /** How often it comes round again once it has started. */
+  yawnEvery: 26,
+  /** How long one lasts, and the share of that spent opening and closing. */
+  yawnFor: 2.4,
+  yawnEase: 0.3,
+  /** How far the head tips back into it — more than the question does. */
+  yawnPitch: 0.6,
+  /** How far the mouth opens, as a multiple of its resting size. */
+  yawnOpen: 2.3,
+
+  /**
    * "Well? What are you waiting for?"
    *
    * Left alone long enough, after it has been looking about and scratching for
@@ -623,6 +642,21 @@ export const FOOD = {
   grassTouch: 1.25,
   /** How long an eaten item takes to shrink away, seconds. */
   vanish: 0.28,
+  /**
+   * How long before grass and fruit come back, in seconds.
+   *
+   * Five minutes: long enough that a meadow you have just cut stays cut, and
+   * that coming back to it is a thing you notice rather than a thing that
+   * happens under your nose. Only these two — leaves, flowers and berries
+   * stay eaten, so the wood is still visibly emptied by a caterpillar working
+   * through it.
+   *
+   * Growing back does not undo any of your counts. It puts food back in the
+   * wood, not progress back on the board.
+   */
+  regrowAfter: 300,
+  /** How long it takes to grow back once its time is up. */
+  sprout: 1.4,
   /** Food sways so the forest is never quite still. */
   swayRate: 1.4,
   swayAmount: 0.05,
