@@ -126,9 +126,12 @@ export class FoodField {
       const dx = item.position.x - mouth.x;
       const dz = item.position.z - mouth.z;
       const dy = item.position.y - mouth.y;
-      // Generous vertically: a caterpillar on the floor should still get the
-      // berry hanging just above its head.
-      if (Math.abs(dy) > 1.3) {
+      // Generous vertically, and more so the bigger it is: a caterpillar on
+      // the floor should still get the berry just above its head, and a fully
+      // grown one stands high enough that a fixed allowance would put whatever
+      // it is standing over out of its own reach.
+      const vertical = FOOD.biteHeight + headRadius * FOOD.biteHeightPerRadius;
+      if (Math.abs(dy) > vertical) {
         continue;
       }
       const r =

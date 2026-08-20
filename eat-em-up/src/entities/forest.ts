@@ -182,6 +182,46 @@ export class Forest {
     return best;
   }
 
+  /**
+   * A bough whose crawlable top is within `reach` of `pos`, ignoring `except`.
+   *
+   * This is what lets the caterpillar cross from one tree's branch to
+   * another's where the two nearly meet, instead of dropping off the end of
+   * the first. Returns where on it to stand.
+   */
+  boughStepAcross(
+    pos: THREE.Vector3,
+    reach: number,
+    except: Bough | null,
+  ): {bough: Bough; point: THREE.Vector3} | null {
+    let best: {bough: Bough; point: THREE.Vector3} | null = null;
+    let bestDist = reach;
+    for (const b of this.boughs) {
+      if (b === except) {
+        continue;
+      }
+      const dx = pos.x - b.base.x;
+      const dz = pos.z - b.base.z;
+      // The nearest point on its crawlable centre line.
+      const along = THREE.MathUtils.clamp(
+        dx * b.dir.x + dz * b.dir.y,
+        b.startAlong,
+        b.length,
+      );
+      const point = new THREE.Vector3(
+        b.base.x + b.dir.x * along,
+        b.base.y + along * b.gradient + this.boughRadiusAt(b, along),
+        b.base.z + b.dir.y * along,
+      );
+      const d = point.distanceTo(pos);
+      if (d < bestDist) {
+        best = {bough: b, point};
+        bestDist = d;
+      }
+    }
+    return best;
+  }
+
   /** How far (x, z) is to the side of a bough's centre line. */
   boughAcross(b: Bough, x: number, z: number): number {
     return -(x - b.base.x) * b.dir.y + (z - b.base.z) * b.dir.x;
@@ -606,8 +646,22 @@ export class Forest {
       parts.push(paint(tuft, this.rng.pick(CROWN_COLOURS)));
 
       if (reachable) {
+        // Resting on top of the bough, a little short of its tip — which is
+        // exactly where the caterpillar's feet go when it crawls out here.
+        const inset = Math.max(0, length - TREE_BRANCH.fruitInset);
+        const t = inset / length;
         this.fruitSpots.push(
-          new THREE.Vector3(end.x, end.y - TREE_BRANCH.fruitDrop, end.z),
+          new THREE.Vector3(
+            start.x + dir.x * Math.cos(TREE_BRANCH.rise) * inset,
+            start.y +
+              Math.sin(TREE_BRANCH.rise) * inset +
+              THREE.MathUtils.lerp(
+                TREE_BRANCH.baseRadius,
+                TREE_BRANCH.tipRadius,
+                t,
+              ),
+            start.z + dir.z * Math.cos(TREE_BRANCH.rise) * inset,
+          ),
         );
         // Only reachable branches are crawlable. Making the scenery ring
         // walkable would cost a surface test per branch per step for boughs no

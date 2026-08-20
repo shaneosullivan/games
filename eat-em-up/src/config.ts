@@ -149,20 +149,41 @@ export const TREE_BRANCH = {
   /**
    * Getting on is judged far more generously than staying on.
    *
-   * Boarding used to be held to the same 0.75-wide strip you crawl along,
-   * which meant lining the climb up to within a few centimetres of the
-   * branch's centre line before it would take. These are the windows for
+   * Held to the same strip you crawl along would mean lining the climb up to
+   * within a few centimetres, which nobody could do. These are the windows for
    * stepping across from the trunk: how far off the centre line you may be,
    * and how far off its height. Once you are on, you are put on the centre
-   * line facing out along it, so a generous grab can't drop you off the side.
+   * line facing out along it, so catching it a little off still leaves you
+   * standing squarely on the branch.
+   *
+   * They were once 1.3 apiece, which took the branch on almost wherever you
+   * happened to be climbing and made getting up a tree feel like it was
+   * playing itself. You have to crawl onto a branch now, not past one.
    */
-  boardAcross: 1.3,
-  boardHeight: 1.3,
+  boardAcross: 0.5,
+  boardHeight: 0.45,
   /** The lowest a branch is ever hung: high enough that it can't be eaten
    *  from the ground, low enough to be seen from it. */
   lowest: 2.6,
-  /** How far under the tip the fruit hangs. */
-  fruitDrop: 0.32,
+  /**
+   * How far short of the tip the fruit sits, on top of the bough.
+   *
+   * On top, not hanging under it. Hung below the tip it floated clear of the
+   * branch with nothing joining the two — and worse, it put the fruit 1.2
+   * units below where the caterpillar stands, which a fully grown one cannot
+   * reach: every branch fruit in the wood became uneatable at exactly the
+   * point you need them to finish the game.
+   */
+  fruitInset: 0.35,
+  /**
+   * How near another branch has to be before the caterpillar will step across
+   * to it, in units from its head.
+   *
+   * Short: the two have to all but touch. It is there so that where one tree's
+   * branches reach into another's you can cross between them rather than
+   * climbing all the way down and up again — not so you can leap gaps.
+   */
+  hopReach: 1.3,
 } as const;
 
 export const CATERPILLAR = {
@@ -201,6 +222,43 @@ export const CATERPILLAR = {
    * fall for going too far.
    */
   hangDropSpeed: 3.2,
+  /**
+   * How much of its length it will pay out, as a fraction of its body.
+   *
+   * Less than all of it, so a good part of the caterpillar stays lying along
+   * the branch and is plainly holding on. Paying out the lot left the very
+   * last segment level with the branch and everything else below it, and
+   * since the tip of a bough is thin and half buried in its leaves, that read
+   * as a caterpillar hanging from nothing at all.
+   */
+  hangGrip: 0.85,
+  /**
+   * Stepping off the side of a branch on purpose.
+   *
+   * On a branch the stick only runs along it, which is what stops a turn
+   * throwing you off — but it also means the only way down is to crawl to an
+   * end. Push firmly across the branch and hold it a moment and the
+   * caterpillar steps off the side and hangs instead. The dwell keeps it
+   * deliberate: a wobble while running along a branch should not drop you.
+   */
+  sideStepPush: 0.5,
+  sideStepDwell: 0.2,
+  /**
+   * How long it must hang before it can haul itself back up.
+   *
+   * Without it, stepping off the side did nothing visible: the push that took
+   * you over the edge is still held on the next frame, hanging reads a held
+   * stick as "climb", and with nothing paid out yet it went straight back onto
+   * the branch in the same step.
+   */
+  hangMinTime: 0.35,
+  /**
+   * A cap on the wait for the stick to come back to rest after hauling onto a
+   * branch. Without it, a player who simply keeps holding the stick is frozen
+   * where they stand — which is exactly what being stuck on a branch feels
+   * like.
+   */
+  regainTimeout: 0.7,
   /** Pushing back toward the branch hauls you up again, a little faster than
    *  you went down: getting back should never feel like a chore. */
   hangClimbSpeed: 4,
@@ -526,6 +584,17 @@ export const FALLING_LEAVES = {
 export const FOOD = {
   /** How close the mouth must be to swallow something. */
   biteRadius: 0.85,
+  /**
+   * How far above or below itself it can reach, as a base plus a share of its
+   * own radius.
+   *
+   * Scaled rather than fixed. A flat allowance is measured from the middle of
+   * a caterpillar, so growing lifts it away from everything on the ground and
+   * out of reach of anything it is standing over — which is how every fruit on
+   * every branch became uneatable once it was fully grown.
+   */
+  biteHeight: 0.9,
+  biteHeightPerRadius: 1.4,
   /**
    * Grass is the exception: it is eaten only where the head actually touches
    * it, as a multiple of the head's own radius, and a tuft's size does not

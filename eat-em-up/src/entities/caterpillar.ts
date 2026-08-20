@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import {mergeGeometries} from "three/examples/jsm/utils/BufferGeometryUtils.js";
-import {CATERPILLAR, CLIMB, IDLE} from "../config";
+import {CATERPILLAR, CLIMB, IDLE, TREE_BRANCH} from "../config";
 import {paint, vertexToon} from "../render/materials";
 import {Climbable, Forest} from "./forest";
 
@@ -45,6 +45,12 @@ export class Caterpillar {
   /** Set after hauling back onto a branch: the stick does nothing until the
    *  player lets go of it. See CATERPILLAR.regainRelease. */
   private awaitRelease = false;
+  /** How long the wait for a released stick has run, so it cannot last for
+   *  ever and strand somebody who simply keeps holding it. */
+  private awaitFor = 0;
+  /** How long the player has been pushing across the branch, for the dwell
+   *  that turns it into stepping off the side. */
+  private sidePush = 0;
   /**
    * Hanging off the end of a branch by the tail, or null.
    *
@@ -60,6 +66,9 @@ export class Caterpillar {
     anchor: THREE.Vector3;
     foothold: THREE.Vector3;
     drop: number;
+    /** How long it has been hanging, so it cannot climb back the instant it
+     *  steps off. */
+    age: number;
   } | null = null;
   /** Unit vector the head points along, pitch included. Where the mouth is. */
   private readonly facing = new THREE.Vector3(0, 0, 1);
@@ -224,7 +233,11 @@ export class Caterpillar {
     // comes back to rest, so the push that got you up there cannot immediately
     // walk you off the other side.
     if (this.awaitRelease) {
-      if (dir.length() < CATERPILLAR.regainRelease) {
+      this.awaitFor += dt;
+      if (
+        dir.length() < CATERPILLAR.regainRelease ||
+        this.awaitFor > CATERPILLAR.regainTimeout
+      ) {
         this.awaitRelease = false;
       }
     }
@@ -244,8 +257,29 @@ export class Caterpillar {
     // from out on a branch. Left and right now run you up and down it, which
     // is what the side-on camera makes it look like they should do anyway.
     if (bough && drive > 0.001) {
+      // Held firmly across the branch, this is someone asking to get off it.
+      // Measured before the projection below, which is what throws it away.
+      const across = -dir.x * bough.dir.y + dir.z * bough.dir.x;
+      if (Math.abs(across) > CATERPILLAR.sideStepPush) {
+        this.sidePush += dt;
+      } else {
+        this.sidePush = 0;
+      }
+      if (this.sidePush >= CATERPILLAR.sideStepDwell) {
+        this.sidePush = 0;
+        // Hung from the edge it stepped over, not from where it was standing.
+        const edge = this.prevPosition.clone();
+        const out =
+          Math.sign(across) * (bough.walkWidth / 2 + this.radius * 0.5);
+        edge.x += -bough.dir.y * out;
+        edge.z += bough.dir.x * out;
+        this.beginDangle(edge);
+        return;
+      }
       const along = dir.x * bough.dir.x + dir.z * bough.dir.y;
       dir.set(bough.dir.x * along, 0, bough.dir.y * along);
+    } else if (!bough) {
+      this.sidePush = 0;
     }
     const railDrive = Math.min(1, dir.length());
 
@@ -313,6 +347,19 @@ export class Caterpillar {
     // caterpillar let go of the branch on its very first step and hang there,
     // descending straight through the branch it had been standing on.
     if (surface <= 0 && this.prevPosition.y > this.radius + 0.2) {
+      // Another branch within reach of its head? Step across to it rather than
+      // hang — where one tree's branches reach into another's you should be
+      // able to cross without climbing all the way down and up again.
+      const near = this.forest.boughStepAcross(
+        this.position,
+        TREE_BRANCH.hopReach + this.radius,
+        bough,
+      );
+      if (near) {
+        this.position.copy(near.point);
+        this.position.y += this.radius;
+        return;
+      }
       this.beginDangle();
       return;
     }
@@ -330,27 +377,36 @@ export class Caterpillar {
     }
   }
 
-  /** How much caterpillar there is behind the head, in world units. */
-  private get bodyLength(): number {
-    return (this.segmentCount - 1) * this.radius * CATERPILLAR.spacing;
+  /**
+   * How far it will lower itself, in world units.
+   *
+   * A fraction of its length rather than all of it: the rest stays lying along
+   * the branch, holding on. See CATERPILLAR.hangGrip.
+   */
+  private get hangReach(): number {
+    return (
+      (this.segmentCount - 1) *
+      this.radius *
+      CATERPILLAR.spacing *
+      CATERPILLAR.hangGrip
+    );
   }
 
-  /** Catches hold of the lip just crawled over. */
-  private beginDangle(): void {
+  /** Catches hold of the lip just crawled over, or of `from` if given. */
+  private beginDangle(from?: THREE.Vector3): void {
     this.dangle = {
-      // Hanging from where the head is now, at the height it last had support:
-      // just past the lip rather than on top of it.
-      anchor: new THREE.Vector3(
-        this.position.x,
-        this.prevPosition.y,
-        this.position.z,
-      ),
+      // Hung from the last place it actually had branch under it, not from the
+      // step past the end where it ran out — it lowers itself from a point on
+      // the branch, which is what holding on looks like. A deliberate step off
+      // the side passes the edge it went over instead.
+      anchor: (from ?? this.prevPosition).clone(),
       // The step before this one, which by definition had support under it.
       // Guessing a way back onto the branch from the anchor instead — a fixed
       // step back along the heading — put the caterpillar down off the side of
       // a neighbouring bough, and it fell straight off again.
       foothold: this.prevPosition.clone(),
       drop: 0,
+      age: 0,
     };
     this.vy = 0;
     this.position.y = this.prevPosition.y;
@@ -377,6 +433,7 @@ export class Caterpillar {
     // climbing. Up the screen is up the rope whichever way the camera happens
     // to be pointing, which is the only mapping that stays true while the
     // camera is swinging about.
+    d.age += dt;
     const haul = -dir.z;
     // Left and right turn on the spot, so the stick always does something and
     // you can choose the way you will be facing when you land.
@@ -389,7 +446,7 @@ export class Caterpillar {
     } else {
       d.drop += CATERPILLAR.hangDropSpeed * dt;
     }
-    d.drop = THREE.MathUtils.clamp(d.drop, 0, this.bodyLength);
+    d.drop = THREE.MathUtils.clamp(d.drop, 0, this.hangReach);
 
     this.position.set(d.anchor.x, d.anchor.y - d.drop, d.anchor.z);
     // Head down, so the mouth reaches whatever it is hanging over.
@@ -404,12 +461,13 @@ export class Caterpillar {
       return;
     }
 
-    if (d.drop <= 0) {
+    if (d.drop <= 0 && d.age > CATERPILLAR.hangMinTime) {
       // Hauled all the way back up: put down exactly where it last had a
       // foothold, and given a moment before the stick means anything again.
       this.dangle = null;
       this.position.copy(d.foothold);
       this.awaitRelease = true;
+      this.awaitFor = 0;
 
       // Facing back the way it came — but along the branch, since that is the
       // only direction it can actually walk in up here. Whichever way along
