@@ -80,10 +80,13 @@ export const CLEARING = {
   radius: 10.5,
   /** Nothing woody is planted within this much of the clearing's edge. */
   margin: 3,
-  /** A tuft's height. Well over the caterpillar's own even fully grown, so
-   *  crawling into the meadow means disappearing into it. */
-  bladeMin: 2.4,
-  bladeMax: 3.6,
+  /**
+   * A tuft's height. Well over the caterpillar's own even fully grown — a
+   * fully fed one stands about 1.2 — so crawling into the meadow means
+   * disappearing into it entirely.
+   */
+  bladeMin: 3.6,
+  bladeMax: 5.4,
   /** Blades in a tuft. One blade reads as a weed; a fistful reads as grass. */
   bladesPerTuft: 10,
   /**
@@ -179,6 +182,16 @@ export const CATERPILLAR = {
   speedMax: 5.8,
   /** How fast the head swings to face where it is going, radians a second. */
   turnRate: 7,
+  /**
+   * How much quicker it turns while it is up on a branch.
+   *
+   * At the ordinary rate, turning round at crawling speed sweeps an arc about
+   * a unit across, and a branch's crawlable strip is 0.9 — so trying to walk
+   * back the way you came threw you off the side every time, which is why
+   * there was no getting back to the trunk from out on a branch.
+   */
+  branchTurnBoost: 3,
+
   /** Fall speed builds at this rate when you crawl off an edge. */
   gravity: 26,
   /**
@@ -317,9 +330,11 @@ export const IDLE = {
    * before settling back down. It is the one idle movement that is addressed
    * to the player rather than to itself.
    */
-  askDelay: 11,
-  /** How often it comes round again, once it has started asking. */
-  askEvery: 17,
+  askDelay: 16,
+  /** How often it comes round again, once it has started asking. Rare on
+   *  purpose: a creature that turns and stares every few seconds stops reading
+   *  as patient and starts reading as broken. */
+  askEvery: 34,
   /** How long it holds the pose. */
   askFor: 3.6,
   /** Fraction of that spent easing into and out of the pose, so it rises and
@@ -344,13 +359,12 @@ export const IDLE = {
   /**
    * How far out along the reared column the head sits, in segment places.
    *
-   * More than one on purpose. At one place the head cleared the segment behind
-   * it by 1.07 units when it needed 1.36 — the two silhouettes still touched,
-   * because a body's spacing is 1.35 radii and a head and a segment together
-   * are 2.16. Stretching the neck by three quarters of a place is what puts
-   * the whole head in the clear.
+   * A little more than one, and no more than that. Stretched to 1.8 the head
+   * cleared the body handsomely and floated half a unit clear of it, which
+   * reads as a head that has come off. The body's own spacing is what keeps
+   * them joined, so this only borrows a fraction of it.
    */
-  askHeadReach: 1.8,
+  askHeadReach: 1.15,
   /** How far the raised legs swing, and how fast. */
   askWaggle: 0.5,
   askWaggleRate: 3.4,

@@ -232,7 +232,24 @@ export class Caterpillar {
     // Idling is a thing it does standing on the ground, so any input — and
     // climbing or hanging, handled elsewhere — puts a stop to it.
     this.still = drive > 0.02 ? 0 : this.still + dt;
-    if (drive > 0.001) {
+
+    const bough = this.forest.boughUnder(this.position, this.radius + 0.4);
+
+    // On a branch you are on a rail: only the part of the stick running along
+    // the branch counts, and the part across it is dropped.
+    //
+    // A branch's crawlable strip is 0.9 wide and an ordinary turn sweeps an
+    // arc wider than that, so steering freely up there walked you off the side
+    // whatever you did — which is why there was no getting back to the trunk
+    // from out on a branch. Left and right now run you up and down it, which
+    // is what the side-on camera makes it look like they should do anyway.
+    if (bough && drive > 0.001) {
+      const along = dir.x * bough.dir.x + dir.z * bough.dir.y;
+      dir.set(bough.dir.x * along, 0, bough.dir.y * along);
+    }
+    const railDrive = Math.min(1, dir.length());
+
+    if (railDrive > 0.001) {
       const want = Math.atan2(dir.x, dir.z);
       // Turn toward the new heading the short way round.
       let delta = want - this.heading;
@@ -242,14 +259,30 @@ export class Caterpillar {
       while (delta < -Math.PI) {
         delta += Math.PI * 2;
       }
-      const step = CATERPILLAR.turnRate * dt;
+      const step =
+        CATERPILLAR.turnRate * dt * (bough ? CATERPILLAR.branchTurnBoost : 1);
       this.heading += THREE.MathUtils.clamp(delta, -step, step);
 
-      const speed = this.speed * drive;
+      // On a branch it travels along the rail rather than along its heading.
+      // Constraining the input alone was not enough: through a turn the
+      // heading sweeps across the branch, and moving along it carried the
+      // caterpillar off the side before it had finished turning round.
+      let moveX = Math.sin(this.heading);
+      let moveZ = Math.cos(this.heading);
+      let speed = this.speed * railDrive;
+      if (bough) {
+        moveX = dir.x / railDrive;
+        moveZ = dir.z / railDrive;
+        // ...and only once it is facing that way, so it turns on the spot
+        // first instead of moonwalking off down the branch backwards.
+        const align =
+          Math.sin(this.heading) * moveX + Math.cos(this.heading) * moveZ;
+        speed *= Math.max(0, align);
+      }
       this.planarSpeed = speed;
-      this.position.x += Math.sin(this.heading) * speed * dt;
-      this.position.z += Math.cos(this.heading) * speed * dt;
-      this.crawlPhase += CATERPILLAR.humpRate * dt * drive;
+      this.position.x += moveX * speed * dt;
+      this.position.z += moveZ * speed * dt;
+      this.crawlPhase += CATERPILLAR.humpRate * dt * railDrive;
     } else {
       this.planarSpeed = 0;
     }
@@ -257,7 +290,7 @@ export class Caterpillar {
     this.facing.set(Math.sin(this.heading), 0, Math.cos(this.heading));
 
     // Heading into a trunk for long enough takes hold of it.
-    if (this.tryGrab(dt, dir, drive)) {
+    if (this.tryGrab(dt, dir, railDrive)) {
       return;
     }
 

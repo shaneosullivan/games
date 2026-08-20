@@ -5,16 +5,29 @@ import {Forest} from "./forest";
 import leaf1Url from "../assets/leaf1.png";
 import leaf2Url from "../assets/leaf2.png";
 import leaf3Url from "../assets/leaf3.png";
+import leaf1GreenUrl from "../assets/leaf1-green.png";
+import leaf2GreenUrl from "../assets/leaf2-green.png";
+import leaf3GreenUrl from "../assets/leaf3-green.png";
 
 /**
- * The three drawn leaves, taken from the bee game, which has the same three
- * falling through its woods. They are pictures rather than built shapes
- * because at this size a picture simply looks better than anything a handful
- * of merged primitives can be talked into.
+ * The six drawn leaves. Three are the bee game's, which has the same ones
+ * falling through its woods; three are those same pictures with their hue
+ * rotated into leaf green, so what comes down is a mix rather than a
+ * permanent autumn in a summer forest.
  *
- * All three are square, which is what lets one plane geometry serve them all.
+ * They are pictures rather than built shapes because at this size a picture
+ * simply looks better than anything a handful of merged primitives can be
+ * talked into. All six are square, which is what lets one plane geometry
+ * serve them all.
  */
-const LEAF_URLS = [leaf1Url, leaf2Url, leaf3Url];
+const LEAF_URLS = [
+  leaf1Url,
+  leaf2Url,
+  leaf3Url,
+  leaf1GreenUrl,
+  leaf2GreenUrl,
+  leaf3GreenUrl,
+];
 
 /** One leaf on its way down, or lying where it landed. */
 interface Leaf {

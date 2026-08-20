@@ -182,9 +182,15 @@ export class Forest {
     return best;
   }
 
+  /** How far (x, z) is to the side of a bough's centre line. */
+  boughAcross(b: Bough, x: number, z: number): number {
+    return -(x - b.base.x) * b.dir.y + (z - b.base.z) * b.dir.x;
+  }
+
   /**
    * The bough whose surface you are standing on at this height, if any. Used
-   * to suspend a trunk's collision while you are out on its own branch.
+   * to suspend a trunk's collision while you are out on its own branch, and to
+   * keep the caterpillar to the middle of it while it turns.
    */
   boughUnder(pos: THREE.Vector3, tolerance: number): Bough | null {
     for (const b of this.boughs) {
