@@ -8,6 +8,12 @@
       "port": 5173
     },
     {
+      "name": "eat-em-up",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "eat-em-up", "run", "dev"],
+      "port": 5173
+    },
+    {
       "name": "site",
       "runtimeExecutable": "npm",
       "runtimeArgs": ["--prefix", "site", "run", "serve"],

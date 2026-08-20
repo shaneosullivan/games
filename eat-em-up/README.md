@@ -1,0 +1,165 @@
+# Eat em up
+
+You are a hungry caterpillar in a small forest. Eat everything you can find,
+grow fatter and longer as you do, and when you have had enough of everything
+you curl up, become a chrysalis, and burst out of it as a butterfly.
+
+A touch-native 3D web game. TypeScript + Three.js + Vite, built to one
+self-contained `index.html` and published by the gallery in the repo root. See
+[docs/plan-for-app.md](docs/plan-for-app.md) for the design this was built from.
+
+## Running it
+
+```bash
+npm --prefix eat-em-up run dev
+```
+
+Then open the URL Vite prints. On a tablet on the same Wi-Fi, use this Mac's LAN
+address (`ipconfig getifaddr en0`) with the same port.
+
+For the installed-app feel, **Share → Add to Home Screen** and launch from the
+icon.
+
+## Controls
+
+One thumb, and nothing else. The stick plants itself wherever a finger lands, so
+there is no control to find first.
+
+- **Drag anywhere** — crawl. Up the screen is always the way you are facing;
+  the camera swings round behind you.
+- **Crawl into a tree** — take hold of it and climb. Up and down the screen
+  climbs the trunk, left and right go round it.
+- **Climb level with a branch** — step onto it, and crawl out along it.
+- **Crawl off the end or the side of a branch** — you do not fall. You hang by
+  your tail and lower yourself. If your head reaches the ground you let go and
+  carry on; if it does not, you just dangle. Push back to haul yourself up.
+- **Arrow keys or WASD** — the same, for testing on a laptop.
+
+## The game
+
+Eat 80 leaves, 40 flowers, 60 berries, 45 fruits and 120 tufts of grass. You
+cannot lose and nothing can hurt you; crawling off a branch just drops you back
+onto the forest floor.
+
+- **Leaves** are on the bushes, along the branch you start on, and up the
+  trunks — the reward for climbing.
+- **Flowers** grow in patches out in the open.
+- **Berries** come in bunches on the bushes.
+- **Fruit** — apples, wild strawberries, blackberries and peaches — lies fallen
+  under the trees, but most of it hangs at the end of a branch. You can see it
+  from the ground and you cannot reach it from there: climb the trunk, step
+  onto the branch, and edge out to the tip.
+- **Grass** fills one tall meadow, and is the one thing eaten only where your
+  head actually touches it.
+
+Growth is your progress toward the quotas, averaged, and anything past a quota
+stops counting — so mowing the whole meadow can never be more than a fifth of
+it. Fully fed you are nearly four times as fat and sixteen times as long as you
+started, and the camera pulls back as you go.
+
+When every quota is met the transformation plays, and then the butterfly is
+yours to fly around the wood for as long as you like.
+
+## Commands
+
+```bash
+npm --prefix eat-em-up run dev         # dev server, hot reload
+npm --prefix eat-em-up run typecheck   # tsc --noEmit
+npm --prefix eat-em-up run build       # typechecks, then one dist/index.html
+```
+
+Formatting and linting come from the repo root (`npm run format`, `npm run
+lint`), so this game is covered without any config of its own.
+
+## Publishing
+
+`game.json` carries a `status`. It starts as `"development"`, which lists the
+game in the gallery's **In Development** section — flagged as unfinished. When
+it is ready, change it to `"published"` and it moves to the main list of games.
+
+## Layout
+
+```
+docs/
+  plan-for-app.md  the design this was built from
+src/
+  config.ts        every tunable number in the game, grouped by system
+  core/            the loop, the thumbstick, the seeded rng
+  render/          the stage, the toon materials, the near-fade shader
+  entities/        the forest, the food, the caterpillar, the ending
+  ui/              the counters, the overlays, the stylesheet
+  game.ts          owns all of it and runs the flow between them
+index.html         the entry point
+card.png           the gallery's thumbnail — still the scaffold's flat colour
+game.json          title, description and status, for the gallery
+```
+
+## Architecture
+
+Constraints that have already caught someone out here:
+
+- **"Nothing underneath" means no surface, not "below me".** A bough tapers, so
+  its top steps fractionally down with every crawl out along it. Testing
+  whether the caterpillar is _above_ the surface treats that slope as thin air
+  and made it let go of the branch on its first step.
+- **A cylinder's first radius sits at +Y**, which `rotateZ(π/2)` maps to −X.
+  The start bough was built with the two the wrong way round, so it was drawn
+  tapering the opposite way to the surface being walked on — the caterpillar
+  floated near the trunk and sank into the branch out at the tip.
+- **Nothing falls off a branch.** Crawling past the end or off the side hangs
+  the caterpillar by its tail from the lip. Hauling back up puts it down on the
+  last position that actually had support, rather than a guessed step back
+  along the heading — that guess landed it off the side of a neighbouring
+  bough, and it fell straight off again.
+- **The body follows, it isn't simulated.** The head records where it has been
+  and every segment sits a fixed distance back along that trail. Crawling off a
+  branch drapes the body over the edge for free, because the trail goes over
+  the edge. Segment pitch is read off the body line for the same reason.
+- **A branch and the bough you start on are the same thing.** Everything that
+  asks what it is standing on walks one list of `Bough`s. Adding a walkable
+  surface means adding to that list, not adding a case.
+- **The canopy is high on purpose.** The camera rides several units above the
+  caterpillar; a lower canopy puts it inside the leaves, and the screen goes
+  dark for no reason the player can see. Climbing stops short of the foliage
+  for the same reason, and the climbing camera drops _below_ the player.
+- **Anything that can stand between the camera and the player fades** — trunks,
+  crowns, bushes and the tall grass all share one material driven by the
+  player's own view depth. See `render/fadeInFront.ts`.
+- **Instanced meshes can't skip an instance.** Eaten food is scaled to zero.
+- **`paint()` needs non-indexed geometry**, so everything that gets merged goes
+  through it.
+- **Coplanar faces z-fight.** Anything laid on a surface stands slightly proud
+  of it.
+- **Screen axes and world axes are different things.** Crawling and flying read
+  the stick against the camera's bearing; climbing reads it raw, because up the
+  screen has to mean up the trunk. For a camera looking along `(sin y, 0, cos y)`
+  screen-right is `(-cos y, 0, sin y)` — its negative is left and right swapped.
+
+## Verifying a change
+
+There is no test suite. In a dev build `window.game` is the live `Game`, and
+most of its fields are private only to TypeScript:
+
+```js
+const g = window.game;
+g.loop.stop(); // take over the clock
+g.running = true; // update() no-ops unless this is set
+g.stick.enabled = false; // stop stray input driving it
+document.querySelectorAll(".overlay").forEach(o => o.classList.add("hidden"));
+g.stick.x = 0;
+g.stick.y = -1;
+g.stick.magnitude = 1; // hold "up the screen"
+for (let i = 0; i < 600; i++) {
+  g.update(1 / 60);
+  g.render(1, 1 / 60);
+}
+```
+
+- `g.cat.place(vec, heading)` puts the caterpillar anywhere; `g.food.eaten` can
+  be written to directly to fake progress. Setting every kind to its quota
+  trips the ending, so use less than that unless you want it.
+- Measure rather than eyeball. The caterpillar is always at the centre of the
+  screen, so to test which way it moved, dot the movement with column 0 of
+  `camera.matrixWorld` — the camera's own right vector.
+- **Screenshots after manual stepping can be a frame stale.** Restart the loop
+  and take it again before believing one.

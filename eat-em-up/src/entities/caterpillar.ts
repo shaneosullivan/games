@@ -1,0 +1,720 @@
+import * as THREE from "three";
+import {mergeGeometries} from "three/examples/jsm/utils/BufferGeometryUtils.js";
+import {CATERPILLAR, CLIMB, IDLE} from "../config";
+import {paint, vertexToon} from "../render/materials";
+import {Climbable, Forest} from "./forest";
+
+/** How far apart trail samples are taken, in units. */
+const TRAIL_STEP = 0.06;
+
+const BODY_LIGHT = 0x8ecb46;
+const BODY_DARK = 0x63a733;
+const HEAD_COLOUR = 0xd94f3d;
+
+/**
+ * The player: a caterpillar that crawls, eats, and gets longer and fatter as
+ * it does.
+ *
+ * The body is not simulated — it follows. The head records where it has been,
+ * and every segment sits a fixed distance back along that trail. That is what
+ * makes crawling off the branch look right for free: the body drapes over the
+ * edge because the trail it is following goes over the edge.
+ */
+export class Caterpillar {
+  readonly group = new THREE.Group();
+
+  readonly position = new THREE.Vector3();
+  private readonly prevPosition = new THREE.Vector3();
+
+  /** Which way the head points, radians about Y. */
+  heading = 0;
+  private vy = 0;
+
+  /** The trunk being climbed, or null when on the ground. */
+  climbing: Climbable | null = null;
+  /** Where round that trunk the caterpillar is, radians. */
+  private climbAngle = 0;
+  /** How long the player has been pushing into a trunk, for the grab dwell. */
+  private pressing = 0;
+  /**
+   * Hanging off the end of a branch by the tail, or null.
+   *
+   * `anchor` is the lip it is hanging from, `drop` is how far the head has
+   * lowered below it, and `foothold` is the last place it definitely had
+   * something under it — which is where it is put back if it hauls itself up.
+   *
+   * The body needs no special handling: it follows the trail as always, and
+   * the trail goes over the lip and straight down, so the drape comes out
+   * right on its own.
+   */
+  private dangle: {
+    anchor: THREE.Vector3;
+    foothold: THREE.Vector3;
+    drop: number;
+  } | null = null;
+  /** Unit vector the head points along, pitch included. Where the mouth is. */
+  private readonly facing = new THREE.Vector3(0, 0, 1);
+
+  /** 0 at the start, 1 when fully grown. Set by the game from what's eaten. */
+  growth = 0;
+
+  private readonly segments: Array<THREE.Mesh> = [];
+  private readonly head: THREE.Group;
+  /** Newest first. The path the head has taken. */
+  private readonly trail: Array<THREE.Vector3> = [];
+  private readonly segCur: Array<THREE.Vector3> = [];
+  private readonly segPrev: Array<THREE.Vector3> = [];
+  private crawlPhase = 0;
+  /** How long the player has been asking for nothing. Drives the idle
+   *  behaviour: looking about, wagging, and scratching. */
+  private still = 0;
+  private readonly tmp = new THREE.Vector3();
+  private readonly tmpB = new THREE.Vector3();
+
+  constructor(private readonly forest: Forest) {
+    // Every segment is built at radius 1 and scaled, so growing is a scale
+    // rather than a rebuild.
+    const light = segmentGeometry(BODY_LIGHT);
+    const dark = segmentGeometry(BODY_DARK);
+    for (let i = 0; i < CATERPILLAR.segmentsMax; i++) {
+      const mesh = new THREE.Mesh(i % 2 === 0 ? light : dark, vertexToon());
+      mesh.visible = false;
+      this.group.add(mesh);
+      this.segments.push(mesh);
+      this.segCur.push(new THREE.Vector3());
+      this.segPrev.push(new THREE.Vector3());
+    }
+
+    this.head = makeHead();
+    this.group.add(this.head);
+  }
+
+  /** The point food is eaten at: just in front of the face. Follows the head's
+   *  pitch, so climbing reaches the leaves above rather than the bark ahead. */
+  get mouth(): THREE.Vector3 {
+    return this.tmpB
+      .copy(this.position)
+      .addScaledVector(this.facing, this.radius * 1.1);
+  }
+
+  get radius(): number {
+    return THREE.MathUtils.lerp(
+      CATERPILLAR.radiusMin,
+      CATERPILLAR.radiusMax,
+      this.growth,
+    );
+  }
+
+  get speed(): number {
+    return THREE.MathUtils.lerp(
+      CATERPILLAR.speedMin,
+      CATERPILLAR.speedMax,
+      this.growth,
+    );
+  }
+
+  private get segmentCount(): number {
+    return Math.round(
+      THREE.MathUtils.lerp(
+        CATERPILLAR.segmentsMin,
+        CATERPILLAR.segmentsMax,
+        this.growth,
+      ),
+    );
+  }
+
+  /** Puts the caterpillar down facing `heading`, with its body laid out behind. */
+  place(at: THREE.Vector3, heading: number): void {
+    this.position.copy(at);
+    this.prevPosition.copy(at);
+    this.heading = heading;
+    this.vy = 0;
+    this.climbing = null;
+    this.dangle = null;
+    this.pressing = 0;
+    this.facing.set(Math.sin(heading), 0, Math.cos(heading));
+    this.trail.length = 0;
+    // Seed the trail straight back from the head. Without this the whole body
+    // starts stacked on one point and unfolds with a lurch on the first step.
+    const back = new THREE.Vector3(-Math.sin(heading), 0, -Math.cos(heading));
+    for (let i = 0; i < CATERPILLAR.trailLength; i++) {
+      this.trail.push(
+        new THREE.Vector3().copy(at).addScaledVector(back, i * TRAIL_STEP),
+      );
+    }
+    this.layOutBody();
+    for (let i = 0; i < this.segCur.length; i++) {
+      this.segPrev[i].copy(this.segCur[i]);
+    }
+  }
+
+  /**
+   * `dir` is the direction to crawl in world space, length 0..1. A zero vector
+   * means stand still.
+   */
+  update(dt: number, dir: THREE.Vector3): void {
+    this.prevPosition.copy(this.position);
+    for (let i = 0; i < this.segCur.length; i++) {
+      this.segPrev[i].copy(this.segCur[i]);
+    }
+
+    if (this.climbing) {
+      this.climb(dt, dir);
+    } else if (this.dangle) {
+      this.hang(dt, dir);
+    } else {
+      this.crawl(dt, dir);
+    }
+
+    this.recordTrail();
+    this.layOutBody();
+  }
+
+  /** Crawling about the forest floor, and along the start branch. */
+  private crawl(dt: number, dir: THREE.Vector3): void {
+    const drive = Math.min(1, dir.length());
+    // Idling is a thing it does standing on the ground, so any input — and
+    // climbing or hanging, handled elsewhere — puts a stop to it.
+    this.still = drive > 0.02 ? 0 : this.still + dt;
+    if (drive > 0.001) {
+      const want = Math.atan2(dir.x, dir.z);
+      // Turn toward the new heading the short way round.
+      let delta = want - this.heading;
+      while (delta > Math.PI) {
+        delta -= Math.PI * 2;
+      }
+      while (delta < -Math.PI) {
+        delta += Math.PI * 2;
+      }
+      const step = CATERPILLAR.turnRate * dt;
+      this.heading += THREE.MathUtils.clamp(delta, -step, step);
+
+      const speed = this.speed * drive;
+      this.position.x += Math.sin(this.heading) * speed * dt;
+      this.position.z += Math.cos(this.heading) * speed * dt;
+      this.crawlPhase += CATERPILLAR.humpRate * dt * drive;
+    }
+
+    this.facing.set(Math.sin(this.heading), 0, Math.cos(this.heading));
+
+    // Heading into a trunk for long enough takes hold of it.
+    if (this.tryGrab(dt, dir, drive)) {
+      return;
+    }
+
+    this.forest.collide(this.position, this.radius);
+
+    // Stand on whatever is underneath, or fall to it.
+    const surface = this.forest.surfaceAt(
+      this.position.x,
+      this.position.z,
+      this.position.y,
+    );
+    const rest = surface + this.radius;
+
+    // Nothing underneath at all, having just been up on something: catch hold
+    // of the lip and hang rather than fall.
+    //
+    // The test is that there is no surface here, not that we are above the one
+    // there is. A bough tapers, so its top steps fractionally down with every
+    // crawl out along it — measuring "am I higher than the surface?" made the
+    // caterpillar let go of the branch on its very first step and hang there,
+    // descending straight through the branch it had been standing on.
+    if (surface <= 0 && this.prevPosition.y > this.radius + 0.2) {
+      this.beginDangle();
+      return;
+    }
+
+    if (this.position.y > rest + 1e-3) {
+      this.vy -= CATERPILLAR.gravity * dt;
+      this.position.y += this.vy * dt;
+      if (this.position.y < rest) {
+        this.position.y = rest;
+        this.vy = 0;
+      }
+    } else {
+      this.position.y = rest;
+      this.vy = 0;
+    }
+  }
+
+  /** How much caterpillar there is behind the head, in world units. */
+  private get bodyLength(): number {
+    return (this.segmentCount - 1) * this.radius * CATERPILLAR.spacing;
+  }
+
+  /** Catches hold of the lip just crawled over. */
+  private beginDangle(): void {
+    this.dangle = {
+      // Hanging from where the head is now, at the height it last had support:
+      // just past the lip rather than on top of it.
+      anchor: new THREE.Vector3(
+        this.position.x,
+        this.prevPosition.y,
+        this.position.z,
+      ),
+      // The step before this one, which by definition had support under it.
+      // Guessing a way back onto the branch from the anchor instead — a fixed
+      // step back along the heading — put the caterpillar down off the side of
+      // a neighbouring bough, and it fell straight off again.
+      foothold: this.prevPosition.clone(),
+      drop: 0,
+    };
+    this.vy = 0;
+    this.position.y = this.prevPosition.y;
+    this.facing.set(0, -1, 0);
+  }
+
+  /**
+   * Hanging by the tail off a branch.
+   *
+   * It lowers itself until either its head reaches the ground — in which case
+   * it lets go and carries on crawling — or it runs out of body, in which case
+   * it simply hangs there. Pushing back toward the branch hauls it up again.
+   */
+  private hang(dt: number, dir: THREE.Vector3): void {
+    this.still = 0;
+    const d = this.dangle;
+    if (!d) {
+      return;
+    }
+
+    // Left and right turn on the spot while hanging, so the stick always does
+    // something and you can choose the way you will be facing when you land.
+    const drive = Math.min(1, dir.length());
+    if (drive > 0.001) {
+      const delta = wrapAngle(Math.atan2(dir.x, dir.z) - this.heading);
+      // sin() takes only the sideways part of that: pushing straight forward
+      // or straight back is for lowering and hauling up, and should not spin
+      // the caterpillar through half a turn.
+      this.heading = wrapAngle(
+        this.heading + Math.sin(delta) * CATERPILLAR.turnRate * dt * drive,
+      );
+    }
+
+    // How much of the stick is pulling back the way we came.
+    const back = -(
+      dir.x * Math.sin(this.heading) +
+      dir.z * Math.cos(this.heading)
+    );
+    if (back > 0.2) {
+      d.drop -= CATERPILLAR.hangClimbSpeed * dt * back;
+    } else {
+      d.drop += CATERPILLAR.hangDropSpeed * dt;
+    }
+    d.drop = THREE.MathUtils.clamp(d.drop, 0, this.bodyLength);
+
+    this.position.set(d.anchor.x, d.anchor.y - d.drop, d.anchor.z);
+    // Head down, so the mouth reaches whatever it is hanging over.
+    this.facing.set(0, -1, 0);
+
+    const floor = this.radius;
+    if (this.position.y - floor <= CATERPILLAR.dangleLetGo) {
+      // Close enough to the ground: let go and drop the rest of the way.
+      this.dangle = null;
+      this.position.y = floor;
+      this.facing.set(Math.sin(this.heading), 0, Math.cos(this.heading));
+      return;
+    }
+
+    if (d.drop <= 0) {
+      // Hauled all the way back up: put down exactly where it last had a
+      // foothold, turned round to face the way it now wants to go.
+      this.dangle = null;
+      this.position.copy(d.foothold);
+      this.heading = wrapAngle(this.heading + Math.PI);
+      this.facing.set(Math.sin(this.heading), 0, Math.cos(this.heading));
+    }
+  }
+
+  /**
+   * Takes hold of a trunk the player is deliberately pushing into.
+   *
+   * The dwell is what stops every glancing bump on the way across the wood
+   * turning into a climb nobody asked for.
+   */
+  private tryGrab(dt: number, dir: THREE.Vector3, drive: number): boolean {
+    const tree = this.forest.climbableAt(this.position, this.radius, 0.25);
+    if (!tree || drive < 0.2 || tree.climbTop <= this.position.y) {
+      this.pressing = 0;
+      return false;
+    }
+    // Are we actually heading at it, or just passing?
+    const tx = tree.x - this.position.x;
+    const tz = tree.z - this.position.z;
+    const len = Math.hypot(tx, tz);
+    const dot = len > 1e-4 ? (dir.x * tx + dir.z * tz) / (drive * len) : 0;
+    if (dot < CLIMB.grabDot) {
+      this.pressing = 0;
+      return false;
+    }
+    this.pressing += dt;
+    if (this.pressing < CLIMB.grabDwell) {
+      return false;
+    }
+    this.pressing = 0;
+    this.climbing = tree;
+    this.climbAngle = Math.atan2(
+      this.position.z - tree.z,
+      this.position.x - tree.x,
+    );
+    this.vy = 0;
+    this.stickToTrunk();
+    return true;
+  }
+
+  /**
+   * Climbing a trunk.
+   *
+   * The stick keeps its screen meaning: push up the screen to go up the tree,
+   * left and right to go round it. Mapping "around" onto the world direction
+   * you happen to be facing would mean the same push did something different
+   * on each side of the trunk.
+   */
+  private climb(dt: number, dir: THREE.Vector3): void {
+    this.still = 0;
+    const tree = this.climbing;
+    if (!tree) {
+      return;
+    }
+    // dir.z is the screen's up-down axis, positive toward the camera.
+    const up = -dir.z;
+    const around = dir.x;
+
+    this.climbAngle += around * CLIMB.aroundSpeed * dt;
+    this.position.y += up * CLIMB.speed * dt;
+    this.crawlPhase +=
+      CATERPILLAR.humpRate * dt * Math.min(1, Math.hypot(up, around));
+
+    const floor = this.radius;
+    const top = tree.climbTop;
+    this.position.y = THREE.MathUtils.clamp(this.position.y, floor, top);
+    this.stickToTrunk();
+
+    // Facing up or down the bark, which is where the mouth needs to be.
+    this.facing.set(0, up < -0.05 ? -1 : 1, 0);
+    // The body still needs a yaw for the head to face out from the trunk.
+    this.heading = Math.atan2(
+      Math.cos(this.climbAngle),
+      Math.sin(this.climbAngle),
+    );
+
+    // Going round the trunk is not an attempt to get onto a branch.
+    //
+    // The boarding window is deliberately wide, which means circling a trunk
+    // sweeps through the window of every branch at that height. Without this
+    // the caterpillar is snatched onto the first one it passes and then —
+    // still being pushed sideways — walks straight off the side of it. From
+    // the player's chair that reads as the tree refusing to let them turn.
+    const circling = Math.abs(around) > Math.abs(up) * 1.2 + 0.15;
+    if (circling) {
+      return;
+    }
+
+    // Step off onto any of this trunk's branches when you climb level with one
+    // on the side you are climbing. This is how you get out to the fruit.
+    const bough = this.forest.boughToStepOnto(
+      tree,
+      this.position,
+      this.position.y - this.radius,
+    );
+    if (bough) {
+      // Put down on the branch's centre line facing along it, rather than left
+      // wherever the climb happened to be. That is what makes a generous grab
+      // safe: catch the branch from a little off to one side and you still end
+      // up standing squarely on it, pointed the way you now want to go.
+      const spot = this.forest.boardingSpot(
+        bough,
+        this.position.x,
+        this.position.z,
+      );
+      this.climbing = null;
+      this.pressing = 0;
+      this.vy = 0;
+      this.position.copy(spot.point);
+      this.position.y += this.radius;
+      this.heading = spot.heading;
+      this.facing.set(Math.sin(this.heading), 0, Math.cos(this.heading));
+      return;
+    }
+
+    // Back on the floor, let go — otherwise you would be stuck to the bark
+    // with nothing to do but climb again.
+    if (this.position.y <= floor + 1e-3 && up < 0) {
+      this.letGo(floor);
+    }
+  }
+
+  /** Holds the caterpillar against the bark at its current height and angle. */
+  private stickToTrunk(): void {
+    const tree = this.climbing;
+    if (!tree) {
+      return;
+    }
+    const r = tree.radius + this.radius;
+    this.position.x = tree.x + Math.cos(this.climbAngle) * r;
+    this.position.z = tree.z + Math.sin(this.climbAngle) * r;
+  }
+
+  /** Lets go of a trunk onto a surface at height `y`. */
+  private letGo(y: number): void {
+    this.climbing = null;
+    this.pressing = 0;
+    this.vy = 0;
+    this.position.y = y;
+    this.facing.set(Math.sin(this.heading), 0, Math.cos(this.heading));
+  }
+
+  /** Samples the head's path at a fixed spacing, so the body's spacing along
+   *  the trail doesn't depend on how fast the head was going. */
+  private recordTrail(): void {
+    const newest = this.trail[0];
+    if (
+      !newest ||
+      newest.distanceToSquared(this.position) >= TRAIL_STEP * TRAIL_STEP
+    ) {
+      this.trail.unshift(new THREE.Vector3().copy(this.position));
+      if (this.trail.length > CATERPILLAR.trailLength) {
+        this.trail.pop();
+      }
+    }
+  }
+
+  /** Walks back along the trail placing each segment its own distance behind. */
+  private layOutBody(): void {
+    const radius = this.radius;
+    const gap = radius * CATERPILLAR.spacing;
+    const count = this.segmentCount;
+
+    let index = 0;
+    let travelled = 0;
+    let target = gap;
+
+    for (let s = 0; s < count; s++) {
+      while (index < this.trail.length - 1 && travelled < target) {
+        travelled += this.trail[index].distanceTo(this.trail[index + 1]);
+        index++;
+      }
+      const point = this.trail[Math.min(index, this.trail.length - 1)];
+      this.segCur[s].copy(point);
+      // The inchworm ripple. Segments further back are further through the
+      // wave, which is what makes it travel down the body instead of the whole
+      // caterpillar bobbing as one.
+      this.segCur[s].y +=
+        Math.max(0, Math.sin(this.crawlPhase - s * CATERPILLAR.humpPhase)) *
+        CATERPILLAR.humpHeight *
+        radius *
+        2;
+      target += gap;
+    }
+
+    for (let s = 0; s < this.segments.length; s++) {
+      this.segments[s].visible = s < count;
+    }
+  }
+
+  /**
+   * How far into its idle behaviour it is, 0 to 1.
+   *
+   * Eased in rather than switched on, so a caterpillar that has just stopped
+   * does not immediately start performing.
+   */
+  private get idling(): number {
+    if (this.still <= IDLE.delay) {
+      return 0;
+    }
+    return Math.min(1, (this.still - IDLE.delay) / IDLE.easeIn);
+  }
+
+  /**
+   * Where it is in a scratch, 0 to 1, or 0 when it isn't scratching.
+   *
+   * Comes round every few seconds and lasts a moment and a half; the envelope
+   * is a half sine, so it lifts into the scratch and settles out of it.
+   */
+  private get scratching(): number {
+    if (this.idling <= 0) {
+      return 0;
+    }
+    const t = this.still % IDLE.scratchEvery;
+    if (t > IDLE.scratchFor) {
+      return 0;
+    }
+    return Math.sin((t / IDLE.scratchFor) * Math.PI) * this.idling;
+  }
+
+  /** `alpha` is how far between the last two simulation steps we are. */
+  render(alpha: number): void {
+    const radius = this.radius;
+    const idling = this.idling;
+    const scratch = this.scratching;
+    // Two waves of different lengths, so looking about never falls into an
+    // obvious rhythm.
+    const look =
+      idling *
+      IDLE.lookAmount *
+      (Math.sin(this.still * IDLE.lookRate) * 0.7 +
+        Math.sin(this.still * IDLE.lookWanderRate) * 0.3);
+
+    this.tmp.lerpVectors(this.prevPosition, this.position, alpha);
+    this.head.position.copy(this.tmp);
+    // YXZ: the yaw is applied first and the pitch about the head's own axis
+    // after it, so a climbing caterpillar looks up the trunk it is facing
+    // rather than up whatever direction the world calls forward.
+    this.head.rotation.order = "YXZ";
+    this.head.rotation.y = this.heading + look;
+    this.head.rotation.x =
+      -Math.atan2(this.facing.y, Math.hypot(this.facing.x, this.facing.z)) +
+      idling * IDLE.nodAmount * Math.sin(this.still * IDLE.nodRate);
+    // Tipped over into a scratch, always to the same side so it reads as one
+    // movement rather than a wobble.
+    this.head.rotation.z = scratch * IDLE.scratchTilt;
+    this.head.scale.setScalar(radius * 1.16);
+
+    const count = this.segmentCount;
+    // Sideways, level, at right angles to the way it is facing — the axis both
+    // the tail wag and the scratch jitter move along.
+    const sideX = Math.cos(this.heading);
+    const sideZ = -Math.sin(this.heading);
+    const wagFrom = Math.floor(count * IDLE.wagFrom);
+
+    for (let s = 0; s < count; s++) {
+      const mesh = this.segments[s];
+      mesh.position.lerpVectors(this.segPrev[s], this.segCur[s], alpha);
+
+      if (idling > 0) {
+        // The back half wags, further the nearer the tail, and each segment a
+        // little behind the one in front so the swing travels down the body.
+        if (s >= wagFrom) {
+          const along = (s - wagFrom) / Math.max(1, count - 1 - wagFrom);
+          const swing =
+            Math.sin(this.still * IDLE.wagRate - s * 0.45) *
+            IDLE.wagAmount *
+            along *
+            idling *
+            radius *
+            2;
+          mesh.position.x += sideX * swing;
+          mesh.position.z += sideZ * swing;
+        }
+        // And the segment or two behind the head do the scratching: lifted
+        // against the head and jittering against it.
+        if (scratch > 0 && s < IDLE.scratchSegments) {
+          const share = 1 - s / IDLE.scratchSegments;
+          mesh.position.y += scratch * IDLE.scratchLift * radius * share;
+          const jitter =
+            Math.sin(this.still * IDLE.scratchRate * Math.PI * 2) *
+            IDLE.scratchJitter *
+            radius *
+            scratch *
+            share;
+          mesh.position.x += sideX * jitter;
+          mesh.position.z += sideZ * jitter;
+        }
+      }
+      // Segments taper toward the tail, so it reads as a caterpillar and not a
+      // string of identical beads.
+      const taper = 1 - (s / Math.max(1, count - 1)) * 0.32;
+      mesh.scale.setScalar(radius * taper);
+      // Each segment faces the one in front, so a turn bends the body and a
+      // climb stands it on end. Taking the pitch from the body line rather
+      // than from a climbing flag means the drape from trunk to floor is
+      // right too: the segments still on the bark are vertical while the ones
+      // that have reached the ground are already flat.
+      const ahead = s === 0 ? this.position : this.segCur[s - 1];
+      const dx = ahead.x - this.segCur[s].x;
+      const dy = ahead.y - this.segCur[s].y;
+      const dz = ahead.z - this.segCur[s].z;
+      const horizontal = Math.hypot(dx, dz);
+      mesh.rotation.order = "YXZ";
+      // Straight up the trunk the horizontal part is nothing but noise, and
+      // taking a yaw from it makes the whole body spin on the spot.
+      if (horizontal > 0.02) {
+        mesh.rotation.y = Math.atan2(dx, dz);
+      }
+      mesh.rotation.x = -Math.atan2(dy, horizontal);
+    }
+  }
+}
+
+/** Keeps an angle in -PI..PI, so it doesn't wander off into big numbers as
+ *  the caterpillar turns about. */
+function wrapAngle(a: number): number {
+  let out = a;
+  while (out > Math.PI) {
+    out -= Math.PI * 2;
+  }
+  while (out < -Math.PI) {
+    out += Math.PI * 2;
+  }
+  return out;
+}
+
+/** One body segment, at radius 1: a slightly squashed ball with two feet. */
+function segmentGeometry(colour: number): THREE.BufferGeometry {
+  const parts: Array<THREE.BufferGeometry> = [];
+  const body = new THREE.SphereGeometry(1, 10, 8);
+  body.scale(1, 0.92, 1);
+  parts.push(paint(body, colour));
+
+  for (const side of [-1, 1]) {
+    const foot = new THREE.SphereGeometry(0.3, 6, 5);
+    foot.scale(1, 0.8, 1.1);
+    // Tucked into the body rather than sitting on its surface, so no seam
+    // shows where the two meet.
+    foot.translate(side * 0.82, -0.72, 0);
+    parts.push(paint(foot, 0x4d7f2a));
+  }
+  const geo = mergeGeometries(parts);
+  if (!geo) {
+    throw new Error("could not merge caterpillar segment");
+  }
+  return geo;
+}
+
+/** The face, at radius 1: eyes, a smile and two antennae. */
+function makeHead(): THREE.Group {
+  const group = new THREE.Group();
+  const parts: Array<THREE.BufferGeometry> = [];
+
+  const skull = new THREE.SphereGeometry(1, 12, 10);
+  parts.push(paint(skull, HEAD_COLOUR));
+
+  for (const side of [-1, 1]) {
+    // The whites stand 0.02 proud of the skull; coplanar with it they flicker.
+    const white = new THREE.SphereGeometry(0.34, 8, 7);
+    white.translate(side * 0.42, 0.26, 0.86);
+    parts.push(paint(white, 0xfdfdfd));
+
+    const pupil = new THREE.SphereGeometry(0.17, 7, 6);
+    pupil.translate(side * 0.44, 0.26, 1.12);
+    parts.push(paint(pupil, 0x241a1a));
+
+    // Antenna: a stalk with a bobble, leaning forward and out.
+    const stalk = new THREE.CylinderGeometry(0.06, 0.07, 0.85, 5);
+    stalk.translate(0, 0.42, 0);
+    stalk.rotateZ(side * -0.42);
+    stalk.rotateX(-0.22);
+    stalk.translate(side * 0.34, 0.86, 0.12);
+    parts.push(paint(stalk, 0x9c3a2c));
+
+    const bobble = new THREE.SphereGeometry(0.19, 7, 6);
+    bobble.translate(side * 0.66, 1.6, 0.28);
+    parts.push(paint(bobble, 0xffd94a));
+  }
+
+  // A smile: a torus tipped forward, most of it buried in the head so only the
+  // curve of the mouth shows.
+  const smile = new THREE.TorusGeometry(0.36, 0.075, 6, 14, Math.PI);
+  smile.rotateZ(Math.PI);
+  smile.rotateX(0.24);
+  smile.translate(0, -0.28, 0.95);
+  parts.push(paint(smile, 0x7a2418));
+
+  const geo = mergeGeometries(parts);
+  if (!geo) {
+    throw new Error("could not merge caterpillar head");
+  }
+  group.add(new THREE.Mesh(geo, vertexToon()));
+  return group;
+}

@@ -1,0 +1,363 @@
+/* Everything on the glass. Sized for an iPad held by a child: big type,
+   generous targets, nothing that needs a hover or a right-click. */
+
+:root {
+  --safe-t: env(safe-area-inset-top, 0px);
+  --safe-b: env(safe-area-inset-bottom, 0px);
+  --safe-l: env(safe-area-inset-left, 0px);
+  --safe-r: env(safe-area-inset-right, 0px);
+  --ink: #23331c;
+  --panel: rgba(255, 255, 255, 0.82);
+}
+
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body,
+#app {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: #9fd7f0;
+  font-family:
+    "Nunito",
+    "Avenir Next",
+    "Segoe UI",
+    system-ui,
+    -apple-system,
+    sans-serif;
+  color: var(--ink);
+  /* The game is driven by dragging; never let a drag scroll or zoom the page. */
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+canvas {
+  display: block;
+}
+
+/* The layer the UI lives on. Transparent to taps except where something
+   opts back in, so the stick still works underneath it. */
+#ui {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.ui-interactive {
+  pointer-events: auto;
+}
+
+/* ---------- The counters ---------- */
+
+.hud {
+  position: absolute;
+  top: calc(var(--safe-t) + 12px);
+  left: calc(var(--safe-l) + 12px);
+  right: calc(var(--safe-r) + 12px);
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.hud.hidden {
+  display: none;
+}
+
+.tally {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 14px 7px 8px;
+  border-radius: 999px;
+  background: var(--panel);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.18);
+  font-size: 20px;
+  font-weight: 800;
+  line-height: 1;
+  backdrop-filter: blur(3px);
+  transition: transform 140ms ease-out;
+}
+
+/* Pops when it ticks up, so eating is felt as well as counted. */
+.tally.bump {
+  transform: scale(1.14);
+}
+
+.tally.done {
+  background: rgba(206, 240, 190, 0.92);
+}
+
+.pip {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+  box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.16);
+}
+
+.tally .count {
+  font-variant-numeric: tabular-nums;
+}
+
+.tally .goal {
+  opacity: 0.5;
+  font-size: 16px;
+}
+
+/* A tick replaces the goal once a quota is met. */
+.tally.done .goal::after {
+  content: " ✓";
+  opacity: 1;
+}
+
+/* ---------- Overlays ---------- */
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  padding: 24px;
+  text-align: center;
+  background: rgba(255, 255, 255, 0.78);
+  backdrop-filter: blur(6px);
+  pointer-events: auto;
+  transition: opacity 320ms ease-out;
+}
+
+.overlay.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.overlay h1 {
+  margin: 0;
+  font-size: clamp(30px, 7vw, 62px);
+  line-height: 1.05;
+}
+
+.overlay p {
+  margin: 0;
+  max-width: 22em;
+  font-size: clamp(17px, 2.6vw, 24px);
+  line-height: 1.45;
+}
+
+.big-button {
+  border: none;
+  border-radius: 999px;
+  padding: 18px 46px;
+  font: inherit;
+  font-size: clamp(20px, 3vw, 28px);
+  font-weight: 800;
+  color: #fff;
+  background: #57a83e;
+  box-shadow: 0 6px 0 #3f7f2c;
+  cursor: pointer;
+}
+
+.big-button:active {
+  transform: translateY(4px);
+  box-shadow: 0 2px 0 #3f7f2c;
+}
+
+/* The way back to the start once you are flying and the overlay has gone.
+   Kept small and out of the way, in the corner opposite the counters. */
+.play-again {
+  position: absolute;
+  /* Below the counters, not beside them: the counters are centred and grow
+     with the numbers in them, and at a tablet's width the two collided. */
+  top: calc(var(--safe-t) + 64px);
+  right: calc(var(--safe-r) + 12px);
+  border: none;
+  border-radius: 999px;
+  padding: 12px 22px;
+  font: inherit;
+  font-size: 17px;
+  font-weight: 800;
+  color: var(--ink);
+  background: var(--panel);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.18);
+  backdrop-filter: blur(3px);
+  cursor: pointer;
+}
+
+.play-again.hidden {
+  display: none;
+}
+
+/* ---------- The butterfly's altitude slider ---------- */
+
+/* Only on screen once there is a butterfly to fly. */
+.alt {
+  position: absolute;
+  right: calc(var(--safe-r) + 26px);
+  bottom: calc(var(--safe-b) + 26px);
+  width: 64px;
+  height: min(300px, 44vh);
+  pointer-events: auto;
+  touch-action: none;
+}
+
+.alt.hidden {
+  display: none;
+}
+
+.alt-track {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  border: 3px solid rgba(255, 255, 255, 0.55);
+  background: rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(2px);
+  overflow: hidden;
+}
+
+/* Warm fill from the bottom up to the height being asked for. */
+.alt-fill {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 224, 122, 0.45),
+    rgba(255, 224, 122, 0.14)
+  );
+}
+
+/* The knob travels within the rail, which is inset by the knob's radius so it
+   never overhangs the rounded ends of the track. */
+.alt-rail {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 32px;
+  bottom: 32px;
+}
+
+.alt-knob {
+  position: absolute;
+  left: 50%;
+  width: 56px;
+  height: 56px;
+  margin: 0 0 -28px -28px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+  transition: transform 100ms ease-out;
+}
+
+.alt-knob.active {
+  transform: scale(1.1);
+}
+
+/* Ghost bar: where the butterfly actually is right now. */
+.alt-current {
+  position: absolute;
+  left: 9px;
+  right: 9px;
+  height: 4px;
+  margin-bottom: -2px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.65);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+}
+
+.alt-cap {
+  position: absolute;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: 14px;
+  color: #fff;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+.alt-cap-top {
+  top: 7px;
+}
+
+.alt-cap-bottom {
+  bottom: 7px;
+}
+
+/* ---------- The floating thumbstick ---------- */
+
+.stick {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+  opacity: 0;
+  transition: opacity 130ms ease-out;
+  pointer-events: none;
+}
+
+.stick.active {
+  opacity: 1;
+}
+
+/* Docked: parked in the bottom-left corner, always on screen, mirroring the
+   altitude slider opposite it. The 94px is the slider's own 26px inset plus
+   the stick's 68px radius, so the two sit at the same height and the same
+   distance in from their edges. */
+.stick.docked {
+  left: calc(var(--safe-l) + 94px);
+  top: auto;
+  bottom: calc(var(--safe-b) + 94px);
+  opacity: 1;
+}
+
+/* Docked, the ring is the thing you aim at, so it reads a little stronger. */
+.stick.docked .stick-ring {
+  border-color: rgba(255, 255, 255, 0.55);
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.stick-ring {
+  position: absolute;
+  width: 136px;
+  height: 136px;
+  margin: -68px 0 0 -68px;
+  border-radius: 50%;
+  border: 3px solid rgba(255, 255, 255, 0.55);
+  background: rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(2px);
+}
+
+.stick-knob {
+  position: absolute;
+  width: 58px;
+  height: 58px;
+  margin: -29px 0 0 -29px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+}
+
+/* On a phone-ish viewport the counters are the thing most at risk of
+   crowding, so they shrink before anything else does. */
+@media (max-aspect-ratio: 1/1) {
+  .tally {
+    font-size: 17px;
+    padding: 6px 11px 6px 6px;
+  }
+
+  .pip {
+    width: 21px;
+    height: 21px;
+  }
+}
