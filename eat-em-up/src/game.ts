@@ -174,10 +174,12 @@ export class Game {
         this.showWin();
       }
     } else {
-      if (this.cat.climbing) {
-        // Climbing wants the stick in plain screen axes — up the screen is up
-        // the trunk, left and right go round it — so it is handed over
-        // untouched.
+      if (this.cat.climbing || this.cat.dangling) {
+        // Climbing and hanging both want the stick in plain screen axes — up
+        // the screen is up the trunk or up the rope, left and right go round
+        // or turn on the spot — so it is handed over untouched. Reading either
+        // against the camera would change what the stick means as the camera
+        // swung, which on a branch is constantly.
         this.dir
           .set(this.stick.x, 0, this.stick.y)
           .multiplyScalar(this.stick.magnitude);
@@ -272,6 +274,13 @@ export class Game {
   }
 
   render = (alpha: number, dt: number): void => {
+    // Which way the camera is, so the caterpillar can look at it when it asks
+    // what you are waiting for. Last frame's camera, which is near enough.
+    const eye = this.stage.camera.position;
+    this.cat.cameraBearing = Math.atan2(
+      eye.x - this.cat.position.x,
+      eye.z - this.cat.position.z,
+    );
     this.cat.render(alpha);
     this.followCamera(dt);
     this.stage.render();

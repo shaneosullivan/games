@@ -203,6 +203,18 @@ export const CATERPILLAR = {
    * dangling with no way down.
    */
   dangleLetGo: 0.9,
+  /**
+   * Below this much stick, the player counts as having let go.
+   *
+   * Hauling back onto a branch waits for it. Getting back up is done by
+   * holding the stick, and on a branch the camera is side-on, so the same held
+   * push means "walk across the branch" the moment you are standing on it —
+   * which walked the caterpillar straight off the other side. A timed grace
+   * period only moved the problem: hold the stick a little longer and off it
+   * went again. Waiting for the stick to come back to rest is the only version
+   * that always leaves you standing on the branch.
+   */
+  regainRelease: 0.15,
   /** The inchworm bounce: how far each segment rises, and how quickly the
    *  wave travels down the body. */
   humpHeight: 0.3,
@@ -295,6 +307,64 @@ export const IDLE = {
   scratchRate: 7,
   /** How many segments behind the head take part. */
   scratchSegments: 2,
+
+  /**
+   * "Well? What are you waiting for?"
+   *
+   * Left alone long enough, after it has been looking about and scratching for
+   * a while, the caterpillar rears its front end up, turns to look straight at
+   * the camera with its eyes raised, and gestures with its two front legs
+   * before settling back down. It is the one idle movement that is addressed
+   * to the player rather than to itself.
+   */
+  askDelay: 11,
+  /** How often it comes round again, once it has started asking. */
+  askEvery: 17,
+  /** How long it holds the pose. */
+  askFor: 3.6,
+  /** Fraction of that spent easing into and out of the pose, so it rises and
+   *  settles rather than snapping. */
+  askEase: 0.22,
+  /** How far the head leans over to one side, radians — the quizzical tilt. */
+  askTilt: 0.3,
+  /** How far the head tips back, radians — the raised eyebrows of it. */
+  askPitch: 0.44,
+  /**
+   * How far the front of the body rears up, in radians from lying flat, and
+   * how many segments come up with it.
+   *
+   * A rotation about the segment behind them rather than a lift applied to
+   * each: lifting the head and the front segment by the same amount left the
+   * head sitting behind the segment in front of it and half hidden by it,
+   * whatever the numbers. Swung up to near vertical the front of the body
+   * stands as a column with the head on top of it, clear of everything.
+   */
+  askRear: 1.4,
+  askSegments: 3,
+  /**
+   * How far out along the reared column the head sits, in segment places.
+   *
+   * More than one on purpose. At one place the head cleared the segment behind
+   * it by 1.07 units when it needed 1.36 — the two silhouettes still touched,
+   * because a body's spacing is 1.35 radii and a head and a segment together
+   * are 2.16. Stretching the neck by three quarters of a place is what puts
+   * the whole head in the clear.
+   */
+  askHeadReach: 1.8,
+  /** How far the raised legs swing, and how fast. */
+  askWaggle: 0.5,
+  askWaggleRate: 3.4,
+  /**
+   * How far the front legs come up from hanging, radians.
+   *
+   * Beyond a right angle on purpose. A quarter turn points them straight
+   * forward, and the head is turned to the camera at the time — so forward is
+   * *at* the camera, and they foreshortened into two little stubs. Past
+   * vertical they read as raised arms from anywhere.
+   */
+  legRaise: 2.35,
+  /** And how far apart they are held: splayed, not held to attention. */
+  legSpread: 0.55,
 } as const;
 
 export const CAMERA = {
@@ -420,6 +490,18 @@ export const FALLING_LEAVES = {
   swayRate: 1.1,
   /** Tumble, radians a second. */
   spinRate: 1.7,
+  /**
+   * A leaf's plane, in world units. The images are square, which is what lets
+   * one plane geometry serve all three.
+   */
+  size: 1.3,
+  /**
+   * How much of a leaf's image counts as leaf. Cut out with alphaTest rather
+   * than drawn transparent: a couple of dozen unsorted transparent quads cut
+   * holes in each other wherever they overlap, and a leaf's edge is hard
+   * enough that a cutout is all it needs.
+   */
+  alphaTest: 0.35,
   /** How long a landed leaf takes to disappear. */
   settle: 1.6,
   /** How far above the top of a climb they let go — i.e. up in the crown. */

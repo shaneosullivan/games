@@ -32,10 +32,19 @@ export class Caterpillar {
 
   /** The trunk being climbed, or null when on the ground. */
   climbing: Climbable | null = null;
+
+  /** Whether it is hanging off a branch. The game reads the stick differently
+   *  while it is — see `hang`. */
+  get dangling(): boolean {
+    return this.dangle !== null;
+  }
   /** Where round that trunk the caterpillar is, radians. */
   private climbAngle = 0;
   /** How long the player has been pushing into a trunk, for the grab dwell. */
   private pressing = 0;
+  /** Set after hauling back onto a branch: the stick does nothing until the
+   *  player lets go of it. See CATERPILLAR.regainRelease. */
+  private awaitRelease = false;
   /**
    * Hanging off the end of a branch by the tail, or null.
    *
@@ -60,6 +69,19 @@ export class Caterpillar {
 
   private readonly segments: Array<THREE.Mesh> = [];
   private readonly head: THREE.Group;
+  /** The two mouths: the everyday smile, and the questioning one. */
+  private readonly smile: THREE.Mesh;
+  private readonly askingMouth: THREE.Mesh;
+  /**
+   * The two front legs, used only for the asking pose.
+   *
+   * A separate pair rather than the feet on the body segments: those are baked
+   * into the merged segment geometry, which is what makes a segment one draw
+   * call, and there is no way to lift one of them on its own. These hang
+   * hidden until they are wanted.
+   */
+  private readonly legs = new THREE.Group();
+  private readonly legHinges: Array<THREE.Group> = [];
   /** Newest first. The path the head has taken. */
   private readonly trail: Array<THREE.Vector3> = [];
   private readonly segCur: Array<THREE.Vector3> = [];
@@ -89,9 +111,30 @@ export class Caterpillar {
       this.segPrev.push(new THREE.Vector3());
     }
 
-    this.head = makeHead();
+    const head = makeHead();
+    this.head = head.group;
+    this.smile = head.smile;
+    this.askingMouth = head.asking;
     this.group.add(this.head);
+
+    for (const side of [-1, 1]) {
+      // Hinged at the shoulder, so raising a leg is a rotation of the hinge
+      // and never touches the position the render puts the pair at.
+      const hinge = new THREE.Group();
+      hinge.add(new THREE.Mesh(legGeometry(), vertexToon()));
+      hinge.position.x = side * 1.05;
+      this.legs.add(hinge);
+      this.legHinges.push(hinge);
+    }
+    this.legs.visible = false;
+    this.group.add(this.legs);
   }
+
+  /**
+   * Bearing from the caterpillar to the camera, set by the game each frame.
+   * Only used to turn and look at it when it asks what you are waiting for.
+   */
+  cameraBearing = 0;
 
   /** The point food is eaten at: just in front of the face. Follows the head's
    *  pitch, so climbing reaches the leaves above rather than the bark ahead. */
@@ -136,6 +179,7 @@ export class Caterpillar {
     this.climbing = null;
     this.dangle = null;
     this.pressing = 0;
+    this.awaitRelease = false;
     this.facing.set(Math.sin(heading), 0, Math.cos(heading));
     this.trail.length = 0;
     // Seed the trail straight back from the head. Without this the whole body
@@ -176,7 +220,15 @@ export class Caterpillar {
 
   /** Crawling about the forest floor, and along the start branch. */
   private crawl(dt: number, dir: THREE.Vector3): void {
-    const drive = Math.min(1, dir.length());
+    // Just back on a branch after hauling up: nothing happens until the stick
+    // comes back to rest, so the push that got you up there cannot immediately
+    // walk you off the other side.
+    if (this.awaitRelease) {
+      if (dir.length() < CATERPILLAR.regainRelease) {
+        this.awaitRelease = false;
+      }
+    }
+    const drive = this.awaitRelease ? 0 : Math.min(1, dir.length());
     // Idling is a thing it does standing on the ground, so any input — and
     // climbing or hanging, handled elsewhere — puts a stop to it.
     this.still = drive > 0.02 ? 0 : this.still + dt;
@@ -287,26 +339,20 @@ export class Caterpillar {
       return;
     }
 
-    // Left and right turn on the spot while hanging, so the stick always does
-    // something and you can choose the way you will be facing when you land.
-    const drive = Math.min(1, dir.length());
-    if (drive > 0.001) {
-      const delta = wrapAngle(Math.atan2(dir.x, dir.z) - this.heading);
-      // sin() takes only the sideways part of that: pushing straight forward
-      // or straight back is for lowering and hauling up, and should not spin
-      // the caterpillar through half a turn.
-      this.heading = wrapAngle(
-        this.heading + Math.sin(delta) * CATERPILLAR.turnRate * dt * drive,
-      );
-    }
-
-    // How much of the stick is pulling back the way we came.
-    const back = -(
-      dir.x * Math.sin(this.heading) +
-      dir.z * Math.cos(this.heading)
+    // `dir` here is the stick in plain screen axes, not world ones — the game
+    // hands it over untouched while hanging, exactly as it does while
+    // climbing. Up the screen is up the rope whichever way the camera happens
+    // to be pointing, which is the only mapping that stays true while the
+    // camera is swinging about.
+    const haul = -dir.z;
+    // Left and right turn on the spot, so the stick always does something and
+    // you can choose the way you will be facing when you land.
+    this.heading = wrapAngle(
+      this.heading + dir.x * CATERPILLAR.turnRate * dt * 0.5,
     );
-    if (back > 0.2) {
-      d.drop -= CATERPILLAR.hangClimbSpeed * dt * back;
+
+    if (haul > 0.2) {
+      d.drop -= CATERPILLAR.hangClimbSpeed * dt * haul;
     } else {
       d.drop += CATERPILLAR.hangDropSpeed * dt;
     }
@@ -327,10 +373,28 @@ export class Caterpillar {
 
     if (d.drop <= 0) {
       // Hauled all the way back up: put down exactly where it last had a
-      // foothold, turned round to face the way it now wants to go.
+      // foothold, and given a moment before the stick means anything again.
       this.dangle = null;
       this.position.copy(d.foothold);
-      this.heading = wrapAngle(this.heading + Math.PI);
+      this.awaitRelease = true;
+
+      // Facing back the way it came — but along the branch, since that is the
+      // only direction it can actually walk in up here. Whichever way along
+      // the bough is nearer to "back the way I came" wins, which is right
+      // whether it went off the end or off the side.
+      const back = wrapAngle(this.heading + Math.PI);
+      const bough = this.forest.boughUnder(d.foothold, this.radius + 0.5);
+      if (bough) {
+        const outward = Math.atan2(bough.dir.x, bough.dir.y);
+        const inward = wrapAngle(outward + Math.PI);
+        this.heading =
+          Math.abs(wrapAngle(outward - back)) <
+          Math.abs(wrapAngle(inward - back))
+            ? outward
+            : inward;
+      } else {
+        this.heading = back;
+      }
       this.facing.set(Math.sin(this.heading), 0, Math.cos(this.heading));
     }
   }
@@ -552,15 +616,39 @@ export class Caterpillar {
     return Math.sin((t / IDLE.scratchFor) * Math.PI) * this.idling;
   }
 
+  /**
+   * How far into the asking pose it is, 0 to 1, or 0 when it isn't asking.
+   *
+   * Eased in and out at both ends so it rears up and settles back rather than
+   * snapping into the pose and out of it.
+   */
+  private get asking(): number {
+    if (this.still <= IDLE.askDelay || this.climbing || this.dangle) {
+      return 0;
+    }
+    const t = (this.still - IDLE.askDelay) % IDLE.askEvery;
+    if (t > IDLE.askFor) {
+      return 0;
+    }
+    const p = t / IDLE.askFor;
+    const ease = IDLE.askEase;
+    const rise = Math.min(1, p / ease);
+    const fall = Math.min(1, (1 - p) / ease);
+    return smoothstep(Math.min(rise, fall));
+  }
+
   /** `alpha` is how far between the last two simulation steps we are. */
   render(alpha: number): void {
     const radius = this.radius;
     const idling = this.idling;
-    const scratch = this.scratching;
+    const ask = this.asking;
+    // The small idle movements give way to the big one rather than fighting it.
+    const fidget = idling * (1 - ask);
+    const scratch = this.scratching * (1 - ask);
     // Two waves of different lengths, so looking about never falls into an
     // obvious rhythm.
     const look =
-      idling *
+      fidget *
       IDLE.lookAmount *
       (Math.sin(this.still * IDLE.lookRate) * 0.7 +
         Math.sin(this.still * IDLE.lookWanderRate) * 0.3);
@@ -571,16 +659,53 @@ export class Caterpillar {
     // after it, so a climbing caterpillar looks up the trunk it is facing
     // rather than up whatever direction the world calls forward.
     this.head.rotation.order = "YXZ";
-    this.head.rotation.y = this.heading + look;
+    // Asking, it turns off its own heading and onto the camera.
+    const toCamera = wrapAngle(this.cameraBearing - this.heading);
+    this.head.rotation.y = this.heading + look + toCamera * ask;
     this.head.rotation.x =
       -Math.atan2(this.facing.y, Math.hypot(this.facing.x, this.facing.z)) +
-      idling * IDLE.nodAmount * Math.sin(this.still * IDLE.nodRate);
+      fidget * IDLE.nodAmount * Math.sin(this.still * IDLE.nodRate) -
+      ask * IDLE.askPitch;
     // Tipped over into a scratch, always to the same side so it reads as one
-    // movement rather than a wobble.
-    this.head.rotation.z = scratch * IDLE.scratchTilt;
+    // movement rather than a wobble — and tipped again, the other way, into
+    // the quizzical lean of the asking pose.
+    this.head.rotation.z = scratch * IDLE.scratchTilt - ask * IDLE.askTilt;
+
+    // It stops smiling while it is asking. A smile and a raised eyebrow read
+    // as pleased with itself; the question wants a small open mouth.
+    const questioning = ask > 0.25;
+    this.smile.visible = !questioning;
+    this.askingMouth.visible = questioning;
     this.head.scale.setScalar(radius * 1.16);
 
     const count = this.segmentCount;
+
+    /**
+     * The rear-up, as an offset for something `d` segments in front of the
+     * pivot: swing it up about the pivot from lying along the ground to
+     * standing at IDLE.askRear.
+     *
+     * Doing it as a rotation is what puts the head clear. Lifting each of the
+     * front parts by its own share left the spacing between them unchanged, so
+     * the head stayed exactly where it had been relative to the segment behind
+     * it — up in the air, but still tucked in behind it.
+     */
+    const gap = radius * CATERPILLAR.spacing;
+    const rearF = (Math.cos(IDLE.askRear) - 1) * ask;
+    const rearUp = Math.sin(IDLE.askRear) * ask;
+    const fwdX = Math.sin(this.heading);
+    const fwdZ = Math.cos(this.heading);
+    const rear = (out: THREE.Vector3, d: number): void => {
+      out.x += fwdX * d * gap * rearF;
+      out.y += d * gap * rearUp;
+      out.z += fwdZ * d * gap * rearF;
+    };
+    if (ask > 0) {
+      // The head stands out beyond the furthest segment — far enough that it
+      // is clear of it rather than tucked in behind it.
+      rear(this.head.position, IDLE.askSegments + IDLE.askHeadReach);
+    }
+
     // Sideways, level, at right angles to the way it is facing — the axis both
     // the tail wag and the scratch jitter move along.
     const sideX = Math.cos(this.heading);
@@ -591,7 +716,11 @@ export class Caterpillar {
       const mesh = this.segments[s];
       mesh.position.lerpVectors(this.segPrev[s], this.segCur[s], alpha);
 
-      if (idling > 0) {
+      if (ask > 0 && s < IDLE.askSegments) {
+        rear(mesh.position, IDLE.askSegments - s);
+      }
+
+      if (fidget > 0) {
         // The back half wags, further the nearer the tail, and each segment a
         // little behind the one in front so the swing travels down the body.
         if (s >= wagFrom) {
@@ -600,7 +729,7 @@ export class Caterpillar {
             Math.sin(this.still * IDLE.wagRate - s * 0.45) *
             IDLE.wagAmount *
             along *
-            idling *
+            fidget *
             radius *
             2;
           mesh.position.x += sideX * swing;
@@ -643,7 +772,67 @@ export class Caterpillar {
       }
       mesh.rotation.x = -Math.atan2(dy, horizontal);
     }
+
+    this.poseLegs(ask, radius);
   }
+
+  /**
+   * The two front legs: up and gesturing while it asks, put away otherwise.
+   */
+  private poseLegs(ask: number, radius: number): void {
+    this.legs.visible = ask > 0.02;
+    if (!this.legs.visible) {
+      return;
+    }
+    // Hung off the first body segment rather than the head. Hung off the head
+    // they sat inside it: the hinge is half a radius out and the head is more
+    // than that across, so most of each leg was swallowed by the face.
+    this.legs.position.copy(this.segments[0].position);
+    this.legs.position.y -= radius * 0.35;
+    // Carried forward of that segment, following the head, so the raised legs
+    // are in front of the body rather than lost against it.
+    this.legs.position.x += Math.sin(this.head.rotation.y) * radius * 0.5;
+    this.legs.position.z += Math.cos(this.head.rotation.y) * radius * 0.5;
+    this.legs.rotation.y = this.head.rotation.y;
+    this.legs.scale.setScalar(radius);
+
+    const waggle = Math.sin(this.still * IDLE.askWaggleRate) * IDLE.askWaggle;
+    this.legHinges.forEach((hinge, i) => {
+      const side = i === 0 ? -1 : 1;
+      // Swung forward and up from hanging, the two of them out of step so it
+      // reads as a gesture rather than a salute.
+      hinge.rotation.x = -(IDLE.legRaise * ask) - waggle * side * ask;
+      hinge.rotation.z = side * IDLE.legSpread * ask;
+    });
+  }
+}
+
+/** Smooth 0..1, for easing a pose in and out. */
+function smoothstep(t: number): number {
+  const x = Math.max(0, Math.min(1, t));
+  return x * x * (3 - 2 * x);
+}
+
+/**
+ * One front leg, at radius 1: a tapered limb hanging from the hinge with a
+ * foot on the end.
+ *
+ * Long, and in the head's colours rather than the body's. Built short and
+ * green to begin with, each was about as long as a segment is wide and the
+ * same colour as the thing it was in front of — two dark nubs by the neck,
+ * which is not a gesture anyone would read.
+ */
+function legGeometry(): THREE.BufferGeometry {
+  const limb = new THREE.CylinderGeometry(0.19, 0.27, 2, 6);
+  limb.translate(0, -1, 0);
+  const foot = new THREE.SphereGeometry(0.29, 7, 6);
+  foot.scale(1, 0.85, 1.1);
+  foot.translate(0, -1.95, 0.04);
+  const geo = mergeGeometries([paint(limb, 0xb1462f), paint(foot, 0x8d3324)]);
+  if (!geo) {
+    throw new Error("could not merge caterpillar leg");
+  }
+  return geo;
 }
 
 /** Keeps an angle in -PI..PI, so it doesn't wander off into big numbers as
@@ -681,8 +870,14 @@ function segmentGeometry(colour: number): THREE.BufferGeometry {
   return geo;
 }
 
-/** The face, at radius 1: eyes, a smile and two antennae. */
-function makeHead(): THREE.Group {
+/**
+ * The face, at radius 1: eyes, two antennae, and both of its mouths.
+ */
+function makeHead(): {
+  group: THREE.Group;
+  smile: THREE.Mesh;
+  asking: THREE.Mesh;
+} {
   const group = new THREE.Group();
   const parts: Array<THREE.BufferGeometry> = [];
 
@@ -712,18 +907,49 @@ function makeHead(): THREE.Group {
     parts.push(paint(bobble, 0xffd94a));
   }
 
-  // A smile: a torus tipped forward, most of it buried in the head so only the
-  // curve of the mouth shows.
-  const smile = new THREE.TorusGeometry(0.36, 0.075, 6, 14, Math.PI);
-  smile.rotateZ(Math.PI);
-  smile.rotateX(0.24);
-  smile.translate(0, -0.28, 0.95);
-  parts.push(paint(smile, 0x7a2418));
-
   const geo = mergeGeometries(parts);
   if (!geo) {
     throw new Error("could not merge caterpillar head");
   }
   group.add(new THREE.Mesh(geo, vertexToon()));
-  return group;
+
+  // The mouth is its own mesh rather than merged in, because it has two of
+  // them: the usual smile, and the small open one it wears while it is asking
+  // you what you are waiting for. Both are children of the head, so they
+  // follow the face wherever it looks without any work.
+  const smile = new THREE.Mesh(smileGeometry(), vertexToon());
+  const asking = new THREE.Mesh(askingMouthGeometry(), vertexToon());
+  asking.visible = false;
+  group.add(smile, asking);
+
+  return {group, smile, asking};
+}
+
+/** The everyday mouth: a torus tipped forward, most of it buried in the head
+ *  so only the curve of the smile shows. */
+function smileGeometry(): THREE.BufferGeometry {
+  const smile = new THREE.TorusGeometry(0.36, 0.075, 6, 14, Math.PI);
+  smile.rotateZ(Math.PI);
+  smile.rotateX(0.24);
+  smile.translate(0, -0.28, 0.95);
+  return paint(smile, 0x7a2418);
+}
+
+/**
+ * The questioning mouth: a short straight line, set at a slight angle.
+ *
+ * Not a smile turned upside down, which reads as sad rather than curious, and
+ * not a round one either, which reads as surprised. A flat line is a face
+ * reserving judgement, and the angle on it is the whole expression — dead
+ * level it would be a face with nothing going on at all.
+ *
+ * A capsule rather than a bar: rounded ends read better than square corners at
+ * the size this is ever seen.
+ */
+function askingMouthGeometry(): THREE.BufferGeometry {
+  const mouth = new THREE.CylinderGeometry(0.062, 0.062, 0.4, 6);
+  // Built up the Y axis, so it is laid on its side and then tipped.
+  mouth.rotateZ(Math.PI / 2 + 0.26);
+  mouth.translate(0.02, -0.29, 0.95);
+  return paint(mouth, 0x7a2418);
 }

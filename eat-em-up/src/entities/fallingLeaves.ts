@@ -1,8 +1,20 @@
 import * as THREE from "three";
 import {FALLING_LEAVES, WORLD} from "../config";
-import {paint, vertexToon} from "../render/materials";
 import {Rng} from "../core/rng";
 import {Forest} from "./forest";
+import leaf1Url from "../assets/leaf1.png";
+import leaf2Url from "../assets/leaf2.png";
+import leaf3Url from "../assets/leaf3.png";
+
+/**
+ * The three drawn leaves, taken from the bee game, which has the same three
+ * falling through its woods. They are pictures rather than built shapes
+ * because at this size a picture simply looks better than anything a handful
+ * of merged primitives can be talked into.
+ *
+ * All three are square, which is what lets one plane geometry serve them all.
+ */
+const LEAF_URLS = [leaf1Url, leaf2Url, leaf3Url];
 
 /** One leaf on its way down, or lying where it landed. */
 interface Leaf {
@@ -25,8 +37,6 @@ interface Variant {
   mesh: THREE.InstancedMesh;
   leaves: Array<Leaf>;
 }
-
-const AUTUMN = [0xd98b3a, 0xc45f2c, 0xe0a94a];
 
 /**
  * Leaves drifting down out of the canopy.
@@ -74,11 +84,27 @@ export class FallingLeaves {
       });
     }
 
-    const per = Math.ceil(FALLING_LEAVES.pool / AUTUMN.length);
-    for (const colour of AUTUMN) {
+    // One plane and one loader for all three, each with its own picture.
+    const plane = new THREE.PlaneGeometry(
+      FALLING_LEAVES.size,
+      FALLING_LEAVES.size,
+    );
+    const loader = new THREE.TextureLoader();
+    const per = Math.ceil(FALLING_LEAVES.pool / LEAF_URLS.length);
+    for (const url of LEAF_URLS) {
+      const map = loader.load(url);
+      // Without this the PNGs come back washed out — they are authored in sRGB
+      // and the renderer works in linear.
+      map.colorSpace = THREE.SRGBColorSpace;
       const mesh = new THREE.InstancedMesh(
-        leafGeometry(colour),
-        vertexToon(),
+        plane,
+        new THREE.MeshBasicMaterial({
+          map,
+          alphaTest: FALLING_LEAVES.alphaTest,
+          // A tumbling leaf shows both of its faces.
+          side: THREE.DoubleSide,
+          fog: true,
+        }),
         per,
       );
       // They are scattered across the whole wood and are never a big enough
@@ -241,17 +267,4 @@ export class FallingLeaves {
     );
     mesh.setMatrixAt(index, this.matrix);
   }
-}
-
-/**
- * A leaf, built the way the bee game builds its: a sphere squashed flat and
- * drawn out along one axis, with a slight tilt across it so it never reads as
- * a perfectly flat disc. Autumn-coloured and a little larger than the ones you
- * eat, so it still reads while it is up in the air.
- */
-function leafGeometry(colour: number): THREE.BufferGeometry {
-  const blade = new THREE.SphereGeometry(0.3, 8, 6);
-  blade.scale(1.5, 0.16, 0.7);
-  blade.rotateZ(0.35);
-  return paint(blade, colour);
 }
