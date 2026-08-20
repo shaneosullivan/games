@@ -57,6 +57,7 @@ const FILES = [
   ["index.html.tmpl", "index.html"],
   ["README.md.tmpl", "README.md"],
   ["CLAUDE.md.tmpl", "CLAUDE.md"],
+  ["plan-for-app.md.tmpl", "docs/plan-for-app.md"],
   ["main.ts.tmpl", "src/main.ts"],
 ];
 
@@ -101,8 +102,9 @@ try {
 
 console.log(`
 Done. Next:
-  npm --prefix ${slug} run dev       # play the starter scene
-  edit ${slug}/src/main.ts           # make it your game
+  write ${slug}/docs/plan-for-app.md  # describe the game before you build it
+  npm --prefix ${slug} run dev        # play the starter scene
+  edit ${slug}/src/main.ts            # make it your game
 When it's ready, set "status": "published" in ${slug}/game.json.
 `);
 
