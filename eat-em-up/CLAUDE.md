@@ -50,7 +50,7 @@ src/
   assets/        images and models (imported by Vite; empty to start)
 index.html       the entry point; the app mounts into #app
 vite.config.ts   single-file build, relative base, .glb treated as an asset
-card.png         the gallery thumbnail — replace the solid colour with real art
+card.png         the gallery thumbnail — a 640x400 shot of the game
 game.json        title, description and status, read by site/build.mjs
 ```
 

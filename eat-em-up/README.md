@@ -90,7 +90,7 @@ src/
   ui/              the counters, the overlays, the stylesheet
   game.ts          owns all of it and runs the flow between them
 index.html         the entry point
-card.png           the gallery's thumbnail — still the scaffold's flat colour
+card.png           the gallery's thumbnail — a shot of the game itself
 game.json          title, description and status, for the gallery
 ```
 
