@@ -304,14 +304,57 @@ export const CAMERA = {
   /** Where the camera sits relative to the caterpillar: back and up. */
   distance: 11.5,
   height: 7,
-  /** How quickly the camera catches up. Low enough to feel unhurried, high
-   *  enough that a fast turn does not leave you off screen. */
-  lerp: 3.4,
-  /** How quickly the camera swings round behind a turn, radians a second's
-   *  worth of lerp. Slower than the caterpillar turns, so a quick change of
-   *  direction is seen from the side before the camera settles in behind —
-   *  snapping straight round is what makes a chase camera sickening. */
-  yawLerp: 2.6,
+  /** How tightly the camera's position follows, as a spring constant. Used as
+   *  1 - exp(-lerp * dt), so the follow is the same at 60Hz and 120Hz. */
+  lerp: 5.5,
+  /**
+   * Swinging round behind a turn. Taken wholesale from the bee game's camera
+   * rig, numbers included, because the problem here is exactly the one it
+   * solves and it was solved better there.
+   *
+   * The camera does not move at all until the caterpillar's heading is more
+   * than `yawDeadzone` away from it, and even then it turns no faster than
+   * `yawMaxRate`. Without both of those it tracks every small correction and
+   * the wood swings about under the player.
+   *
+   * There is a second reason beyond comfort. The stick is read in the camera's
+   * frame, so turning the camera turns the caterpillar's heading by the same
+   * amount: the offset between them is a fixed point of that loop and no gain
+   * will close it. All the follow can do while steering is widen the arc — so
+   * it stays gentle, and the real re-centring happens when the stick is let go.
+   */
+  yawDeadzone: 0.38,
+  yawGain: 1.5,
+  yawMaxRate: 0.75,
+  /**
+   * And when nobody is touching the stick — brisker, because that feedback
+   * loop only exists while the player is steering. Let go after a turn and the
+   * camera comes round behind within about a second, rather than stopping
+   * wherever it happened to be and leaving the caterpillar side-on.
+   */
+  yawIdleGain: 1.8,
+  yawIdleMaxRate: 1.4,
+  /** The follow is scaled by how fast the caterpillar is actually going, up to
+   *  this speed: barely moving should barely move the shot. */
+  yawSpeedFull: 3.5,
+  /**
+   * Standing on a branch, the camera swings round to look along the branch's
+   * side rather than down its length.
+   *
+   * Behind the caterpillar on a branch means behind it along the branch, which
+   * is where the trunk is — so the shot spends its time inside a tree. From
+   * the side the branch runs left-to-right across the screen with nothing in
+   * front of it, and because the stick is read in the camera's frame, pushing
+   * left and right becomes crawling along the branch. It turns into a side-on
+   * platformer for as long as you are up there, which is what it should be.
+   */
+  branchSideLerp: 1.9,
+  /** How near the top of a bough counts as standing on it, over and above the
+   *  caterpillar's own radius. */
+  branchGrip: 0.4,
+  /** How quickly the point the camera looks at eases toward its target. A
+   *  moving subject makes an unsmoothed look target jitter. */
+  lookLerp: 8,
   /** How far above the caterpillar the camera actually looks. */
   lookAhead: 1.2,
   /**

@@ -65,6 +65,10 @@ export class Caterpillar {
   private readonly segCur: Array<THREE.Vector3> = [];
   private readonly segPrev: Array<THREE.Vector3> = [];
   private crawlPhase = 0;
+  /** How fast it is actually travelling across the ground, units a second.
+   *  The camera's follow is scaled by it — barely moving should barely move
+   *  the shot. */
+  planarSpeed = 0;
   /** How long the player has been asking for nothing. Drives the idle
    *  behaviour: looking about, wagging, and scratching. */
   private still = 0;
@@ -190,9 +194,12 @@ export class Caterpillar {
       this.heading += THREE.MathUtils.clamp(delta, -step, step);
 
       const speed = this.speed * drive;
+      this.planarSpeed = speed;
       this.position.x += Math.sin(this.heading) * speed * dt;
       this.position.z += Math.cos(this.heading) * speed * dt;
       this.crawlPhase += CATERPILLAR.humpRate * dt * drive;
+    } else {
+      this.planarSpeed = 0;
     }
 
     this.facing.set(Math.sin(this.heading), 0, Math.cos(this.heading));
@@ -274,6 +281,7 @@ export class Caterpillar {
    */
   private hang(dt: number, dir: THREE.Vector3): void {
     this.still = 0;
+    this.planarSpeed = 0;
     const d = this.dangle;
     if (!d) {
       return;
@@ -373,6 +381,7 @@ export class Caterpillar {
    */
   private climb(dt: number, dir: THREE.Vector3): void {
     this.still = 0;
+    this.planarSpeed = 0;
     const tree = this.climbing;
     if (!tree) {
       return;

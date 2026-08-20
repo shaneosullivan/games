@@ -13,6 +13,18 @@ import {Ending} from "./entities/ending";
 import {Hud} from "./ui/hud";
 import {Overlay} from "./ui/overlays";
 
+/** The way round from `from` to `to`, in -PI..PI. */
+function shortestAngle(from: number, to: number): number {
+  let d = (to - from) % (Math.PI * 2);
+  if (d > Math.PI) {
+    d -= Math.PI * 2;
+  }
+  if (d < -Math.PI) {
+    d += Math.PI * 2;
+  }
+  return d;
+}
+
 /** Fixed, so the wood is laid out the same way every time you play. */
 const FOREST_SEED = 20260820;
 
@@ -48,10 +60,23 @@ export class Game {
   private readonly dir = new THREE.Vector3();
   private readonly wantEye = new THREE.Vector3();
   private readonly lookAt = new THREE.Vector3();
+  /** The eased point the camera actually looks at. */
+  private readonly smoothedLook = new THREE.Vector3();
   private readonly viewSpace = new THREE.Vector3();
   private readonly viewForward = new THREE.Vector3();
   /** The bearing the camera is looking along. Chases the caterpillar's own. */
   private camYaw = 0;
+  /**
+   * The bearing the stick is read against, which is not always the camera's.
+   *
+   * Stepping onto a branch the camera is still swinging round to its side-on
+   * bearing, and reading the stick against a moving frame steers the
+   * caterpillar as the camera turns — hold "forward" while you step on and the
+   * camera's own swing walks you off the side. So up there the frame is pinned
+   * to where the camera is *going*, and the swing changes nothing under the
+   * player's thumb.
+   */
+  private inputYaw = 0;
 
   constructor(app: HTMLElement, ui: HTMLElement) {
     const rng = new Rng(FOREST_SEED);
@@ -216,8 +241,8 @@ export class Game {
    * negative is what had left and right the wrong way round.
    */
   private readStickAgainstCamera(): void {
-    const forwardX = Math.sin(this.camYaw);
-    const forwardZ = Math.cos(this.camYaw);
+    const forwardX = Math.sin(this.inputYaw);
+    const forwardZ = Math.cos(this.inputYaw);
     const ahead = -this.stick.y;
     const side = this.stick.x;
     this.dir
@@ -270,18 +295,45 @@ export class Game {
     const distance = CAMERA.distance + this.cat.growth * CAMERA.growthPullback;
     const height = CAMERA.height + this.cat.growth * CAMERA.heightPullback;
 
-    // Swing round behind, the short way. The ending keeps whatever bearing it
-    // had, so the transformation isn't watched through a spinning camera.
-    if (!this.transforming || this.flying) {
-      let delta =
-        (this.flying ? this.ending.heading : this.cat.heading) - this.camYaw;
-      while (delta > Math.PI) {
-        delta -= Math.PI * 2;
-      }
-      while (delta < -Math.PI) {
-        delta += Math.PI * 2;
-      }
-      this.camYaw += delta * Math.min(1, dt * CAMERA.yawLerp);
+    // Up on a branch the camera goes side-on to it; everywhere else it sits
+    // behind the caterpillar. The ending keeps whatever bearing it had, so the
+    // transformation is not watched through a spinning camera.
+    const bough =
+      this.transforming || this.cat.climbing
+        ? null
+        : this.forest.boughUnder(
+            this.cat.position,
+            this.cat.radius + CAMERA.branchGrip,
+          );
+
+    if (bough) {
+      // Square on to the branch, from whichever of its two sides the camera is
+      // already nearer — swinging the long way round would be a whip pan every
+      // time you stepped onto a branch.
+      const along = Math.atan2(bough.dir.x, bough.dir.y);
+      const a = along + Math.PI / 2;
+      const b = along - Math.PI / 2;
+      const target =
+        Math.abs(shortestAngle(this.camYaw, a)) <
+        Math.abs(shortestAngle(this.camYaw, b))
+          ? a
+          : b;
+      // No dead zone here: the target does not depend on the player's heading,
+      // so there is no feedback loop to be gentle about.
+      const step = shortestAngle(this.camYaw, target);
+      this.camYaw += step * (1 - Math.exp(-CAMERA.branchSideLerp * dt));
+      // Pinned to where the camera is going, not to where it currently is.
+      this.inputYaw = target;
+    } else if (!this.transforming || this.flying) {
+      this.followYaw(
+        dt,
+        this.flying ? this.ending.heading : this.cat.heading,
+        this.stick.magnitude > 0.01,
+        this.flying ? ENDING.flySpeed : this.cat.planarSpeed,
+      );
+      this.inputYaw = this.camYaw;
+    } else {
+      this.inputYaw = this.camYaw;
     }
     // The direction the camera looks in: from behind the caterpillar, toward it.
     const backX = -Math.sin(this.camYaw);
@@ -317,12 +369,17 @@ export class Game {
         focus.z + backZ * distance,
       );
     }
+    // 1 - exp(-k dt) rather than k*dt: the same follow whatever the frame rate.
     this.stage.camera.position.lerp(
       this.wantEye,
-      Math.min(1, dt * CAMERA.lerp),
+      1 - Math.exp(-CAMERA.lerp * dt),
     );
+
+    // The point it looks at is eased too. Aimed straight at a moving subject
+    // the shot jitters, and every small correction of the body shows up in it.
     this.lookAt.set(focus.x, focus.y + CAMERA.lookAhead, focus.z);
-    this.stage.camera.lookAt(this.lookAt);
+    this.smoothedLook.lerp(this.lookAt, 1 - Math.exp(-CAMERA.lookLerp * dt));
+    this.stage.camera.lookAt(this.smoothedLook);
 
     // Dissolve whatever stands between the eye and whatever is being watched —
     // the caterpillar, or the chrysalis and butterfly during the ending. The
@@ -342,20 +399,65 @@ export class Game {
     this.forest.setFadeDepth(-this.viewSpace.z);
   }
 
+  /**
+   * Drifts the shot round to sit behind the caterpillar. Lifted from the bee
+   * game's camera rig, which had already worked out that this is two problems.
+   *
+   * While the player is steering, the stick is read in the camera's frame, so
+   * turning the camera turns the heading by the same amount: the offset
+   * between them is a fixed point of the loop and no gain closes it. All the
+   * follow can do is widen the arc, so it keeps a dead zone and a hard rate
+   * cap and stays out of the way.
+   *
+   * The moment nobody is pushing, that loop is gone — the heading is fixed in
+   * the world — and the camera can simply come round behind it, briskly.
+   */
+  private followYaw(
+    dt: number,
+    heading: number,
+    steering: boolean,
+    speed: number,
+  ): void {
+    const diff = shortestAngle(this.camYaw, heading);
+    const size = Math.abs(diff);
+    if (size < 1e-4) {
+      return;
+    }
+
+    let rate: number;
+    if (steering) {
+      const off = size - CAMERA.yawDeadzone;
+      if (off <= 0) {
+        // Inside the dead zone the camera simply does not move.
+        return;
+      }
+      rate =
+        Math.min(off * CAMERA.yawGain, CAMERA.yawMaxRate) *
+        Math.min(1, speed / CAMERA.yawSpeedFull);
+    } else {
+      rate = Math.min(size * CAMERA.yawIdleGain, CAMERA.yawIdleMaxRate);
+    }
+
+    // Never overshoot the heading in a single step.
+    this.camYaw += Math.sign(diff) * Math.min(rate * dt, size);
+  }
+
   /** Puts the camera where it belongs straight away, so the first frame isn't
    *  a swoop in from the origin. */
   private snapCamera(): void {
     this.camYaw = this.cat.heading;
+    this.inputYaw = this.camYaw;
     this.wantEye.set(
       this.cat.position.x - Math.sin(this.camYaw) * CAMERA.distance,
       this.cat.position.y + CAMERA.height,
       this.cat.position.z - Math.cos(this.camYaw) * CAMERA.distance,
     );
     this.stage.camera.position.copy(this.wantEye);
-    this.stage.camera.lookAt(
+    this.smoothedLook.set(
       this.cat.position.x,
       this.cat.position.y + CAMERA.lookAhead,
       this.cat.position.z,
     );
+    this.stage.camera.lookAt(this.smoothedLook);
   }
 }
