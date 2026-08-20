@@ -56,6 +56,13 @@ export interface Spot {
   /** Set for trees, so leaves can be hung up a trunk within a climb's reach. */
   trunkRadius?: number;
   climbTop?: number;
+  /**
+   * The actual blobs a bush is made of. Food goes on their surfaces: a bush is
+   * three lumps of foliage at odd offsets, so anything placed on a nominal
+   * radius around the middle of it hangs in the air beside the leaves rather
+   * than sitting in them.
+   */
+  blobs?: Array<{x: number; y: number; z: number; r: number}>;
 }
 
 const TRUNK_COLOUR = 0x9c7550;
@@ -786,22 +793,21 @@ export class Forest {
         continue;
       }
       const size = this.rng.range(1.1, 2.0);
+      const blobs: Array<{x: number; y: number; z: number; r: number}> = [];
 
       for (let j = 0; j < 3; j++) {
-        const blob = new THREE.IcosahedronGeometry(
-          size * this.rng.range(0.6, 1),
-          1,
-        );
-        blob.translate(
-          x + this.rng.range(-size, size) * 0.6,
-          size * this.rng.range(0.5, 0.85),
-          z + this.rng.range(-size, size) * 0.6,
-        );
+        const br = size * this.rng.range(0.6, 1);
+        const bx = x + this.rng.range(-size, size) * 0.6;
+        const by = size * this.rng.range(0.5, 0.85);
+        const bz = z + this.rng.range(-size, size) * 0.6;
+        const blob = new THREE.IcosahedronGeometry(br, 1);
+        blob.translate(bx, by, bz);
+        blobs.push({x: bx, y: by, z: bz, r: br});
         parts.push(paint(blob, this.rng.pick(BUSH_COLOURS)));
       }
       // Bushes are food furniture, not obstacles — a caterpillar crawls
       // straight through a bush, and being stopped by one would be baffling.
-      this.bushSpots.push({x, z, top: size * 1.3, radius: size});
+      this.bushSpots.push({x, z, top: size * 1.3, radius: size, blobs});
     }
     const merged = mergeGeometries(parts);
     if (merged) {

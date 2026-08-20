@@ -52,6 +52,16 @@ export class Caterpillar {
    *  that turns it into stepping off the side. */
   private sidePush = 0;
   /**
+   * Whether a push across the branch is allowed to step off it yet.
+   *
+   * Disarmed the moment it hauls back up, and rearmed only when the player
+   * eases off. On a branch the camera is side-on, so "up the screen" is both
+   * "climb the rope" while hanging and "step off the side" while standing —
+   * the same held push. Without this, hauling yourself up put you straight
+   * back off the side, up and down for as long as you held it.
+   */
+  private sideStepArmed = true;
+  /**
    * Hanging off the end of a branch by the tail, or null.
    *
    * `anchor` is the lip it is hanging from, `drop` is how far the head has
@@ -256,32 +266,51 @@ export class Caterpillar {
     // whatever you did — which is why there was no getting back to the trunk
     // from out on a branch. Left and right now run you up and down it, which
     // is what the side-on camera makes it look like they should do anyway.
-    if (bough && drive > 0.001) {
+    if (bough) {
       // Held firmly across the branch, this is someone asking to get off it.
       // Measured before the projection below, which is what throws it away.
-      const across = -dir.x * bough.dir.y + dir.z * bough.dir.x;
-      if (Math.abs(across) > CATERPILLAR.sideStepPush) {
+      // Read from the stick itself, not from `drive`. While the wait for a
+      // released stick is running, drive is forced to zero — and reading that
+      // as "eased off" rearmed this every time, so the still-held push stepped
+      // off again the moment the wait ended. Up and down, for as long as it
+      // was held.
+      const pushing = dir.length() > 0.001;
+      const across = pushing ? -dir.x * bough.dir.y + dir.z * bough.dir.x : 0;
+
+      if (Math.abs(across) <= CATERPILLAR.sideStepPush) {
+        // Eased off: forget any dwell, and let the next firm push count.
+        this.sidePush = 0;
+        this.sideStepArmed = true;
+      } else if (this.sideStepArmed) {
         this.sidePush += dt;
-      } else {
-        this.sidePush = 0;
+        if (this.sidePush >= CATERPILLAR.sideStepDwell) {
+          this.sidePush = 0;
+          // Hung from where it stood, without shifting it to the edge first.
+          // That shift was a teleport of most of a body-width: the trail the
+          // body follows got a jump in it, and the segments bunched either
+          // side of the jump instead of hanging as one caterpillar.
+          this.beginDangle();
+          return;
+        }
       }
-      if (this.sidePush >= CATERPILLAR.sideStepDwell) {
-        this.sidePush = 0;
-        // Hung from the edge it stepped over, not from where it was standing.
-        const edge = this.prevPosition.clone();
-        const out =
-          Math.sign(across) * (bough.walkWidth / 2 + this.radius * 0.5);
-        edge.x += -bough.dir.y * out;
-        edge.z += bough.dir.x * out;
-        this.beginDangle(edge);
-        return;
+
+      if (drive > 0.001) {
+        const along = dir.x * bough.dir.x + dir.z * bough.dir.y;
+        dir.set(bough.dir.x * along, 0, bough.dir.y * along);
       }
-      const along = dir.x * bough.dir.x + dir.z * bough.dir.y;
-      dir.set(bough.dir.x * along, 0, bough.dir.y * along);
-    } else if (!bough) {
+    } else {
       this.sidePush = 0;
+      this.sideStepArmed = true;
     }
-    const railDrive = Math.min(1, dir.length());
+
+    // Taken from `drive`, not from the length of `dir`.
+    //
+    // `drive` is what the wait for a released stick zeroes, and the rail above
+    // only projects when it is non-zero — so measuring the movement off `dir`
+    // meant that during that wait the caterpillar moved along the *unprojected*
+    // stick, straight off the side of the branch. Which is what made hauling
+    // yourself up put you back off again, over and over.
+    const railDrive = drive > 0.001 ? Math.min(1, dir.length()) : 0;
 
     if (railDrive > 0.001) {
       const want = Math.atan2(dir.x, dir.z);
@@ -468,6 +497,10 @@ export class Caterpillar {
       this.position.copy(d.foothold);
       this.awaitRelease = true;
       this.awaitFor = 0;
+      // The push that hauled it up is still held, and up there that same push
+      // means "step off the side". Not until they ease off.
+      this.sideStepArmed = false;
+      this.sidePush = 0;
 
       // Facing back the way it came — but along the branch, since that is the
       // only direction it can actually walk in up here. Whichever way along

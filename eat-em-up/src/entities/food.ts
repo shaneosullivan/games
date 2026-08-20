@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import {mergeGeometries} from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import {
+  CATERPILLAR,
   CLEARING,
   FOOD,
   FOOD_KINDS,
@@ -12,7 +13,7 @@ import {
 } from "../config";
 import {paint, vertexToon} from "../render/materials";
 import {Rng} from "../core/rng";
-import {Forest} from "./forest";
+import {Forest, Spot} from "./forest";
 
 /** One thing you can eat. */
 interface Item {
@@ -280,6 +281,48 @@ export class FoodField {
     return new THREE.Vector2(minR, 0);
   }
 
+  /**
+   * A point on the skin of one of a bush's blobs, in its lower half.
+   *
+   * On the foliage, not on a nominal circle around the bush: a bush is three
+   * lumps at odd offsets, so a ring about its middle leaves food hanging in
+   * the air beside the leaves. Kept to the lower half so a caterpillar on the
+   * ground can always reach it.
+   */
+  private onBush(bush: Spot): {x: number; y: number; z: number} {
+    const blobs = bush.blobs;
+    if (!blobs || blobs.length === 0) {
+      return {x: bush.x, y: 0.3, z: bush.z};
+    }
+    const blob = this.rng.pick(blobs);
+    const a = this.rng.next() * Math.PI * 2;
+    // Right on the surface. Further in and it reads as a dark hole in the bush
+    // rather than a berry sitting in it.
+    const rr = blob.r * 1.02;
+
+    // Downward-ish on the blob, so it nestles under the leaves rather than
+    // perching on top of a tall one out of everything's reach.
+    let lift = this.rng.range(-0.75, 0.15);
+    // And never higher than a brand new caterpillar standing on the ground can
+    // reach, worked out from its own size and bite rather than guessed — a
+    // tall bush would otherwise put a berry on its crown that nothing in the
+    // game could ever eat.
+    const highest =
+      CATERPILLAR.radiusMin +
+      FOOD.biteHeight +
+      CATERPILLAR.radiusMin * FOOD.biteHeightPerRadius -
+      0.15;
+    if (blob.y + lift * rr > highest) {
+      lift = THREE.MathUtils.clamp((highest - blob.y) / rr, -0.95, 0.15);
+    }
+    const ring = Math.sqrt(Math.max(0, 1 - lift * lift));
+    return {
+      x: blob.x + Math.cos(a) * ring * rr,
+      y: Math.max(0.18, blob.y + lift * rr),
+      z: blob.z + Math.sin(a) * ring * rr,
+    };
+  }
+
   private placeLeaves(
     geos: Array<{kind: FoodKind; geometry: THREE.BufferGeometry}>,
     add: AddFn,
@@ -329,15 +372,13 @@ export class FoodField {
     // The rest around the skirts of bushes, low enough to reach from the floor.
     for (let i = onBranch + upTrees; i < total; i++) {
       if (this.rng.next() < 0.65 && this.forest.bushSpots.length > 0) {
-        const bush = this.rng.pick(this.forest.bushSpots);
-        const a = this.rng.next() * Math.PI * 2;
-        const r = bush.radius * this.rng.range(0.7, 1.25);
+        const at = this.onBush(this.rng.pick(this.forest.bushSpots));
         add(
           "leaf",
           this.rng.pick(variants),
-          bush.x + Math.cos(a) * r,
-          this.rng.range(0.25, 0.95),
-          bush.z + Math.sin(a) * r,
+          at.x,
+          at.y,
+          at.z,
           this.rng.range(0.8, 1.2),
         );
       } else {
@@ -396,16 +437,8 @@ export class FoodField {
       // Berries come in bunches on one bush, all the same kind.
       const bunch = Math.min(total - placed, this.rng.int(3, 6));
       for (let i = 0; i < bunch; i++) {
-        const a = this.rng.next() * Math.PI * 2;
-        const r = bush.radius * this.rng.range(0.55, 1.1);
-        add(
-          "berry",
-          variant,
-          bush.x + Math.cos(a) * r,
-          this.rng.range(0.4, 1.15),
-          bush.z + Math.sin(a) * r,
-          this.rng.range(0.9, 1.2),
-        );
+        const at = this.onBush(bush);
+        add("berry", variant, at.x, at.y, at.z, this.rng.range(0.9, 1.2));
         placed++;
       }
     }
