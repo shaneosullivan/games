@@ -298,7 +298,19 @@ export class Caterpillar {
       }
 
       if (drive > 0.001) {
-        const along = dir.x * bough.dir.x + dir.z * bough.dir.y;
+        let along = dir.x * bough.dir.x + dir.z * bough.dir.y;
+        if (Math.abs(along) < 0.25 && !this.sideStepArmed) {
+          // Pushed across the branch rather than along it, and not a fresh
+          // push meaning to get off: carry on the way it is facing.
+          //
+          // Otherwise the stick simply does nothing up here, which is what
+          // being stuck on a branch feels like — you arrive holding the push
+          // that climbed you here, and that push is across the branch.
+          const facing =
+            Math.sin(this.heading) * bough.dir.x +
+            Math.cos(this.heading) * bough.dir.y;
+          along = (facing < 0 ? -1 : 1) * Math.min(1, Math.abs(across));
+        }
         dir.set(bough.dir.x * along, 0, bough.dir.y * along);
       }
     } else {
@@ -650,6 +662,12 @@ export class Caterpillar {
       this.climbing = null;
       this.pressing = 0;
       this.vy = 0;
+      // The stick that climbed you here is still held, and on a branch that
+      // same push is "step off the side" — which dropped you straight back off
+      // the branch you had just reached, over and over. Not until they ease
+      // off and mean it.
+      this.sideStepArmed = false;
+      this.sidePush = 0;
       this.position.copy(spot.point);
       this.position.y += this.radius;
       this.heading = spot.heading;
@@ -1120,8 +1138,11 @@ function smileGeometry(): THREE.BufferGeometry {
  * no inside to it — opening one only gives a thicker line.
  */
 function yawningMouthGeometry(): THREE.BufferGeometry {
-  const mouth = new THREE.SphereGeometry(0.19, 10, 8);
-  mouth.scale(0.8, 1, 0.45);
+  // Wide and flat at rest, so that once the render stretches it open it comes
+  // out round rather than as a tall narrow slot. Built the other way about it
+  // was half as wide as it was tall at full gape.
+  const mouth = new THREE.SphereGeometry(0.19, 12, 9);
+  mouth.scale(1.45, 0.6, 0.45);
   mouth.translate(0, -0.32, 0.93);
   return paint(mouth, 0x5e1a12);
 }
