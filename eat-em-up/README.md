@@ -43,7 +43,8 @@ Eat 80 leaves, 40 flowers, 60 berries, 45 fruits, 12 mushrooms and 120 tufts of
 grass. One bar across the top says how close you are; there are no other
 numbers.
 
-There is exactly one way to lose, and it arrives two minutes in: **a crow**.
+There is exactly one way to lose, and it arrives two minutes in, once and only
+once in a game: **a crow**.
 It comes over, circles, and you have ten seconds to reach the long grass —
 the message says so and counts down. Reach the meadow and it gives up and
 goes. Stay in the open and it takes you, and you start again. Nothing else in
@@ -82,6 +83,11 @@ is the one shape a fair game must not have.
 
 From the far rim of the wood the meadow is about seven seconds of running with
 no mistakes, so ten seconds is meant to be tight.
+
+It comes exactly once. A threat that kept coming back would stop a child
+wandering off from the meadow, and wandering off is most of what there is to
+do here — so once it has had its go, whether it caught you, gave up, or was
+called off by a rainbow mushroom, the wood is safe again for good.
 
 Boulders lie about the floor, some mossy. They are the one thing in the wood
 you cannot simply crawl past: the caterpillar goes over them. Their surface is

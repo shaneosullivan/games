@@ -893,14 +893,14 @@ export const MUSIC = {
 
 export const CROW = {
   /**
-   * Seconds before the first crow. Fixed rather than rolled: the first one is
-   * the one that teaches you what a crow means, and a lesson that may or may
-   * not arrive is no lesson.
+   * Seconds before the crow, which comes exactly once in a game.
+   *
+   * Fixed rather than rolled, and once rather than now and again: it is the
+   * one thing here that can go wrong for you, and something that kept coming
+   * back would stop a child wandering off from the meadow, which is most of
+   * what there is to do in this wood.
    */
   firstGap: 2 * 60,
-  /** Seconds between them after that. */
-  minGap: 20 * 60,
-  maxGap: 65 * 60,
   /**
    * How long you have to reach the grass once it starts circling.
    *
@@ -926,19 +926,6 @@ export const CROW = {
   hideNeedsGrass: 0.15,
   /** How long the dive takes, once it has decided it has you. */
   diveFor: 0.9,
-  /**
-   * How often a wait is a short one instead, and how short.
-   *
-   * The long gap is the point of the crow — it is meant to be rare enough that
-   * seeing it feels like catching something. But at twenty minutes at the very
-   * best, most sittings ended before it ever came, so the rarest thing in the
-   * game was one almost nobody met. A share of the waits are early ones, which
-   * means a child usually sees a crow in the first few minutes and then has no
-   * idea when the next will be.
-   */
-  earlyChance: 0.4,
-  earlyMin: 2 * 60,
-  earlyMax: 3 * 60,
   /** How long one pass takes, and how far it travels in that time. */
   crossTime: 9,
   travel: 110,

@@ -22,8 +22,17 @@ export class CrowShadow {
   readonly group = new THREE.Group();
 
   private readonly wings: Array<THREE.Object3D> = [];
-  /** Seconds until the next one comes over. */
+  /** Seconds until it comes over. */
   private wait: number;
+  /**
+   * Set the moment it arrives, and never cleared.
+   *
+   * The crow comes once in a game and then the wood is safe again. It is the
+   * one thing here that can go wrong for you, and a threat that keeps coming
+   * back is a different game — you would stop wandering off from the meadow,
+   * which is most of what there is to do.
+   */
+  private done = false;
   /** How far through a pass it is, or null between them. */
   private crossing: number | null = null;
   private readonly from = new THREE.Vector3();
@@ -81,7 +90,13 @@ export class CrowShadow {
     return Math.max(0, Math.ceil(this.hunt ?? 0));
   }
 
-  /** Calls off a hunt without a catch — see the note about fits in Game. */
+  /**
+   * Calls off a hunt without a catch — see the note about fits in Game.
+   *
+   * It does not get another go: it has had its arrival. Otherwise eating a
+   * rainbow mushroom at the wrong moment would be a way of putting the crow
+   * off until later, which is a strange thing to have to explain.
+   */
   callOff(): void {
     if (this.hunt === null) {
       return;
@@ -89,17 +104,6 @@ export class CrowShadow {
     this.hunt = null;
     this.dive = 0;
     this.group.visible = false;
-    this.wait = this.nextWait();
-  }
-
-  /**
-   * How long until the next one. Rolled fresh every time, so an early crow is
-   * no promise about the one after it.
-   */
-  private nextWait(): number {
-    return this.rng.next() < CROW.earlyChance
-      ? this.rng.range(CROW.earlyMin, CROW.earlyMax)
-      : this.rng.range(CROW.minGap, CROW.maxGap);
   }
 
   /** True while a shadow is actually crossing. */
@@ -170,7 +174,6 @@ export class CrowShadow {
       if (t >= 1) {
         this.crossing = null;
         this.group.visible = false;
-        this.wait = this.nextWait();
         return "none";
       }
       this.group.position
@@ -181,6 +184,9 @@ export class CrowShadow {
       return "none";
     }
 
+    if (this.done) {
+      return "none";
+    }
     this.wait -= dt;
     if (this.wait <= 0) {
       this.begin(near);
@@ -216,6 +222,7 @@ export class CrowShadow {
 
   /** Starts a hunt: it arrives already circling, and the clock starts. */
   private begin(near: THREE.Vector3): void {
+    this.done = true;
     this.hunt = CROW.warnFor;
     this.circle = this.rng.next() * Math.PI * 2;
     this.group.scale.setScalar(CROW.size);
