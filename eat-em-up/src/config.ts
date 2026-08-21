@@ -349,6 +349,28 @@ export const CATERPILLAR = {
    * touching you is a strange thing to explain to a child. A body's width and
    * a little, so it really is a branch you are against.
    */
+  /**
+   * The belly: how much fatter the middle of the body is than the taper alone
+   * would make it, at full size.
+   *
+   * Nothing at all when the caterpillar is new — a hungry one is a thin tube,
+   * and the swelling middle is what a well-fed one looks like. It grows with
+   * everything else, so getting fat is something that happens to the shape and
+   * not only to the scale.
+   *
+   * It has to beat the taper to be seen, which is what this number is really
+   * set against: the taper has already taken a seventh off the body by the
+   * time it reaches the belly, so a bulge of a third left the middle only a
+   * tenth fatter than the shoulders and the caterpillar still read as a cone.
+   * At this it is a third fatter, and the middle is plainly the fattest part.
+   */
+  bellyBulge: 0.55,
+  /** Where along the body it swells, from 0 at the head to 1 at the tail.
+   *  Forward of the middle, where a caterpillar carries it. */
+  bellyAt: 0.42,
+  /** How much of the body the swelling covers. Wide enough to be a belly
+   *  rather than one fat segment in a row of thin ones. */
+  bellySpread: 0.33,
   hangGrabReach: 0.45,
   /** How far apart the body is tested along its length for one. */
   hangGrabStep: 0.5,

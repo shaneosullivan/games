@@ -1010,8 +1010,15 @@ export class Caterpillar {
         }
       }
       // Segments taper toward the tail, so it reads as a caterpillar and not a
-      // string of identical beads.
-      const taper = 1 - (s / Math.max(1, count - 1)) * 0.32;
+      // string of identical beads — and the well-fed ones swell in the middle
+      // on top of that. See CATERPILLAR.bellyBulge: the swelling is worth
+      // nothing on a new caterpillar and most on a full one, so the body
+      // changes shape as it eats rather than only changing size.
+      const along = s / Math.max(1, count - 1);
+      const fromBelly = (along - CATERPILLAR.bellyAt) / CATERPILLAR.bellySpread;
+      const belly =
+        Math.exp(-fromBelly * fromBelly) * CATERPILLAR.bellyBulge * this.growth;
+      const taper = (1 - along * 0.32) * (1 + belly);
       mesh.scale.setScalar(radius * taper);
       // Each segment faces the one in front, so a turn bends the body and a
       // climb stands it on end. Taking the pitch from the body line rather
@@ -1030,6 +1037,14 @@ export class Caterpillar {
         mesh.rotation.y = Math.atan2(dx, dz);
       }
       mesh.rotation.x = -Math.atan2(dy, horizontal);
+
+      // Sit the segment on the body's underside rather than centred on the
+      // line the body follows. The line is one base radius off the ground, so
+      // without this a belly segment is buried in the floor by however much
+      // fatter than the base it is, and a tapered tail segment floats the same
+      // distance above it. Along the segment's own up, not the world's, so it
+      // is still right on the side of a trunk.
+      mesh.translateY(radius * (taper - 1));
     }
 
     this.poseLegs(ask, radius);
