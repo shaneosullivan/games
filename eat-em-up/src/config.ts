@@ -804,7 +804,7 @@ export const BOULDER = {
  */
 export const MADNESS = {
   /** How many of the wood's mushrooms are the rainbow sort. */
-  count: 4,
+  count: 2,
   /** How much bigger they are than an ordinary one. This is what makes them
    *  worth crawling to from across the wood. */
   scale: 2.7,
@@ -868,6 +868,15 @@ export const MADNESS = {
    *  apart two neighbouring segments are on the wheel. */
   rainbowRate: 0.55,
   rainbowSpacing: 0.055,
+  /**
+   * The last seconds of a fit, as a countdown you can watch.
+   *
+   * The rainbow goes out one section at a time from the tail forward, evenly
+   * over this long — so with ten sections one settles back to green every half
+   * second, and the head is the last to go, at the moment the fit ends. A
+   * child gets to see how much of it is left without a number to read.
+   */
+  fadeOut: 5,
   /** How fast the fit winds down at the end, so it stops rather than snaps. */
   easeOut: 1.2,
 } as const;

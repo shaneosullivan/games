@@ -1210,6 +1210,19 @@ export class Caterpillar {
     const sideZ = -Math.sin(this.heading);
     const wagFrom = Math.floor(count * IDLE.wagFrom);
 
+    // How many sections, counting from the tail, have already settled back to
+    // green. Spread evenly over the last MADNESS.fadeOut seconds of the fit,
+    // so the head is the last to go and goes exactly as the fit ends.
+    const settled =
+      this.mad > 0
+        ? Math.max(
+            0,
+            Math.floor(
+              ((MADNESS.fadeOut - this.mad) / MADNESS.fadeOut) * count,
+            ),
+          )
+        : count;
+
     for (let s = 0; s < count; s++) {
       const mesh = this.segments[s];
       mesh.position.lerpVectors(this.segPrev[s], this.segCur[s], alpha);
@@ -1263,13 +1276,19 @@ export class Caterpillar {
       // Off its head, the whole body runs through the colours of the rainbow,
       // a little further round the wheel for every segment so the colours
       // travel down it rather than the caterpillar flashing all one shade.
+      //
+      // And it goes out from the tail forward over the last seconds, one
+      // section at a time — the countdown, see MADNESS.fadeOut. Full strength
+      // right up to the moment a section settles, rather than the whole body
+      // dimming: a section that faded out would say nothing about how much
+      // longer there is, and the point of it is that it says exactly that.
       const mat = mesh.material as THREE.MeshToonMaterial;
-      if (madness > 0) {
+      if (this.mad > 0 && s < count - settled) {
         const hue =
           (this.mad * MADNESS.rainbowRate + s * MADNESS.rainbowSpacing) % 1;
         this.tint.setHSL(hue < 0 ? hue + 1 : hue, 1, 0.55);
-        mat.color.setScalar(1 - (1 - MADNESS.bodyDim) * madness);
-        mat.emissive.copy(this.tint).multiplyScalar(MADNESS.bodyGlow * madness);
+        mat.color.setScalar(MADNESS.bodyDim);
+        mat.emissive.copy(this.tint).multiplyScalar(MADNESS.bodyGlow);
       } else if (mat.emissive.r + mat.emissive.g + mat.emissive.b > 0) {
         // Back to an ordinary green caterpillar the moment it is over.
         mat.color.setScalar(1);

@@ -54,12 +54,14 @@ drops you back onto the forest floor.
   onto the branch, and edge out to the tip.
 - **Mushrooms** grow on the boulders and nowhere else, round their shoulders
   and their feet — so filling that quota means visiting every rock in the wood.
-  Four of them are **rainbow** ones: much bigger, spotted, and glowing, so they
+  Two of them are **rainbow** ones: much bigger, spotted, and glowing, so they
   are spotted from across the wood. Eating one sets the caterpillar off for
   thirteen seconds — it runs the colours of the rainbow, grins, goes odd about
   the eyes, and tears round the wood and up and down the trees under its own
-  steam while you watch. It counts for the quota like any other mushroom, so it
-  is never a trap, and it grows back like the rest.
+  steam while you watch. The last five seconds are a countdown you can see: the
+  rainbow goes out one section at a time from the tail forward, evenly, and the
+  head is the last to go as the fit ends. It counts for the quota like any
+  other mushroom, so it is never a trap, and it grows back like the rest.
 - **Grass** fills one tall meadow, and is the one thing eaten only where your
   head actually touches it.
 
