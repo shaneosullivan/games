@@ -1,39 +1,43 @@
-import track from "../assets/mossy_trail.mp3";
+import calmTrack from "../assets/mossy_trail.mp3";
+import rainbowTrack from "../assets/rainbow_time.mp3";
 import {MUSIC} from "../config";
 
 /**
- * The background music: one track, looping, with a way to turn it off.
+ * The music: the wood's own track, and the one that takes over during a fit.
  *
- * An `Audio` element rather than the WebAudio graph. There is one sound in
- * this game and nothing has to be mixed, positioned or timed against anything
- * else, and an element loops and streams on its own — WebAudio would mean
- * decoding the whole file up front to gain nothing.
+ * `Audio` elements rather than the WebAudio graph. Nothing here has to be
+ * mixed, positioned or timed against anything else — one track plays and the
+ * other doesn't — and an element loops and streams on its own, where WebAudio
+ * would mean decoding whole files up front to gain nothing.
  *
- * It cannot be started until the player has touched the screen: a browser will
- * refuse to play audio that no one asked for, and on iPad that refusal is the
- * default. So `start` is called from the button on the intro panel, which is
- * the first thing anyone touches, and a refusal is swallowed rather than
+ * Neither can be started until the player has touched the screen: a browser
+ * will refuse to play audio that no one asked for, and on iPad that refusal is
+ * the default. So `start` is called from the button on the intro panel, which
+ * is the first thing anyone touches, and a refusal is swallowed rather than
  * thrown — music that will not play is not a reason for the game not to run.
  */
 export class Music {
-  private readonly audio: HTMLAudioElement;
+  private readonly calm: HTMLAudioElement;
+  private readonly rainbow: HTMLAudioElement;
+  /** Whichever of the two the game currently wants playing. */
+  private current: HTMLAudioElement;
   private muted = false;
   /** Whether the game has asked for music at all yet. */
   private started = false;
 
   constructor() {
-    this.audio = new Audio(track);
-    this.audio.loop = true;
-    this.audio.volume = MUSIC.volume;
-    this.audio.preload = "auto";
+    this.calm = makeTrack(calmTrack, MUSIC.volume);
+    this.rainbow = makeTrack(rainbowTrack, MUSIC.rainbowVolume);
+    this.current = this.calm;
 
     // A tablet game left on the table is a tab nobody is looking at, and music
     // coming out of one is just a noise in the room.
     document.addEventListener("visibilitychange", () => {
       if (document.hidden) {
-        this.audio.pause();
-      } else if (this.started && !this.muted) {
-        void this.audio.play().catch(() => {});
+        this.calm.pause();
+        this.rainbow.pause();
+      } else {
+        this.resume();
       }
     });
   }
@@ -41,10 +45,28 @@ export class Music {
   /** Called from the first touch: see the note about autoplay above. */
   start(): void {
     this.started = true;
-    if (this.muted) {
-      return;
-    }
-    void this.audio.play().catch(() => {});
+    this.resume();
+  }
+
+  /**
+   * A rainbow mushroom has hold of the caterpillar: hand over to the other
+   * track.
+   *
+   * Rewound rather than resumed, so a second mushroom eaten during a fit
+   * starts the tune again from the top, the way the fit itself restarts.
+   */
+  beginRainbow(): void {
+    this.calm.pause();
+    this.rainbow.currentTime = 0;
+    this.current = this.rainbow;
+    this.resume();
+  }
+
+  /** The fit has worn off: back to the wood's own music, from where it was. */
+  endRainbow(): void {
+    this.rainbow.pause();
+    this.current = this.calm;
+    this.resume();
   }
 
   get isMuted(): boolean {
@@ -55,9 +77,26 @@ export class Music {
   setMuted(muted: boolean): void {
     this.muted = muted;
     if (muted) {
-      this.audio.pause();
-    } else if (this.started) {
-      void this.audio.play().catch(() => {});
+      this.calm.pause();
+      this.rainbow.pause();
+      return;
     }
+    this.resume();
   }
+
+  /** Plays whichever track is wanted, if it is allowed to play anything. */
+  private resume(): void {
+    if (!this.started || this.muted || document.hidden) {
+      return;
+    }
+    void this.current.play().catch(() => {});
+  }
+}
+
+function makeTrack(src: string, volume: number): HTMLAudioElement {
+  const audio = new Audio(src);
+  audio.loop = true;
+  audio.volume = volume;
+  audio.preload = "auto";
+  return audio;
 }

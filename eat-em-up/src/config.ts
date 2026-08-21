@@ -889,6 +889,9 @@ export const MADNESS = {
  */
 export const MUSIC = {
   volume: 0.35,
+  /** The rainbow-mushroom track, a shade louder than the wood's own: the
+   *  point of it is that something has plainly taken over. */
+  rainbowVolume: 0.45,
 } as const;
 
 export const CROW = {

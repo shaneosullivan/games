@@ -49,6 +49,8 @@ export class Game {
   /** Shown when the crow takes the caterpillar; see caughtByTheCrow. */
   private readonly caught: Overlay;
   private readonly music = new Music();
+  /** Whether the caterpillar was off its head last frame; see update. */
+  private wasMad = false;
   readonly cat: Caterpillar;
   readonly ending: Ending;
   readonly hud: Hud;
@@ -224,9 +226,11 @@ export class Game {
         this.cat.radius * CATERPILLAR.biteReach,
         this.cat.radius,
       );
-      // A rainbow mushroom takes the caterpillar off you for a few seconds.
+      // A rainbow mushroom takes the caterpillar off you for a few seconds,
+      // and the music goes with it.
       if (swallowed?.magic) {
         this.cat.goMad();
+        this.music.beginRainbow();
       }
       if (this.food.complete) {
         this.beginTransformation();
@@ -239,6 +243,13 @@ export class Game {
     // seen rather than behind the player's back.
     this.viewForward.set(Math.sin(this.camYaw), 0, Math.cos(this.camYaw));
     this.leaves.update(dt, this.cat.position, this.viewForward);
+    // The fit ends by running out rather than by anything calling it off, so
+    // the only way to know is to watch it stop.
+    if (this.wasMad && !this.cat.isMad) {
+      this.music.endRainbow();
+    }
+    this.wasMad = this.cat.isMad;
+
     this.tickCrow(dt);
     this.hud.update(this.food.eaten);
   };
