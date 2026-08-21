@@ -49,7 +49,17 @@ export class CrowShadow {
 
     this.group.visible = false;
     this.group.scale.setScalar(CROW.size);
-    this.wait = this.rng.range(CROW.minGap, CROW.maxGap);
+    this.wait = this.nextWait();
+  }
+
+  /**
+   * How long until the next one. Rolled fresh every time, so an early crow is
+   * no promise about the one after it.
+   */
+  private nextWait(): number {
+    return this.rng.next() < CROW.earlyChance
+      ? this.rng.range(CROW.earlyMin, CROW.earlyMax)
+      : this.rng.range(CROW.minGap, CROW.maxGap);
   }
 
   /** True while a shadow is actually crossing. */
@@ -72,7 +82,7 @@ export class CrowShadow {
     if (t >= 1) {
       this.crossing = null;
       this.group.visible = false;
-      this.wait = this.rng.range(CROW.minGap, CROW.maxGap);
+      this.wait = this.nextWait();
       return;
     }
 

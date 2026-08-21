@@ -695,6 +695,19 @@ export const CROW = {
   /** Seconds before the first shadow, and between them afterwards. */
   minGap: 20 * 60,
   maxGap: 65 * 60,
+  /**
+   * How often a wait is a short one instead, and how short.
+   *
+   * The long gap is the point of the crow — it is meant to be rare enough that
+   * seeing it feels like catching something. But at twenty minutes at the very
+   * best, most sittings ended before it ever came, so the rarest thing in the
+   * game was one almost nobody met. A share of the waits are early ones, which
+   * means a child usually sees a crow in the first few minutes and then has no
+   * idea when the next will be.
+   */
+  earlyChance: 0.4,
+  earlyMin: 2 * 60,
+  earlyMax: 3 * 60,
   /** How long one pass takes, and how far it travels in that time. */
   crossTime: 9,
   travel: 110,
