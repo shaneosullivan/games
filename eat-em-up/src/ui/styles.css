@@ -68,6 +68,39 @@ canvas {
   display: none;
 }
 
+/* The crow warning. Red, big, and above everything else on the glass — it is
+   the only thing in this game that is actually urgent. */
+.alert {
+  position: absolute;
+  top: 54px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 10px 22px;
+  border-radius: 999px;
+  background: rgba(198, 48, 44, 0.94);
+  color: #fff;
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+  animation: alert-pulse 900ms ease-in-out infinite;
+}
+
+.alert.hidden {
+  display: none;
+}
+
+@keyframes alert-pulse {
+  0%,
+  100% {
+    transform: translateX(-50%) scale(1);
+  }
+  50% {
+    transform: translateX(-50%) scale(1.06);
+  }
+}
+
 /* ---------- Overlays ---------- */
 
 .overlay {

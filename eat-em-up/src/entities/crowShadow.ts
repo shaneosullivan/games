@@ -3,18 +3,21 @@ import {mergeGeometries} from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import {CROW} from "../config";
 import {Rng} from "../core/rng";
 
+/** What the crow did this frame, for the game to act on. */
+export type CrowEvent = "none" | "began" | "left" | "caught";
+
 /**
- * A crow's shadow crossing the forest floor.
+ * A crow's shadow, and the one thing in this wood that can go wrong for you.
  *
- * Just the shadow. There is no crow above it and nothing happens if it passes
- * over you — the plan's notes have it snatching a caterpillar that fails to
- * hide, which is not built. What it is for is the feeling that the wood has
- * something else in it, once in a long while.
+ * It comes over, circles, and closes in. You have CROW.warnFor seconds to get
+ * into the long grass; reach it and the crow gives up and goes, and if you do
+ * not it takes you and the game is over. Nothing else here can be lost, which
+ * is exactly what makes this land — for two minutes the wood is entirely safe
+ * and then, once, it isn't.
  *
  * Drawn flat on the ground rather than cast: a real shadow would want a light
- * with shadow maps for one dark shape a player may never see. This is a dark
- * patch laid on the floor, unlit and see-through, which reads the same and
- * costs a draw call.
+ * with shadow maps for one dark shape. This is a dark patch laid on the floor,
+ * unlit and see-through, which reads the same and costs a draw call.
  */
 export class CrowShadow {
   readonly group = new THREE.Group();
@@ -27,6 +30,16 @@ export class CrowShadow {
   private readonly from = new THREE.Vector3();
   private readonly heading = new THREE.Vector3();
   private beat = 0;
+  /**
+   * The hunt: seconds left of it, or null when there is none on.
+   *
+   * Counted down rather than up so what the HUD needs to show — how long you
+   * have — is the number itself.
+   */
+  private hunt: number | null = null;
+  /** Where it is round the circle, and how long the dive has left. */
+  private circle = 0;
+  private dive = 0;
 
   constructor(private readonly rng: Rng) {
     const material = new THREE.MeshBasicMaterial({
@@ -49,6 +62,28 @@ export class CrowShadow {
 
     this.group.visible = false;
     this.group.scale.setScalar(CROW.size);
+    // The first one is at a fixed two minutes; see CROW.firstGap.
+    this.wait = CROW.firstGap;
+  }
+
+  /** True while it is circling and the clock is running. */
+  get hunting(): boolean {
+    return this.hunt !== null;
+  }
+
+  /** Seconds left to reach the grass, for the HUD to show. */
+  get secondsLeft(): number {
+    return Math.max(0, Math.ceil(this.hunt ?? 0));
+  }
+
+  /** Calls off a hunt without a catch — see the note about fits in Game. */
+  callOff(): void {
+    if (this.hunt === null) {
+      return;
+    }
+    this.hunt = null;
+    this.dive = 0;
+    this.group.visible = false;
     this.wait = this.nextWait();
   }
 
@@ -67,33 +102,94 @@ export class CrowShadow {
     return this.crossing !== null;
   }
 
-  /** `near` is the caterpillar: a shadow nobody sees is not worth having. */
-  update(dt: number, near: THREE.Vector3): void {
-    if (this.crossing === null) {
-      this.wait -= dt;
-      if (this.wait <= 0) {
-        this.begin(near);
+  /**
+   * `near` is the caterpillar and `safe` whether it is somewhere the crow
+   * cannot see it. Returns what happened, for the game to act on.
+   *
+   * Safety is judged at the end of the count and not before: diving the
+   * instant you step out of the grass would punish a wobble, and standing in
+   * the grass for nine seconds and stepping out on the tenth is a mistake a
+   * child should be allowed to make and see.
+   */
+  update(dt: number, near: THREE.Vector3, safe: boolean): CrowEvent {
+    if (this.dive > 0) {
+      this.dive -= dt;
+      // Down onto the caterpillar. The shadow shrinking is the crow coming
+      // down to meet the ground it is drawn on.
+      const t = 1 - Math.max(0, this.dive) / CROW.diveFor;
+      this.group.position.lerp(near, Math.min(1, t * 0.4));
+      this.group.position.y = CROW.height;
+      this.group.scale.setScalar(CROW.size * (1 - t * 0.55));
+      this.beatWings(dt * 2.5);
+      return "none";
+    }
+
+    if (this.hunt !== null) {
+      this.hunt -= dt;
+      this.circle += dt * CROW.circleRate * Math.PI * 2;
+
+      // Closing in over the whole count, so how much time is left is
+      // something you can see as well as read.
+      const through = 1 - Math.max(0, this.hunt) / CROW.warnFor;
+      const r = CROW.circleFrom + (CROW.circleTo - CROW.circleFrom) * through;
+      this.group.position.set(
+        near.x + Math.cos(this.circle) * r,
+        CROW.height,
+        near.z + Math.sin(this.circle) * r,
+      );
+      // Facing the way it is going round, which is a quarter turn on from the
+      // direction it lies from the caterpillar.
+      this.group.rotation.y = -this.circle + Math.PI / 2;
+      this.beatWings(dt);
+
+      if (this.hunt > 0) {
+        return "none";
       }
-      return;
+      this.hunt = null;
+      if (safe) {
+        // Gives up and goes. It leaves the way any of them used to: straight
+        // across and out of the wood.
+        this.crossing = 0;
+        this.heading.subVectors(this.group.position, near).setY(0).normalize();
+        this.from.copy(this.group.position);
+        this.group.scale.setScalar(CROW.size);
+        return "left";
+      }
+      this.dive = CROW.diveFor;
+      return "caught";
     }
 
-    this.crossing += dt;
-    const t = this.crossing / CROW.crossTime;
-    if (t >= 1) {
-      this.crossing = null;
-      this.group.visible = false;
-      this.wait = this.nextWait();
-      return;
+    if (this.crossing !== null) {
+      this.crossing += dt;
+      const t = this.crossing / CROW.crossTime;
+      if (t >= 1) {
+        this.crossing = null;
+        this.group.visible = false;
+        this.wait = this.nextWait();
+        return "none";
+      }
+      this.group.position
+        .copy(this.from)
+        .addScaledVector(this.heading, t * CROW.travel);
+      this.group.position.y = CROW.height;
+      this.beatWings(dt);
+      return "none";
     }
 
-    this.group.position
-      .copy(this.from)
-      .addScaledVector(this.heading, t * CROW.travel);
-    this.group.position.y = CROW.height;
+    this.wait -= dt;
+    if (this.wait <= 0) {
+      this.begin(near);
+      return "began";
+    }
+    return "none";
+  }
 
-    // The wings beat by folding along the body rather than flapping up and
-    // down: seen from directly above, which is what a shadow on the ground is,
-    // that is what a wing beat looks like.
+  /**
+   * The wings beat by folding along the body rather than flapping up and down:
+   * seen from directly above, which is what a shadow on the ground is, that is
+   * what a wing beat looks like.
+   */
+  private beatWings(dt: number): void {
     this.beat += dt * CROW.beatHz * Math.PI * 2;
     const fold = 0.45 + 0.55 * (0.5 + 0.5 * Math.sin(this.beat));
     for (const wing of this.wings) {
@@ -101,24 +197,17 @@ export class CrowShadow {
     }
   }
 
-  /** Sends one over, on a line that passes close by the caterpillar. */
+  /** Starts a hunt: it arrives already circling, and the clock starts. */
   private begin(near: THREE.Vector3): void {
-    const bearing = this.rng.next() * Math.PI * 2;
-    this.heading.set(Math.sin(bearing), 0, Math.cos(bearing));
-    // Offset the line sideways a little, so it passes by rather than exactly
-    // overhead every time.
-    const side = this.rng.range(-CROW.nearMiss, CROW.nearMiss);
-    const closest = new THREE.Vector3(
-      near.x - this.heading.z * side,
-      0,
-      near.z + this.heading.x * side,
+    this.hunt = CROW.warnFor;
+    this.circle = this.rng.next() * Math.PI * 2;
+    this.group.scale.setScalar(CROW.size);
+    this.group.position.set(
+      near.x + Math.cos(this.circle) * CROW.circleFrom,
+      CROW.height,
+      near.z + Math.sin(this.circle) * CROW.circleFrom,
     );
-    this.from.copy(closest).addScaledVector(this.heading, -CROW.travel / 2);
-    this.group.position.copy(this.from);
-    this.group.position.y = CROW.height;
-    this.group.rotation.y = bearing;
     this.group.visible = true;
-    this.crossing = 0;
   }
 }
 

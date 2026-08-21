@@ -15,6 +15,9 @@ export class Hud {
   private readonly root: HTMLDivElement;
   private readonly bar: ProgressBar;
 
+  /** The crow warning; see setAlert. */
+  private readonly alert: HTMLDivElement;
+
   constructor(host: HTMLElement) {
     this.root = document.createElement("div");
     this.root.className = "hud";
@@ -28,8 +31,30 @@ export class Hud {
     });
     this.root.appendChild(this.bar.root);
 
+    // The crow warning, under the bar. Its own element rather than words in
+    // the bar: the bar is the slow business of becoming a butterfly and this
+    // is the one urgent thing in the game, so they must not be read as the
+    // same kind of thing.
+    this.alert = document.createElement("div");
+    this.alert.className = "alert hidden";
+    this.root.appendChild(this.alert);
+
     host.appendChild(this.root);
     this.update();
+  }
+
+  /**
+   * The crow warning: words and the seconds left, or null to take it away.
+   *
+   * Both, because a child who cannot yet read gets the number counting down
+   * and a child who can gets told what to do about it.
+   */
+  setAlert(text: string | null, seconds = 0): void {
+    this.alert.classList.toggle("hidden", text === null);
+    if (text === null) {
+      return;
+    }
+    this.alert.textContent = `${text}  ${seconds}`;
   }
 
   /**

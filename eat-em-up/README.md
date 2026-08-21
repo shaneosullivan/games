@@ -41,8 +41,13 @@ there is no control to find first.
 
 Eat 80 leaves, 40 flowers, 60 berries, 45 fruits, 12 mushrooms and 120 tufts of
 grass. One bar across the top says how close you are; there are no other
-numbers. You cannot lose and nothing can hurt you; crawling off a branch just
-drops you back onto the forest floor.
+numbers.
+
+There is exactly one way to lose, and it arrives two minutes in: **a crow**.
+It comes over, circles, and you have ten seconds to reach the long grass —
+the message says so and counts down. Reach the meadow and it gives up and
+goes. Stay in the open and it takes you, and you start again. Nothing else in
+the wood can hurt you: crawling off a branch just drops you onto the floor.
 
 - **Leaves** are on the bushes, along the branch you start on, and up the
   trunks — the reward for climbing.
@@ -64,6 +69,19 @@ drops you back onto the forest floor.
   other mushroom, so it is never a trap, and it grows back like the rest.
 - **Grass** fills one tall meadow, and is the one thing eaten only where your
   head actually touches it.
+
+Hiding is the meadow as a whole, not the particular tuft you are standing on —
+gaps in the grass do not matter, because a child who has run to the grass has
+done what was asked. What does matter is how much of the meadow is left: eat
+nearly all of it and there is nowhere to get out of sight, and the crow finds
+you standing in it. Grass grows back after five minutes, so that is never a
+game you cannot win. The crow does not hunt during a rainbow-mushroom fit
+either — the fit outlasts its count and you have no say in where the
+caterpillar goes, and being taken for something you could not have prevented
+is the one shape a fair game must not have.
+
+From the far rim of the wood the meadow is about seven seconds of running with
+no mistakes, so ten seconds is meant to be tight.
 
 Boulders lie about the floor, some mossy. They are the one thing in the wood
 you cannot simply crawl past: the caterpillar goes over them. Their surface is

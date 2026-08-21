@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import {CAMERA, CATERPILLAR, CLIMB, ENDING} from "./config";
+import {CAMERA, CATERPILLAR, CLEARING, CLIMB, CROW, ENDING} from "./config";
 import {GameLoop} from "./core/loop";
 import {Joystick} from "./core/input";
 import {AltitudeStick} from "./core/altitudeStick";
@@ -44,6 +44,8 @@ export class Game {
   readonly food: FoodField;
   readonly leaves: FallingLeaves;
   readonly crow: CrowShadow;
+  /** Shown when the crow takes the caterpillar; see caughtByTheCrow. */
+  private readonly caught: Overlay;
   readonly cat: Caterpillar;
   readonly ending: Ending;
   readonly hud: Hud;
@@ -121,6 +123,11 @@ export class Game {
       this.beginFlying(),
     );
     this.win.hide();
+
+    this.caught = new Overlay(ui, "The crow got you!", "", "Try again", () =>
+      window.location.reload(),
+    );
+    this.caught.hide();
 
     // Once you are flying there is nothing left to finish, so starting over
     // has to be reachable without the overlay in the way. A reload rather than
@@ -217,10 +224,83 @@ export class Game {
     // seen rather than behind the player's back.
     this.viewForward.set(Math.sin(this.camYaw), 0, Math.cos(this.camYaw));
     this.leaves.update(dt, this.cat.position, this.viewForward);
-    // And once in a very long while, something goes over.
-    this.crow.update(dt, this.cat.position);
+    this.tickCrow(dt);
     this.hud.update(this.food.eaten);
   };
+
+  /**
+   * The crow: the one thing here that can go wrong for you.
+   *
+   * It comes over at two minutes, circles, and gives you ten seconds to reach
+   * the long grass. Reach it and it goes; don't and it has you, and the game
+   * is over.
+   */
+  private tickCrow(dt: number): void {
+    // Not once the transformation has started. A chrysalis cannot run for the
+    // grass, and a butterfly has finished the game.
+    if (this.transforming) {
+      this.crow.callOff();
+      this.hud.setAlert(null);
+      return;
+    }
+
+    // Not while a rainbow mushroom has hold of it either. The fit lasts longer
+    // than the crow's count and the player has no say in where the caterpillar
+    // goes during it — being taken for something you could not have prevented
+    // is the one shape a fair game must not have.
+    if (this.cat.isMad) {
+      this.crow.callOff();
+      this.hud.setAlert(null);
+      return;
+    }
+
+    const event = this.crow.update(dt, this.cat.position, this.hidden);
+    if (event === "began") {
+      this.hud.setAlert("Hide in the grass!", this.crow.secondsLeft);
+    } else if (event === "left") {
+      this.hud.setAlert(null);
+    } else if (event === "caught") {
+      this.hud.setAlert(null);
+      this.caughtByTheCrow();
+    } else if (this.crow.hunting) {
+      this.hud.setAlert("Hide in the grass!", this.crow.secondsLeft);
+    }
+  }
+
+  /**
+   * Whether the crow can see the caterpillar.
+   *
+   * The meadow hides you, and gaps in it do not matter — a child who has run
+   * to the grass has done the thing that was asked, and being taken while
+   * standing in it because the particular tuft they were over had been eaten
+   * would be unreadable. What does matter is the meadow as a whole: eat nearly
+   * all of it and there is nothing left to hide behind. It grows back after
+   * five minutes, so that is never permanent.
+   */
+  private get hidden(): boolean {
+    if (!this.forest.inClearing(this.cat.position.x, this.cat.position.z)) {
+      return false;
+    }
+    const left = this.food.remaining("grass") / CLEARING.tufts;
+    return left >= CROW.hideNeedsGrass;
+  }
+
+  /** The crow got you. */
+  private caughtByTheCrow(): void {
+    this.running = false;
+    this.stick.enabled = false;
+    this.stick.release();
+    this.hud.setVisible(false);
+    // Which of the two ways it went wrong, because they call for different
+    // things next time: run sooner, or leave some of the meadow standing.
+    const bare = this.food.remaining("grass") / CLEARING.tufts;
+    this.caught.setBody(
+      bare < CROW.hideNeedsGrass
+        ? "You had eaten nearly all the grass, so there was nowhere left to hide. It grows back — leave some of the meadow standing next time."
+        : "The crow was looking for you and you were out in the open. When one comes over, run for the long grass!",
+    );
+    this.caught.show();
+  }
 
   /** Hands the butterfly to the player. */
   private beginFlying(): void {

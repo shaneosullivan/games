@@ -882,9 +882,40 @@ export const MADNESS = {
 } as const;
 
 export const CROW = {
-  /** Seconds before the first shadow, and between them afterwards. */
+  /**
+   * Seconds before the first crow. Fixed rather than rolled: the first one is
+   * the one that teaches you what a crow means, and a lesson that may or may
+   * not arrive is no lesson.
+   */
+  firstGap: 2 * 60,
+  /** Seconds between them after that. */
   minGap: 20 * 60,
   maxGap: 65 * 60,
+  /**
+   * How long you have to reach the grass once it starts circling.
+   *
+   * The one thing in this game that can go wrong for you. It is deliberately
+   * a long ten seconds — the meadow is a fair walk from the far side of the
+   * wood, and the point is the scramble, not the arithmetic of whether you
+   * were near enough when it began.
+   */
+  warnFor: 10,
+  /** How close it circles at the start of the hunt and at the end of it. It
+   *  closes in, so the danger is something you can see coming. */
+  circleFrom: 16,
+  circleTo: 5,
+  /** How fast it goes round, turns a second. */
+  circleRate: 0.32,
+  /**
+   * How much of the meadow has to be left for it to hide you.
+   *
+   * Eat the whole thing and there is nowhere to get out of sight, which is
+   * the one way the wood can be made dangerous by your own doing. Grass grows
+   * back after five minutes, so it is never a permanent state.
+   */
+  hideNeedsGrass: 0.15,
+  /** How long the dive takes, once it has decided it has you. */
+  diveFor: 0.9,
   /**
    * How often a wait is a short one instead, and how short.
    *
