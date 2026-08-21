@@ -101,6 +101,14 @@ canvas {
   }
 }
 
+/* Where the shared sound button sits. The button brings its own looks; this
+   only says where it goes — top right, the one corner nothing else uses. */
+.sound-corner {
+  position: absolute;
+  top: calc(var(--safe-t) + 12px);
+  right: calc(var(--safe-r) + 12px);
+}
+
 /* ---------- Overlays ---------- */
 
 .overlay {

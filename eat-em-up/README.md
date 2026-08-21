@@ -102,6 +102,15 @@ started, and the camera pulls back as you go.
 When every quota is met the transformation plays, and then the butterfly is
 yours to fly around the wood for as long as you like.
 
+## Sound
+
+One looping track, `src/assets/mossy_trail.mp3`, quiet enough to sit under the
+game. It cannot start until the player has touched the screen — a browser will
+refuse audio nobody asked for, and on an iPad that refusal is the default — so
+it begins on the button on the intro panel, which is the first thing anyone
+touches. The round switch in the top right turns it off; it is the shared one
+from `shared/soundButton.ts`, the same button the bee game has.
+
 ## Commands
 
 ```bash

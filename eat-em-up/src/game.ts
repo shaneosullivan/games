@@ -4,6 +4,8 @@ import {GameLoop} from "./core/loop";
 import {Joystick} from "./core/input";
 import {AltitudeStick} from "./core/altitudeStick";
 import {Rng} from "./core/rng";
+import {Music} from "./core/music";
+import {SoundButton} from "../../shared/soundButton";
 import {Stage} from "./render/stage";
 import {Forest} from "./entities/forest";
 import {FoodField} from "./entities/food";
@@ -46,6 +48,7 @@ export class Game {
   readonly crow: CrowShadow;
   /** Shown when the crow takes the caterpillar; see caughtByTheCrow. */
   private readonly caught: Overlay;
+  private readonly music = new Music();
   readonly cat: Caterpillar;
   readonly ending: Ending;
   readonly hud: Hud;
@@ -139,6 +142,15 @@ export class Game {
     this.playAgain.addEventListener("click", () => window.location.reload());
     ui.appendChild(this.playAgain);
 
+    // The shared switch, the same one the bee game has, in the one corner
+    // nothing else uses: both sticks are along the bottom and the progress bar
+    // runs across the top middle.
+    const sound = new SoundButton({
+      onToggle: muted => this.music.setMuted(muted),
+      className: "sound-corner ui-interactive",
+    });
+    ui.appendChild(sound.root);
+
     this.snapCamera();
     this.loop = new GameLoop(this.update, this.render);
     this.loop.start();
@@ -146,6 +158,9 @@ export class Game {
 
   private begin(): void {
     this.intro.hide();
+    // The first touch of the game, and so the only moment the browser will
+    // let the music start. See Music.
+    this.music.start();
     this.stick.enabled = true;
     this.running = true;
   }

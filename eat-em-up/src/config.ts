@@ -881,6 +881,16 @@ export const MADNESS = {
   easeOut: 1.2,
 } as const;
 
+/**
+ * The background music.
+ *
+ * One track on a loop. Quiet by default: it is meant to be the room the game
+ * happens in, and a child on an iPad has it a foot from their face.
+ */
+export const MUSIC = {
+  volume: 0.35,
+} as const;
+
 export const CROW = {
   /**
    * Seconds before the first crow. Fixed rather than rolled: the first one is
@@ -936,12 +946,32 @@ export const CROW = {
   size: 3.6,
   /** How near the caterpillar it passes, so it is actually seen. */
   nearMiss: 7,
-  /** Laid just proud of the floor: coplanar with it, the two would z-fight. */
-  height: 0.05,
-  /** Dark, but a shadow rather than a hole. */
-  opacity: 0.32,
+  /**
+   * Laid just proud of the floor: coplanar with it, the two would z-fight.
+   *
+   * Above the ground patches, not merely above the ground. The patches are
+   * stacked a fraction apart to stop them fighting each other and the top of
+   * that stack stands 0.155 up, so a shadow at 0.05 spent most of its time
+   * hidden underneath the mottling of the very floor it was supposed to be
+   * lying on.
+   */
+  height: 0.24,
+  /** Dark, but a shadow rather than a hole. Enough to carry over grass in the
+   *  shade of a tree, which is where it most needs to be seen. */
+  opacity: 0.4,
   /** Wing beats a second. */
   beatHz: 1.5,
+  /**
+   * The penumbra: how much wider the soft copy of the bird is than the crisp
+   * one, and how dark it is against it.
+   *
+   * A shadow cast from any height has a soft edge, and a single hard-edged
+   * cutout is the thing that most says "decal" rather than "shadow".
+   */
+  spread: 1.22,
+  softness: 0.55,
+  /** How far the span foreshortens at the top and bottom of a wing beat. */
+  foldMin: 0.42,
 } as const;
 
 export const FOOD = {

@@ -16,6 +16,7 @@ bee/            Bee Quest. Self-contained npm project, own deps, own dev server.
   src/game.ts       owns everything and hands levels a GameContext
 shared/         the few widgets the games have in common. No build of its own.
   progressBar.ts    the filling bar, used by both games
+  soundButton.ts    the round sound switch, used by both games
 site/           the gallery. Zero dependencies, no build step of its own.
   build.mjs         discovers games, builds them, generates the site, writes the PWA
   styles.css        the gallery's stylesheet, hand-written

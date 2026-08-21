@@ -1,5 +1,6 @@
 import {POLLEN_COLOR, type PollenKind} from "../config";
 import {ProgressBar} from "../../../shared/progressBar";
+import {SoundButton} from "../../../shared/soundButton";
 
 const RING_R = 32;
 const RING_C = 2 * Math.PI * RING_R;
@@ -85,17 +86,12 @@ export class Hud {
     menu.addEventListener("click", onMenu);
     buttons.appendChild(menu);
 
-    const mute = document.createElement("button");
-    mute.className = "icon-btn ui-interactive";
-    mute.textContent = "🔊";
-    mute.setAttribute("aria-label", "Mute");
-    let muted = false;
-    mute.addEventListener("click", () => {
-      muted = !muted;
-      mute.textContent = muted ? "🔇" : "🔊";
-      onMuteToggle(muted);
+    // The shared switch, so it is the same button the caterpillar game shows.
+    const mute = new SoundButton({
+      onToggle: onMuteToggle,
+      className: "ui-interactive",
     });
-    buttons.appendChild(mute);
+    buttons.appendChild(mute.root);
 
     this.perf = el("div", "hud-perf", "");
     this.perf.classList.add("ui-interactive");

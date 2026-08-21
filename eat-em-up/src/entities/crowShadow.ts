@@ -1,5 +1,4 @@
 import * as THREE from "three";
-import {mergeGeometries} from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import {CROW} from "../config";
 import {Rng} from "../core/rng";
 
@@ -22,7 +21,7 @@ export type CrowEvent = "none" | "began" | "left" | "caught";
 export class CrowShadow {
   readonly group = new THREE.Group();
 
-  private readonly wings: Array<THREE.Mesh> = [];
+  private readonly wings: Array<THREE.Object3D> = [];
   /** Seconds until the next one comes over. */
   private wait: number;
   /** How far through a pass it is, or null between them. */
@@ -42,20 +41,26 @@ export class CrowShadow {
   private dive = 0;
 
   constructor(private readonly rng: Rng) {
-    const material = new THREE.MeshBasicMaterial({
-      color: 0x101a10,
-      transparent: true,
-      opacity: CROW.opacity,
-      // A shadow must not hide what is behind it, and several of these
-      // overlapping should not darken each other in steps.
-      depthWrite: false,
-      side: THREE.DoubleSide,
-    });
+    // Two copies of the bird: a crisp core and a larger, fainter one under it.
+    // A shadow cast from any height has a penumbra, and a single hard-edged
+    // cutout is the thing that most says "decal" rather than "shadow" — the
+    // two together give a soft edge for the price of one more draw call.
+    const core = shadowMaterial(CROW.opacity);
+    const soft = shadowMaterial(CROW.opacity * CROW.softness);
 
-    const body = new THREE.Mesh(bodyShape(), material);
-    this.group.add(body);
+    const body = bodyShape();
+    const bodyBlur = new THREE.Mesh(body, soft);
+    bodyBlur.scale.setScalar(CROW.spread);
+    this.group.add(bodyBlur, new THREE.Mesh(body, core));
+
     for (const side of [-1, 1]) {
-      const wing = new THREE.Mesh(wingShape(side), material);
+      // Each wing is a little group of its own — core and penumbra — so the
+      // beat is one scale of the pair rather than two things kept in step.
+      const wing = new THREE.Group();
+      const shape = wingShape(side);
+      const blur = new THREE.Mesh(shape, soft);
+      blur.scale.setScalar(CROW.spread);
+      wing.add(blur, new THREE.Mesh(shape, core));
       this.group.add(wing);
       this.wings.push(wing);
     }
@@ -191,9 +196,21 @@ export class CrowShadow {
    */
   private beatWings(dt: number): void {
     this.beat += dt * CROW.beatHz * Math.PI * 2;
-    const fold = 0.45 + 0.55 * (0.5 + 0.5 * Math.sin(this.beat));
+    // Across the span, not along the chord.
+    //
+    // Seen from directly above — which is what a shadow on the ground is — a
+    // beating wing does not get shorter front to back. It rolls about the
+    // shoulder, so what you see is the span foreshortening: the tip swings in
+    // toward the body at the top and bottom of the stroke and reaches full
+    // width as it passes level. Scaling the chord instead read as a bird
+    // sweeping its wings forward and back, which is not a thing birds do.
+    const roll = Math.sin(this.beat);
+    const fold = CROW.foldMin + (1 - CROW.foldMin) * Math.abs(Math.cos(roll));
     for (const wing of this.wings) {
-      wing.scale.z = fold;
+      wing.scale.x = fold;
+      // A trace of chord with it: at the extremes of the stroke the wing is
+      // tilted, and a tilted wing shows a little less of itself.
+      wing.scale.z = 0.92 + 0.08 * fold;
     }
   }
 
@@ -212,43 +229,103 @@ export class CrowShadow {
 }
 
 /** The body and tail, lying flat in the XZ plane. */
-function bodyShape(): THREE.BufferGeometry {
-  const body = new THREE.CircleGeometry(0.32, 14);
-  body.scale(0.5, 1, 1);
-  body.rotateX(-Math.PI / 2);
+/** One flat, unlit, see-through patch of dark. */
+function shadowMaterial(opacity: number): THREE.MeshBasicMaterial {
+  return new THREE.MeshBasicMaterial({
+    color: 0x101a10,
+    transparent: true,
+    opacity,
+    // A shadow must not hide what is behind it, and several of these
+    // overlapping should not darken each other in steps.
+    depthWrite: false,
+    side: THREE.DoubleSide,
+  });
+}
 
-  const tail = new THREE.CircleGeometry(0.22, 3);
-  tail.scale(0.55, 1, 1);
-  tail.rotateX(-Math.PI / 2);
-  tail.rotateY(Math.PI);
-  tail.translate(0, 0, -0.42);
-
-  const head = new THREE.CircleGeometry(0.12, 10);
-  head.rotateX(-Math.PI / 2);
-  head.translate(0, 0, 0.34);
-
-  const geo = mergeGeometries([body, tail, head]);
-  if (!geo) {
-    throw new Error("could not merge crow shadow body");
-  }
+/**
+ * Lays a flat shape on the ground.
+ *
+ * The shapes below are drawn in plain 2D with x across the bird and y along
+ * it, nose forward, which is the only sane way to write an outline by hand.
+ * This turns one into a piece of floor: rotating about X by a quarter turn
+ * sends +y to +z, so "forward" in the drawing becomes "forward" in the wood.
+ */
+function laidFlat(shape: THREE.Shape): THREE.BufferGeometry {
+  const geo = new THREE.ShapeGeometry(shape, 12);
+  geo.rotateX(Math.PI / 2);
   return geo;
 }
 
-/** One wing, swept back from the body, hinged at nothing — the render folds it
- *  by scaling it along the bird's own axis. */
+/**
+ * The body: a tapered lozenge with a head and a wedge of tail.
+ *
+ * A crow from directly above is mostly a long straight line — the give-away is
+ * that the tail is a fan about as long as the body and the head barely shows
+ * past the shoulders, which is the opposite of the way one draws a bird from
+ * the side.
+ */
+function bodyShape(): THREE.BufferGeometry {
+  const s = new THREE.Shape();
+  // Bill, then down the right side to the tail.
+  s.moveTo(0, 0.62);
+  s.quadraticCurveTo(0.06, 0.52, 0.09, 0.42);
+  s.quadraticCurveTo(0.16, 0.2, 0.15, -0.02);
+  s.quadraticCurveTo(0.14, -0.2, 0.1, -0.3);
+  // The tail: a fan, notched very slightly at the end the way a crow's is —
+  // it is what tells a crow from a rook at this distance, and the notch is
+  // the only detail at this size that survives being a shadow.
+  s.lineTo(0.2, -0.34);
+  s.quadraticCurveTo(0.26, -0.62, 0.22, -0.82);
+  s.lineTo(0.06, -0.72);
+  s.lineTo(0, -0.76);
+  s.lineTo(-0.06, -0.72);
+  s.lineTo(-0.22, -0.82);
+  s.quadraticCurveTo(-0.26, -0.62, -0.2, -0.34);
+  s.lineTo(-0.1, -0.3);
+  // Back up the left side.
+  s.quadraticCurveTo(-0.14, -0.2, -0.15, -0.02);
+  s.quadraticCurveTo(-0.16, 0.2, -0.09, 0.42);
+  s.quadraticCurveTo(-0.06, 0.52, 0, 0.62);
+  return laidFlat(s);
+}
+
+/**
+ * One wing: long, swept, and fingered at the tip.
+ *
+ * The fingers are the whole point. A crow's primaries splay at the wingtip
+ * into four or five separate feathers with daylight between them, and that
+ * ragged tip is what the eye uses to tell a crow's shadow from a gull's — a
+ * smooth ellipse reads as a paper dart, whatever else is right about it.
+ */
 function wingShape(side: number): THREE.BufferGeometry {
-  // An ellipse rather than a triangle. A three-sided circle is cheaper and
-  // from above it read as a paper dart: the outline of a wing is what makes a
-  // dark patch on the ground a bird rather than a shape.
-  const wing = new THREE.CircleGeometry(0.66, 14);
-  wing.scale(1, 1, 0.3);
-  wing.rotateX(-Math.PI / 2);
-  wing.translate(0.62, 0, 0);
-  // Swept back from the shoulder, and mirrored for the other side.
-  wing.rotateY(-0.5);
-  if (side < 0) {
-    wing.scale(-1, 1, 1);
+  const s = new THREE.Shape();
+  // Leading edge, from the shoulder out to the wrist and on to the tip.
+  s.moveTo(0.08, 0.26);
+  s.quadraticCurveTo(0.5, 0.3, 0.86, 0.16);
+  s.quadraticCurveTo(1.06, 0.09, 1.22, -0.02);
+
+  // Four fingers, each a notch back toward the wing and out again a little
+  // shorter than the last.
+  const fingers = [
+    [1.16, -0.12, 1.3, -0.16],
+    [1.06, -0.2, 1.2, -0.27],
+    [0.95, -0.26, 1.06, -0.36],
+    [0.83, -0.3, 0.92, -0.42],
+  ];
+  for (const [nx, ny, tx, ty] of fingers) {
+    s.lineTo(nx as number, ny as number);
+    s.lineTo(tx as number, ty as number);
   }
-  wing.translate(0, 0, 0.02);
-  return wing;
+
+  // Trailing edge, swept back in to the body.
+  s.quadraticCurveTo(0.5, -0.4, 0.16, -0.24);
+  s.lineTo(0.08, 0.26);
+
+  const geo = laidFlat(s);
+  // Swept back from the shoulder, the way a bird holds them in level flight.
+  geo.rotateY(-0.22);
+  if (side < 0) {
+    geo.scale(-1, 1, 1);
+  }
+  return geo;
 }
