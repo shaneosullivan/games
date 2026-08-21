@@ -668,6 +668,18 @@ export const CAMERA = {
  * render/fadeInFront.ts for how it works.
  */
 export const FADE = {
+  /**
+   * How much room to clear around the head, at the head's own distance.
+   *
+   * Only what falls inside the cone from the eye to a disc this wide fades.
+   * Depth alone used to decide it, which dissolved every trunk nearer than the
+   * caterpillar whether or not it hid anything — half the wood going ghostly
+   * because one trunk was in the way.
+   */
+  radius: 2.4,
+  /** And a little more of it as the caterpillar grows, since a bigger one
+   *  needs more of the shot to itself. */
+  radiusPerRadius: 1.1,
   /** Depth over which a trunk goes from solid to gone. */
   band: 2.4,
   /** Below this alpha the fragment is discarded outright, so a ghost trunk

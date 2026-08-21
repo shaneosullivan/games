@@ -635,6 +635,15 @@ export const MAZE = {
    */
   fadeMargin: 1.4,
   fadeBand: 2.6,
+  /**
+   * How much room to clear around the bee, at her own distance from the eye.
+   *
+   * Only what falls inside the cone from the eye to a disc this wide fades.
+   * Depth alone used to decide it, which dissolved every hedge nearer than she
+   * was whether or not it hid anything — most of the maze going ghostly to
+   * clear the one wall actually in the way.
+   */
+  fadeRadius: 3.2,
   /** Below this the fragment is dropped, so a ghost can't hide the bee behind
    *  it by writing depth. */
   fadeCutoff: 0.06,
@@ -1412,7 +1421,7 @@ export const COTTAGE = {
    * ghost wall can't hide her by still writing depth. margin+band is kept under
    * her clearance to the wall (~4) so a wall she's turned from fully dissolves.
    */
-  wallFade: {margin: 1.5, band: 2, cutoff: 0.06},
+  wallFade: {margin: 1.5, band: 2, cutoff: 0.06, radius: 3.4},
 } as const;
 
 /**

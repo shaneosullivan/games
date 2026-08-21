@@ -42,7 +42,9 @@ export interface CottageScene {
    * Pass the camera-to-bee distance; pass null to leave the house solid (the
    * default, and what every view but the interior gather wants).
    */
-  setWallFade(cameraToBee: number | null): void;
+  /** Where the eye is, and where the bee is; a null eye leaves the walls
+   *  solid. See fadeInFront. */
+  setWallFade(eye: THREE.Vector3 | null, bee: THREE.Vector3): void;
   update(elapsed: number): void;
 }
 
@@ -121,14 +123,16 @@ export function createCottage(rng: Rng): CottageScene {
   const houseHolder = new THREE.Group();
   yard.add(houseHolder);
   // Set once the model resolves; until then setWallFade has nothing to drive.
-  let setModelFade: ((d: number) => void) | null = null;
+  let setModelFade:
+    | ((eye: THREE.Vector3 | null, bee: THREE.Vector3, radius: number) => void)
+    | null = null;
   loadHouseModel(COTTAGE.modelScale, {
     band: COTTAGE.wallFade.band,
     cutoff: COTTAGE.wallFade.cutoff,
   })
     .then(model => {
       houseHolder.add(model.group);
-      setModelFade = model.setFadeDepth;
+      setModelFade = model.setFadeFocus;
     })
     .catch(() => {
       // A missing model is not fatal — the clearing, mat and jar still play.
@@ -195,12 +199,23 @@ export function createCottage(rng: Rng): CottageScene {
     setGateOpen(open) {
       fence.setOpen(open);
     },
-    setWallFade(cameraToBee) {
-      // Null (and everywhere but the interior gather) leaves the house solid:
-      // a depth behind the eye means nothing is ever counted as in front of her.
-      setModelFade?.(
-        cameraToBee === null ? -1e9 : cameraToBee - COTTAGE.wallFade.margin,
-      );
+    setWallFade(eye, bee) {
+      // A null eye — which is everywhere but the interior gather — leaves the
+      // house solid, because nothing is ever counted as in front of her.
+      if (eye === null) {
+        setModelFade?.(null, bee, COTTAGE.wallFade.radius);
+        return;
+      }
+      // Pulled a little toward the camera so she is never caught by her own
+      // fade; see the same margin in the Windy Woods.
+      const gap = eye.distanceTo(bee);
+      const at = bee
+        .clone()
+        .lerp(
+          eye,
+          gap > 0.01 ? Math.min(0.9, COTTAGE.wallFade.margin / gap) : 0,
+        );
+      setModelFade?.(eye, at, COTTAGE.wallFade.radius);
     },
     update(elapsed) {
       glow.update(elapsed);

@@ -3,12 +3,15 @@ import * as THREE from "three";
 export interface NearFade {
   material: THREE.Material;
   /**
-   * The view depth to fade up to: fragments nearer the camera than this dissolve
-   * and are dropped. Pass the bee's own depth (less a margin) to clear whatever
-   * stands between the camera and her; pass a large negative number to leave the
-   * material solid (nothing is ever in front).
+   * Where the eye is and what it is watching, both in world space, and how
+   * much room to clear around the watched thing.
+   *
+   * Only what stands inside the cone from the eye out to a disc of `radius`
+   * about the focus dissolves. Call `setSolid` to leave the material alone.
    */
-  setDepth(d: number): void;
+  setFocus(eye: THREE.Vector3, focus: THREE.Vector3, radius: number): void;
+  /** Nothing is in front of anything: leave the material solid. */
+  setSolid(): void;
 }
 
 /**
@@ -47,20 +50,40 @@ export function fadeInFront(
   }: {band: number; cutoff: number; cacheKey: string; spareFloor?: boolean},
 ): NearFade {
   material.transparent = true;
-  // Solid until told otherwise: a depth behind the eye means nothing is in front.
-  const live = {value: -1e9};
+  // World space rather than view space, so a caller needs nothing but two
+  // points it already has — where the camera is and what it is watching. The
+  // old view-space form made every call site fetch the camera's inverse world
+  // matrix and refresh it by hand, because the renderer does not update it
+  // until it draws and a fade one frame behind the camera flickers.
+  const eye = {value: new THREE.Vector3()};
+  const focus = {value: new THREE.Vector3()};
+  const spread = {value: 3};
+  // Solid until told otherwise.
+  const live = {value: 0};
   material.onBeforeCompile = shader => {
-    shader.uniforms.fadeUpTo = live;
+    shader.uniforms.fadeEye = eye;
+    shader.uniforms.fadeFocus = focus;
+    shader.uniforms.fadeRadius = spread;
+    shader.uniforms.fadeOn = live;
     shader.uniforms.fadeBand = {value: band};
     shader.vertexShader = shader.vertexShader
       .replace(
         "#include <common>",
-        "#include <common>\nvarying float vEyeDist;\nvarying float vUpFacing;",
+        "#include <common>\nvarying vec3 vWorldPos;\nvarying float vUpFacing;",
       )
       .replace(
         "#include <fog_vertex>",
         `#include <fog_vertex>
-         vEyeDist = -mvPosition.z;
+         // Through the instance matrix where there is one. An instanced mesh
+         // keeps its per-copy transform there and not in modelMatrix, so
+         // without this every copy reports the world position of the original
+         // — which for a wood of instanced hedges means one position for the
+         // lot of them, and a fade that never fires.
+         vec4 fadeLocal = vec4(transformed, 1.0);
+         #ifdef USE_INSTANCING
+           fadeLocal = instanceMatrix * fadeLocal;
+         #endif
+         vWorldPos = (modelMatrix * fadeLocal).xyz;
          vUpFacing = normalize(mat3(modelMatrix) * normal).y;`,
       );
     // The floor spared: an up-facing fragment holds at full solid.
@@ -70,11 +93,35 @@ export function fadeInFront(
     shader.fragmentShader = shader.fragmentShader
       .replace(
         "#include <common>",
-        "#include <common>\nvarying float vEyeDist;\nvarying float vUpFacing;\nuniform float fadeUpTo;\nuniform float fadeBand;",
+        "#include <common>\nvarying vec3 vWorldPos;\nvarying float vUpFacing;\nuniform vec3 fadeEye;\nuniform vec3 fadeFocus;\nuniform float fadeRadius;\nuniform float fadeOn;\nuniform float fadeBand;",
       )
       .replace(
         "#include <dithering_fragment>",
-        `float nearFade = smoothstep(fadeUpTo - fadeBand, fadeUpTo, vEyeDist);
+        `vec3 fadeAxis = fadeFocus - fadeEye;
+         float fadeLen = max(length(fadeAxis), 0.0001);
+         vec3 fadeRel = vWorldPos - fadeEye;
+
+         // Nearer the eye than the thing being watched.
+         float nearFade = smoothstep(fadeLen - fadeBand, fadeLen, length(fadeRel));
+
+         // And actually in the way.
+         //
+         // Depth alone is not enough: "nearer than the caterpillar" is true of
+         // half the wood, and dissolving a trunk at the edge of the shot that
+         // hides nothing is both distracting and a lie about where things are.
+         // What matters is whether the fragment falls inside the cone from the
+         // eye out to a disc of fadeRadius about the head — project it onto
+         // the line of sight and allow a radius that grows with how far along
+         // that line it lies, so at the head itself the allowance is the full
+         // radius and half way there it is half as much.
+         float along = dot(fadeRel, fadeAxis) / (fadeLen * fadeLen);
+         float offAxis = length(fadeRel - fadeAxis * along);
+         float allowed = fadeRadius * max(along, 0.0);
+         // Solid again once clear of the cone, with a soft rim so a trunk does
+         // not snap back as you steer past it.
+         nearFade = max(nearFade, smoothstep(allowed * 0.72, allowed * 1.08, offAxis));
+         nearFade = mix(1.0, nearFade, fadeOn);
+
          ${spare}if (nearFade < ${cutoff.toFixed(4)}) discard;
          gl_FragColor.a *= nearFade;
          #include <dithering_fragment>`,
@@ -83,8 +130,14 @@ export function fadeInFront(
   material.customProgramCacheKey = () => cacheKey;
   return {
     material,
-    setDepth(d) {
-      live.value = d;
+    setFocus(at, watching, radius) {
+      eye.value.copy(at);
+      focus.value.copy(watching);
+      spread.value = radius;
+      live.value = 1;
+    },
+    setSolid() {
+      live.value = 0;
     },
   };
 }

@@ -129,6 +129,9 @@ export class Forest {
 
   /** Trunks, crowns and bushes share one material so a single depth drives the
    *  whole wood's dissolve. */
+  /** Where the fade is centred, in view space; see setFadeFocus. */
+  private readonly fadeAt = new THREE.Vector3();
+
   private readonly fade: NearFade = fadeInFront(vertexToon(), {
     band: FADE.band,
     cutoff: FADE.cutoff,
@@ -495,9 +498,23 @@ export class Forest {
    * Dissolves the wood in front of the caterpillar. `depth` is how far it is
    * from the eye, in view space; null leaves everything solid.
    */
-  setFadeDepth(depth: number | null): void {
-    // A depth behind the eye means nothing is ever in front of it.
-    this.fade.setDepth(depth === null ? -1e9 : depth - FADE.margin);
+  setFadeFocus(
+    eye: THREE.Vector3 | null,
+    watching: THREE.Vector3,
+    radius: number,
+  ): void {
+    if (eye === null) {
+      this.fade.setSolid();
+      return;
+    }
+    // The focus pulled a little toward the camera, so the thing being watched
+    // is never caught by its own fade. A distance, not a fraction: at four
+    // units away and again at forty it has to clear the same margin.
+    const gap = eye.distanceTo(watching);
+    this.fadeAt
+      .copy(watching)
+      .lerp(eye, gap > 0.01 ? Math.min(0.9, FADE.margin / gap) : 0);
+    this.fade.setFocus(eye, this.fadeAt, radius);
   }
 
   // ---- building -----------------------------------------------------------

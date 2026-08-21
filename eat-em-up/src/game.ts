@@ -1,5 +1,13 @@
 import * as THREE from "three";
-import {CAMERA, CATERPILLAR, CLEARING, CLIMB, CROW, ENDING} from "./config";
+import {
+  CAMERA,
+  CATERPILLAR,
+  CLEARING,
+  CLIMB,
+  CROW,
+  ENDING,
+  FADE,
+} from "./config";
 import {GameLoop} from "./core/loop";
 import {Joystick} from "./core/input";
 import {AltitudeStick} from "./core/altitudeStick";
@@ -71,7 +79,6 @@ export class Game {
   private readonly lookAt = new THREE.Vector3();
   /** The eased point the camera actually looks at. */
   private readonly smoothedLook = new THREE.Vector3();
-  private readonly viewSpace = new THREE.Vector3();
   private readonly viewForward = new THREE.Vector3();
   /** The bearing the camera is looking along. Chases the caterpillar's own. */
   private camYaw = 0;
@@ -513,21 +520,19 @@ export class Game {
     this.stage.camera.lookAt(this.smoothedLook);
 
     // Dissolve whatever stands between the eye and whatever is being watched —
-    // the caterpillar, or the chrysalis and butterfly during the ending. The
-    // shader wants that thing's depth in view space, which is what it compares
-    // each fragment against.
+    // the caterpillar's head, or the chrysalis and butterfly during the ending.
     //
     // The ending needs this every bit as much as the crawling does: the camera
     // goes where the chrysalis is, and a wood this thick will happily put three
     // trunks between you and the one thing you are meant to be looking at.
-    const camera = this.stage.camera;
-    // The renderer refreshes these itself, but not until stage.render() below,
-    // and a fade a frame behind the camera shows as a flicker on the trunk you
-    // are moving past.
-    camera.updateMatrixWorld();
-    camera.matrixWorldInverse.copy(camera.matrixWorld).invert();
-    this.viewSpace.copy(focus).applyMatrix4(camera.matrixWorldInverse);
-    this.forest.setFadeDepth(-this.viewSpace.z);
+    //
+    // Room enough to see the head and a little around it, and more of it the
+    // bigger the caterpillar has grown.
+    this.forest.setFadeFocus(
+      this.stage.camera.position,
+      focus,
+      FADE.radius + this.cat.radius * FADE.radiusPerRadius,
+    );
   }
 
   /**

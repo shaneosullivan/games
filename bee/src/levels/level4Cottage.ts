@@ -315,9 +315,9 @@ export class CottageLevel implements Level {
     // stands between the eye and her, the way the Windy Woods fades its hedges.
     // Every other phase leaves the house solid.
     if (this.phase === "inside" || this.phase === "carrying") {
-      ctx.cottage.setWallFade(ctx.cameraPosition.distanceTo(ctx.bee.position));
+      ctx.cottage.setWallFade(ctx.cameraPosition, ctx.bee.position);
     } else {
-      ctx.cottage.setWallFade(null);
+      ctx.cottage.setWallFade(null, ctx.bee.position);
     }
 
     // The run home is a corridor, not the open meadow.

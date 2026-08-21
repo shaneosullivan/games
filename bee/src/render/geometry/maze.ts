@@ -71,7 +71,11 @@ export interface MazeScene {
    * in front of her. Call it before rendering; pass null to stop fading
    * altogether, which any shot that isn't the chase rig has to do.
    */
-  setFadeDepth(distanceToBee: number | null): void;
+  /**
+   * Where the eye is and where the bee is, both in world space, or a null eye
+   * to leave the maze solid — see fadeInFront for what it does with them.
+   */
+  setFadeFocus(eye: THREE.Vector3 | null, bee: THREE.Vector3): void;
   dispose(): void;
 }
 
@@ -360,13 +364,22 @@ export function createMazeScene(maze: Maze, rng: Rng): MazeScene {
     confine,
     cellAt,
 
-    setFadeDepth(distanceToBee) {
-      // A depth behind the eye means nothing is ever in front of her, so the
-      // whole maze stays solid.
-      const upTo =
-        distanceToBee === null ? -1e9 : distanceToBee - MAZE.fadeMargin;
-      treeFade.setDepth(upTo);
-      bushFade.setDepth(upTo);
+    setFadeFocus(eye, bee) {
+      // No eye means nothing is ever in front of her, so the maze stays solid.
+      if (eye === null) {
+        treeFade.setSolid();
+        bushFade.setSolid();
+        return;
+      }
+      // The focus pulled a little toward the camera, so she is never caught by
+      // her own fade. A distance rather than a fraction: near or far, it has
+      // to clear the same margin.
+      const gap = eye.distanceTo(bee);
+      const at = bee
+        .clone()
+        .lerp(eye, gap > 0.01 ? Math.min(0.9, MAZE.fadeMargin / gap) : 0);
+      treeFade.setFocus(eye, at, MAZE.fadeRadius);
+      bushFade.setFocus(eye, at, MAZE.fadeRadius);
     },
 
     update(elapsed, dt, near) {

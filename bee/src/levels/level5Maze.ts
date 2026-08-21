@@ -199,10 +199,9 @@ export class MazeLevel implements Level {
     // as standing in front of her — and the survey has to turn that off. From
     // 178 units up the entire maze is "in front of her", and fading it leaves
     // a scent trail hanging over an empty field.
-    scene.setFadeDepth(
-      this.phase === "surveying"
-        ? null
-        : ctx.cameraPosition.distanceTo(ctx.bee.position),
+    scene.setFadeFocus(
+      this.phase === "surveying" ? null : ctx.cameraPosition,
+      ctx.bee.position,
     );
 
     switch (this.phase) {

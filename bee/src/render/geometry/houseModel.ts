@@ -33,7 +33,11 @@ export interface HouseModel {
    * a margin); pass a large negative number to leave the house solid. See
    * fadeInFront.
    */
-  setFadeDepth(d: number): void;
+  setFadeFocus(
+    eye: THREE.Vector3 | null,
+    bee: THREE.Vector3,
+    radius: number,
+  ): void;
 }
 
 /**
@@ -46,7 +50,7 @@ export interface HouseModel {
  * box back to size the smokey field over the opening.
  *
  * `fade` is the near-fade shaping for the walls (see fadeInFront); the returned
- * `setFadeDepth` drives all of the house's materials at once.
+ * `setFadeFocus` drives all of the house's materials at once.
  */
 export async function loadHouseModel(
   scale: number,
@@ -103,9 +107,13 @@ export async function loadHouseModel(
   return {
     group,
     box: fitted,
-    setFadeDepth(d) {
+    setFadeFocus(eye, bee, radius) {
       for (const f of fades) {
-        f.setDepth(d);
+        if (eye === null) {
+          f.setSolid();
+        } else {
+          f.setFocus(eye, bee, radius);
+        }
       }
     },
   };
