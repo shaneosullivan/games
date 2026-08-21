@@ -19,7 +19,7 @@ import {
   type Maze,
 } from "../../levels/maze";
 import {paint, solidToon, vertexToon} from "../materials";
-import {fadeInFront} from "../fadeInFront";
+import {fadeInFront} from "../../../../shared/fadeInFront";
 import {createFlowerGeometry} from "./flower";
 import leaf1Url from "../../assets/leaf1.png";
 import leaf2Url from "../../assets/leaf2.png";

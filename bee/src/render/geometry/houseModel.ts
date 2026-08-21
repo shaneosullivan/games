@@ -2,7 +2,7 @@ import * as THREE from "three";
 import {GLTFLoader} from "three/examples/jsm/loaders/GLTFLoader.js";
 import houseUrl from "../../assets/cottage/house.glb";
 import {toonRamp} from "../materials";
-import {fadeInFront, type NearFade} from "../fadeInFront";
+import {fadeInFront, type NearFade} from "../../../../shared/fadeInFront";
 
 /**
  * The Caramel Cottage, as a model.
@@ -59,7 +59,7 @@ export async function loadHouseModel(
   const gltf = await new GLTFLoader().loadAsync(houseUrl);
   const model = gltf.scene;
 
-  const fades: Array<NearFade> = [];
+  const fades: Array<NearFade<THREE.Material>> = [];
   model.traverse(child => {
     const mesh = child as THREE.Mesh;
     if (!mesh.isMesh) {

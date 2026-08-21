@@ -1,7 +1,45 @@
-import * as THREE from "three";
+/**
+ * No import of three.
+ *
+ * This file sits above both games, and each of them has its own copy of three
+ * in its own node_modules. Importing it here would resolve to a *third* copy at
+ * the repo root and bundle two of them into one game — where nothing is quite
+ * the same class as anything else. So the few shapes it needs are described
+ * structurally instead, and a real THREE.Vector3 and THREE.Material satisfy
+ * them without knowing about this file at all.
+ */
 
-export interface NearFade {
-  material: THREE.Material;
+/** Anything with x, y and z: THREE.Vector3 satisfies this. */
+export interface Vec3Like {
+  x: number;
+  y: number;
+  z: number;
+}
+
+/** The parts of a three shader this rewrites. */
+interface ShaderLike {
+  uniforms: Record<string, {value: unknown}>;
+  vertexShader: string;
+  fragmentShader: string;
+}
+
+/**
+ * The parts of a material this needs. Any THREE.Material satisfies it.
+ *
+ * `onBeforeCompile` is typed loosely on purpose. Three declares it as a
+ * property taking its own huge parameters object, and a property is checked
+ * against the function assigned to it in both directions — so naming a smaller
+ * shape here makes the assignment illegal however compatible it really is.
+ * The callback below narrows it back to ShaderLike immediately.
+ */
+export interface FadeableMaterial {
+  transparent: boolean;
+  onBeforeCompile: (shader: any, ...rest: Array<any>) => void;
+  customProgramCacheKey: () => string;
+}
+
+export interface NearFade<M extends FadeableMaterial = FadeableMaterial> {
+  material: M;
   /**
    * Where the eye is and what it is watching, both in world space, and how
    * much room to clear around the watched thing.
@@ -9,56 +47,59 @@ export interface NearFade {
    * Only what stands inside the cone from the eye out to a disc of `radius`
    * about the focus dissolves. Call `setSolid` to leave the material alone.
    */
-  setFocus(eye: THREE.Vector3, focus: THREE.Vector3, radius: number): void;
+  setFocus(eye: Vec3Like, focus: Vec3Like, radius: number): void;
   /** Nothing is in front of anything: leave the material solid. */
   setSolid(): void;
 }
 
 /**
- * Make a material dissolve anything that comes between the camera and the bee.
+ * Make a material dissolve whatever comes between the camera and the player.
  *
- * The Windy Woods are thick enough that a hedge regularly stands in the shot,
- * and a player who cannot see the thing they are steering is simply stuck. The
- * cottage does the same with its walls.
+ * Both games are thick with things that stand in the shot — the bee's hedges
+ * and the walls of her cottage, the caterpillar's trunks — and a player who
+ * cannot see the thing they are steering is simply stuck. Shared rather than
+ * copied because it is one piece of shading with several fiddly parts (the
+ * cone, the instance matrix, the discard), and two copies of that drift the
+ * moment one of them is fixed.
  *
  * Two tests, both needed. A fragment dissolves only if it is nearer the eye
- * than the bee *and* inside the cone from the eye out to a disc about her —
- * that is, actually in the way. Distance alone cannot do it: a hedge blocking
- * the view and the hedge right beside her are both a few units off, so a range
- * wide enough to clear the first washes the whole maze out. And depth alone
- * dissolves everything nearer than she is, wherever it sits on the screen,
- * which empties half the shot to clear one hedge.
+ * than the subject *and* inside the cone from the eye out to a disc about
+ * them — that is, actually in the way. Distance alone cannot do it: a wall
+ * blocking the view and the wall right beside the player are both a few units
+ * off, so a range wide enough to clear the first washes the whole level out.
+ * And depth alone dissolves everything nearer than the player wherever it sits
+ * on the screen, which empties half the shot to clear one wall.
  *
  * Anything under the cutoff is discarded rather than drawn faint, because a
- * transparent fragment still writes depth and would go on hiding the
- * bee behind a trunk you can see straight through.
+ * transparent fragment still writes depth and would go on hiding the player
+ * behind a wall you can see straight through.
  *
  * @param band  the depth over which a fragment fades from solid to gone
  * @param cutoff below this alpha the fragment is dropped entirely
  * @param cacheKey a name unique to this (band, cutoff, spareFloor) combination —
  *   without one three would hand every faded material the same compiled program
  * @param spareFloor leave up-facing surfaces solid, so a fading mesh that also
- *   contains ground never has a hole punched in it. The cottage needs it: its
- *   model has the yard in the same mesh as the walls.
- */
-export function fadeInFront(
-  material: THREE.Material,
+ *   contains ground never has a hole punched in it. The bee's cottage needs it:
+ *   its model has the yard in the same mesh as the walls.
+ */ export function fadeInFront<M extends FadeableMaterial>(
+  material: M,
   {
     band,
     cutoff,
     cacheKey,
     spareFloor = false,
   }: {band: number; cutoff: number; cacheKey: string; spareFloor?: boolean},
-): NearFade {
+): NearFade<M> {
   material.transparent = true;
   // World space, so a caller needs nothing but two points it already has —
   // where the camera is and what it is watching.
-  const eye = {value: new THREE.Vector3()};
-  const focus = {value: new THREE.Vector3()};
+  const eye = {value: {x: 0, y: 0, z: 0}};
+  const focus = {value: {x: 0, y: 0, z: 0}};
   const spread = {value: 3};
   // Solid until told otherwise.
   const live = {value: 0};
-  material.onBeforeCompile = shader => {
+  material.onBeforeCompile = (raw: ShaderLike) => {
+    const shader = raw;
     shader.uniforms.fadeEye = eye;
     shader.uniforms.fadeFocus = focus;
     shader.uniforms.fadeRadius = spread;
@@ -104,19 +145,19 @@ export function fadeInFront(
 
          // And actually in the way.
          //
-         // Depth alone is not enough: "nearer than the bee" is true of
-         // half the maze, and dissolving a hedge at the edge of the shot that
+         // Depth alone is not enough: "nearer than the player" is true of
+         // half the level, and dissolving a wall at the edge of the shot that
          // hides nothing is both distracting and a lie about where things are.
          // What matters is whether the fragment falls inside the cone from the
-         // eye out to a disc of fadeRadius about the bee — project it onto
+         // eye out to a disc of fadeRadius about the player — project it onto
          // the line of sight and allow a radius that grows with how far along
-         // that line it lies, so at the bee herself the allowance is the full
+         // that line it lies, so at the player the allowance is the full
          // radius and half way there it is half as much.
          float along = dot(fadeRel, fadeAxis) / (fadeLen * fadeLen);
          float offAxis = length(fadeRel - fadeAxis * along);
          float allowed = fadeRadius * max(along, 0.0);
-         // Solid again once clear of the cone, with a soft rim so a hedge does
-         // not snap back as you fly past it.
+         // Solid again once clear of the cone, with a soft rim so a wall does
+         // not snap back as you move past it.
          nearFade = max(nearFade, smoothstep(allowed * 0.72, allowed * 1.08, offAxis));
          nearFade = mix(1.0, nearFade, fadeOn);
 
@@ -129,8 +170,12 @@ export function fadeInFront(
   return {
     material,
     setFocus(at, watching, radius) {
-      eye.value.copy(at);
-      focus.value.copy(watching);
+      eye.value.x = at.x;
+      eye.value.y = at.y;
+      eye.value.z = at.z;
+      focus.value.x = watching.x;
+      focus.value.y = watching.y;
+      focus.value.z = watching.z;
       spread.value = radius;
       live.value = 1;
     },

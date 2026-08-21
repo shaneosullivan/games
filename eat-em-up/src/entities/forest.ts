@@ -10,7 +10,7 @@ import {
   WORLD,
 } from "../config";
 import {paint, vertexToon} from "../render/materials";
-import {fadeInFront, type NearFade} from "../render/fadeInFront";
+import {fadeInFront, type NearFade} from "../../../shared/fadeInFront";
 import {Rng} from "../core/rng";
 
 /** A trunk: something to crawl around, and something to climb. */
@@ -132,11 +132,14 @@ export class Forest {
   /** Where the fade is centred, in view space; see setFadeFocus. */
   private readonly fadeAt = new THREE.Vector3();
 
-  private readonly fade: NearFade = fadeInFront(vertexToon(), {
-    band: FADE.band,
-    cutoff: FADE.cutoff,
-    cacheKey: "forestFade",
-  });
+  private readonly fade: NearFade<THREE.MeshToonMaterial> = fadeInFront(
+    vertexToon(),
+    {
+      band: FADE.band,
+      cutoff: FADE.cutoff,
+      cacheKey: "forestFade",
+    },
+  );
 
   /** Unit vector along the start branch, in the (x, z) plane. */
   private readonly branchDir = new THREE.Vector2(

@@ -14,9 +14,10 @@ bee/            Bee Quest. Self-contained npm project, own deps, own dev server.
   src/levels/       the Level interface, one file per level, the map's lands
   src/ui/           HUD, overlays, sliding puzzle, stylesheet
   src/game.ts       owns everything and hands levels a GameContext
-shared/         the few widgets the games have in common. No build of its own.
+shared/         the few things the games have in common. No build of its own.
   progressBar.ts    the filling bar, used by both games
   soundButton.ts    the round sound switch, used by both games
+  fadeInFront.ts    the shader that dissolves whatever blocks the shot
 site/           the gallery. Zero dependencies, no build step of its own.
   build.mjs         discovers games, builds them, generates the site, writes the PWA
   styles.css        the gallery's stylesheet, hand-written
@@ -24,14 +25,31 @@ site/           the gallery. Zero dependencies, no build step of its own.
 ```
 
 Games share almost nothing: a game is a self-contained npm project with its own
-deps and its own dev server, and that is the default. The exception is
-`shared/`, which holds _furniture_ — a widget a child should meet in the same
-form in every game, where two copies would drift the moment one was touched.
-Adding to it needs that argument; everything else stays in the game that uses
-it. A shared widget brings its own CSS, since the games have separate
-hand-written stylesheets with no class names in common, and each game's
-`vite.config.ts` allows `..` so its dev server will serve a file from above its
-own root.
+deps and its own dev server, and that is the default. `shared/` is the
+exception, and something earns a place in it one of two ways:
+
+- **Furniture** — a widget a child should meet in the same form in every game,
+  like the progress bar and the sound switch. Two copies would drift the moment
+  one was touched.
+- **One piece of machinery with fiddly parts**, like the near-fade shader. Its
+  cone, its instance matrix and its discard all have to be right together, and
+  a second copy is a second thing to get wrong — which is exactly what had
+  happened: one game's copy had been fixed and the other's had not.
+
+Anything else stays in the game that uses it, and adding to `shared/` means
+making one of those two arguments out loud.
+
+Two rules for what lives there. A shared **widget** brings its own CSS, since
+the games have separate hand-written stylesheets with no class names in common.
+And nothing in `shared/` may import `three`: each game has its own copy in its
+own `node_modules`, so an import here resolves to a third at the repo root and
+bundles two of them into one game, where nothing is quite the same class as
+anything else. Describe the shapes you need structurally instead — see
+`fadeInFront.ts`, whose `Vec3Like` a real `THREE.Vector3` satisfies without
+knowing the file exists.
+
+Each game's `vite.config.ts` allows `..`, so its dev server will serve a file
+from above its own root.
 
 The gallery finds games by looking for top-level folders
 with a `build` script, so adding one is dropping a folder in — or running
