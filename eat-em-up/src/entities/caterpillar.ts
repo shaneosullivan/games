@@ -465,6 +465,53 @@ export class Caterpillar {
     );
   }
 
+  /**
+   * Any bough touching the hanging body: climb onto it. True if it did.
+   *
+   * Walks up the rope from the head to the anchor, a body's width at a time.
+   * The bough it is hanging from is excluded — that one it is already holding,
+   * and catching it again would put the caterpillar back where it fell from
+   * every time it tried to lower itself past.
+   */
+  private grabFromRope(d: {
+    anchor: THREE.Vector3;
+    foothold: THREE.Vector3;
+  }): boolean {
+    const hanging = this.forest.boughUnder(d.foothold, this.radius + 0.5);
+    const reach = CATERPILLAR.hangGrabReach + this.radius;
+    const at = new THREE.Vector3();
+    const rope = d.anchor.y - this.position.y;
+    for (let up = 0; up <= rope; up += CATERPILLAR.hangGrabStep) {
+      at.set(this.position.x, this.position.y + up, this.position.z);
+      const found = this.forest.boughStepAcross(at, reach, hanging);
+      if (!found) {
+        continue;
+      }
+      this.dangle = null;
+      this.position.copy(found.point);
+      this.position.y += this.radius;
+      this.facing.set(Math.sin(this.heading), 0, Math.cos(this.heading));
+      // Face along the branch it has just caught: it is the only way it can
+      // walk up here, and being put down across one is being put down facing
+      // straight off it.
+      const outward = Math.atan2(found.bough.dir.x, found.bough.dir.y);
+      const inward = wrapAngle(outward + Math.PI);
+      this.heading =
+        Math.abs(wrapAngle(outward - this.heading)) <
+        Math.abs(wrapAngle(inward - this.heading))
+          ? outward
+          : inward;
+      // The stick that was hauling is still held, and up here it means
+      // something else entirely. See awaitRelease.
+      this.awaitRelease = true;
+      this.awaitFor = 0;
+      this.sideStepArmed = false;
+      this.sidePush = 0;
+      return true;
+    }
+    return false;
+  }
+
   /** Catches hold of the lip just crawled over, or of `from` if given. */
   private beginDangle(from?: THREE.Vector3): void {
     this.dangle = {
@@ -524,6 +571,16 @@ export class Caterpillar {
     this.position.set(d.anchor.x, d.anchor.y - d.drop, d.anchor.z);
     // Head down, so the mouth reaches whatever it is hanging over.
     this.facing.set(0, -1, 0);
+
+    // Hanging against another branch: take hold of it and stand up on it.
+    //
+    // Tested down the whole hanging body rather than at the head, because a
+    // dangling caterpillar is mostly rope — the branch it is lying against is
+    // usually touching its middle, and reaching only with the head meant
+    // hanging in plain contact with a branch it could not get onto.
+    if (this.grabFromRope(d)) {
+      return;
+    }
 
     const floor = this.radius;
     if (this.position.y - floor <= CATERPILLAR.dangleLetGo) {

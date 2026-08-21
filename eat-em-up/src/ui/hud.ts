@@ -1,104 +1,64 @@
 import {FOOD_KINDS, FoodKind, GOAL} from "../config";
-
-/** What each counter is called and the colour of its pip. */
-const LOOK: Record<FoodKind, {label: string; colour: string}> = {
-  leaf: {label: "Leaves", colour: "#63b04a"},
-  flower: {label: "Flowers", colour: "#f2809f"},
-  berry: {label: "Berries", colour: "#4a5fd8"},
-  fruit: {label: "Fruit", colour: "#ff9c3d"},
-  grass: {label: "Grass", colour: "#8fd155"},
-};
-
-interface Tally {
-  root: HTMLDivElement;
-  count: HTMLSpanElement;
-  goal: HTMLSpanElement;
-  bumpTimer: number;
-}
+import {ProgressBar} from "../../../shared/progressBar";
 
 /**
- * The four counters along the top. Deliberately the only readout in the game:
- * there is no score, no timer and nothing to lose, so this is the whole of
- * what a player needs to know.
+ * One bar across the top: how close you are to being a butterfly.
+ *
+ * It replaced a row of six counters, one per kind of food. Six numbers is six
+ * things to read, and a child who cannot yet read numbers got nothing at all
+ * from them — where a bar that fills says the only thing the game actually
+ * asks, which is "how much further?".
+ *
+ * The bar itself is the shared one, the same furniture the bee game uses.
  */
 export class Hud {
-  private readonly bar: HTMLDivElement;
-  private readonly tallies = new Map<FoodKind, Tally>();
-  private readonly shown: Record<FoodKind, number> = {
-    leaf: -1,
-    flower: -1,
-    berry: -1,
-    fruit: -1,
-    grass: -1,
-  };
+  private readonly root: HTMLDivElement;
+  private readonly bar: ProgressBar;
 
   constructor(host: HTMLElement) {
-    const bar = document.createElement("div");
-    bar.className = "hud";
-    this.bar = bar;
+    this.root = document.createElement("div");
+    this.root.className = "hud";
 
-    for (const kind of FOOD_KINDS) {
-      const root = document.createElement("div");
-      root.className = "tally";
+    this.bar = new ProgressBar({
+      label: "Butterfly",
+      // Wider than the shared default: this is the whole readout of the game
+      // rather than a second meter tucked under another one, and it is being
+      // read across a room on an iPad on a child's knee.
+      width: 240,
+    });
+    this.root.appendChild(this.bar.root);
 
-      const pip = document.createElement("span");
-      pip.className = "pip";
-      pip.style.background = LOOK[kind].colour;
-
-      const count = document.createElement("span");
-      count.className = "count";
-      const goal = document.createElement("span");
-      goal.className = "goal";
-
-      root.append(pip, count, goal);
-      bar.appendChild(root);
-      this.tallies.set(kind, {root, count, goal, bumpTimer: 0});
-    }
-
-    host.appendChild(bar);
+    host.appendChild(this.root);
     this.update();
   }
 
   /**
    * Taken off screen once the game is won and the butterfly is being flown.
    *
-   * Every quota is met by then, so the counters have nothing left to say — and
-   * on a narrow screen they wrap onto a second row and run into the Play again
-   * button. The win overlay lists the totals anyway.
+   * There is nothing left to fill by then, and on a narrow screen the bar sits
+   * where the Play again button wants to be.
    */
   setVisible(visible: boolean): void {
-    this.bar.classList.toggle("hidden", !visible);
+    this.root.classList.toggle("hidden", !visible);
   }
 
-  /** Repaints any counter whose number has moved. */
+  /**
+   * How full the bar is: the average of the quotas, each capped at its own.
+   *
+   * Averaged per kind rather than counted over everything eaten, so no one
+   * kind can fill the bar on its own — eating the whole meadow is 120 things
+   * and would be most of the way to a butterfly if the total were all that
+   * mattered, without a single fruit having been found.
+   */
   update(eaten?: Record<FoodKind, number>): void {
-    for (const kind of FOOD_KINDS) {
-      const tally = this.tallies.get(kind);
-      if (!tally) {
-        continue;
-      }
-      const n = eaten ? eaten[kind] : 0;
-      if (n === this.shown[kind]) {
-        continue;
-      }
-      const first = this.shown[kind] < 0;
-      this.shown[kind] = n;
-
-      const target = GOAL[kind];
-      const left = Math.max(0, target - n);
-      tally.count.textContent = String(Math.min(n, target));
-      tally.goal.textContent = left > 0 ? `/ ${target}` : "";
-      tally.root.classList.toggle("done", left === 0);
-
-      // The pop is the reward for a bite, so it must not fire on the first
-      // paint, when nothing has been eaten yet.
-      if (!first) {
-        tally.root.classList.add("bump");
-        window.clearTimeout(tally.bumpTimer);
-        tally.bumpTimer = window.setTimeout(() => {
-          tally.root.classList.remove("bump");
-        }, 150);
-      }
+    if (!eaten) {
+      this.bar.set(0);
+      return;
     }
+    let sum = 0;
+    for (const kind of FOOD_KINDS) {
+      sum += Math.min(1, eaten[kind] / GOAL[kind]);
+    }
+    this.bar.set(sum / FOOD_KINDS.length);
   }
 }

@@ -137,6 +137,10 @@ const IGNORED = new Set([
   "dist",
   "scripts",
   "tmp",
+  // Not a game: the handful of widgets the games have in common. It has no
+  // package.json, so it would be listed as an unbuildable game with an empty
+  // dist rather than skipped.
+  "shared",
 ]);
 
 /** Where we'll look for a game's card image, in order of preference. */

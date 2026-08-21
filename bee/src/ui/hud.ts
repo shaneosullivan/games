@@ -1,4 +1,5 @@
 import {POLLEN_COLOR, type PollenKind} from "../config";
+import {ProgressBar} from "../../../shared/progressBar";
 
 const RING_R = 32;
 const RING_C = 2 * Math.PI * RING_R;
@@ -31,10 +32,9 @@ export class Hud {
   /** The life meter and its bar; see setHealth. */
   private readonly health: HTMLDivElement;
   private readonly healthFill: HTMLDivElement;
-  /** A second bar under the life meter, for a level that fills one up. */
-  private readonly progress: HTMLDivElement;
-  private readonly progressLabel: HTMLDivElement;
-  private readonly progressFill: HTMLDivElement;
+  /** A second bar under the life meter, for a level that fills one up. The
+   *  shared one, so it is the same bar the caterpillar game shows. */
+  private readonly progress: ProgressBar;
   private readonly harvest: SVGSVGElement;
   private readonly harvestFill: SVGCircleElement;
   private readonly carry: HTMLDivElement;
@@ -125,13 +125,10 @@ export class Hud {
     this.healthFill = el("div", "hud-health-fill", "");
     healthTrack.append(this.healthFill);
     this.health.append(healthLabel, healthTrack);
-    this.progress = el("div", "hud-health hidden", "");
-    this.progressLabel = el("div", "hud-health-label", "");
-    const progressTrack = el("div", "hud-health-track", "");
-    this.progressFill = el("div", "hud-health-fill", "");
-    progressTrack.append(this.progressFill);
-    this.progress.append(this.progressLabel, progressTrack);
-    topRight.append(this.perf, buttons, this.health, this.progress);
+    this.progress = new ProgressBar();
+    this.progress.root.style.marginTop = "10px";
+    this.progress.setVisible(false);
+    topRight.append(this.perf, buttons, this.health, this.progress.root);
     // Banner and objective are their own grid items rather than one stacked
     // column, so a phone can put the title up beside the buttons and leave the
     // objective its own full-width line underneath.
@@ -219,14 +216,12 @@ export class Hud {
    */
   setProgress(label: string | null, fraction = 0): void {
     if (label === null) {
-      this.progress.classList.add("hidden");
+      this.progress.setVisible(false);
       return;
     }
-    this.progress.classList.remove("hidden");
-    this.progressLabel.textContent = label;
-    const clamped = Math.max(0, Math.min(1, fraction));
-    this.progressFill.style.width = `${clamped * 100}%`;
-    this.progressFill.style.background = clamped >= 1 ? "#8fe36b" : "#ffd257";
+    this.progress.setVisible(true);
+    this.progress.setLabel(label);
+    this.progress.set(fraction);
   }
 
   /**

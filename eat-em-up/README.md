@@ -39,9 +39,10 @@ there is no control to find first.
 
 ## The game
 
-Eat 80 leaves, 40 flowers, 60 berries, 45 fruits and 120 tufts of grass. You
-cannot lose and nothing can hurt you; crawling off a branch just drops you back
-onto the forest floor.
+Eat 80 leaves, 40 flowers, 60 berries, 45 fruits, 25 mushrooms and 120 tufts of
+grass. One bar across the top says how close you are; there are no other
+numbers. You cannot lose and nothing can hurt you; crawling off a branch just
+drops you back onto the forest floor.
 
 - **Leaves** are on the bushes, along the branch you start on, and up the
   trunks — the reward for climbing.
@@ -51,16 +52,24 @@ onto the forest floor.
   under the trees, but most of it hangs at the end of a branch. You can see it
   from the ground and you cannot reach it from there: climb the trunk, step
   onto the branch, and edge out to the tip.
+- **Mushrooms** grow on the boulders and nowhere else, round their shoulders
+  and their feet — so filling that quota means visiting every rock in the wood.
 - **Grass** fills one tall meadow, and is the one thing eaten only where your
   head actually touches it.
 
-Grass and fruit grow back five minutes after they are eaten; leaves, flowers
-and berries stay eaten, so the wood is still visibly emptied by a caterpillar
+Boulders lie about the floor, some mossy. They are the one thing in the wood
+you cannot simply crawl past: the caterpillar goes over them. Their surface is
+a paraboloid, which is a slope all the way to its rim — an ellipsoid stands
+vertically where it meets the floor, which is a wall a caterpillar cannot walk
+up and got it stuck against the steeper rocks.
+
+Grass, fruit and mushrooms grow back five minutes after they are eaten; leaves,
+flowers and berries stay eaten, so the wood is still visibly emptied by a caterpillar
 working through it. Growing back puts food back in the wood, never progress
 back on the board.
 
 Growth is your progress toward the quotas, averaged, and anything past a quota
-stops counting — so mowing the whole meadow can never be more than a fifth of
+stops counting — so mowing the whole meadow can never be more than a sixth of
 it. Fully fed you are nearly four times as fat and sixteen times as long as you
 started, and the camera pulls back as you go.
 
@@ -94,7 +103,14 @@ src/
   core/            the loop, the thumbstick, the seeded rng
   render/          the stage, the toon materials, the near-fade shader
   entities/        the forest, the food, the caterpillar, the ending
-  ui/              the counters, the overlays, the stylesheet
+  ui/              the progress bar, the overlays, the stylesheet
+```
+
+The progress bar itself is `shared/progressBar.ts` at the repo root, the same
+one the bee game shows — see the root `CLAUDE.md` for when something belongs
+there rather than here.
+
+```
   game.ts          owns all of it and runs the flow between them
 index.html         the entry point
 card.png           the gallery's thumbnail — a shot of the game itself

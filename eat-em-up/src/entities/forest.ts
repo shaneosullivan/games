@@ -1,6 +1,14 @@
 import * as THREE from "three";
 import {mergeGeometries} from "three/examples/jsm/utils/BufferGeometryUtils.js";
-import {CLEARING, CLIMB, FADE, START_TREE, TREE_BRANCH, WORLD} from "../config";
+import {
+  BOULDER,
+  CLEARING,
+  CLIMB,
+  FADE,
+  START_TREE,
+  TREE_BRANCH,
+  WORLD,
+} from "../config";
 import {paint, vertexToon} from "../render/materials";
 import {fadeInFront, type NearFade} from "../render/fadeInFront";
 import {Rng} from "../core/rng";
@@ -46,6 +54,22 @@ export interface Bough {
   trunk: Climbable | null;
 }
 
+/**
+ * A rock on the floor.
+ *
+ * Stored as the smooth dome the caterpillar walks over rather than as the
+ * lumpy thing that is drawn: `radius` across at the ground, `height` at the
+ * middle. A dome falls away to nothing at its own rim, which is the whole
+ * reason for using one — there is no lip anywhere on a rock, so crawling off
+ * one is a walk down a slope and never the fall off an edge that a branch is.
+ */
+export interface Boulder {
+  x: number;
+  z: number;
+  radius: number;
+  height: number;
+}
+
 /** Somewhere food can sit: a bush, a tree, or a patch of open floor. */
 export interface Spot {
   x: number;
@@ -69,6 +93,11 @@ const TRUNK_COLOUR = 0x9c7550;
 const TRUNK_DARK = 0x82603f;
 const CROWN_COLOURS = [0x6fbc52, 0x7fcc5e, 0x63ad49, 0x8ad866];
 const BUSH_COLOURS = [0x5aa347, 0x66b350, 0x4f9440];
+// Light, because the toon ramp darkens anything not facing the sun by a band
+// and a half — at a true stone grey the rocks came out nearly black and read
+// as holes in the ground rather than as stone standing on it.
+const ROCK_COLOURS = [0xc3c2bc, 0xb4b6b0, 0xcecdc5, 0xa9aeaa];
+const MOSS_COLOURS = [0x5f9c3f, 0x6cae49, 0x548c37];
 
 /**
  * The wood you crawl about in: the floor, the trees, the bushes, and the one
@@ -95,6 +124,9 @@ export class Forest {
   /** Every branch you can crawl along, the start bough included. */
   readonly boughs: Array<Bough> = [];
 
+  /** Rocks on the floor. Not solid — you go over them, not round them. */
+  readonly boulders: Array<Boulder> = [];
+
   /** Trunks, crowns and bushes share one material so a single depth drives the
    *  whole wood's dissolve. */
   private readonly fade: NearFade = fadeInFront(vertexToon(), {
@@ -118,6 +150,8 @@ export class Forest {
     this.buildStartTree();
     this.buildTrees();
     this.buildBushes();
+    // Last: rocks are placed in whatever room the trees and bushes left.
+    this.buildBoulders();
   }
 
   // ---- queries the caterpillar asks ---------------------------------------
@@ -179,7 +213,10 @@ export class Forest {
    * doesn't teleport you onto it.
    */
   surfaceAt(x: number, z: number, from: number): number {
-    let best = 0;
+    // A rock holds you up from wherever you are: unlike a bough there is no
+    // underneath to walk along, and its top falls to the floor at its own rim,
+    // so there is nothing to be teleported on top of.
+    let best = this.boulderTopAt(x, z);
     for (const b of this.boughs) {
       const on = this.onBough(b, x, z);
       if (on && from >= on.top - 0.35 && on.top > best) {
@@ -187,6 +224,61 @@ export class Forest {
       }
     }
     return best;
+  }
+
+  /**
+   * How high the rock under (x, z) is, or 0 for open floor.
+   *
+   * A paraboloid, and not the ellipsoid it started as. An ellipsoid stands
+   * vertically where it meets the floor, and a wall is not something a
+   * caterpillar can walk up: it sank into the stone at the rim of the steeper
+   * rocks and was stopped dead by one of them. A paraboloid's steepest point
+   * is its rim, at a slope of twice the height over the radius, which is a
+   * climb rather than a wall.
+   *
+   * Overlapping rocks take the higher of the two, which is what stops a pair
+   * of them having a crevice between them for the caterpillar to drop into.
+   */
+  boulderTopAt(x: number, z: number): number {
+    let top = 0;
+    for (const b of this.boulders) {
+      const d = Math.hypot(x - b.x, z - b.z);
+      if (d >= b.radius) {
+        continue;
+      }
+      const h = b.height * (1 - (d / b.radius) ** 2);
+      if (h > top) {
+        top = h;
+      }
+    }
+    return top;
+  }
+
+  /**
+   * Somewhere on a rock a mushroom can grow: round its shoulders and its foot.
+   *
+   * The forest decides this rather than the food field, because it is the
+   * forest that knows the shape of a rock — and the answer has to be on the
+   * stone, since a mushroom hanging beside one is exactly the floating food
+   * the wood is not allowed to have.
+   */
+  mushroomSpot(b: Boulder, rng: Rng): {x: number; y: number; z: number} {
+    const a = rng.next() * Math.PI * 2;
+    const up = rng.range(0, BOULDER.mushroomBelow);
+    // Out from the middle by however far the dome has come down by then.
+    const out = Math.sqrt(1 - up) * b.radius * rng.range(0.9, 1.02);
+    return {
+      x: b.x + Math.cos(a) * out,
+      y: b.height * up,
+      z: b.z + Math.sin(a) * out,
+    };
+  }
+
+  /** Whether (x, z) is on a rock, with `margin` of clearance around it. */
+  onBoulder(x: number, z: number, margin = 0): boolean {
+    return this.boulders.some(
+      b => Math.hypot(x - b.x, z - b.z) < b.radius + margin,
+    );
   }
 
   /**
@@ -806,6 +898,150 @@ export class Forest {
       mesh.receiveShadow = true;
       this.group.add(mesh);
     }
+  }
+
+  /**
+   * Rocks, with moss on the sunlit half of some and mushrooms round the foot
+   * of others.
+   *
+   * Each is drawn as a lumpy ball squashed flat and sunk into the floor, and
+   * walked as the smooth dome of the same size — see Boulder for why the two
+   * are kept apart.
+   */
+  private buildBoulders(): void {
+    const parts: Array<THREE.BufferGeometry> = [];
+    for (let i = 0; i < BOULDER.count; i++) {
+      const radius = this.rng.range(BOULDER.radiusMin, BOULDER.radiusMax);
+      // Keep trying for somewhere this one fits rather than giving its place
+      // up: taking the first throw and dropping it on a clash left the wood
+      // with barely half the rocks it was asked for.
+      let x = 0;
+      let z = 0;
+      let found = false;
+      for (let tries = 0; tries < BOULDER.tries && !found; tries++) {
+        const a = this.rng.next() * Math.PI * 2;
+        const r = this.rng.range(6, WORLD.radius - 4);
+        x = Math.cos(a) * r;
+        z = Math.sin(a) * r;
+        found = this.roomForBoulder(x, z, radius);
+      }
+      if (!found) {
+        continue;
+      }
+      const height =
+        radius * this.rng.range(BOULDER.squashMin, BOULDER.squashMax);
+      this.boulders.push({x, z, radius, height});
+
+      // Drawn as the very surface it is walked on. A unit hemisphere has each
+      // vertex at height cos(phi) and distance sin(phi) out; squaring the
+      // height gives cos^2 = 1 - sin^2, which is the paraboloid boulderTopAt
+      // returns. Anything else and the caterpillar walks a shape the rock is
+      // not, floating over one part of it and buried in another.
+      const rock = new THREE.SphereGeometry(
+        1,
+        12,
+        6,
+        0,
+        Math.PI * 2,
+        0,
+        Math.PI / 2,
+      );
+      const pos = rock.attributes.position;
+      for (let v = 0; v < pos.count; v++) {
+        const y = pos.getY(v);
+        // Lumps go inward only, never out. A dent leaves the caterpillar
+        // riding a little above the stone, which nobody notices; a bulge puts
+        // it inside the stone, which everybody does.
+        const k = 1 - this.rng.next() * BOULDER.jitter;
+        pos.setXYZ(v, pos.getX(v) * k, y * y * k, pos.getZ(v) * k);
+      }
+      rock.computeVertexNormals();
+      rock.scale(radius, height, radius);
+      // Rocks are sunk a little: one sitting exactly on the floor shows the
+      // seam where its rim meets it, and a buried one reads as bedrock.
+      rock.translate(x, -height * 0.12, z);
+      parts.push(paint(rock, this.rng.pick(ROCK_COLOURS)));
+
+      if (this.rng.next() < BOULDER.mossChance) {
+        parts.push(...this.mossOn(x, z, radius, height));
+      }
+    }
+    const merged = mergeGeometries(parts);
+    if (merged) {
+      // Not the fading material the trees use. A trunk dissolves because it is
+      // tall enough to stand between you and the camera for a long time; a
+      // rock is knee-high and you are usually on top of it, so fading one
+      // would mostly mean the thing you are climbing disappearing under you.
+      const mesh = new THREE.Mesh(merged, vertexToon());
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      this.group.add(mesh);
+    }
+  }
+
+  /** Whether a rock of this size fits here without crowding anything. */
+  private roomForBoulder(x: number, z: number, radius: number): boolean {
+    // The whole rock out of the meadow, not just its middle: one lapping over
+    // the edge stands in grass that is eaten where it touches your head, and
+    // the tufts inside its footprint cannot be got at.
+    if (this.inClearing(x, z, CLEARING.margin + radius)) {
+      return false;
+    }
+    // Never over the start branch: the first thing a player does is crawl off
+    // the end of it, and landing on a rock is a strange way to begin.
+    if (this.onBranch(x, z) || Math.hypot(x, z) < START_TREE.branchLength) {
+      return false;
+    }
+    const clear = radius + BOULDER.spacing;
+    for (const t of this.climbables) {
+      if (Math.hypot(x - t.x, z - t.z) < clear + t.radius) {
+        return false;
+      }
+    }
+    for (const b of this.bushSpots) {
+      if (Math.hypot(x - b.x, z - b.z) < clear + b.radius) {
+        return false;
+      }
+    }
+    for (const b of this.boulders) {
+      if (Math.hypot(x - b.x, z - b.z) < clear + b.radius) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /** Cushions of moss on the upper half of a rock, lying along its surface. */
+  private mossOn(
+    x: number,
+    z: number,
+    radius: number,
+    height: number,
+  ): Array<THREE.BufferGeometry> {
+    const out: Array<THREE.BufferGeometry> = [];
+    const n = this.rng.int(BOULDER.mossPatchesMin, BOULDER.mossPatchesMax);
+    for (let i = 0; i < n; i++) {
+      const a = this.rng.next() * Math.PI * 2;
+      // Up the dome rather than across the floor, so the patch lands on the
+      // stone wherever on it the angle happens to fall. The rock is a
+      // paraboloid, so at a height of `up` of the way to the top it is
+      // sqrt(1 - up) of the way out — the ellipsoid's sqrt(1 - up squared)
+      // put every cushion of moss either inside the stone or floating off it.
+      const up = this.rng.range(BOULDER.mossAbove, 0.94);
+      const out2 = Math.sqrt(1 - up);
+      const size = radius * this.rng.range(0.18, 0.34);
+      const patch = new THREE.IcosahedronGeometry(size, 1);
+      // Flattened hard and sunk a little in, so it lies on the rock like a
+      // cushion of moss rather than sitting on it like a green pebble.
+      patch.scale(1, 0.3, 1);
+      patch.translate(
+        x + Math.cos(a) * out2 * radius,
+        height * up - size * 0.1,
+        z + Math.sin(a) * out2 * radius,
+      );
+      out.push(paint(patch, this.rng.pick(MOSS_COLOURS)));
+    }
+    return out;
   }
 
   private buildBushes(): void {

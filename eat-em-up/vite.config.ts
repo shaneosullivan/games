@@ -17,6 +17,9 @@ export default defineConfig({
 
   // host: true binds 0.0.0.0 so a tablet on the same Wi-Fi can reach it.
   server: {
+    // The shared progress bar lives above this game's root, and the dev
+    // server refuses to serve anything outside it unless told to.
+    fs: {allow: [".", ".."]},
     host: true,
     port: 5173,
   },

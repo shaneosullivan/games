@@ -14,13 +14,25 @@ bee/            Bee Quest. Self-contained npm project, own deps, own dev server.
   src/levels/       the Level interface, one file per level, the map's lands
   src/ui/           HUD, overlays, sliding puzzle, stylesheet
   src/game.ts       owns everything and hands levels a GameContext
+shared/         the few widgets the games have in common. No build of its own.
+  progressBar.ts    the filling bar, used by both games
 site/           the gallery. Zero dependencies, no build step of its own.
   build.mjs         discovers games, builds them, generates the site, writes the PWA
   styles.css        the gallery's stylesheet, hand-written
   serve.mjs         a static server for previewing site/dist
 ```
 
-Games don't share code. The gallery finds them by looking for top-level folders
+Games share almost nothing: a game is a self-contained npm project with its own
+deps and its own dev server, and that is the default. The exception is
+`shared/`, which holds _furniture_ — a widget a child should meet in the same
+form in every game, where two copies would drift the moment one was touched.
+Adding to it needs that argument; everything else stays in the game that uses
+it. A shared widget brings its own CSS, since the games have separate
+hand-written stylesheets with no class names in common, and each game's
+`vite.config.ts` allows `..` so its dev server will serve a file from above its
+own root.
+
+The gallery finds games by looking for top-level folders
 with a `build` script, so adding one is dropping a folder in — or running
 `npm run new-game -- "My Game"`, which scaffolds one that works like the
 bee (starter 3D scene, same configs, `card.png`, README, `game.json`) and

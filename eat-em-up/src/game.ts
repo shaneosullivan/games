@@ -113,7 +113,7 @@ export class Game {
     this.intro = new Overlay(
       ui,
       "Eat em up",
-      "You are a hungry caterpillar. Crawl around the forest — and up the trees — eating leaves, flowers, berries and fruit. Eat enough of everything and you will turn into a butterfly!",
+      "You are a hungry caterpillar. Crawl around the forest — up the trees and over the rocks — eating leaves, flowers, berries, fruit and mushrooms. Eat enough of everything and you will turn into a butterfly!",
       "Start eating",
       () => this.begin(),
     );

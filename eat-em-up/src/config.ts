@@ -20,6 +20,9 @@ export const GOAL = {
   flower: 40,
   berry: 60,
   fruit: 45,
+  /** Mushrooms grow on the rocks and nowhere else, so the quota is small: it
+   *  is a reason to visit every boulder in the wood, not a second meadow. */
+  mushroom: 25,
   /** Grass isn't in the plan's list of quotas — the plan only mentions eating
    *  it — but the HUD is built out of quotas, and a child mowing a meadow
    *  needs to see it counting for something. It is deliberately the easiest
@@ -34,6 +37,7 @@ export const FOOD_KINDS: ReadonlyArray<FoodKind> = [
   "flower",
   "berry",
   "fruit",
+  "mushroom",
   "grass",
 ];
 
@@ -50,6 +54,14 @@ export const FOOD_SURPLUS: Record<FoodKind, number> = {
   flower: 1.35,
   berry: 1.35,
   grass: 1.35,
+  /**
+   * Mushrooms get more, because where they can grow is fixed.
+   *
+   * Everything else is scattered over the whole floor of the wood; these only
+   * grow round the rocks, and there are twenty of those. The surplus is what
+   * keeps the quota from depending on finding very nearly every one.
+   */
+  mushroom: 1.6,
   /**
    * Fruit gets more, because most of it grows where it is hardest to get.
    *
@@ -328,6 +340,18 @@ export const CATERPILLAR = {
    * dangling with no way down.
    */
   dangleLetGo: 0.9,
+  /**
+   * How near a bough has to come to the hanging body to be caught hold of.
+   *
+   * Measured from the rope the caterpillar hangs down, not from its head:
+   * where two trees' branches cross, hanging off one leaves the body lying
+   * against the other, and being unable to take hold of a branch that is
+   * touching you is a strange thing to explain to a child. A body's width and
+   * a little, so it really is a branch you are against.
+   */
+  hangGrabReach: 0.45,
+  /** How far apart the body is tested along its length for one. */
+  hangGrabStep: 0.5,
   /**
    * Below this much stick, the player counts as having let go.
    *
@@ -691,6 +715,60 @@ export const FALLING_LEAVES = {
  * minutes of play, which for most sittings means it never comes at all, and
  * for a long one means it comes once, unannounced, and is not seen again.
  */
+/**
+ * Boulders: the only thing on the floor you cannot simply crawl past.
+ *
+ * Everything else in the wood is either scenery you walk through (bushes) or
+ * something you climb on purpose (trunks, boughs). A rock is in the way, and
+ * going over it is the only way past — which is what makes the floor of the
+ * wood somewhere to navigate rather than a flat sheet to cross.
+ */
+export const BOULDER = {
+  count: 20,
+  /** Throws at finding somewhere each one fits before giving its place up. */
+  tries: 30,
+  /** Across, at the ground. */
+  radiusMin: 0.9,
+  radiusMax: 2.4,
+  /**
+   * Height as a share of the width.
+   *
+   * Around 1, not well under it: at half the width the rocks read as grey
+   * puddles lying on the grass rather than as stone standing on it. They stay
+   * climbable at this height because the surface is a paraboloid, whose
+   * steepest point is its rim, at a slope of twice the height over the radius
+   * — about two, or sixty degrees, which is a climb and not a wall.
+   */
+  squashMin: 0.72,
+  squashMax: 1.05,
+  /**
+   * How far the drawn rock is dented in from the smooth dome it is walked on,
+   * as a share of its size.
+   *
+   * Inward only. Every dent leaves the caterpillar riding fractionally above
+   * the stone, which is invisible; a bulge would put it inside the stone,
+   * which is not. So the lumps are all bitten out of the rock, never added.
+   */
+  jitter: 0.12,
+  /** Clear space kept around trees, bushes and other rocks. */
+  spacing: 0.6,
+  /** Which of them wear moss, and how many cushions of it. */
+  mossChance: 0.6,
+  mossPatchesMin: 2,
+  mossPatchesMax: 5,
+  /** Moss sits on the sunlit upper half, above this share of the rock's own
+   *  height — never underneath it. */
+  mossAbove: 0.45,
+  /**
+   * Where mushrooms grow on a rock, as a share of its height.
+   *
+   * Round the shoulders and the foot, never the crown: the crown is the path
+   * over the rock, and a toadstool standing in it is one the caterpillar
+   * walks straight through on its way past.
+   */
+  mushroomBelow: 0.55,
+} as const;
+
 export const CROW = {
   /** Seconds before the first shadow, and between them afterwards. */
   minGap: 20 * 60,
@@ -726,6 +804,14 @@ export const CROW = {
 export const FOOD = {
   /** How close the mouth must be to swallow something. */
   biteRadius: 0.85,
+  /**
+   * How far clear of a rock's footprint food on the floor is kept.
+   *
+   * Floor food is placed at floor height, and the one part of the floor with
+   * stone standing on it is a rock's footprint — anything scattered there is
+   * inside the rock, which both looks wrong and cannot be eaten.
+   */
+  boulderClearance: 0.4,
   /**
    * How far above or below itself it can reach, as a base plus a share of its
    * own radius.

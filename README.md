@@ -9,15 +9,18 @@ thing deploys as a folder.
 ```
 .
 ├── bee/          Bee Quest — a 3D bee game for iPad (TypeScript + Three.js)
+├── eat-em-up/    Eat em up — a 3D caterpillar game for iPad (TypeScript + Three.js)
+├── shared/       the few widgets the games have in common
 ├── site/         the gallery that lists the games and publishes them
 └── README.md     you are here
 ```
 
 ## The games
 
-| Game                           | What it is                                                                                                                                                                  |
-| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [**Bee Quest**](bee/README.md) | Fly a bee, found a hive, feed the brood, see off a wasp, get the honey home past a bear, hop a river of frogs and net the ants. Eight levels. Built for a child on an iPad. |
+| Game                                 | What it is                                                                                                                                                                                                                     |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| [**Bee Quest**](bee/README.md)       | Fly a bee, found a hive, feed the brood, see off a wasp, get the honey home past a bear, hop a river of frogs and net the ants. Eight levels. Built for a child on an iPad.                                                    |
+| [**Eat em up**](eat-em-up/README.md) | Be a caterpillar in a friendly wood. Eat leaves, flowers, berries, fruit, mushrooms and grass; climb the trees and the rocks for the ones out of reach; grow as you go, and turn into a butterfly. Nothing in it can hurt you. |
 
 The gallery also links out to native apps on the App Store (Mazers, Super
 Bubbly, Kidz Fun Art). Those aren't in this repo — they're listed by hand in

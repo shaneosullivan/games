@@ -58,6 +58,7 @@ export class FoodField {
     flower: 0,
     berry: 0,
     fruit: 0,
+    mushroom: 0,
     grass: 0,
   };
 
@@ -149,7 +150,11 @@ export class FoodField {
         item.vanish = FOOD.vanish;
         // Grass and fruit come back; the rest of the wood stays eaten.
         item.regrow =
-          item.kind === "grass" || item.kind === "fruit" ? FOOD.regrowAfter : 0;
+          item.kind === "grass" ||
+          item.kind === "fruit" ||
+          item.kind === "mushroom"
+            ? FOOD.regrowAfter
+            : 0;
         this.eaten[item.kind]++;
         return item.kind;
       }
@@ -244,6 +249,7 @@ export class FoodField {
     this.placeFlowers(geometries, add);
     this.placeBerries(geometries, add);
     this.placeFruits(geometries, add);
+    this.placeMushrooms(geometries, add);
     this.placeGrass(geometries, add);
 
     for (let v = 0; v < geometries.length; v++) {
@@ -312,7 +318,13 @@ export class FoodField {
       const r = this.rng.range(minR, maxR);
       const x = Math.cos(a) * r;
       const z = Math.sin(a) * r;
-      if (Math.hypot(x, z) > START_TREE.trunkRadius + 1.5) {
+      // Not inside a rock: food on the floor is placed at floor height, and a
+      // rock's footprint is the one part of the floor that has stone standing
+      // on it. Anything dropped there is buried in it and cannot be eaten.
+      if (
+        Math.hypot(x, z) > START_TREE.trunkRadius + 1.5 &&
+        !this.forest.onBoulder(x, z, FOOD.boulderClearance)
+      ) {
         return new THREE.Vector2(x, z);
       }
     }
@@ -547,6 +559,36 @@ export class FoodField {
     }
   }
 
+  /**
+   * Mushrooms, round the rocks.
+   *
+   * Dealt out over the boulders in turn rather than scattered at random, so
+   * every rock in the wood is worth crawling to and none of them is bare.
+   */
+  private placeMushrooms(
+    geos: Array<{kind: FoodKind; geometry: THREE.BufferGeometry}>,
+    add: AddFn,
+  ): void {
+    const variants = indicesOf(geos, "mushroom");
+    const rocks = this.forest.boulders;
+    if (rocks.length === 0) {
+      return;
+    }
+    const total = this.count("mushroom");
+    for (let i = 0; i < total; i++) {
+      const rock = rocks[i % rocks.length];
+      const at = this.forest.mushroomSpot(rock, this.rng);
+      add(
+        "mushroom",
+        this.rng.pick(variants),
+        at.x,
+        at.y,
+        at.z,
+        this.rng.range(0.8, 1.25),
+      );
+    }
+  }
+
   private placeGrass(
     geos: Array<{kind: FoodKind; geometry: THREE.BufferGeometry}>,
     add: AddFn,
@@ -590,6 +632,9 @@ export class FoodField {
     }
     for (const colour of [0x8fd155, 0x7ab942, 0xa6de63]) {
       out.push({kind: "grass", geometry: makeGrassTuft(colour, this.rng)});
+    }
+    for (const colour of MUSHROOM_CAPS) {
+      out.push({kind: "mushroom", geometry: makeMushroom(colour)});
     }
     out.push({kind: "fruit", geometry: makeApple()});
     out.push({kind: "fruit", geometry: makeStrawberry()});
@@ -711,6 +756,33 @@ function lighten(colour: number): number {
   const c = new THREE.Color(colour);
   c.offsetHSL(0.02, 0, 0.09);
   return c.getHex();
+}
+
+const MUSHROOM_CAPS = [0xc9503f, 0xd9694a, 0xe0b45c, 0xb8705a];
+const MUSHROOM_STEM = 0xefe4cf;
+
+/** A toadstool: a pale stem under a domed cap. */
+function makeMushroom(colour: number): THREE.BufferGeometry {
+  const stem = new THREE.CylinderGeometry(0.07, 0.09, 0.26, 7);
+  stem.translate(0, 0.13, 0);
+
+  const cap = new THREE.SphereGeometry(
+    0.17,
+    9,
+    5,
+    0,
+    Math.PI * 2,
+    0,
+    Math.PI / 2,
+  );
+  cap.scale(1, 0.75, 1);
+  cap.translate(0, 0.24, 0);
+
+  const merged = mergeGeometries([
+    paint(stem, MUSHROOM_STEM),
+    paint(cap, colour),
+  ]);
+  return merged ?? paint(stem, MUSHROOM_STEM);
 }
 
 function makeApple(): THREE.BufferGeometry {
