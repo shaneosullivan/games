@@ -1,8 +1,9 @@
 import * as THREE from "three";
 import {mergeGeometries} from "three/examples/jsm/utils/BufferGeometryUtils.js";
-import {CATERPILLAR, CLIMB, IDLE, TREE_BRANCH} from "../config";
+import {CATERPILLAR, CLIMB, IDLE, MADNESS, TREE_BRANCH} from "../config";
 import {paint, vertexToon} from "../render/materials";
 import {Climbable, Forest} from "./forest";
+import {Rng} from "../core/rng";
 
 /** How far apart trail samples are taken, in units. */
 const TRAIL_STEP = 0.06;
@@ -88,11 +89,34 @@ export class Caterpillar {
 
   private readonly segments: Array<THREE.Mesh> = [];
   private readonly head: THREE.Group;
-  /** Its three mouths: the everyday smile, the questioning line, and the
-   *  wide open one it yawns with. */
+  /** Its four mouths: the everyday smile, the questioning line, the wide open
+   *  one it yawns with, and the grin it wears while it is off its head. */
   private readonly smile: THREE.Mesh;
   private readonly askingMouth: THREE.Mesh;
   private readonly yawnMouth: THREE.Mesh;
+  private readonly crazyMouth: THREE.Mesh;
+  /** Left and right, the only parts of the face that change size. */
+  private readonly pupils: Array<THREE.Mesh>;
+
+  /**
+   * The rainbow-mushroom fit: seconds left of it.
+   *
+   * While it runs the caterpillar drives itself — see madDrive — and the
+   * stick is ignored. That is the whole point of it: something takes hold of
+   * your caterpillar and gives it back a few seconds later.
+   */
+  private mad = 0;
+  /** What it is up to this second: tearing across the floor, or up a tree. */
+  private whim: "run" | "tree" = "run";
+  private whimLeft = 0;
+  private readonly whimTarget = new THREE.Vector3();
+  /** The tree it has its eye on, while the whim is a tree. */
+  private whimTree: Climbable | null = null;
+  /** Which way up the trunk it is going, while it is on one. */
+  private whimUp = 1;
+  /** Where it was when the stall check last looked, and when to look again. */
+  private readonly stallFrom = new THREE.Vector3();
+  private stallCheck = 0;
   /**
    * The two front legs, used only for the asking pose.
    *
@@ -116,9 +140,16 @@ export class Caterpillar {
    *  behaviour: looking about, wagging, and scratching. */
   private still = 0;
   private readonly tmp = new THREE.Vector3();
+  /** The drive the fit hands back in place of the stick; see madDrive. */
+  private readonly madDir = new THREE.Vector3();
+  /** Scratch colour for the rainbow body; see render. */
+  private readonly tint = new THREE.Color();
   private readonly tmpB = new THREE.Vector3();
 
-  constructor(private readonly forest: Forest) {
+  constructor(
+    private readonly forest: Forest,
+    private readonly rng: Rng,
+  ) {
     // Every segment is built at radius 1 and scaled, so growing is a scale
     // rather than a rebuild.
     const light = segmentGeometry(BODY_LIGHT);
@@ -145,6 +176,8 @@ export class Caterpillar {
     this.smile = head.smile;
     this.askingMouth = head.asking;
     this.yawnMouth = head.yawn;
+    this.crazyMouth = head.crazy;
+    this.pupils = head.pupils;
     this.group.add(this.head);
 
     for (const side of [-1, 1]) {
@@ -185,11 +218,14 @@ export class Caterpillar {
   }
 
   get speed(): number {
-    return THREE.MathUtils.lerp(
+    const walk = THREE.MathUtils.lerp(
       CATERPILLAR.speedMin,
       CATERPILLAR.speedMax,
       this.growth,
     );
+    // Everything that moves the caterpillar over the ground goes through here,
+    // so the fit only has to be applied in one place.
+    return this.mad > 0 ? walk * MADNESS.speed : walk;
   }
 
   private get segmentCount(): number {
@@ -228,6 +264,28 @@ export class Caterpillar {
     }
   }
 
+  /** True while a rainbow mushroom has hold of it. */
+  get isMad(): boolean {
+    return this.mad > 0;
+  }
+
+  /**
+   * Ate a rainbow mushroom.
+   *
+   * Restarts the clock rather than adding to it, so eating a second one in the
+   * middle of a fit is another full fit and never a stacking one.
+   */
+  goMad(): void {
+    this.mad = MADNESS.duration;
+    this.whimLeft = 0;
+    this.stallCheck = MADNESS.stallAfter;
+    this.stallFrom.copy(this.position);
+    // Whatever it was in the middle of, it isn't now: the idle behaviours all
+    // hang off how long the player has asked for nothing, and this is the
+    // opposite of nothing.
+    this.still = 0;
+  }
+
   /**
    * `dir` is the direction to crawl in world space, length 0..1. A zero vector
    * means stand still.
@@ -236,6 +294,24 @@ export class Caterpillar {
     this.prevPosition.copy(this.position);
     for (let i = 0; i < this.segCur.length; i++) {
       this.segPrev[i].copy(this.segCur[i]);
+    }
+
+    if (this.mad > 0) {
+      this.mad -= dt;
+      // It does not hang about. Hauling itself back onto a branch is a slow,
+      // careful business and this is neither: a fit that finds it dangling
+      // simply lets go, and nothing in this wood is hurt by a fall. Crawling
+      // refuses to start a new one while the fit lasts — see the guard in
+      // crawl — because otherwise it catches hold again on the very next
+      // frame and hangs there in mid-air for the rest of the fit.
+      if (this.dangle) {
+        this.dangle = null;
+        this.vy = 0;
+      }
+      // Its own whims, not the player's. Handing the stick back is the end of
+      // the fit, so the drive has to be replaced here rather than blended
+      // with what was passed in.
+      dir = this.madDrive(dt);
     }
 
     if (this.climbing) {
@@ -248,6 +324,108 @@ export class Caterpillar {
 
     this.recordTrail();
     this.layOutBody();
+  }
+
+  /**
+   * Where it wants to go this second, while it is off its head.
+   *
+   * Returned in whatever axes the caller reads: world axes on the floor, and
+   * screen axes on a trunk, where up the screen is up the tree. That split is
+   * the game's own — see climb — and the drive has to speak both.
+   */
+  private madDrive(dt: number): THREE.Vector3 {
+    const out = this.madDir;
+
+    // On a trunk: straight up until the top of the climb, then straight down.
+    // No sideways at all — going round a trunk suppresses stepping onto its
+    // branches, and a caterpillar in this state landing on a branch is one
+    // that spends the rest of the fit hanging off it.
+    if (this.climbing) {
+      const top = this.climbing.climbTop * MADNESS.climbShare;
+      if (this.whimUp > 0 && this.position.y >= top) {
+        this.whimUp = -1;
+      }
+      return out.set(0, 0, -this.whimUp);
+    }
+
+    this.whimLeft -= dt;
+    if (this.whimLeft <= 0) {
+      this.takeUpAWhim();
+    }
+
+    // Getting nowhere: take up something else.
+    //
+    // A whim is a point to head for, and nothing in the drive knows how to
+    // steer round anything. Making for a tree with another trunk in the way
+    // ends in a standoff — the trunk pushes it out, the whim pushes it back,
+    // and it stands there shoving until the fit ends. Rather than teach it to
+    // find its way round, it simply loses interest in anything it has stopped
+    // making progress toward, which is also very much in character.
+    this.stallCheck -= dt;
+    if (this.stallCheck <= 0) {
+      const moved = this.position.distanceTo(this.stallFrom);
+      this.stallCheck = MADNESS.stallAfter;
+      this.stallFrom.copy(this.position);
+      if (moved < MADNESS.stallDistance) {
+        this.takeUpAWhim();
+        // And on foot, away from whatever it was stuck against, rather than
+        // choosing another tree it may not be able to reach either.
+        this.whim = "run";
+        this.whimTree = null;
+      }
+    }
+
+    // Been up and come down again: that whim is spent. Without this it walks
+    // straight back into the same trunk and climbs it for the whole fit.
+    if (this.whim === "tree" && this.whimUp < 0) {
+      this.takeUpAWhim();
+    }
+
+    const to =
+      this.whim === "tree" && this.whimTree ? this.whimTree : this.whimTarget;
+    const dx = to.x - this.position.x;
+    const dz = to.z - this.position.z;
+    const d = Math.hypot(dx, dz);
+    if (d < 0.001) {
+      return out.set(0, 0, 0);
+    }
+    // Arrived at the floor target with time still on the whim: pick another
+    // rather than stand there vibrating on the spot.
+    if (this.whim === "run" && d < this.radius * 1.5) {
+      this.takeUpAWhim();
+    }
+    return out.set(dx / d, 0, dz / d);
+  }
+
+  /** Chooses the next thing it is going to do: a tree, or a dash. */
+  private takeUpAWhim(): void {
+    this.whimLeft = this.rng.range(MADNESS.whimMin, MADNESS.whimMax);
+    this.whimUp = 1;
+    const trees = this.forest.climbables;
+    if (trees.length > 0 && this.rng.next() < MADNESS.treeChance) {
+      // The nearest few, so it makes for one it can actually reach inside the
+      // whim rather than setting off across the whole wood.
+      const near = trees
+        .map(t => ({
+          t,
+          d: Math.hypot(t.x - this.position.x, t.z - this.position.z),
+        }))
+        .sort((a, b) => a.d - b.d)
+        .slice(0, 4);
+      this.whim = "tree";
+      this.whimTree = this.rng.pick(near).t;
+      return;
+    }
+    this.whim = "run";
+    this.whimTree = null;
+    // Somewhere else on the floor, well away from here so it is a dash.
+    const a = this.rng.next() * Math.PI * 2;
+    const r = this.rng.range(MADNESS.dashMin, MADNESS.dashMax);
+    this.whimTarget.set(
+      this.position.x + Math.cos(a) * r,
+      0,
+      this.position.z + Math.sin(a) * r,
+    );
   }
 
   /** Crawling about the forest floor, and along the start branch. */
@@ -347,8 +525,17 @@ export class Caterpillar {
       while (delta < -Math.PI) {
         delta += Math.PI * 2;
       }
+      // Off its head it turns far quicker too. Without this the fit was
+      // slower across the ground than an ordinary walk: it tears off after a
+      // whim, cannot come round fast enough to face the next one, and spends
+      // the whole time wheeling on the spot — movement is gated on how
+      // squarely it faces where it is going, so a caterpillar mid-turn is a
+      // caterpillar barely moving.
       const step =
-        CATERPILLAR.turnRate * dt * (bough ? CATERPILLAR.branchTurnBoost : 1);
+        CATERPILLAR.turnRate *
+        dt *
+        (bough ? CATERPILLAR.branchTurnBoost : 1) *
+        (this.mad > 0 ? MADNESS.turn : 1);
       this.heading += THREE.MathUtils.clamp(delta, -step, step);
 
       // On a branch it travels along the rail rather than along its heading.
@@ -419,7 +606,26 @@ export class Caterpillar {
     // crawl out along it — measuring "am I higher than the surface?" made the
     // caterpillar let go of the branch on its very first step and hang there,
     // descending straight through the branch it had been standing on.
-    if (surface <= 0 && this.prevPosition.y > this.radius + 0.2) {
+    // Never off a rock, at any speed. A rock's top comes down to meet the
+    // floor at its own rim, so crawling off one is a walk down a slope and
+    // there is no lip to catch hold of — but one fast step can cross the last
+    // of that slope in a single frame and look exactly like one. Off a
+    // rainbow mushroom the caterpillar moves fast enough to do it every time:
+    // it would dangle from the rock, haul itself back up, run off the same
+    // rim again, and never get anywhere.
+    const rockTop = this.forest.boulderTopAt(
+      this.prevPosition.x,
+      this.prevPosition.z,
+    );
+    const wasOnARock =
+      rockTop > 0.01 && this.prevPosition.y <= rockTop + this.radius + 0.3;
+
+    if (
+      surface <= 0 &&
+      this.prevPosition.y > this.radius + 0.2 &&
+      !wasOnARock &&
+      this.mad <= 0
+    ) {
       // Another branch within reach of its head? Step across to it rather than
       // hang — where one tree's branches reach into another's you should be
       // able to cross without climbing all the way down and up again.
@@ -680,7 +886,8 @@ export class Caterpillar {
     const around = dir.x;
 
     this.climbAngle += around * CLIMB.aroundSpeed * dt;
-    this.position.y += up * CLIMB.speed * dt;
+    this.position.y +=
+      up * CLIMB.speed * dt * (this.mad > 0 ? MADNESS.climbSpeed : 1);
     this.crawlPhase +=
       CATERPILLAR.humpRate * dt * Math.min(1, Math.hypot(up, around));
 
@@ -706,6 +913,18 @@ export class Caterpillar {
     // the player's chair that reads as the tree refusing to let them turn.
     const circling = Math.abs(around) > Math.abs(up) * 1.2 + 0.15;
     if (circling) {
+      return;
+    }
+
+    // Not while it is off its head. A branch is a narrow thing to be let loose
+    // on at three times the usual speed: it climbed, was caught by the first
+    // bough it passed, ran off the side of it, hung, hauled itself back up and
+    // did the same again — thirty grabs at a trunk in one fit with three units
+    // of actual climbing to show for it. A fit is up and down trunks.
+    if (this.mad > 0) {
+      if (this.position.y <= floor + 1e-3 && up < 0) {
+        this.letGo(floor);
+      }
       return;
     }
 
@@ -926,14 +1145,34 @@ export class Caterpillar {
 
     // It stops smiling while it is asking. A smile and a raised eyebrow read
     // as pleased with itself; the question wants a small open mouth.
-    const yawning = yawn > 0.15;
-    const questioning = !yawning && ask > 0.25;
-    this.smile.visible = !yawning && !questioning;
+    //
+    // Off its head beats all of it: there is no yawning or asking going on
+    // while a rainbow mushroom has hold of you.
+    const madness = Math.min(1, this.mad * MADNESS.easeOut);
+    const grinning = madness > 0.02;
+    const yawning = !grinning && yawn > 0.15;
+    const questioning = !grinning && !yawning && ask > 0.25;
+    this.smile.visible = !grinning && !yawning && !questioning;
     this.askingMouth.visible = questioning;
     this.yawnMouth.visible = yawning;
+    this.crazyMouth.visible = grinning;
     if (yawning) {
       // Opens and closes with the yawn, rather than appearing at full gape.
       this.yawnMouth.scale.set(1, 0.35 + yawn * IDLE.yawnOpen, 1);
+    }
+    if (grinning) {
+      // The grin arrives and leaves at the same rate the fit does, so it is
+      // not a face that snaps on and off.
+      this.crazyMouth.scale.set(madness, 0.4 + madness * 0.6, 1);
+    }
+
+    // The eyes: one pupil blown wide and the other gone small, trading places
+    // as it goes. Held at their own size the moment the fit is over.
+    const swap = Math.sin(this.mad * Math.PI * 2 * MADNESS.pupilSwapRate);
+    for (let i = 0; i < this.pupils.length; i++) {
+      const side = i === 0 ? swap : -swap;
+      const target = side > 0 ? MADNESS.pupilBig : MADNESS.pupilSmall;
+      this.pupils[i].scale.setScalar(1 + (target - 1) * madness);
     }
     this.head.scale.setScalar(radius * 1.16);
 
@@ -1020,6 +1259,22 @@ export class Caterpillar {
         Math.exp(-fromBelly * fromBelly) * CATERPILLAR.bellyBulge * this.growth;
       const taper = (1 - along * 0.32) * (1 + belly);
       mesh.scale.setScalar(radius * taper);
+
+      // Off its head, the whole body runs through the colours of the rainbow,
+      // a little further round the wheel for every segment so the colours
+      // travel down it rather than the caterpillar flashing all one shade.
+      const mat = mesh.material as THREE.MeshToonMaterial;
+      if (madness > 0) {
+        const hue =
+          (this.mad * MADNESS.rainbowRate + s * MADNESS.rainbowSpacing) % 1;
+        this.tint.setHSL(hue < 0 ? hue + 1 : hue, 1, 0.55);
+        mat.color.setScalar(1 - (1 - MADNESS.bodyDim) * madness);
+        mat.emissive.copy(this.tint).multiplyScalar(MADNESS.bodyGlow * madness);
+      } else if (mat.emissive.r + mat.emissive.g + mat.emissive.b > 0) {
+        // Back to an ordinary green caterpillar the moment it is over.
+        mat.color.setScalar(1);
+        mat.emissive.setScalar(0);
+      }
       // Each segment faces the one in front, so a turn bends the body and a
       // climb stands it on end. Taking the pitch from the body line rather
       // than from a climbing flag means the drape from trunk to floor is
@@ -1152,6 +1407,8 @@ function makeHead(): {
   smile: THREE.Mesh;
   asking: THREE.Mesh;
   yawn: THREE.Mesh;
+  crazy: THREE.Mesh;
+  pupils: Array<THREE.Mesh>;
 } {
   const group = new THREE.Group();
   const parts: Array<THREE.BufferGeometry> = [];
@@ -1164,10 +1421,6 @@ function makeHead(): {
     const white = new THREE.SphereGeometry(0.34, 8, 7);
     white.translate(side * 0.42, 0.26, 0.86);
     parts.push(paint(white, 0xfdfdfd));
-
-    const pupil = new THREE.SphereGeometry(0.17, 7, 6);
-    pupil.translate(side * 0.44, 0.26, 1.12);
-    parts.push(paint(pupil, 0x241a1a));
 
     // Antenna: a stalk with a bobble, leaning forward and out.
     const stalk = new THREE.CylinderGeometry(0.06, 0.07, 0.85, 5);
@@ -1197,9 +1450,56 @@ function makeHead(): {
   asking.visible = false;
   const yawn = new THREE.Mesh(yawningMouthGeometry(), vertexToon());
   yawn.visible = false;
-  group.add(smile, asking, yawn);
+  const crazy = new THREE.Mesh(crazyMouthGeometry(), vertexToon());
+  crazy.visible = false;
+  group.add(smile, asking, yawn, crazy);
 
-  return {group, smile, asking, yawn};
+  // The pupils are their own meshes rather than merged into the skull, so one
+  // of them can be blown wide while the other goes small. Everything else on
+  // the face is one mesh; these two are the only parts that change size.
+  const pupils: Array<THREE.Mesh> = [];
+  for (const side of [-1, 1]) {
+    const geo = new THREE.SphereGeometry(0.17, 7, 6);
+    const pupil = new THREE.Mesh(paint(geo, 0x241a1a), vertexToon());
+    pupil.position.set(side * 0.44, 0.26, 1.12);
+    pupil.castShadow = true;
+    group.add(pupil);
+    pupils.push(pupil);
+  }
+
+  return {group, smile, asking, yawn, crazy, pupils};
+}
+
+/**
+ * The mad mouth: wide open and grinning.
+ *
+ * The open dark of it and the grin are one shape rather than a mouth with a
+ * smile drawn over it — a wide open smile is a mouth whose *outline* is a
+ * grin, so this is the yawn's opening bent into an arc and pushed out far
+ * enough that the corners turn up clear of the face.
+ */
+function crazyMouthGeometry(): THREE.BufferGeometry {
+  const parts: Array<THREE.BufferGeometry> = [];
+
+  // The opening: wide, deep, and curved up at the ends by sitting it inside
+  // the head so only the arc of it shows.
+  const open = new THREE.SphereGeometry(0.3, 14, 10);
+  open.scale(1.5, 1.05, 0.5);
+  open.translate(0, -0.24, 0.86);
+  parts.push(paint(open, 0x5e1a12));
+
+  // The grin round it: a half torus, thick, standing proud of the opening.
+  const grin = new THREE.TorusGeometry(0.44, 0.075, 6, 16, Math.PI);
+  grin.rotateZ(Math.PI);
+  grin.rotateX(0.2);
+  grin.translate(0, -0.16, 0.9);
+  parts.push(paint(grin, 0x7a2418));
+
+  const merged = mergeGeometries(parts);
+  if (!merged) {
+    throw new Error("could not merge the mad mouth");
+  }
+  return merged;
 }
 
 /** The everyday mouth: a torus tipped forward, most of it buried in the head

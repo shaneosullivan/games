@@ -60,3 +60,38 @@ export function paint(
   geo.setAttribute("color", new THREE.BufferAttribute(arr, 3));
   return geo;
 }
+
+/**
+ * A soft round glow, drawn once into a canvas and reused.
+ *
+ * For the halo round a rainbow mushroom. A sprite with a gradient in it is the
+ * whole of the trick — there is no bloom pass in this game, and adding one for
+ * four mushrooms would cost every frame of the wood to light up four.
+ */
+let glow: THREE.Texture | null = null;
+export function glowTexture(): THREE.Texture {
+  if (glow) {
+    return glow;
+  }
+  const size = 128;
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) {
+    throw new Error("no 2d context for the glow");
+  }
+  const half = size / 2;
+  const gradient = ctx.createRadialGradient(half, half, 0, half, half, half);
+  // Falls away fast at first and then slowly: a hard core with a wide, faint
+  // halo, which is what reads as light rather than as a painted disc.
+  gradient.addColorStop(0, "rgba(255,255,255,0.95)");
+  gradient.addColorStop(0.25, "rgba(255,255,255,0.45)");
+  gradient.addColorStop(0.55, "rgba(255,255,255,0.14)");
+  gradient.addColorStop(1, "rgba(255,255,255,0)");
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, size, size);
+  glow = new THREE.CanvasTexture(canvas);
+  glow.colorSpace = THREE.SRGBColorSpace;
+  return glow;
+}

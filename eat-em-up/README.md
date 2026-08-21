@@ -39,7 +39,7 @@ there is no control to find first.
 
 ## The game
 
-Eat 80 leaves, 40 flowers, 60 berries, 45 fruits, 25 mushrooms and 120 tufts of
+Eat 80 leaves, 40 flowers, 60 berries, 45 fruits, 12 mushrooms and 120 tufts of
 grass. One bar across the top says how close you are; there are no other
 numbers. You cannot lose and nothing can hurt you; crawling off a branch just
 drops you back onto the forest floor.
@@ -54,6 +54,12 @@ drops you back onto the forest floor.
   onto the branch, and edge out to the tip.
 - **Mushrooms** grow on the boulders and nowhere else, round their shoulders
   and their feet — so filling that quota means visiting every rock in the wood.
+  Four of them are **rainbow** ones: much bigger, spotted, and glowing, so they
+  are spotted from across the wood. Eating one sets the caterpillar off for
+  thirteen seconds — it runs the colours of the rainbow, grins, goes odd about
+  the eyes, and tears round the wood and up and down the trees under its own
+  steam while you watch. It counts for the quota like any other mushroom, so it
+  is never a trap, and it grows back like the rest.
 - **Grass** fills one tall meadow, and is the one thing eaten only where your
   head actually touches it.
 

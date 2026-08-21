@@ -2,6 +2,7 @@ import * as THREE from "three";
 import {mergeGeometries} from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import {
   CATERPILLAR,
+  MADNESS,
   CLEARING,
   FOOD,
   FOOD_KINDS,
@@ -12,7 +13,7 @@ import {
   START_TREE,
   WORLD,
 } from "../config";
-import {paint, vertexToon} from "../render/materials";
+import {glowTexture, paint, vertexToon} from "../render/materials";
 import {Rng} from "../core/rng";
 import {Forest, Spot} from "./forest";
 
@@ -70,6 +71,11 @@ export class FoodField {
   private readonly up = new THREE.Vector3(0, 1, 0);
   private clock = 0;
 
+  /** Which variety is the rainbow toadstool; see buildGeometries. */
+  private magicVariant = -1;
+  /** The halo round each rainbow mushroom, and the mushroom it belongs to. */
+  private readonly halos: Array<{sprite: THREE.Sprite; item: Item}> = [];
+
   constructor(
     private readonly rng: Rng,
     private readonly forest: Forest,
@@ -125,7 +131,7 @@ export class FoodField {
     mouth: THREE.Vector3,
     reach: number,
     headRadius: number,
-  ): FoodKind | null {
+  ): {kind: FoodKind; magic: boolean} | null {
     for (const item of this.items) {
       if (item.eaten) {
         continue;
@@ -156,7 +162,7 @@ export class FoodField {
             ? FOOD.regrowAfter
             : 0;
         this.eaten[item.kind]++;
-        return item.kind;
+        return {kind: item.kind, magic: item.variant === this.magicVariant};
       }
     }
     return null;
@@ -164,6 +170,20 @@ export class FoodField {
 
   update(dt: number): void {
     this.clock += dt;
+
+    // The halos breathe, and go out with the mushroom they belong to — an
+    // eaten one leaving its glow behind would be a light with nothing under
+    // it, which is worse than no light at all.
+    for (const halo of this.halos) {
+      halo.sprite.visible = !halo.item.eaten;
+      if (!halo.sprite.visible) {
+        continue;
+      }
+      const breath =
+        1 + Math.sin(this.clock * MADNESS.glowRate) * MADNESS.glowSwell;
+      halo.sprite.scale.setScalar(MADNESS.glowSize * breath);
+    }
+
     for (const variant of this.variants) {
       for (const item of variant.items) {
         if (item.eaten && item.regrow > 0) {
@@ -575,12 +595,39 @@ export class FoodField {
       return;
     }
     const total = this.count("mushroom");
-    for (let i = 0; i < total; i++) {
+    // The rainbow ones go down first, spread as far apart as the rocks allow —
+    // one every few boulders, rather than two on the same stone and none for
+    // the rest of the wood.
+    const magic = Math.min(MADNESS.count, rocks.length);
+    const spacing = Math.floor(rocks.length / Math.max(1, magic));
+    for (let i = 0; i < magic; i++) {
+      const at = this.forest.mushroomSpot(rocks[i * spacing], this.rng);
+      add("mushroom", this.magicVariant, at.x, at.y, at.z, MADNESS.scale);
+
+      // A halo, so one of these is spotted from across the wood rather than
+      // stumbled upon. Additive and depth-write off: it is light lying over
+      // the scene, not a disc standing in it.
+      const halo = new THREE.Sprite(
+        new THREE.SpriteMaterial({
+          map: glowTexture(),
+          color: MADNESS.glowColour,
+          transparent: true,
+          depthWrite: false,
+          blending: THREE.AdditiveBlending,
+        }),
+      );
+      halo.position.set(at.x, at.y + MADNESS.glowLift, at.z);
+      halo.scale.setScalar(MADNESS.glowSize);
+      this.group.add(halo);
+      this.halos.push({sprite: halo, item: this.items[this.items.length - 1]});
+    }
+    const plain = variants.filter(v => v !== this.magicVariant);
+    for (let i = 0; i < total - magic; i++) {
       const rock = rocks[i % rocks.length];
       const at = this.forest.mushroomSpot(rock, this.rng);
       add(
         "mushroom",
-        this.rng.pick(variants),
+        this.rng.pick(plain),
         at.x,
         at.y,
         at.z,
@@ -636,6 +683,10 @@ export class FoodField {
     for (const colour of MUSHROOM_CAPS) {
       out.push({kind: "mushroom", geometry: makeMushroom(colour)});
     }
+    // The rainbow one is its own variety, so which of them are magic is a
+    // property of the mesh rather than something to be remembered per item.
+    this.magicVariant = out.length;
+    out.push({kind: "mushroom", geometry: makeMagicMushroom()});
     out.push({kind: "fruit", geometry: makeApple()});
     out.push({kind: "fruit", geometry: makeStrawberry()});
     out.push({kind: "fruit", geometry: makeBlackberry()});
@@ -783,6 +834,62 @@ function makeMushroom(colour: number): THREE.BufferGeometry {
     paint(cap, colour),
   ]);
   return merged ?? paint(stem, MUSHROOM_STEM);
+}
+
+/**
+ * The rainbow toadstool: much bigger than the rest, and spotted.
+ *
+ * Built at the same scale as an ordinary one and enlarged by MADNESS.scale
+ * where it is placed, so the two are the same shape family and it reads as a
+ * mushroom that has got above itself rather than as a different object.
+ */
+function makeMagicMushroom(): THREE.BufferGeometry {
+  const parts: Array<THREE.BufferGeometry> = [];
+
+  const stem = new THREE.CylinderGeometry(0.09, 0.13, 0.34, 8);
+  stem.translate(0, 0.17, 0);
+  parts.push(paint(stem, MUSHROOM_STEM));
+
+  const capR = 0.24;
+  const cap = new THREE.SphereGeometry(
+    capR,
+    12,
+    6,
+    0,
+    Math.PI * 2,
+    0,
+    Math.PI / 2,
+  );
+  cap.scale(1, 0.72, 1);
+  cap.translate(0, 0.3, 0);
+  parts.push(paint(cap, 0xd7477f));
+
+  // Spots laid on the cap's own surface, each in its own colour: an even turn
+  // round it and a different height each time, so they read as scattered
+  // rather than as a ring.
+  for (let i = 0; i < MADNESS.dots; i++) {
+    const a = (i / MADNESS.dots) * Math.PI * 2 * 1.618;
+    const up = 0.15 + (i / MADNESS.dots) * 0.75;
+    const out = Math.sqrt(1 - up * up);
+    const dot = new THREE.SphereGeometry(capR * 0.24, 7, 5);
+    // Flattened onto the cap so it is a spot on the surface, not a bead
+    // stuck to it, and set a hair proud so the two do not z-fight.
+    dot.scale(1, 0.5, 1);
+    dot.translate(
+      Math.cos(a) * out * capR * 0.92,
+      0.3 + up * capR * 0.72,
+      Math.sin(a) * out * capR * 0.92,
+    );
+    parts.push(
+      paint(dot, MADNESS.dotColours[i % MADNESS.dotColours.length] as number),
+    );
+  }
+
+  const merged = mergeGeometries(parts);
+  if (!merged) {
+    throw new Error("could not merge the rainbow mushroom");
+  }
+  return merged;
 }
 
 function makeApple(): THREE.BufferGeometry {

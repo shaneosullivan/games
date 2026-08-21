@@ -86,7 +86,7 @@ export class Game {
     this.stage = new Stage(app);
     this.forest = new Forest(rng);
     this.food = new FoodField(rng, this.forest);
-    this.cat = new Caterpillar(this.forest);
+    this.cat = new Caterpillar(this.forest, rng);
     this.ending = new Ending(this.forest);
     this.leaves = new FallingLeaves(rng, this.forest);
     this.crow = new CrowShadow(rng);
@@ -197,11 +197,15 @@ export class Game {
         this.readStickAgainstCamera();
       }
       this.cat.update(dt, this.dir);
-      this.food.bite(
+      const swallowed = this.food.bite(
         this.cat.mouth,
         this.cat.radius * CATERPILLAR.biteReach,
         this.cat.radius,
       );
+      // A rainbow mushroom takes the caterpillar off you for a few seconds.
+      if (swallowed?.magic) {
+        this.cat.goMad();
+      }
       if (this.food.complete) {
         this.beginTransformation();
       }

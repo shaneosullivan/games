@@ -21,8 +21,10 @@ export const GOAL = {
   berry: 60,
   fruit: 45,
   /** Mushrooms grow on the rocks and nowhere else, so the quota is small: it
-   *  is a reason to visit every boulder in the wood, not a second meadow. */
-  mushroom: 25,
+   *  is a reason to visit every boulder in the wood, not a second meadow.
+   *  Low enough that a rock wears one or two and not a crop of them — at 25
+   *  every boulder in the wood was ringed with toadstools. */
+  mushroom: 12,
   /** Grass isn't in the plan's list of quotas — the plan only mentions eating
    *  it — but the HUD is built out of quotas, and a child mowing a meadow
    *  needs to see it counting for something. It is deliberately the easiest
@@ -789,6 +791,85 @@ export const BOULDER = {
    * walks straight through on its way past.
    */
   mushroomBelow: 0.55,
+} as const;
+
+/**
+ * The rainbow mushrooms, and what eating one does.
+ *
+ * A handful of big spotted toadstools among the ordinary ones. They count for
+ * the mushroom quota like any other, so they are never a trap — the whole of
+ * what they do is send the caterpillar haring round the wood for a while,
+ * grinning, with its eyes gone odd. Nothing in this game can hurt you, and
+ * that includes this.
+ */
+export const MADNESS = {
+  /** How many of the wood's mushrooms are the rainbow sort. */
+  count: 4,
+  /** How much bigger they are than an ordinary one. This is what makes them
+   *  worth crawling to from across the wood. */
+  scale: 2.7,
+  /** Dots on the cap, and the colours they come in. */
+  dots: 9,
+  dotColours: [0xff4d5a, 0xffa73d, 0xffe14d, 0x5ad46b, 0x4bc6ff, 0x8f6dff],
+  /** The halo round one, so it is spotted from across the wood. */
+  glowColour: 0xffd9ff,
+  glowSize: 2.6,
+  /** Lifted to sit about the cap rather than round the foot of the stem. The
+   *  cap of one of these sits about here once MADNESS.scale has been applied
+   *  to it — at half this the halo hung round the stem like a puddle. */
+  glowLift: 0.85,
+  /** It breathes: how fast, and by how much. */
+  glowRate: 1.7,
+  glowSwell: 0.12,
+  /** How long the fit lasts. Long enough to be an event, short enough that a
+   *  child who wants their caterpillar back gets it back. */
+  duration: 13,
+  /** How much quicker it comes round onto a new whim. Movement is gated on
+   *  facing the way you are going, so without this it wheels on the spot. */
+  turn: 3,
+  /** How much faster it runs and climbs while it lasts. */
+  speed: 2.7,
+  climbSpeed: 3.2,
+  /** How long it holds one whim before taking up another. */
+  whimMin: 1.1,
+  whimMax: 2.6,
+  /** How often it asks itself whether it is actually getting anywhere, and
+   *  how far it must have gone in that time to count as progress. */
+  stallAfter: 0.5,
+  stallDistance: 1.6,
+  /** How far off a dash across the floor is aimed. Far enough to be a run in
+   *  a straight line rather than a lap of wherever it happens to stand. */
+  dashMin: 12,
+  dashMax: 26,
+  /** How often a whim is a tree rather than a dash across the floor. */
+  treeChance: 0.55,
+  /** How near the trunk it has to get before it counts as arrived and starts
+   *  climbing — it presses into the bark, which is how climbing begins. */
+  treeGrip: 1.2,
+  /** How far up it means to go, as a share of what the tree allows. */
+  climbShare: 0.75,
+  /** The eyes: one pupil blown wide, the other gone small. They swap over at
+   *  this rate, which is what makes it read as manic rather than cross-eyed. */
+  pupilBig: 1.7,
+  pupilSmall: 0.55,
+  pupilSwapRate: 0.9,
+  /**
+   * The body while the fit lasts: every colour of the rainbow, travelling
+   * down it.
+   *
+   * The green is knocked back with the material's colour and the rainbow put
+   * on with its emissive, which adds rather than multiplies — multiplying a
+   * hue into green can only ever darken it, and what this wants is a body
+   * lit up.
+   */
+  bodyDim: 0.18,
+  bodyGlow: 0.95,
+  /** How fast the colours run down the body, turns a second, and how far
+   *  apart two neighbouring segments are on the wheel. */
+  rainbowRate: 0.55,
+  rainbowSpacing: 0.055,
+  /** How fast the fit winds down at the end, so it stops rather than snaps. */
+  easeOut: 1.2,
 } as const;
 
 export const CROW = {
