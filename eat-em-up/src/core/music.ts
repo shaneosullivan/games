@@ -98,12 +98,21 @@ export class Music {
     // coming out of one is just a noise in the room.
     document.addEventListener("visibilitychange", () => {
       if (document.hidden) {
-        this.calm.pause();
-        this.rainbow.pause();
+        this.silence();
       } else {
         this.resume();
       }
     });
+
+    // Leaving the page — the home button, the back gesture, closing the tab.
+    //
+    // `pagehide` rather than `unload`, because a browser does not necessarily
+    // destroy this page on the way out: it may freeze it whole and keep it for
+    // the back button, and a frozen page can go on playing. That is how a
+    // child taps home, lands on the gallery, and can still hear the wood.
+    window.addEventListener("pagehide", () => this.silence());
+    // And coming back to a page that was only frozen, rather than reloaded.
+    window.addEventListener("pageshow", () => this.resume());
   }
 
   /**
@@ -177,6 +186,20 @@ export class Music {
     void voice.play().catch(() => {});
   }
 
+  /**
+   * Everything off: both tracks, the wings, and any chewing.
+   *
+   * For leaving the page and for the tab going to the background. It does not
+   * touch `current` or `muted`, so whatever was playing is what starts again
+   * if the player comes back.
+   */
+  silence(): void {
+    this.calm.pause();
+    this.rainbow.pause();
+    this.wingBeat.pause();
+    this.stopEating();
+  }
+
   /** Cuts any chewing short, wherever it had got to. */
   stopEating(): void {
     for (const pool of this.bites.values()) {
@@ -206,14 +229,7 @@ export class Music {
   setMuted(muted: boolean): void {
     this.muted = muted;
     if (muted) {
-      this.calm.pause();
-      this.rainbow.pause();
-      this.wingBeat.pause();
-      for (const pool of this.bites.values()) {
-        for (const voice of pool.voices) {
-          voice.pause();
-        }
-      }
+      this.silence();
       return;
     }
     this.resume();
@@ -248,16 +264,16 @@ export class Music {
   }
 }
 
-/**
- * Which recording each variety of food asks for by name; see FoodField.
- *
- * The peach takes the orange, being the orange one of the four fruits. There
- * is no flower and no mushroom here — nothing was recorded for them, and
- * silence beats the wrong noise.
- */
 /** The first of these to happen is treated as the player arriving. */
 const WAKE_EVENTS = ["pointerdown", "touchstart", "keydown"] as const;
 
+/**
+ * Which recording each variety of food asks for by name; see FoodField.
+ *
+ * Two of them borrow. A flower bites like a leaf, being the same soft green
+ * thing to bite through, and a mushroom bites like an apple — the same crunch,
+ * at the same volume, because that is what it sounds like.
+ */
 const BITE_SOUNDS: Record<string, {url: string; volume?: number}> = {
   grass: {url: grassBite},
   leaf: {url: leafBite},
@@ -266,10 +282,6 @@ const BITE_SOUNDS: Record<string, {url: string; volume?: number}> = {
   strawberry: {url: strawberryBite},
   blackberry: {url: blackberryBite},
   orange: {url: orangeBite},
-  // Flowers borrow the leaf, which is the same soft green thing to bite
-  // through. Mushrooms borrow the apple's crunch, turned down: a mushroom
-  // gives way where an apple resists.
-  mushroom: {url: appleBite, volume: MUSIC.chompVolume * MUSIC.mushroomHush},
 };
 
 function makeTrack(src: string, volume: number): HTMLAudioElement {

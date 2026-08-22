@@ -101,12 +101,42 @@ canvas {
   }
 }
 
-/* Where the shared sound button sits. The button brings its own looks; this
-   only says where it goes — top right, the one corner nothing else uses. */
-.sound-corner {
+/* Where the corner buttons sit — top right, the one corner nothing else uses.
+   The sound switch is the shared one and brings its own looks; this only says
+   where the pair of them goes. */
+.corner-buttons {
   position: absolute;
   top: calc(var(--safe-t) + 12px);
   right: calc(var(--safe-r) + 12px);
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+/* The home button, cut to match the shared sound switch beside it: a child
+   should not be able to tell that one of them came from somewhere else. */
+.icon-button {
+  /* Border-box, because the shared sound button next to it is one: an anchor
+     is not, so without this the two discs differ by the two pixels of their
+     border and sit a pixel out of line. */
+  box-sizing: border-box;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: 1px solid var(--stroke, rgba(255, 255, 255, 0.22));
+  background: var(--panel);
+  color: var(--ink, #fff);
+  font-size: 20px;
+  line-height: 1;
+  display: grid;
+  place-items: center;
+  text-decoration: none;
+  backdrop-filter: blur(8px);
+  cursor: pointer;
+}
+
+.icon-button:active {
+  transform: scale(0.93);
 }
 
 /* ---------- Overlays ---------- */

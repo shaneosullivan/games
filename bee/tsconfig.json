@@ -13,7 +13,26 @@
     "isolatedModules": true,
     "noEmit": true,
     "skipLibCheck": true,
-    "types": ["vite/client"]
+    "types": ["vite/client"],
+    /*
+     * Where `three` comes from, for TypeScript.
+     *
+     * Files in shared/ import three like anybody else, but they sit above this
+     * folder, so TypeScript looks for it from there and walks up to the repo
+     * root — which on a deploy is never installed, because Vercel runs
+     * site/build.mjs with no install step of its own and build.mjs installs
+     * each game, not the root. That is exactly how a green local build became
+     * a red one: `Cannot find module 'three'`, from shared/particles.ts.
+     *
+     * Pointing it at this game's own typings settles it wherever the build is
+     * run. The runtime half is the alias in vite.config.ts, which pins the
+     * import to this game's copy so a second three is never bundled.
+     */
+    "baseUrl": ".",
+    "paths": {
+      "three": ["./node_modules/@types/three"],
+      "three/*": ["./node_modules/@types/three/*"]
+    }
   },
   "include": ["src"]
 }

@@ -222,7 +222,18 @@ function buildGame(game) {
     run("npm install --no-audit --no-fund", game.dir);
   }
   console.log(`  · ${game.name}: building`);
-  run("npm run build", game.dir);
+  try {
+    run("npm run build", game.dir);
+  } catch {
+    // The child's own output has already gone to the log — it is spawned with
+    // stdio inherited — so the useful part is above this. What a bare throw
+    // adds is ten lines of Node internals between the reader and it, which on
+    // a deploy is where people stop reading.
+    console.error(
+      `\n  ✗ ${game.name} failed to build. The error is in its output above.`,
+    );
+    process.exit(1);
+  }
 }
 
 /** Copy the game's whole dist so multi-file games work too, not just bee. */

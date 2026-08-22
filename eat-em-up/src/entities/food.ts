@@ -42,7 +42,7 @@ interface Item {
  * The sound belongs to the variety and not to the kind, because the four
  * fruits do not sound alike — an apple is a crunch and a blackberry is not.
  * Nothing was recorded for flowers or mushrooms, so they borrow: a flower
- * bites like a leaf, and a mushroom is an apple's crunch played softer.
+ * bites like a leaf, and a mushroom bites like an apple.
  */
 interface Variety {
   kind: FoodKind;
@@ -698,8 +698,8 @@ export class FoodField {
       out.push({
         kind: "mushroom",
         geometry: makeMushroom(colour),
-        // An apple's crunch, but softer — see MUSHROOM in the sound bank.
-        sound: "mushroom",
+        // The apple's crunch, as it is: a mushroom bites like one.
+        sound: "apple",
       });
     }
     // The rainbow one is its own variety, so which of them are magic is a
@@ -708,7 +708,7 @@ export class FoodField {
     out.push({
       kind: "mushroom",
       geometry: makeMagicMushroom(),
-      sound: "mushroom",
+      sound: "apple",
     });
     out.push({kind: "fruit", geometry: makeApple(), sound: "apple"});
     out.push({

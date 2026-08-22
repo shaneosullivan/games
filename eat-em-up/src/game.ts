@@ -166,14 +166,32 @@ export class Game {
     this.playAgain.addEventListener("click", () => window.location.reload());
     ui.appendChild(this.playAgain);
 
-    // The shared switch, the same one the bee game has, in the one corner
-    // nothing else uses: both sticks are along the bottom and the progress bar
-    // runs across the top middle.
+    // The two buttons, in the one corner nothing else uses: both sticks are
+    // along the bottom and the progress bar runs across the top middle.
+    const corner = document.createElement("div");
+    corner.className = "corner-buttons";
+
+    // The way out, the same button the bee game has. It goes to the gallery
+    // rather than to a level menu, this game having no levels to go back to.
+    //
+    // Relative, not the site's own address: the game is always staged inside
+    // the gallery, so two steps up from /games/eat-em-up/ is the front page —
+    // and it stays right on a preview deploy or a local server, where an
+    // absolute link would jump to the live site instead.
+    const home = document.createElement("a");
+    home.className = "icon-button ui-interactive";
+    home.href = "../../";
+    home.textContent = "🏠";
+    home.title = "Chofter Games";
+    home.setAttribute("aria-label", "Back to Chofter Games");
+    corner.appendChild(home);
+
     const sound = new SoundButton({
       onToggle: muted => this.music.setMuted(muted),
-      className: "sound-corner ui-interactive",
+      className: "ui-interactive",
     });
-    ui.appendChild(sound.root);
+    corner.appendChild(sound.root);
+    ui.appendChild(corner);
 
     this.snapCamera();
     this.loop = new GameLoop(this.update, this.render);
