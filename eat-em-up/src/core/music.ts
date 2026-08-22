@@ -53,11 +53,11 @@ export class Music {
   private readonly wingBeat: HTMLAudioElement;
 
   constructor() {
-    for (const [name, url] of Object.entries(BITE_SOUNDS)) {
+    for (const [name, bite] of Object.entries(BITE_SOUNDS)) {
       const voices: Array<HTMLAudioElement> = [];
       for (let i = 0; i < MUSIC.chompVoices; i++) {
-        const voice = new Audio(url);
-        voice.volume = MUSIC.chompVolume;
+        const voice = new Audio(bite.url);
+        voice.volume = bite.volume ?? MUSIC.chompVolume;
         voice.preload = "auto";
         voices.push(voice);
       }
@@ -73,6 +73,27 @@ export class Music {
     this.rainbow = makeTrack(rainbowTrack, MUSIC.rainbowVolume);
     this.current = this.calm;
 
+    // Try it straight away, and again on the first touch of anything.
+    //
+    // A browser will refuse to play audio nobody asked for, and on an iPad
+    // that refusal is the default — but not everywhere, and where it is
+    // allowed the wood should have its music from the moment it is on screen
+    // rather than from whenever the intro card is dismissed. Where it is
+    // refused, the first touch anywhere starts it: a child who taps the screen
+    // before finding the button has asked for the game to begin as surely as
+    // one who presses it.
+    this.started = true;
+    this.resume();
+    const wake = (): void => {
+      this.resume();
+      for (const type of WAKE_EVENTS) {
+        window.removeEventListener(type, wake);
+      }
+    };
+    for (const type of WAKE_EVENTS) {
+      window.addEventListener(type, wake, {passive: true});
+    }
+
     // A tablet game left on the table is a tab nobody is looking at, and music
     // coming out of one is just a noise in the room.
     document.addEventListener("visibilitychange", () => {
@@ -85,7 +106,11 @@ export class Music {
     });
   }
 
-  /** Called from the first touch: see the note about autoplay above. */
+  /**
+   * The game has begun. Harmless if the music is already going, which it will
+   * be if the browser allowed it or the player touched anything on the way to
+   * the button.
+   */
   start(): void {
     this.started = true;
     this.resume();
@@ -212,14 +237,21 @@ export class Music {
  * is no flower and no mushroom here — nothing was recorded for them, and
  * silence beats the wrong noise.
  */
-const BITE_SOUNDS: Record<string, string> = {
-  grass: grassBite,
-  leaf: leafBite,
-  blueberry: blueberryBite,
-  apple: appleBite,
-  strawberry: strawberryBite,
-  blackberry: blackberryBite,
-  orange: orangeBite,
+/** The first of these to happen is treated as the player arriving. */
+const WAKE_EVENTS = ["pointerdown", "touchstart", "keydown"] as const;
+
+const BITE_SOUNDS: Record<string, {url: string; volume?: number}> = {
+  grass: {url: grassBite},
+  leaf: {url: leafBite},
+  blueberry: {url: blueberryBite},
+  apple: {url: appleBite},
+  strawberry: {url: strawberryBite},
+  blackberry: {url: blackberryBite},
+  orange: {url: orangeBite},
+  // Flowers borrow the leaf, which is the same soft green thing to bite
+  // through. Mushrooms borrow the apple's crunch, turned down: a mushroom
+  // gives way where an apple resists.
+  mushroom: {url: appleBite, volume: MUSIC.chompVolume * MUSIC.mushroomHush},
 };
 
 function makeTrack(src: string, volume: number): HTMLAudioElement {

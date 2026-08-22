@@ -41,8 +41,8 @@ interface Item {
  *
  * The sound belongs to the variety and not to the kind, because the four
  * fruits do not sound alike — an apple is a crunch and a blackberry is not.
- * Flowers and mushrooms have no recording, and no sound is better than the
- * wrong one.
+ * Nothing was recorded for flowers or mushrooms, so they borrow: a flower
+ * bites like a leaf, and a mushroom is an apple's crunch played softer.
  */
 interface Variety {
   kind: FoodKind;
@@ -672,7 +672,13 @@ export class FoodField {
       out.push({kind: "leaf", geometry: makeLeaf(colour), sound: "leaf"});
     }
     for (const colour of [0xf2809f, 0xfff0f5, 0xffd94a, 0xb38fe0, 0x8fc7ff]) {
-      out.push({kind: "flower", geometry: makeFlower(colour)});
+      out.push({
+        kind: "flower",
+        geometry: makeFlower(colour),
+        // The same as a leaf: a flower is the same soft green thing to bite
+        // through, and nothing was recorded for it.
+        sound: "leaf",
+      });
     }
     for (const colour of [0xd8344a, 0x4a5fd8, 0x3a2350]) {
       out.push({
@@ -689,12 +695,21 @@ export class FoodField {
       });
     }
     for (const colour of MUSHROOM_CAPS) {
-      out.push({kind: "mushroom", geometry: makeMushroom(colour)});
+      out.push({
+        kind: "mushroom",
+        geometry: makeMushroom(colour),
+        // An apple's crunch, but softer — see MUSHROOM in the sound bank.
+        sound: "mushroom",
+      });
     }
     // The rainbow one is its own variety, so which of them are magic is a
     // property of the mesh rather than something to be remembered per item.
     this.magicVariant = out.length;
-    out.push({kind: "mushroom", geometry: makeMagicMushroom()});
+    out.push({
+      kind: "mushroom",
+      geometry: makeMagicMushroom(),
+      sound: "mushroom",
+    });
     out.push({kind: "fruit", geometry: makeApple(), sound: "apple"});
     out.push({
       kind: "fruit",

@@ -114,14 +114,15 @@ yours to fly around the wood for as long as you like.
 ## Sound
 
 One looping track, `src/assets/mossy_trail.mp3`, quiet enough to sit under the
-game. It cannot start until the player has touched the screen — a browser will
-refuse audio nobody asked for, and on an iPad that refusal is the default — so
-it begins on the button on the intro panel, which is the first thing anyone
-touches. Eating has a sound, and the sound belongs to the variety rather than the kind:
+game. It tries to start the moment the page is up, and where a browser refuses
+audio nobody asked for — which on an iPad is the default — the first touch of
+anything starts it, whether that is the button on the intro card or a tap
+beside it. So the wood has its music from as early as the browser will allow. Eating has a sound, and the sound belongs to the variety rather than the kind:
 an apple is a crunch and a blackberry is not, so the four fruits have four
-recordings between them, and leaves, berries and grass have their own. Flowers
-and mushrooms are eaten in silence — nothing was recorded for them, and no
-sound beats the wrong one.
+recordings between them, and leaves, berries and grass have their own. Nothing was
+recorded for flowers or mushrooms, so they borrow: a flower bites like a leaf,
+being the same soft green thing to bite through, and a mushroom is the apple's
+crunch turned down, because a mushroom gives way where an apple resists.
 
 Each has a small pool of voices and there is one gap enforced across all of
 them, because a caterpillar in the meadow bites faster than a clip lasts and a

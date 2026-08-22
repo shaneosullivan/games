@@ -923,6 +923,9 @@ export const MUSIC = {
    */
   chompHold: 0.4,
   chompVoices: 2,
+  /** How much of the apple's crunch a mushroom keeps: it is the same bite,
+   *  softer, because a mushroom gives way where an apple resists. */
+  mushroomHush: 0.55,
   /** The crow's wings, while it is in the air. */
   wingsVolume: 0.5,
   /** Each one a little faster or slower than the last, so a mouthful is not
