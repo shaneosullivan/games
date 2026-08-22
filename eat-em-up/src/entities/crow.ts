@@ -83,7 +83,15 @@ export class Crow {
     for (const side of [-1, 1]) {
       const hinge = new THREE.Group();
       hinge.position.set(side * 0.36, 0.18, 0.1);
-      const wing = new THREE.Mesh(wingShape(side), vertexToon());
+      // Both sides, and it matters twice over. A wing is a flat cut-out, so
+      // from underneath — which is where the player is for the whole of the
+      // snatch — a front-facing one is not there at all. And the left wing is
+      // the right one mirrored, which reverses its winding, so it faces the
+      // wrong way even from above. Either alone leaves the bird looking as
+      // though it has one wing or none.
+      const material = vertexToon();
+      material.side = THREE.DoubleSide;
+      const wing = new THREE.Mesh(wingShape(side), material);
       wing.castShadow = true;
       hinge.add(wing);
       this.group.add(hinge);

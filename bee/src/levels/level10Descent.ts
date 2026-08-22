@@ -7,7 +7,7 @@ import {
   type RollKind,
   type RollKit,
 } from "../entities/rollItems";
-import {FIREWORK_PALETTE} from "../fx/particles";
+import {FIREWORK_PALETTE} from "../../../shared/particles";
 import {createBear, type BearModel} from "../render/geometry/bear";
 import {
   createCage,

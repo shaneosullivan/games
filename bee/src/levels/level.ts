@@ -7,7 +7,7 @@ import type {BeeActor} from "../entities/beeActor";
 import type {FlowerField, HarvestEvent} from "../entities/flowerField";
 import type {BearActor} from "../entities/bearActor";
 import type {WaspActor} from "../entities/waspActor";
-import type {ParticleBurst} from "../fx/particles";
+import type {ParticleBurst} from "../../../shared/particles";
 import type {HiveInterior} from "../render/geometry/hiveInterior";
 import type {DanglingLoad} from "../entities/danglingLoad";
 import type {CottageScene} from "../render/geometry/cottage";

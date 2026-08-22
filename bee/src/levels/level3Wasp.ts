@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import {CAMERA, FLIGHT, LEVELS, WASP, WORLD} from "../config";
-import {FIREWORK_PALETTE} from "../fx/particles";
+import {FIREWORK_PALETTE} from "../../../shared/particles";
 import {HiveEntry} from "./hiveEntry";
 import type {GameContext, Level} from "./level";
 

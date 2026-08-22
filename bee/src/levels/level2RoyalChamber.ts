@@ -6,7 +6,7 @@ import {
   POLLEN_LABEL,
   type PollenKind,
 } from "../config";
-import {FIREWORK_PALETTE} from "../fx/particles";
+import {FIREWORK_PALETTE} from "../../../shared/particles";
 import type {GameContext, Level} from "./level";
 
 const TOTAL_BABIES = LEVELS.babyCount;

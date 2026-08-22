@@ -20,6 +20,7 @@ import {FoodField} from "./entities/food";
 import {FallingLeaves} from "./entities/fallingLeaves";
 import {CrowShadow} from "./entities/crowShadow";
 import {Crow} from "./entities/crow";
+import {createFireworks} from "../../shared/particles";
 import {Caterpillar} from "./entities/caterpillar";
 import {Ending} from "./entities/ending";
 import {Hud} from "./ui/hud";
@@ -58,6 +59,7 @@ export class Game {
   /** Shown when the crow takes the caterpillar; see caughtByTheCrow. */
   private readonly caught: Overlay;
   private readonly music = new Music();
+  private readonly fireworks = createFireworks();
   /** Whether the caterpillar was off its head last frame; see update. */
   private wasMad = false;
   /** The bird that takes it, and how far through the taking we are. */
@@ -109,7 +111,7 @@ export class Game {
     this.forest = new Forest(rng);
     this.food = new FoodField(rng, this.forest);
     this.cat = new Caterpillar(this.forest, rng);
-    this.ending = new Ending(this.forest);
+    this.ending = new Ending(this.forest, rng);
     this.leaves = new FallingLeaves(rng, this.forest);
     this.crow = new CrowShadow(rng);
 
@@ -118,6 +120,10 @@ export class Game {
     this.stage.scene.add(this.leaves.group);
     this.stage.scene.add(this.crow.group);
     this.stage.scene.add(this.bird.group);
+    // The sparks for the transformation, the bee game's own. One pool, handed
+    // to the ending, which is the only thing here with anything to celebrate.
+    this.stage.scene.add(this.fireworks.mesh);
+    this.ending.fireworks = this.fireworks;
     this.stage.scene.add(this.cat.group);
     this.stage.scene.add(this.ending.group);
 
@@ -193,6 +199,7 @@ export class Game {
     // it never ran at all and the bird hung in the sky.
     if (this.snatching !== null) {
       this.tickSnatch(dt);
+      this.fireworks.update(dt);
       return;
     }
 
@@ -268,8 +275,10 @@ export class Game {
       }
     }
 
-    // The food sways, and leaves come down, whether or not anyone is eating.
+    // The food sways, the leaves come down and any sparks burn out, whether or
+    // not anyone is eating.
     this.food.update(dt);
+    this.fireworks.update(dt);
     // The way the camera is looking, so leaves come down where they are
     // seen rather than behind the player's back.
     this.viewForward.set(Math.sin(this.camYaw), 0, Math.cos(this.camYaw));

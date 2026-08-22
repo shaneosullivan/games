@@ -18,6 +18,7 @@ shared/         the few things the games have in common. No build of its own.
   progressBar.ts    the filling bar, used by both games
   soundButton.ts    the round sound switch, used by both games
   fadeInFront.ts    the shader that dissolves whatever blocks the shot
+  particles.ts      the instanced motes: pollen puffs and fireworks
 site/           the gallery. Zero dependencies, no build step of its own.
   build.mjs         discovers games, builds them, generates the site, writes the PWA
   styles.css        the gallery's stylesheet, hand-written
@@ -39,17 +40,27 @@ exception, and something earns a place in it one of two ways:
 Anything else stays in the game that uses it, and adding to `shared/` means
 making one of those two arguments out loud.
 
-Two rules for what lives there. A shared **widget** brings its own CSS, since
-the games have separate hand-written stylesheets with no class names in common.
-And nothing in `shared/` may import `three`: each game has its own copy in its
-own `node_modules`, so an import here resolves to a third at the repo root and
-bundles two of them into one game, where nothing is quite the same class as
-anything else. Describe the shapes you need structurally instead — see
-`fadeInFront.ts`, whose `Vec3Like` a real `THREE.Vector3` satisfies without
-knowing the file exists.
+A shared **widget** brings its own CSS, since the games have separate
+hand-written stylesheets with no class names in common.
 
-Each game's `vite.config.ts` allows `..`, so its dev server will serve a file
-from above its own root.
+Importing `three` from `shared/` is fine, and `particles.ts` does. It takes
+care, though: each game has its own copy in its own `node_modules`, so a bare
+import from above them would resolve to the one at the repo root and bundle a
+second three into the game — where nothing is quite the same class as anything
+else. Each game's `vite.config.ts` therefore **aliases `three` to its own
+copy**, which pins any import made from up here to the three that game is
+already bundling. The root's `three` and `@types/three` exist only so
+`shared/` typechecks; the alias means they are never bundled. If you add a
+game, copy that alias across, and check afterwards that its built
+`index.html` contains one three and not two.
+
+`fadeInFront.ts` needs none of that and describes the shapes it wants
+structurally instead — a real `THREE.Vector3` satisfies its `Vec3Like` without
+knowing the file exists. Prefer that where it is easy; use the alias where it
+is not.
+
+Each game's `vite.config.ts` also allows `..`, so its dev server will serve a
+file from above its own root.
 
 The gallery finds games by looking for top-level folders
 with a `build` script, so adding one is dropping a folder in — or running

@@ -1,3 +1,4 @@
+import {fileURLToPath, URL} from "node:url";
 import {defineConfig} from "vite";
 import {viteSingleFile} from "vite-plugin-singlefile";
 
@@ -5,6 +6,21 @@ import {viteSingleFile} from "vite-plugin-singlefile";
 // index.html with the JS and CSS inlined, images and models left as siblings
 // with content-hashed names. See bee/vite.config.ts for the full reasoning.
 export default defineConfig({
+  /**
+   * `three` always means this game's own copy.
+   *
+   * The shared widgets live above this folder, and a bare import of three from
+   * up there resolves to whatever sits at the repo root — a second copy,
+   * bundled alongside this one, where nothing is quite the same class as
+   * anything else. Pinning it here means shared code can import three like
+   * anybody else and still get ours.
+   */
+  resolve: {
+    alias: {
+      three: fileURLToPath(new URL("./node_modules/three", import.meta.url)),
+    },
+  },
+
   // Relative URLs so the built file works from any sub-path, not just a root.
   base: "./",
 

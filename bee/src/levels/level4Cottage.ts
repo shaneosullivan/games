@@ -3,7 +3,7 @@ import {BEAR, CAMERA, COTTAGE, DANCE, FLIGHT, WORLD} from "../config";
 import {DanceMat} from "../entities/danceMat";
 import type {Music} from "../core/music";
 import {Rng} from "../core/rng";
-import {FIREWORK_PALETTE} from "../fx/particles";
+import {FIREWORK_PALETTE} from "../../../shared/particles";
 import type {GameContext, Level} from "./level";
 
 const CELEBRATION_TIME = 2.8;

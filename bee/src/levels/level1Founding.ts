@@ -10,7 +10,7 @@ import {
   type PollenKind,
 } from "../config";
 import type {HarvestEvent} from "../entities/flowerField";
-import {FIREWORK_PALETTE} from "../fx/particles";
+import {FIREWORK_PALETTE} from "../../../shared/particles";
 import {HiveEntry, ENTRY_RADIUS} from "./hiveEntry";
 import type {GameContext, Level} from "./level";
 

@@ -3,7 +3,7 @@ import {ISLANDS as I, ISLANDS_PALETTE as P} from "../config";
 import type {Hop} from "../core/hopButtons";
 import {Rng} from "../core/rng";
 import {createBaby, type BabyModel} from "../render/geometry/bee";
-import {FIREWORK_PALETTE} from "../fx/particles";
+import {FIREWORK_PALETTE} from "../../../shared/particles";
 import {
   createIslandsScene,
   type IslandsScene,

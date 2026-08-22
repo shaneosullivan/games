@@ -20,6 +20,16 @@ export interface BurstOptions {
 /**
  * A pool of instanced motes shared by every particle effect. One InstancedMesh
  * per pool, so a whole firework show is a single draw call.
+ *
+ * The bee game's, now shared with the caterpillar's. It is one piece of
+ * machinery with a trap in it — see the note about the white colour attribute
+ * below, which cost somebody an afternoon — and that is the kind of thing this
+ * folder is for.
+ *
+ * It imports three, which everything else here avoids. Each game's Vite config
+ * and tsconfig alias `three` to that game's own copy, so this import resolves
+ * to the same three the game is already bundling rather than to a second one
+ * at the repo root. See the repo's CLAUDE.md.
  */
 export class ParticleBurst {
   readonly mesh: THREE.InstancedMesh;
@@ -160,7 +170,7 @@ export function createPollenPuff(): ParticleBurst {
 
 /**
  * Fireworks: bigger and slow-falling. Deliberately NOT additive — this is a
- * bright daytime sky, and additive sparks saturate straight to white against
+ * bright daytime wood, and additive sparks saturate straight to white against
  * it. Normal blending keeps every spark its own colour.
  */
 export function createFireworks(): ParticleBurst {

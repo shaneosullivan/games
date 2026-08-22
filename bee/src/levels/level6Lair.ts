@@ -4,7 +4,7 @@ import {CAMERA, DOME, LAIR, LAIR_PALETTE} from "../config";
 import {isPhone} from "../core/device";
 import {flapInstruction} from "../core/holdInput";
 import {Rng} from "../core/rng";
-import {FIREWORK_PALETTE} from "../fx/particles";
+import {FIREWORK_PALETTE} from "../../../shared/particles";
 import {
   createLairScene,
   gateHit,

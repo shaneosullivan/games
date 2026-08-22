@@ -16,7 +16,7 @@ import {BabyRing} from "./entities/babyRing";
 import {BeeActor} from "./entities/beeActor";
 import {WaspActor} from "./entities/waspActor";
 import {FlowerField} from "./entities/flowerField";
-import {createFireworks, createPollenPuff} from "./fx/particles";
+import {createFireworks, createPollenPuff} from "../../shared/particles";
 import {FoundingLevel} from "./levels/level1Founding";
 import {RoyalChamberLevel} from "./levels/level2RoyalChamber";
 import {WaspLevel} from "./levels/level3Wasp";

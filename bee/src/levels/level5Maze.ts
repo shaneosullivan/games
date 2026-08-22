@@ -3,7 +3,7 @@ import {MAZE, MAZE_PALETTE, POLLEN_COLOR} from "../config";
 import {Rng} from "../core/rng";
 import {PollenTrail} from "../entities/pollenTrail";
 import {ScentTrail} from "../entities/scentTrail";
-import {FIREWORK_PALETTE} from "../fx/particles";
+import {FIREWORK_PALETTE} from "../../../shared/particles";
 import {
   createMazeScene,
   type MazeFlower,

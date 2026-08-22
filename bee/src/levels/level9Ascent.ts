@@ -8,7 +8,7 @@ import {
   type Foe,
   type FoeKit,
 } from "../entities/slopeFoes";
-import {FIREWORK_PALETTE} from "../fx/particles";
+import {FIREWORK_PALETTE} from "../../../shared/particles";
 import {createMountain, type Mountain} from "../render/geometry/mountain";
 import {loadPreparedModel} from "../render/geometry/islandModels";
 import frogUrl from "../assets/islands/mrfrog.glb";

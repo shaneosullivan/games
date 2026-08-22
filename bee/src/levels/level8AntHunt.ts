@@ -8,7 +8,7 @@ import {
 } from "../entities/antActor";
 import {BeeNet} from "../entities/beeNet";
 import {DanglingLoad} from "../entities/danglingLoad";
-import {FIREWORK_PALETTE} from "../fx/particles";
+import {FIREWORK_PALETTE} from "../../../shared/particles";
 import {createBaby, type BabyModel} from "../render/geometry/bee";
 import {createAntIslands, type AntIslands} from "../render/geometry/antIslands";
 import {createWater, type Water} from "../render/geometry/water";

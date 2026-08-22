@@ -1121,6 +1121,19 @@ export const FOOD = {
  */
 export const ENDING = {
   /**
+   * The shower of colour the chrysalis gives way in, and the odd firework
+   * overhead while the butterfly is loose.
+   *
+   * The bee game's own sparks — the same ones its levels finish on — because a
+   * child who has met them there should meet them here. One burst is the
+   * moment; the rest keep the party up, since a wood that went quiet again
+   * straight afterwards would read as the game having stopped rather than
+   * having been won.
+   */
+  burstMotes: 34,
+  burstSpeed: 4.2,
+  fireworkEvery: 1.9,
+  /**
    * Making its own way to a branch before it changes.
    *
    * A caterpillar pupates hanging off something, not lying on a forest floor,

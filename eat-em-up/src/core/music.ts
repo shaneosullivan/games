@@ -124,7 +124,6 @@ export class Music {
    * starts the tune again from the top, the way the fit itself restarts.
    */
   beginRainbow(): void {
-    this.calm.pause();
     this.rainbow.currentTime = 0;
     this.current = this.rainbow;
     this.resume();
@@ -132,7 +131,6 @@ export class Music {
 
   /** The fit has worn off: back to the wood's own music, from where it was. */
   endRainbow(): void {
-    this.rainbow.pause();
     this.current = this.calm;
     this.resume();
   }
@@ -221,12 +219,32 @@ export class Music {
     this.resume();
   }
 
-  /** Plays whichever track is wanted, if it is allowed to play anything. */
+  /**
+   * Plays whichever track is wanted and silences the other, if it is allowed
+   * to play anything at all.
+   *
+   * Silencing the other one here, every time, rather than trusting each caller
+   * to have done it: there is one piece of music playing in this game at any
+   * moment, and the way to be sure of that is to have one place that can start
+   * anything and to have it stop everything else on the way past. Two tracks
+   * running over each other is the kind of fault nobody hears in a quiet
+   * office and everybody hears on an iPad.
+   */
   private resume(): void {
+    for (const track of [this.calm, this.rainbow]) {
+      if (track !== this.current && !track.paused) {
+        track.pause();
+      }
+    }
     if (!this.started || this.muted || document.hidden) {
       return;
     }
     void this.current.play().catch(() => {});
+  }
+
+  /** For tests and for peace of mind: how many tracks are sounding. */
+  get tracksPlaying(): number {
+    return [this.calm, this.rainbow].filter(t => !t.paused).length;
   }
 }
 

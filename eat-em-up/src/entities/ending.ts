@@ -4,6 +4,8 @@ import {ENDING, WORLD} from "../config";
 import {paint, vertexToon} from "../render/materials";
 import {Caterpillar} from "./caterpillar";
 import type {Bough, Climbable, Forest} from "./forest";
+import {Rng} from "../core/rng";
+import {FIREWORK_PALETTE, type ParticleBurst} from "../../../shared/particles";
 
 export type EndingPhase =
   "seek" | "curl" | "chrysalis" | "split" | "fly" | "free";
@@ -22,6 +24,12 @@ export type EndingPhase =
  */
 export class Ending {
   readonly group = new THREE.Group();
+
+  /** The sparks, handed in by the game so the pool is shared with anything
+   *  else that ever wants one. Set before the transformation begins. */
+  fireworks: ParticleBurst | null = null;
+  private readonly sparkAt = new THREE.Vector3();
+  private nextFirework = 0;
 
   phase: EndingPhase = "seek";
   /** Seconds spent in the current phase. */
@@ -48,7 +56,10 @@ export class Ending {
   /** Set once it is out on the branch and ready to change. */
   private arrived = false;
 
-  constructor(private readonly forest: Forest) {
+  constructor(
+    private readonly forest: Forest,
+    private readonly rng: Rng,
+  ) {
     for (const side of [-1, 1]) {
       const shell = new THREE.Mesh(chrysalisHalf(side), vertexToon());
       this.chrysalis.add(shell);
@@ -157,6 +168,18 @@ export class Ending {
             this.chrysalis.rotation.z = 0;
             this.butterfly.visible = true;
             this.butterfly.position.copy(this.chrysalis.position);
+            // The shell gives way in a shower of colour, the bee game's own
+            // fireworks — this is the moment the whole game has been for.
+            this.chrysalis.getWorldPosition(this.sparkAt);
+            this.fireworks?.burst(this.sparkAt, {
+              color: FIREWORK_PALETTE,
+              count: ENDING.burstMotes,
+              speed: ENDING.burstSpeed,
+              lift: 0.4,
+              gravity: 2.2,
+              ttl: 1.5,
+              spherical: 1,
+            });
           }
           const b = (t - ENDING.burstAt) / (1 - ENDING.burstAt);
           // The shell gives way: two halves thrown apart and down, shrinking
@@ -185,6 +208,7 @@ export class Ending {
 
       case "free":
         this.freeFlight(dt, fly, wantHeight);
+        this.celebrate(dt);
         break;
 
       case "fly": {
@@ -394,6 +418,40 @@ export class Ending {
     // to it, which flew the butterfly tail first.
     this.butterfly.rotation.y = this.heading;
     this.butterfly.scale.setScalar(1.4);
+  }
+
+  /**
+   * The odd firework overhead while the butterfly is loose.
+   *
+   * The one burst out of the chrysalis is the moment, but a wood that goes
+   * quiet again straight afterwards reads as the game having ended rather than
+   * as having been won. These keep the party up.
+   */
+  private celebrate(dt: number): void {
+    if (!this.fireworks) {
+      return;
+    }
+    this.nextFirework -= dt;
+    if (this.nextFirework > 0) {
+      return;
+    }
+    this.nextFirework = ENDING.fireworkEvery;
+    const a = this.rng.next() * Math.PI * 2;
+    const r = this.rng.range(4, 12);
+    this.sparkAt.set(
+      this.butterfly.position.x + Math.cos(a) * r,
+      this.butterfly.position.y + this.rng.range(3, 8),
+      this.butterfly.position.z + Math.sin(a) * r,
+    );
+    this.fireworks.burst(this.sparkAt, {
+      color: FIREWORK_PALETTE,
+      count: ENDING.burstMotes,
+      speed: ENDING.burstSpeed,
+      lift: 0.4,
+      gravity: 2.2,
+      ttl: 1.5,
+      spherical: 1,
+    });
   }
 
   private enter(phase: EndingPhase): void {
