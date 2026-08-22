@@ -46,8 +46,10 @@ numbers.
 There is exactly one way to lose, and it arrives two minutes in, once and only
 once in a game: **a crow**.
 It comes over, circles, and you have ten seconds to reach the long grass —
-the message says so and counts down. Reach the meadow and it gives up and
-goes. Stay in the open and it comes down, takes the caterpillar in its beak and
+the message says so and counts down. Reach the meadow and it still comes down — it stoops at the grass you are
+hidden in, skims the tops of it and pulls out empty, then flies off over the
+wood. You keep the stick throughout: a near miss takes nothing away from you,
+and being missed is the whole reward for having run. Stay in the open and it comes down, takes the caterpillar in its beak and
 carries it away over the trees while you watch — and only then does the card
 come up. A game that stopped dead and put up a card saying you had been caught
 would leave a child to take the card's word for it. Nothing else in

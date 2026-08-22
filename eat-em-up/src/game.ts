@@ -309,6 +309,7 @@ export class Game {
     this.wasMad = this.cat.isMad;
 
     this.tickCrow(dt);
+    this.tickBird(dt);
     this.hud.update(this.food.eaten);
   };
 
@@ -343,11 +344,43 @@ export class Game {
       this.hud.setAlert("Hide in the grass!", this.crow.secondsLeft);
     } else if (event === "left") {
       this.hud.setAlert(null);
+      // Missed. It still comes down — a crow that vanished the moment you
+      // reached the grass would leave a child with no idea they had just been
+      // missed, and being missed is the whole reward for running.
+      //
+      // Along the way the camera is looking, not along the line the shadow was
+      // circling on. The shadow's bearing is wherever it happened to have got
+      // to, which is unrelated to where the player is facing: aimed that way
+      // the bird was inside the frame for 7% of its flight, which is to say it
+      // was never seen at all. Flying it away from the eye brings it down over
+      // the player's shoulder and out ahead of them, in shot the whole way up.
+      this.bird.swoopPast(this.cat.position, this.camYaw);
     } else if (event === "caught") {
       this.hud.setAlert(null);
       this.caughtByTheCrow();
     } else if (this.crow.hunting) {
       this.hud.setAlert("Hide in the grass!", this.crow.secondsLeft);
+    }
+  }
+
+  /**
+   * The bird in the air on a miss, while the game carries on around it.
+   *
+   * Its own tick rather than the snatch's: a near miss takes nothing away from
+   * the player, so the stick keeps working and the caterpillar can go on
+   * eating while a crow stoops at the grass over its head.
+   */
+  private tickBird(dt: number): void {
+    if (!this.bird.busy) {
+      return;
+    }
+    this.bird.update(dt);
+    this.crow.trackBird(this.bird.group.position);
+    this.music.setWings(true);
+    if (this.bird.finished) {
+      this.bird.reset();
+      this.crow.putAway();
+      this.music.setWings(false);
     }
   }
 

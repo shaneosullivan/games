@@ -998,6 +998,38 @@ export const CROW = {
   /** How high above the caterpillar the beak closes. */
   grabLift: 0.5,
   /**
+   * How high above it the beak closes on nothing, when you made it to the
+   * grass in time.
+   *
+   * Over the meadow, which stands three and a half to five and a half tall, so
+   * the bird pulls out of the stoop just above the tops of it — near enough to
+   * be frightening and plainly a miss.
+   */
+  missClearance: 6.6,
+  /**
+   * A miss flies flatter and lower than a catch.
+   *
+   * A catch climbs hard out of the wood, and the camera follows because it is
+   * following the caterpillar in the beak. A miss leaves the caterpillar on
+   * the floor, so the shot stays down there — and a bird that rockets to
+   * twenty-six units up is out of the top of the frame in half a second,
+   * which is a near miss nobody sees. Measured: on the catch's numbers the
+   * bird was inside the frame for 17% of its flight.
+   */
+  missStoopFrom: 26,
+  missStoopHeight: 10,
+  missAwayOut: 40,
+  /**
+   * And it leaves *below* the camera, which is the whole trick.
+   *
+   * The shot sits about seven up and looks down at a caterpillar on the floor,
+   * so anything higher than that is off the top of the frame — the bird was
+   * dead centre horizontally and out of shot vertically for its whole flight,
+   * at a measured 18% on screen. Under the camera and over the grass is the
+   * band where it can actually be watched going.
+   */
+  missAwayHeight: 5,
+  /**
    * How far in front of the bird's own middle the beak is, in world units.
    *
    * The stoop aims this much short of the caterpillar, so it is the beak that

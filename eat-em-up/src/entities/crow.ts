@@ -32,6 +32,8 @@ export class Crow {
   private readonly here = new THREE.Vector3();
   private readonly wasHere = new THREE.Vector3();
   private beat = 0;
+  /** Whether this run is a miss: down at the grass and up again, empty. */
+  private missing = false;
 
   constructor() {
     const parts: Array<THREE.BufferGeometry> = [];
@@ -110,9 +112,9 @@ export class Crow {
     return this.t !== null;
   }
 
-  /** True once it has the caterpillar in its beak. */
+  /** True once it has the caterpillar in its beak. Never on a miss. */
   get holding(): boolean {
-    return this.t !== null && this.t >= CROW.snatchDive;
+    return !this.missing && this.t !== null && this.t >= CROW.snatchDive;
   }
 
   /** True when the whole business is over and the card can come up. */
@@ -133,34 +135,58 @@ export class Crow {
    * has been watching go round, rather than out of nowhere.
    */
   snatch(at: THREE.Vector3, bearing: number): void {
+    this.fly(at, bearing, false);
+  }
+
+  /**
+   * Comes down on `at`, misses, and goes away empty.
+   *
+   * What a child sees when they made it to the grass in time. The same stoop
+   * as a catch and the same climb out of it — the only difference is that it
+   * bottoms out above the grass rather than in it, and there is nothing in the
+   * beak on the way up. Being missed is worth watching; the crow simply
+   * vanishing the moment you are safe is not.
+   */
+  swoopPast(at: THREE.Vector3, bearing: number): void {
+    this.fly(at, bearing, true);
+  }
+
+  private fly(at: THREE.Vector3, bearing: number, miss: boolean): void {
     this.t = 0;
+    this.missing = miss;
     const dirX = Math.sin(bearing);
     const dirZ = Math.cos(bearing);
     // Short of the caterpillar by the length of the beak, so it is the beak
-    // that arrives on it — see CROW.beakReach.
+    // that arrives on it — see CROW.beakReach. A miss pulls out above the
+    // grass instead, close enough to be frightening and high enough to be
+    // plainly a miss.
     this.grabAt.set(
       at.x - dirX * CROW.beakReach,
-      at.y + CROW.grabLift,
+      at.y + (miss ? CROW.missClearance : CROW.grabLift),
       at.z - dirZ * CROW.beakReach,
     );
-    // In from one side and high up, out the other side and higher still.
+    // In from one side and high up, out the other side and higher still — or,
+    // on a miss, flatter and lower, so it stays in the shot. See the note on
+    // CROW.missStoopFrom.
+    const stoopFrom = miss ? CROW.missStoopFrom : CROW.stoopFrom;
+    const stoopHeight = miss ? CROW.missStoopHeight : CROW.stoopHeight;
     this.from.set(
-      at.x - dirX * CROW.stoopFrom,
-      at.y + CROW.stoopHeight,
-      at.z - dirZ * CROW.stoopFrom,
+      at.x - dirX * stoopFrom,
+      at.y + stoopHeight,
+      at.z - dirZ * stoopFrom,
     );
     this.away.set(
-      at.x + dirX * CROW.awayOut,
-      at.y + CROW.awayHeight,
-      at.z + dirZ * CROW.awayOut,
+      at.x + dirX * (miss ? CROW.missAwayOut : CROW.awayOut),
+      at.y + (miss ? CROW.missAwayHeight : CROW.awayHeight),
+      at.z + dirZ * (miss ? CROW.missAwayOut : CROW.awayOut),
     );
     // The control point sits out along the run and low, which is what bends
     // the descent into a stoop that levels off at the floor instead of
     // arriving like a dropped stone.
     this.control.set(
-      at.x - dirX * CROW.stoopFrom * 0.35,
-      at.y + CROW.stoopHeight * 0.25,
-      at.z - dirZ * CROW.stoopFrom * 0.35,
+      at.x - dirX * stoopFrom * 0.35,
+      at.y + stoopHeight * 0.25,
+      at.z - dirZ * stoopFrom * 0.35,
     );
     this.group.visible = true;
     this.group.position.copy(this.from);
@@ -213,6 +239,7 @@ export class Crow {
   /** Puts the bird away again. */
   reset(): void {
     this.t = null;
+    this.missing = false;
     this.group.visible = false;
   }
 

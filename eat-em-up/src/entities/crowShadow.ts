@@ -116,6 +116,15 @@ export class CrowShadow {
     return Math.max(0, Math.ceil(this.hunt ?? 0));
   }
 
+  /** Off the floor entirely, once the bird has finished with it. */
+  putAway(): void {
+    this.hunt = null;
+    this.crossing = null;
+    this.dive = 0;
+    this.group.visible = false;
+    this.group.scale.setScalar(CROW.size);
+  }
+
   /**
    * Calls off a hunt without a catch — see the note about fits in Game.
    *
@@ -182,11 +191,9 @@ export class CrowShadow {
       }
       this.hunt = null;
       if (safe) {
-        // Gives up and goes. It leaves the way any of them used to: straight
-        // across and out of the wood.
-        this.crossing = 0;
-        this.heading.subVectors(this.group.position, near).setY(0).normalize();
-        this.from.copy(this.group.position);
+        // It still comes down — it just misses. The game flies the bird and
+        // this patch follows it, so what a child sees is a crow stooping at
+        // the grass they are hidden in and pulling out of it empty-beaked.
         this.group.scale.setScalar(CROW.size);
         return "left";
       }
