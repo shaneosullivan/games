@@ -26,6 +26,12 @@ unformatted commit makes the next format a diff about nothing.
 Always typecheck before calling a change done; `npm --prefix eat-em-up run build`
 does it for you.
 
+**Before pushing, build the whole repo** — `npm run format && npm run lint &&
+npm --prefix site run build` from the root. Building this game alone is not the
+same thing: the gallery build is what stages what actually gets published, and
+it is what a push puts in front of somebody. Fix whatever it finds before
+pushing, not after.
+
 ## House style
 
 Copied from the rest of the repo, so code moves between games unchanged: double

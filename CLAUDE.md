@@ -89,6 +89,19 @@ npm --prefix site run serve      # preview site/dist on :4173
 unformatted commit means the next format produces a diff that has nothing to do
 with the change it lands in.
 
+**Build the whole repo before every push, and fix what it finds.**
+
+```bash
+npm run format && npm run lint && npm --prefix site run build
+```
+
+`site/build.mjs` builds every game and then the gallery, which is the only
+thing that exercises what actually gets published — a game can typecheck and
+run perfectly under its own dev server and still fail to build, or build and
+then be staged wrong. Pushing is what puts it in front of a child on an iPad,
+so the build has to have been run and come back clean first. If it does not,
+fix it before pushing rather than after.
+
 Formatting and lint rules are copied from the syncawesome repo so code moves
 between the two unchanged: double quotes, no bracket spacing, no parens on
 single-arg arrows, trailing commas, 80 columns, braces on every `if`, and
