@@ -1,5 +1,6 @@
 import calmTrack from "../assets/mossy_trail.mp3";
 import rainbowTrack from "../assets/rainbow_time.mp3";
+import chompTrack from "../assets/grass.m4a";
 import {MUSIC} from "../config";
 
 /**
@@ -25,7 +26,25 @@ export class Music {
   /** Whether the game has asked for music at all yet. */
   private started = false;
 
+  /**
+   * The munching, which lives here with the music because the sound switch has
+   * to silence everything and this is what owns being muted.
+   *
+   * Several voices rather than one: a caterpillar in the meadow bites faster
+   * than the clip lasts, and a single element would cut itself off mid-chew on
+   * every mouthful.
+   */
+  private readonly chomps: Array<HTMLAudioElement> = [];
+  private nextChomp = 0;
+  private sinceChomp = 0;
+
   constructor() {
+    for (let i = 0; i < MUSIC.chompVoices; i++) {
+      const chomp = new Audio(chompTrack);
+      chomp.volume = MUSIC.chompVolume;
+      chomp.preload = "auto";
+      this.chomps.push(chomp);
+    }
     this.calm = makeTrack(calmTrack, MUSIC.volume);
     this.rainbow = makeTrack(rainbowTrack, MUSIC.rainbowVolume);
     this.current = this.calm;
@@ -69,6 +88,28 @@ export class Music {
     this.resume();
   }
 
+  /**
+   * A mouthful of grass. Called on every tuft; it decides for itself whether
+   * this one is heard.
+   *
+   * `dt` rather than a clock of its own, so it keeps to the game's time and a
+   * paused game does not come back owing itself a run of chews.
+   */
+  munch(dt: number, eating: boolean): void {
+    this.sinceChomp += dt;
+    if (!eating || this.muted || this.sinceChomp < MUSIC.chompGap) {
+      return;
+    }
+    this.sinceChomp = 0;
+    const voice = this.chomps[this.nextChomp % this.chomps.length];
+    this.nextChomp++;
+    voice.currentTime = 0;
+    voice.playbackRate =
+      MUSIC.chompPitchMin +
+      Math.random() * (MUSIC.chompPitchMax - MUSIC.chompPitchMin);
+    void voice.play().catch(() => {});
+  }
+
   get isMuted(): boolean {
     return this.muted;
   }
@@ -79,6 +120,9 @@ export class Music {
     if (muted) {
       this.calm.pause();
       this.rainbow.pause();
+      for (const chomp of this.chomps) {
+        chomp.pause();
+      }
       return;
     }
     this.resume();

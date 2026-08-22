@@ -85,6 +85,32 @@ export class CrowShadow {
     return this.hunt !== null;
   }
 
+  /**
+   * Which way round the caterpillar it is at this moment, as a bearing.
+   *
+   * The bird uses it to come in along the same line, so it arrives from the
+   * direction the child has been watching go round rather than out of nowhere.
+   */
+  get bearing(): number {
+    return this.circle;
+  }
+
+  /**
+   * Follow the bird: once the real crow is in the air, the patch on the floor
+   * is its shadow and belongs underneath it.
+   */
+  trackBird(at: THREE.Vector3): void {
+    this.hunt = null;
+    this.crossing = null;
+    this.dive = 0;
+    this.group.visible = true;
+    this.group.position.set(at.x, CROW.height, at.z);
+    // Smaller and fainter the higher it climbs, the way a shadow does.
+    const high = Math.max(0, at.y);
+    const shrink = 1 / (1 + high * CROW.shadowFalloff);
+    this.group.scale.setScalar(CROW.size * Math.max(0.35, shrink));
+  }
+
   /** Seconds left to reach the grass, for the HUD to show. */
   get secondsLeft(): number {
     return Math.max(0, Math.ceil(this.hunt ?? 0));

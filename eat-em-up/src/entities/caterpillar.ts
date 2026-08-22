@@ -990,6 +990,32 @@ export class Caterpillar {
 
   /** Samples the head's path at a fixed spacing, so the body's spacing along
    *  the trail doesn't depend on how fast the head was going. */
+  /**
+   * Hung from a crow's beak: the head goes where it is put and the body
+   * follows.
+   *
+   * Its own entry point rather than update() with the stick at rest, because
+   * everything update() does is wrong up here — it would look for a surface
+   * under the head, find the floor twenty units below, and drop the whole
+   * caterpillar back onto it. All that is wanted is the trail, which is what
+   * makes the body hang and swing behind the head instead of going up stiff
+   * as a poker.
+   */
+  carried(at: THREE.Vector3): void {
+    this.prevPosition.copy(this.position);
+    for (let i = 0; i < this.segCur.length; i++) {
+      this.segPrev[i].copy(this.segCur[i]);
+    }
+    this.position.copy(at);
+    this.climbing = null;
+    this.dangle = null;
+    this.still = 0;
+    // Head down, looking at the ground it has just left.
+    this.facing.set(0, -1, 0);
+    this.recordTrail();
+    this.layOutBody();
+  }
+
   private recordTrail(): void {
     const newest = this.trail[0];
     if (

@@ -19,6 +19,7 @@ import {Forest} from "./entities/forest";
 import {FoodField} from "./entities/food";
 import {FallingLeaves} from "./entities/fallingLeaves";
 import {CrowShadow} from "./entities/crowShadow";
+import {Crow} from "./entities/crow";
 import {Caterpillar} from "./entities/caterpillar";
 import {Ending} from "./entities/ending";
 import {Hud} from "./ui/hud";
@@ -59,6 +60,13 @@ export class Game {
   private readonly music = new Music();
   /** Whether the caterpillar was off its head last frame; see update. */
   private wasMad = false;
+  /** The bird that takes it, and how far through the taking we are. */
+  readonly bird = new Crow();
+  private snatching: number | null = null;
+  private readonly carryAt = new THREE.Vector3();
+  /** Where the caterpillar was when the beak closed, and when that was. */
+  private grabbedFrom: THREE.Vector3 | null = null;
+  private grabbedAt = 0;
   readonly cat: Caterpillar;
   readonly ending: Ending;
   readonly hud: Hud;
@@ -109,6 +117,7 @@ export class Game {
     this.stage.scene.add(this.food.group);
     this.stage.scene.add(this.leaves.group);
     this.stage.scene.add(this.crow.group);
+    this.stage.scene.add(this.bird.group);
     this.stage.scene.add(this.cat.group);
     this.stage.scene.add(this.ending.group);
 
@@ -175,6 +184,18 @@ export class Game {
   }
 
   update = (dt: number): void => {
+    // Above the running gate, because it is what happens once the game has
+    // stopped: the crow is taking the caterpillar and the player has no say.
+    //
+    // Tested against null, not for truth. The snatch starts at zero seconds
+    // in, and a plain `if (this.snatching)` skipped that very first frame and
+    // fell through to the gate below — where the game is already stopped, so
+    // it never ran at all and the bird hung in the sky.
+    if (this.snatching !== null) {
+      this.tickSnatch(dt);
+      return;
+    }
+
     if (!this.running) {
       return;
     }
@@ -239,6 +260,10 @@ export class Game {
         this.cat.goMad();
         this.music.beginRainbow();
       }
+      // Grass is the one thing eaten in a stream rather than one at a time, so
+      // it is the one worth hearing. Music decides how often a bite is
+      // actually heard — see munch.
+      this.music.munch(dt, swallowed?.kind === "grass");
       if (this.food.complete) {
         this.beginTransformation();
       }
@@ -318,12 +343,64 @@ export class Game {
     return left >= CROW.hideNeedsGrass;
   }
 
-  /** The crow got you. */
+  /**
+   * The crow got you: it comes down, takes the caterpillar, and carries it
+   * away over the trees. The card waits until it has gone.
+   */
   private caughtByTheCrow(): void {
     this.running = false;
     this.stick.enabled = false;
     this.stick.release();
     this.hud.setVisible(false);
+    this.snatching = 0;
+    this.grabbedFrom = null;
+    // In along the line its shadow was last on, so the bird arrives from the
+    // direction the child has been watching go round rather than out of
+    // nowhere.
+    this.bird.snatch(this.cat.position, this.crow.bearing);
+  }
+
+  /**
+   * The snatch, frame by frame: the bird flies its path, the caterpillar hangs
+   * from its beak once it has it, and the card comes up at the end.
+   */
+  private tickSnatch(dt: number): void {
+    if (this.snatching === null) {
+      return;
+    }
+    this.snatching += dt;
+    this.bird.update(dt);
+
+    if (this.bird.holding) {
+      // The caterpillar goes where the beak goes, and its body trails and
+      // swings behind it — see Caterpillar.carried.
+      this.bird.carryPoint(this.carryAt);
+      if (this.grabbedFrom === null) {
+        this.grabbedFrom = this.cat.position.clone();
+        this.grabbedAt = this.snatching;
+      }
+      // Swung up into the beak over a moment rather than appearing in it: the
+      // beak closes on the floor and the caterpillar is lifted off it.
+      const into = Math.min(
+        1,
+        (this.snatching - this.grabbedAt) / CROW.carryBlend,
+      );
+      this.carryAt.lerpVectors(this.grabbedFrom, this.carryAt, into * into);
+      this.cat.carried(this.carryAt);
+    }
+    // The shadow keeps pace underneath, which is what sells the height.
+    this.crow.trackBird(this.bird.group.position);
+
+    this.followCamera(dt);
+
+    if (this.snatching > CROW.snatchDive + CROW.snatchAway + CROW.snatchHold) {
+      this.snatching = null;
+      this.showCaughtCard();
+    }
+  }
+
+  /** The card itself, once the bird is gone. */
+  private showCaughtCard(): void {
     // Which of the two ways it went wrong, because they call for different
     // things next time: run sooner, or leave some of the meadow standing.
     const bare = this.food.remaining("grass") / CLEARING.tufts;

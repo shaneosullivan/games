@@ -901,6 +901,21 @@ export const MADNESS = {
  */
 export const MUSIC = {
   volume: 0.35,
+  /**
+   * The munch, and how often it may be heard.
+   *
+   * Grass goes down a tuft at a time and a caterpillar crossing the meadow
+   * eats faster than once a second, so every bite firing the clip would be a
+   * mush. A gap between them and a handful of voices to overlap in is what
+   * turns that into chewing.
+   */
+  chompVolume: 0.55,
+  chompGap: 0.22,
+  chompVoices: 3,
+  /** Each one a little faster or slower than the last, so a mouthful is not
+   *  the same sound played six times. */
+  chompPitchMin: 0.88,
+  chompPitchMax: 1.14,
   /** The rainbow-mushroom track, a shade louder than the wood's own: the
    *  point of it is that something has plainly taken over. */
   rainbowVolume: 0.45,
@@ -939,8 +954,60 @@ export const CROW = {
    * back after five minutes, so it is never a permanent state.
    */
   hideNeedsGrass: 0.15,
-  /** How long the dive takes, once it has decided it has you. */
+  /** How long the shadow's own dive takes, once it has decided it has you. */
   diveFor: 0.9,
+
+  /**
+   * The bird itself, which is only ever seen taking the caterpillar.
+   *
+   * A game that stops dead and puts up a card saying you have been caught
+   * leaves a child to take the card's word for it. So the crow comes down and
+   * is seen to do it, and the card waits until it has gone.
+   */
+  /**
+   * How big the bird is.
+   *
+   * Plainly bigger than the caterpillar and no bigger than it needs to be. A
+   * fully grown caterpillar's head is about 2.7 across, so at this the crow's
+   * body alone out-measures it and the whole bird is some three times the
+   * caterpillar's girth — a bird that can carry it off, rather than one that
+   * fills the wood.
+   */
+  birdSize: 2.1,
+  feather: 0x181a20,
+  beak: 0x2c2f36,
+  eye: 0xf2c14a,
+  /** The stoop: how far out and how high up it comes from, and how long it
+   *  takes to arrive. */
+  stoopFrom: 22,
+  stoopHeight: 17,
+  snatchDive: 1.1,
+  /** How high above the caterpillar the beak closes. */
+  grabLift: 0.5,
+  /**
+   * How far in front of the bird's own middle the beak is, in world units.
+   *
+   * The stoop aims this much short of the caterpillar, so it is the beak that
+   * arrives on it and not the bird's belly with its head stuck out two units
+   * past the thing it is supposed to be picking up.
+   */
+  beakReach: 3,
+  /** How long the caterpillar takes to swing up into the beak, rather than
+   *  appearing in it. */
+  carryBlend: 0.22,
+  /** Away with it: how far out, how high, how long, and how much of a scoop
+   *  there is out of the grab before the climb proper. */
+  awayOut: 30,
+  awayHeight: 26,
+  snatchAway: 2.2,
+  awayScoop: 2.4,
+  /** How fast the shadow shrinks as the bird climbs away with its prize. A
+   *  shadow that stayed the same size would leave the bird looking pinned to
+   *  the floor however high it got. */
+  shadowFalloff: 0.06,
+  /** A breath at the end, so the last thing seen is the bird going rather
+   *  than the card arriving on top of it. */
+  snatchHold: 0.45,
   /** How long one pass takes, and how far it travels in that time. */
   crossTime: 9,
   travel: 110,

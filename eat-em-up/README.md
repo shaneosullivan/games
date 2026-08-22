@@ -47,7 +47,10 @@ There is exactly one way to lose, and it arrives two minutes in, once and only
 once in a game: **a crow**.
 It comes over, circles, and you have ten seconds to reach the long grass —
 the message says so and counts down. Reach the meadow and it gives up and
-goes. Stay in the open and it takes you, and you start again. Nothing else in
+goes. Stay in the open and it comes down, takes the caterpillar in its beak and
+carries it away over the trees while you watch — and only then does the card
+come up. A game that stopped dead and put up a card saying you had been caught
+would leave a child to take the card's word for it. Nothing else in
 the wood can hurt you: crawling off a branch just drops you onto the floor.
 
 - **Leaves** are on the bushes, along the branch you start on, and up the
@@ -114,7 +117,14 @@ One looping track, `src/assets/mossy_trail.mp3`, quiet enough to sit under the
 game. It cannot start until the player has touched the screen — a browser will
 refuse audio nobody asked for, and on an iPad that refusal is the default — so
 it begins on the button on the intro panel, which is the first thing anyone
-touches. The round switch in the top right turns it off; it is the shared one
+touches. Eating grass has a sound of its own, `src/assets/grass.m4a` — it is the one
+thing eaten in a stream rather than one at a time, so it is the one worth
+hearing. It plays through a handful of voices with a gap enforced between
+them, each a little higher or lower than the last, because a caterpillar in
+the meadow bites faster than the clip lasts and one voice would cut itself off
+on every mouthful.
+
+The round switch in the top right turns all of it off; it is the shared one
 from `shared/soundButton.ts`, the same button the bee game has.
 
 ## Commands
