@@ -260,10 +260,9 @@ export class Game {
         this.cat.goMad();
         this.music.beginRainbow();
       }
-      // Grass is the one thing eaten in a stream rather than one at a time, so
-      // it is the one worth hearing. Music decides how often a bite is
-      // actually heard — see munch.
-      this.music.munch(dt, swallowed?.kind === "grass");
+      // Every variety has its own noise going down, or none — see munch, which
+      // decides how often a bite is actually heard.
+      this.music.munch(dt, swallowed?.sound);
       if (this.food.complete) {
         this.beginTransformation();
       }
@@ -354,6 +353,8 @@ export class Game {
     this.hud.setVisible(false);
     this.snatching = 0;
     this.grabbedFrom = null;
+    // Whatever it was in the middle of swallowing, it is not any more.
+    this.music.stopEating();
     // In along the line its shadow was last on, so the bird arrives from the
     // direction the child has been watching go round rather than out of
     // nowhere.
@@ -370,6 +371,7 @@ export class Game {
     }
     this.snatching += dt;
     this.bird.update(dt);
+    this.music.setWings(true);
 
     if (this.bird.holding) {
       // The caterpillar goes where the beak goes, and its body trails and
@@ -395,6 +397,7 @@ export class Game {
 
     if (this.snatching > CROW.snatchDive + CROW.snatchAway + CROW.snatchHold) {
       this.snatching = null;
+      this.music.setWings(false);
       this.showCaughtCard();
     }
   }

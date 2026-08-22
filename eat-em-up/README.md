@@ -117,12 +117,19 @@ One looping track, `src/assets/mossy_trail.mp3`, quiet enough to sit under the
 game. It cannot start until the player has touched the screen — a browser will
 refuse audio nobody asked for, and on an iPad that refusal is the default — so
 it begins on the button on the intro panel, which is the first thing anyone
-touches. Eating grass has a sound of its own, `src/assets/grass.m4a` — it is the one
-thing eaten in a stream rather than one at a time, so it is the one worth
-hearing. It plays through a handful of voices with a gap enforced between
-them, each a little higher or lower than the last, because a caterpillar in
-the meadow bites faster than the clip lasts and one voice would cut itself off
-on every mouthful.
+touches. Eating has a sound, and the sound belongs to the variety rather than the kind:
+an apple is a crunch and a blackberry is not, so the four fruits have four
+recordings between them, and leaves, berries and grass have their own. Flowers
+and mushrooms are eaten in silence — nothing was recorded for them, and no
+sound beats the wrong one.
+
+Each has a small pool of voices and there is one gap enforced across all of
+them, because a caterpillar in the meadow bites faster than a clip lasts and a
+single voice would cut itself off on every mouthful. Stop eating and the
+chewing stops with you, four tenths of a second later: several of the clips run
+past three seconds and would otherwise still be going long after the
+caterpillar had wandered off. The crow's wings beat for exactly as long as it
+is in the air.
 
 The round switch in the top right turns all of it off; it is the shared one
 from `shared/soundButton.ts`, the same button the bee game has.

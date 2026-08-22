@@ -911,7 +911,20 @@ export const MUSIC = {
    */
   chompVolume: 0.55,
   chompGap: 0.22,
-  chompVoices: 3,
+  /**
+   * How long after the last bite the chewing is cut off.
+   *
+   * Not immediately: measured crossing the meadow, tufts go down about one
+   * every three tenths of a second, so anything shorter than that would chop
+   * the sound between every mouthful of a continuous graze. Longer than a
+   * gap between bites and shorter than the clips, several of which run past
+   * three seconds and would otherwise still be chewing well after the
+   * caterpillar had stopped.
+   */
+  chompHold: 0.4,
+  chompVoices: 2,
+  /** The crow's wings, while it is in the air. */
+  wingsVolume: 0.5,
   /** Each one a little faster or slower than the last, so a mouthful is not
    *  the same sound played six times. */
   chompPitchMin: 0.88,

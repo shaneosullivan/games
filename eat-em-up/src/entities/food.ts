@@ -36,7 +36,23 @@ interface Item {
   sprout: number;
 }
 
+/**
+ * One variety of food: its shape, and the noise it makes going down.
+ *
+ * The sound belongs to the variety and not to the kind, because the four
+ * fruits do not sound alike — an apple is a crunch and a blackberry is not.
+ * Flowers and mushrooms have no recording, and no sound is better than the
+ * wrong one.
+ */
+interface Variety {
+  kind: FoodKind;
+  geometry: THREE.BufferGeometry;
+  sound?: string;
+}
+
 interface Variant {
+  /** What it sounds like being eaten, if anything. */
+  sound?: string;
   kind: FoodKind;
   geometry: THREE.BufferGeometry;
   mesh: THREE.InstancedMesh;
@@ -131,7 +147,7 @@ export class FoodField {
     mouth: THREE.Vector3,
     reach: number,
     headRadius: number,
-  ): {kind: FoodKind; magic: boolean} | null {
+  ): {kind: FoodKind; magic: boolean; sound?: string} | null {
     for (const item of this.items) {
       if (item.eaten) {
         continue;
@@ -162,7 +178,11 @@ export class FoodField {
             ? FOOD.regrowAfter
             : 0;
         this.eaten[item.kind]++;
-        return {kind: item.kind, magic: item.variant === this.magicVariant};
+        return {
+          kind: item.kind,
+          magic: item.variant === this.magicVariant,
+          sound: this.variants[item.variant]?.sound,
+        };
       }
     }
     return null;
@@ -297,6 +317,7 @@ export class FoodField {
       mesh.castShadow = true;
       mesh.receiveShadow = true;
       const variant: Variant = {
+        sound: geometries[v].sound,
         kind: geometries[v].kind,
         geometry: geometries[v].geometry,
         mesh,
@@ -393,10 +414,7 @@ export class FoodField {
     };
   }
 
-  private placeLeaves(
-    geos: Array<{kind: FoodKind; geometry: THREE.BufferGeometry}>,
-    add: AddFn,
-  ): void {
+  private placeLeaves(geos: Array<Variety>, add: AddFn): void {
     const variants = indicesOf(geos, "leaf");
     const total = this.count("leaf");
 
@@ -465,10 +483,7 @@ export class FoodField {
     }
   }
 
-  private placeFlowers(
-    geos: Array<{kind: FoodKind; geometry: THREE.BufferGeometry}>,
-    add: AddFn,
-  ): void {
+  private placeFlowers(geos: Array<Variety>, add: AddFn): void {
     const variants = indicesOf(geos, "flower");
     const total = this.count("flower");
     // In patches rather than evenly: a meadow of one colour is a nicer thing
@@ -494,10 +509,7 @@ export class FoodField {
     }
   }
 
-  private placeBerries(
-    geos: Array<{kind: FoodKind; geometry: THREE.BufferGeometry}>,
-    add: AddFn,
-  ): void {
+  private placeBerries(geos: Array<Variety>, add: AddFn): void {
     const variants = indicesOf(geos, "berry");
     const total = this.count("berry");
     let placed = 0;
@@ -514,10 +526,7 @@ export class FoodField {
     }
   }
 
-  private placeFruits(
-    geos: Array<{kind: FoodKind; geometry: THREE.BufferGeometry}>,
-    add: AddFn,
-  ): void {
+  private placeFruits(geos: Array<Variety>, add: AddFn): void {
     const variants = indicesOf(geos, "fruit");
     const total = this.count("fruit");
 
@@ -585,10 +594,7 @@ export class FoodField {
    * Dealt out over the boulders in turn rather than scattered at random, so
    * every rock in the wood is worth crawling to and none of them is bare.
    */
-  private placeMushrooms(
-    geos: Array<{kind: FoodKind; geometry: THREE.BufferGeometry}>,
-    add: AddFn,
-  ): void {
+  private placeMushrooms(geos: Array<Variety>, add: AddFn): void {
     const variants = indicesOf(geos, "mushroom");
     const rocks = this.forest.boulders;
     if (rocks.length === 0) {
@@ -636,10 +642,7 @@ export class FoodField {
     }
   }
 
-  private placeGrass(
-    geos: Array<{kind: FoodKind; geometry: THREE.BufferGeometry}>,
-    add: AddFn,
-  ): void {
+  private placeGrass(geos: Array<Variety>, add: AddFn): void {
     const variants = indicesOf(geos, "grass");
     // Density comes from the clearing, not from the quota — see CLEARING.tufts.
     for (let i = 0; i < CLEARING.tufts; i++) {
@@ -660,25 +663,30 @@ export class FoodField {
 
   // ---- the food itself ----------------------------------------------------
 
-  private buildGeometries(): Array<{
-    kind: FoodKind;
-    geometry: THREE.BufferGeometry;
-  }> {
-    const out: Array<{kind: FoodKind; geometry: THREE.BufferGeometry}> = [];
+  private buildGeometries(): Array<Variety> {
+    const out: Array<Variety> = [];
 
     // Yellow-greens, deliberately: a leaf the same green as the forest floor is
     // food the player cannot find.
     for (const colour of [0xa8d94b, 0xc2e85f, 0x93cc3e]) {
-      out.push({kind: "leaf", geometry: makeLeaf(colour)});
+      out.push({kind: "leaf", geometry: makeLeaf(colour), sound: "leaf"});
     }
     for (const colour of [0xf2809f, 0xfff0f5, 0xffd94a, 0xb38fe0, 0x8fc7ff]) {
       out.push({kind: "flower", geometry: makeFlower(colour)});
     }
     for (const colour of [0xd8344a, 0x4a5fd8, 0x3a2350]) {
-      out.push({kind: "berry", geometry: makeBerry(colour)});
+      out.push({
+        kind: "berry",
+        geometry: makeBerry(colour),
+        sound: "blueberry",
+      });
     }
     for (const colour of [0x8fd155, 0x7ab942, 0xa6de63]) {
-      out.push({kind: "grass", geometry: makeGrassTuft(colour, this.rng)});
+      out.push({
+        kind: "grass",
+        geometry: makeGrassTuft(colour, this.rng),
+        sound: "grass",
+      });
     }
     for (const colour of MUSHROOM_CAPS) {
       out.push({kind: "mushroom", geometry: makeMushroom(colour)});
@@ -687,10 +695,18 @@ export class FoodField {
     // property of the mesh rather than something to be remembered per item.
     this.magicVariant = out.length;
     out.push({kind: "mushroom", geometry: makeMagicMushroom()});
-    out.push({kind: "fruit", geometry: makeApple()});
-    out.push({kind: "fruit", geometry: makeStrawberry()});
-    out.push({kind: "fruit", geometry: makeBlackberry()});
-    out.push({kind: "fruit", geometry: makePeach()});
+    out.push({kind: "fruit", geometry: makeApple(), sound: "apple"});
+    out.push({
+      kind: "fruit",
+      geometry: makeStrawberry(),
+      sound: "strawberry",
+    });
+    out.push({
+      kind: "fruit",
+      geometry: makeBlackberry(),
+      sound: "blackberry",
+    });
+    out.push({kind: "fruit", geometry: makePeach(), sound: "orange"});
 
     return out;
   }
