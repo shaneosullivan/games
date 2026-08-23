@@ -126,7 +126,10 @@ export class Nuts {
         t = Math.max(0, Math.min(1, t));
       }
       const ox = from.x + dx * t - nut.x;
-      const oy = from.y + dy * t - nut.y;
+      // Squashed in height, so the catch is a flattened ball rather than a
+      // ball: height is the axis the pitch control moves you along, so height
+      // is where the forgiveness belongs. See NUTS.catchHeightScale.
+      const oy = (from.y + dy * t - nut.y) / NUTS.catchHeightScale;
       const oz = from.z + dz * t - nut.z;
       if (ox * ox + oy * oy + oz * oz <= NUTS.catchRadius * NUTS.catchRadius) {
         this.taken[i] = true;

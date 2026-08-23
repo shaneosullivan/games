@@ -73,7 +73,7 @@ export class Gates {
     const at = new THREE.Vector3(
       Math.max(-room, Math.min(room, this.lineAt(z) + side)),
       Math.max(
-        radius + 4,
+        radius * GATES.heightScale + 2,
         this.pathAt(z) +
           this.rng.range(-GATES.heightWander, GATES.heightWander),
       ),
@@ -104,7 +104,11 @@ export class Gates {
       }),
     );
     halo.position.copy(at);
-    halo.scale.setScalar(radius * GATES.haloSize);
+    halo.scale.set(
+      radius * GATES.haloSize,
+      radius * GATES.haloSize * GATES.heightScale,
+      1,
+    );
     this.group.add(halo);
 
     this.gates.push({at, radius, ring, halo, passed: false});
@@ -131,7 +135,9 @@ export class Gates {
       const t = span > 1e-6 ? (from.z - gate.at.z) / span : 0;
       const x = from.x + (to.x - from.x) * t - gate.at.x;
       const y = from.y + (to.y - from.y) * t - gate.at.y;
-      if (Math.hypot(x, y) <= gate.radius) {
+      // An ellipse, not a circle: an arch is taller than it is wide, and the
+      // height is where the room has to be. See GATES.heightScale.
+      if (Math.hypot(x, y / GATES.heightScale) <= gate.radius) {
         gate.passed = true;
         this.passed++;
         gate.ring.geometry = paint(gate.ring.geometry, GATES.litColour);
@@ -148,15 +154,16 @@ export class Gates {
     for (const gate of this.gates) {
       const pulse =
         1 + Math.sin(this.clock * GATES.pulseRate + gate.at.z) * GATES.pulse;
-      gate.halo.scale.setScalar(gate.radius * GATES.haloSize * pulse);
+      const size = gate.radius * GATES.haloSize * pulse;
+      gate.halo.scale.set(size, size * GATES.heightScale, 1);
     }
   }
 }
 
-/** A ring: a torus stood upright, facing back up the valley. */
+/** An arch: a torus stood upright facing back up the valley, and stretched
+ *  taller than it is wide. See GATES.heightScale. */
 function ringShape(radius: number): THREE.BufferGeometry {
-  return paint(
-    new THREE.TorusGeometry(radius, GATES.ribRadius, 8, 26),
-    GATES.colour,
-  );
+  const ring = new THREE.TorusGeometry(radius, GATES.ribRadius, 8, 26);
+  ring.scale(1, GATES.heightScale, 1);
+  return paint(ring, GATES.colour);
 }

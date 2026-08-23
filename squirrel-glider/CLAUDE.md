@@ -65,7 +65,7 @@ scripts any of it. The coefficients in `GLIDE` are set from measured wingsuit
 flight — about 150km/h and three-to-one hands off, and a vertical dive that
 runs out at 378km/h against a world record of 374.8.
 
-Five things this has already caught someone out on, each with the symptom:
+Seven things this has already caught someone out on, each with the symptom:
 
 - **A commanded pitch rate is free height.** Letting the stick add to `dgamma`
   directly flies beautifully and cheats: measured, holding the stick half back
@@ -88,6 +88,18 @@ Five things this has already caught someone out on, each with the symptom:
   flying speed, so the first seconds are a dive), and a turn costs height on
   top of that. `Terrain.flyThePath` runs the real model at startup for exactly
   this reason; ignore it and every arch hangs above the squirrel's head.
+- **A point-mass glider has no attitude, and you have to give it one.** It
+  points exactly where it is going, always — and since the camera follows that
+  path too, a screaming dive and a gentle glide looked nearly identical. Both
+  pitch controls worked perfectly and neither one looked like it did anything.
+  The body is drawn at a real angle to its path now (`AOA`), which is honest:
+  a gliding squirrel flies at about forty degrees angle of attack.
+- **A linear pitch stick is a trap.** Diving and air-braking are expensive on
+  purpose, but linear means a thumb resting slightly off centre pays that
+  price continuously and by accident. Measured: a pilot who nudged the pitch to
+  chase every arch landed 28% short of one who never touched it, and took 7
+  arches instead of 17. An expo curve on the axis (`CONTROL.pitchExpo`) put it
+  back to 17 and made using the control _better_ than not using it.
 - **Scale the cues to the speeds the game actually flies.** The first version
   read "how fast are we going" as trim-speed-to-top-speed, and since a glide
   sits within a unit or two of trim, every cue in the game read zero for the

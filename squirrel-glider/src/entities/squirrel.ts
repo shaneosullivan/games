@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import {mergeGeometries} from "three/examples/jsm/utils/BufferGeometryUtils.js";
-import {GLIDE, SQUIRREL} from "../config";
+import {AOA, GLIDE, SQUIRREL} from "../config";
 import {paint, vertexToon} from "../render/materials";
 
 const FUR = 0xb4703a;
@@ -258,7 +258,25 @@ export class Squirrel {
       ),
     );
     const lift = lifting * held * stalled;
-    const drag = (GLIDE.dragPerV2 + GLIDE.inducedDrag * held * held) * v * v;
+    // The air brake: how far past an ordinary glide the *player* is asking for,
+    // squared, because a belly turned into the wind is form drag and form drag
+    // does not come on gently. See GLIDE.brakeDrag.
+    //
+    // Measured off the commanded lift and deliberately not off `held`, which
+    // carries the extra the squirrel pulls to hold itself up in a bank. That
+    // is a real cost and it is already charged as induced drag; charging it as
+    // an air brake as well would mean every turn slammed the belly out, and
+    // turning is the whole game.
+    const flare = Math.max(
+      0,
+      (this.cl + snap - GLIDE.clTrim) / (GLIDE.clMax - GLIDE.clTrim),
+    );
+    const drag =
+      (GLIDE.dragPerV2 +
+        GLIDE.inducedDrag * held * held +
+        GLIDE.brakeDrag * flare * flare) *
+      v *
+      v;
 
     const g = GLIDE.gravity;
     this.speed += (-g * Math.sin(this.gamma) - drag) * dt;
@@ -284,15 +302,15 @@ export class Squirrel {
   }
 
   /**
-   * How far the animal's nose sits above the path it travels along.
+   * How far the animal's body sits away from the path it travels along.
    *
    * Read back out of the lift it is making, which is what an angle of attack
-   * is. It only drives the look of the thing — the physics above works in lift
-   * coefficients — but without it a diving squirrel would be drawn flat to its
-   * own descent, which is not what a wing does.
+   * is. It drives only the look of the thing — the physics above works in lift
+   * coefficients throughout — but the look is most of the game: see AOA in the
+   * config for why it is as large as it is.
    */
   private angleOfAttack(): number {
-    return (this.cl / GLIDE.clMax) * 0.42;
+    return angleOfAttack(this.cl);
   }
 
   /** `alpha` is how far between the last two simulation steps we are. */
@@ -301,7 +319,7 @@ export class Squirrel {
     const gamma = THREE.MathUtils.lerp(this.prevGamma, this.gamma, alpha);
     const bank = THREE.MathUtils.lerp(this.prevBank, this.bank, alpha);
     const cl = THREE.MathUtils.lerp(this.prevCl, this.cl, alpha);
-    const pitch = gamma + (cl / GLIDE.clMax) * 0.42;
+    const pitch = gamma + angleOfAttack(cl);
 
     // YXZ so the yaw goes on first and the pitch is about the squirrel's own
     // axis, not the world's — otherwise a banked turn also pitches it.
@@ -331,6 +349,17 @@ export class Squirrel {
     this.tail.rotation.y = bank * SQUIRREL.tailSwing;
     this.tail.rotation.x = -pitch * 0.3;
   }
+}
+
+/**
+ * The body's angle to its own flight path, from how hard the membrane is
+ * working. See AOA: tucked and nose-down at one end of the stick, reared up
+ * with the belly to the wind at the other.
+ */
+function angleOfAttack(cl: number): number {
+  const t = (cl - GLIDE.clMin) / (GLIDE.clMax - GLIDE.clMin);
+  const eased = Math.pow(Math.max(0, Math.min(1, t)), AOA.curve);
+  return AOA.tucked + eased * (AOA.flared - AOA.tucked);
 }
 
 /** One limb: a stubby leg with a paw, pointing out from the body. */

@@ -230,6 +230,18 @@ export const GLIDE = {
   bankRate: 4.5,
   bankReturn: 3.2,
 
+  /**
+   * The air brake: what turning the belly into the wind costs.
+   *
+   * Induced drag alone already makes a hard pull-back expensive, but induced
+   * drag is the price of *lift* and what is happening here is bluffer than
+   * that — a squirrel flaring is a furry parachute held broadside to the air,
+   * which is form drag and a lot of it. Without this the brake worked on the
+   * numbers and could not be felt, and "slow down" is the one thing a child
+   * needs from a flying game when it is all getting away from them.
+   */
+  brakeDrag: 0.0024,
+
   /** Speed it can never exceed, however long the dive. Terminal velocity, in
    *  effect: drag would do it anyway, but a hard cap keeps the camera sane. */
   maxSpeed: 105,
@@ -237,6 +249,57 @@ export const GLIDE = {
   /** What the leap off the ledge gives it: forward, and a little up. */
   jumpSpeed: 9,
   jumpUp: 2.5,
+} as const;
+
+/**
+ * How far the animal's body swings away from the path it is travelling along
+ * — its angle of attack, and the single clearest thing the player has to read.
+ *
+ * A point-mass glider has no attitude of its own: it points exactly where it
+ * is going, always. Drawn that way the squirrel was glued to its own flight
+ * path, and since the camera follows that path too, a screaming dive and a
+ * gentle glide looked nearly identical. Both controls worked and neither one
+ * looked like it did anything.
+ *
+ * So the body is drawn at a real angle to its path. This is not a cheat: a
+ * gliding squirrel flies at an angle of attack of about forty degrees, which
+ * is far past what an aircraft wing would tolerate and is exactly how the
+ * animal works. Pushing the stick up tucks it to eleven degrees below its
+ * path — head down, back arched, falling like a dart. Pulling it down rears
+ * it up to nearly fifty above, belly flat against the oncoming air, which is
+ * a squirrel putting the brakes on and looks like one.
+ */
+export const AOA = {
+  tucked: -0.2,
+  flared: 0.85,
+  /** Bends the middle of the range down, so an ordinary glide sits at a
+   *  natural ten degrees or so and the drama is saved for the ends of the
+   *  stick. */
+  curve: 1.6,
+} as const;
+
+/**
+ * The shape of the stick: what a small movement is worth against a large one.
+ *
+ * Straight through, the pitch axis was a trap. A dive and an air brake are
+ * both expensive — that is what makes them worth having — but with a linear
+ * stick a child who rests a thumb slightly off centre pays that price
+ * continuously without ever meaning to. Measured, a pilot who nudged the pitch
+ * to chase every arch landed 28% short of one who left it alone entirely, and
+ * took seven arches instead of seventeen.
+ *
+ * So the middle of the stick is made gentle and the ends are left alone: at a
+ * quarter deflection the pitch axis gives about three per cent, at half about
+ * a fifth, and at the stops it gives everything. Small corrections are nearly
+ * free and a real shove is still a real shove. This is the standard expo curve
+ * that model aircraft have used for decades, and it is the single cheapest
+ * thing that makes a flying game easier to fly.
+ */
+export const CONTROL = {
+  pitchExpo: 2.2,
+  /** Gentler on the turn, which is the axis the game is really about and
+   *  wants to stay responsive. */
+  bankExpo: 1.4,
 } as const;
 
 /** The squirrel itself: how big it is drawn, and how it flaps and steers. */
@@ -253,7 +316,7 @@ export const SQUIRREL = {
    * a third of that it is under three units long and covers about fourteen —
    * the same flight, the same physics, read correctly.
    */
-  scale: 0.5,
+  scale: 0.62,
   /** How far the limbs spread the membrane, and how much they pull in when
    *  diving — a wingsuit tucks to go fast. */
   spread: 1,
@@ -331,6 +394,9 @@ export const NUTS = {
    *  flying the line and not a test of aim: a child who is a couple of body
    *  lengths off should still be having their flying rewarded. */
   catchRadius: 5,
+  /** And more room again in height, for the same reason the arches are tall:
+   *  pitch is what moves a player off the line. See GATES.heightScale. */
+  catchHeightScale: 1.8,
   size: 0.72,
   /** Turning and bobbing, so they hang rather than sit. */
   spinRate: 1.4,
@@ -375,6 +441,20 @@ export const GATES = {
    */
   radius: 8,
   sizeJitter: 1.6,
+  /**
+   * How much taller than wide an arch is.
+   *
+   * Round arches punished the player for using the controls. Everything in the
+   * valley hangs at the height a hands-off glide passes through, and both the
+   * dive and the air brake change that height — so the moment a child did what
+   * the game told them to do, they dropped underneath the next arch. Measured:
+   * a pilot flying every arch on purpose fell from 16 of 17 to 6 of 17 the day
+   * the brake was added.
+   *
+   * Height is the axis pitch moves you along, so height is the axis with the
+   * room in it. A tall arch is also simply what an arch looks like.
+   */
+  heightScale: 1.9,
   /** How far a ring may sit off the line — see LINE — and off the height the
    *  glide will actually be at by then. Both small: a ring is meant to be the
    *  next bead on the string of acorns, not a separate errand. */
@@ -429,11 +509,11 @@ export const CAMERA = {
    * squirrel fills a quarter of it — big enough for a child to read what it is
    * doing, near enough that the valley moves.
    */
-  distance: 11,
-  height: 2.6,
+  distance: 9.5,
+  height: 2.3,
   /** How far ahead of the squirrel the shot is aimed, so the ground below is
    *  not most of the frame. */
-  lookAhead: 9,
+  lookAhead: 8,
   /** How quickly the shot swings round behind a turn. Loose enough that a hard
    *  turn throws the squirrel across the frame before the camera follows it,
    *  which is most of what makes speed feel like speed — but it is the
@@ -470,9 +550,12 @@ export const CAMERA = {
    * The camera used to look ten degrees down whatever the squirrel was doing,
    * so in a fifty-degree dive the ground coming up at you happened below the
    * bottom of the screen — the dive had no picture. Not all of it, because a
-   * shot pinned exactly to the path never shows you the horizon tilting.
+   * shot pinned exactly to the path never shows the attitude change: the
+   * squirrel would sit at the same angle in the frame whatever it was doing.
+   * Most of that job belongs to AOA now, which swings the body against its own
+   * path, so this only has to keep the animal in shot.
    */
-  pathFollow: 0.75,
+  pathFollow: 0.72,
   /**
    * How much the lens trembles flat out, and how much of that is owed to
    * flying low.

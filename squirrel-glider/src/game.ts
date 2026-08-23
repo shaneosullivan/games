@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import {CAMERA, FEEL, LANDING, SIM, WORLD} from "./config";
+import {CAMERA, CONTROL, FEEL, LANDING, SIM, WORLD} from "./config";
 import {GameLoop} from "./core/loop";
 import {Joystick} from "./core/input";
 import {Rng} from "./core/rng";
@@ -100,7 +100,7 @@ export class Game {
     this.intro = new Overlay(
       ui,
       "Squirrel Glider",
-      "You are a flying squirrel on the edge of a huge cliff. Tap to jump off, then drag to fly: pull back to lift your head and stretch the glide, push forward to point your nose down and go fast, and lean left or right to turn. Catch acorns and fly through the stone arches.",
+      "You are a flying squirrel on the edge of a huge cliff. Tap to jump off, then drag to fly. Drag up and you tip your nose down and dive, fast. Drag down and you throw your belly out into the wind and slow right down. Drag left or right to lean into a turn. Follow the floating acorns — they lead you through every glowing arch.",
       "Ready",
       () => this.begin(),
     );
@@ -197,7 +197,11 @@ export class Game {
     // when it is pulled *back*, and pulling back is what raises the head and
     // slows it down. Pushing forward points the head at the ground and lets it
     // run. That is also which way round a real one works.
-    this.dir.set(this.stick.x, this.stick.y, 0);
+    this.dir.set(
+      expo(this.stick.x, CONTROL.bankExpo),
+      expo(this.stick.y, CONTROL.pitchExpo),
+      0,
+    );
 
     this.from.copy(this.squirrel.position);
     this.squirrel.update(dt, this.dir);
@@ -284,7 +288,7 @@ export class Game {
     this.done.setBody(
       everything
         ? `Every single arch — all ${this.gates.total} of them — and every last acorn. ${far} There is nothing left out there to catch.`
-        : `${far} You flew through ${arches} of the ${this.gates.total} arches and caught ${nuts} of the ${this.nuts.total} acorns. Lean into the turns to follow the acorns — they lead to every arch. Pull back gently to stretch the glide; push forward and you will go faster but land sooner.`,
+        : `${far} You flew through ${arches} of the ${this.gates.total} arches and caught ${nuts} of the ${this.nuts.total} acorns. Follow the acorns and they will take you through all of them. Drag down to slow yourself and line up a tricky arch; drag up to dive and go fast. Let go and you will glide the furthest of all.`,
     );
     this.done.show();
   }
@@ -412,4 +416,12 @@ export class Game {
       this.followCamera(SIM.step);
     }
   }
+}
+
+/**
+ * The expo curve: gentle in the middle of the stick, full at the ends. See
+ * CONTROL, which is where the reasoning lives.
+ */
+function expo(v: number, power: number): number {
+  return Math.sign(v) * Math.pow(Math.abs(v), power);
 }
