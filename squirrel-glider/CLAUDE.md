@@ -48,6 +48,57 @@ folder automatically.
 - Keep tunable numbers together and named, not as magic numbers at the call
   site.
 
+## The flight model
+
+The squirrel is a **three-degree-of-freedom point-mass glider** — the model an
+aircraft is normally taught with — in `src/entities/squirrel.ts`:
+
+```
+dv     = -g sin(gamma) - drag
+dgamma = (lift cos(bank) - g cos(gamma)) / v
+dpsi   =  lift sin(bank) / (v cos(gamma))
+```
+
+Everything the game feels comes out of those three lines: the speed a dive
+builds, the float of a pull-up, turns that tighten as they slow. Nothing
+scripts any of it. The coefficients in `GLIDE` are set from measured wingsuit
+flight — about 150km/h and three-to-one hands off, and a vertical dive that
+runs out at 378km/h against a world record of 374.8.
+
+Five things this has already caught someone out on, each with the symptom:
+
+- **A commanded pitch rate is free height.** Letting the stick add to `dgamma`
+  directly flies beautifully and cheats: measured, holding the stick half back
+  turned a 1393-unit glide into a 4105-unit one, and every flight became "hold
+  back and wait". The whole game is a budget of height, so anything that moves
+  the nose has to arrive as _lift_ and be charged induced drag for it. See
+  `GLIDE.snap` — a washed-out transient, so a movement of the stick is worth
+  something and a held stick is worth only what its position deserves.
+- **Forward is `(sin(heading), cos(heading))`.** Write the look target as the
+  negation of the backwards vector and it is easy to drop a sign, which aims
+  the camera up the valley at the cliff. The symptom is a dark slab filling the
+  frame and no squirrel anywhere.
+- **A close camera cannot be reached with a soft lerp.** At these speeds a
+  camera closing five per cent of the gap a frame sits permanently behind — it
+  was measured at 100 units back on a shot asked to be 11. The looseness has to
+  live in the _heading_ the camera uses, with the eye then placed exactly.
+- **Anything hung in the valley must be placed off a flight that was actually
+  flown**, and flown along the same line it is placing things on. The
+  arithmetic glide path is higher than the real one (the leap starts below
+  flying speed, so the first seconds are a dive), and a turn costs height on
+  top of that. `Terrain.flyThePath` runs the real model at startup for exactly
+  this reason; ignore it and every arch hangs above the squirrel's head.
+- **Scale the cues to the speeds the game actually flies.** The first version
+  read "how fast are we going" as trim-speed-to-top-speed, and since a glide
+  sits within a unit or two of trim, every cue in the game read zero for the
+  whole flight and the lens never opened once. `FEEL` holds the real range.
+
+Speed is read in **body-lengths per second**, not units per second: a real
+flying squirrel covers about twenty of its own lengths a second and a wingsuit
+pilot twenty-five. That is why `SQUIRREL.scale` and `CAMERA.distance` are small
+— the same flight drawn three times larger reads as a slow animal whatever the
+number in the corner says.
+
 ## Layout
 
 ```

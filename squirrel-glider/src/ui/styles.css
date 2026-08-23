@@ -1,0 +1,237 @@
+/*
+ * The glass: the HUD, the stick and the overlays.
+ *
+ * Lifted from the caterpillar game so the two look like the same shelf of
+ * games — same panel colour, same big button, same floating stick. What is
+ * new here is the readouts beside the progress bar and the sky-blue ink,
+ * because this game is read against a bright sky rather than a dark wood.
+ */
+
+:root {
+  --safe-t: env(safe-area-inset-top, 0px);
+  --safe-b: env(safe-area-inset-bottom, 0px);
+  --safe-l: env(safe-area-inset-left, 0px);
+  --safe-r: env(safe-area-inset-right, 0px);
+  --ink: #23331c;
+  --panel: rgba(255, 255, 255, 0.82);
+}
+html,
+body,
+#app {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: #9fd7f0;
+  font-family:
+    "Nunito",
+    "Avenir Next",
+    "Segoe UI",
+    system-ui,
+    -apple-system,
+    sans-serif;
+  color: var(--ink);
+  /* The game is driven by dragging; never let a drag scroll or zoom the page. */
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.ui-interactive {
+  pointer-events: auto;
+}
+.ui-interactive {
+  pointer-events: auto;
+}
+.overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  padding: 24px;
+  text-align: center;
+  background: rgba(255, 255, 255, 0.78);
+  backdrop-filter: blur(6px);
+  pointer-events: auto;
+  transition: opacity 320ms ease-out;
+}
+
+.overlay.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.overlay h1 {
+  margin: 0;
+  font-size: clamp(30px, 7vw, 62px);
+  line-height: 1.05;
+}
+
+.overlay p {
+  margin: 0;
+  max-width: 22em;
+  font-size: clamp(17px, 2.6vw, 24px);
+  line-height: 1.45;
+}
+.big-button {
+  border: none;
+  border-radius: 999px;
+  padding: 18px 46px;
+  font: inherit;
+  font-size: clamp(20px, 3vw, 28px);
+  font-weight: 800;
+  color: #fff;
+  background: #57a83e;
+  box-shadow: 0 6px 0 #3f7f2c;
+  cursor: pointer;
+}
+
+.big-button:active {
+  transform: translateY(4px);
+  box-shadow: 0 2px 0 #3f7f2c;
+}
+.stick {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+  opacity: 0;
+  transition: opacity 130ms ease-out;
+  pointer-events: none;
+}
+
+.stick.active {
+  opacity: 1;
+}
+
+.stick.docked {
+  left: calc(var(--safe-l) + 94px);
+  top: auto;
+  bottom: calc(var(--safe-b) + 94px);
+  opacity: 1;
+}
+
+.stick.docked .stick-ring {
+  border-color: rgba(255, 255, 255, 0.55);
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.stick-ring {
+  position: absolute;
+  width: 136px;
+  height: 136px;
+  margin: -68px 0 0 -68px;
+  border-radius: 50%;
+  border: 3px solid rgba(255, 255, 255, 0.55);
+  background: rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(2px);
+}
+
+.stick-knob {
+  position: absolute;
+  width: 58px;
+  height: 58px;
+  margin: -29px 0 0 -29px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+}
+.corner-buttons {
+  position: absolute;
+  top: calc(var(--safe-t) + 12px);
+  right: calc(var(--safe-r) + 12px);
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+.icon-button {
+  /* Border-box, because the shared sound button next to it is one: an anchor
+     is not, so without this the two discs differ by the two pixels of their
+     border and sit a pixel out of line. */
+  box-sizing: border-box;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: 1px solid var(--stroke, rgba(255, 255, 255, 0.22));
+  background: var(--panel);
+  color: var(--ink, #fff);
+  font-size: 20px;
+  line-height: 1;
+  display: grid;
+  place-items: center;
+  text-decoration: none;
+  backdrop-filter: blur(8px);
+  cursor: pointer;
+}
+
+.icon-button:active {
+  transform: scale(0.93);
+}
+
+/* ---------- The readouts ---------- */
+
+/* The bar and the two numbers, along the top. The bar is the shared one and
+   brings its own looks; this only says where the row goes. */
+.hud {
+  position: absolute;
+  top: calc(var(--safe-t) + 12px);
+  left: calc(var(--safe-l) + 12px);
+  right: calc(var(--safe-r) + 12px);
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.hud.hidden {
+  display: none;
+}
+
+/* One number in a pill: how many arches, and how high. Tabular figures so a
+   changing height does not shuffle the pill's width every frame. */
+.readout {
+  padding: 7px 14px;
+  border-radius: 999px;
+  background: var(--panel);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.18);
+  font-size: 20px;
+  font-weight: 800;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  backdrop-filter: blur(3px);
+  white-space: nowrap;
+}
+
+/* The one instruction on the ledge. Big and central, because at that moment
+   there is exactly one thing to do and nothing else on the glass. */
+.prompt {
+  position: absolute;
+  left: 50%;
+  bottom: 22%;
+  transform: translateX(-50%);
+  padding: 12px 26px;
+  border-radius: 999px;
+  background: var(--panel);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.22);
+  font-size: 26px;
+  font-weight: 800;
+  white-space: nowrap;
+  animation: prompt-pulse 1.4s ease-in-out infinite;
+}
+
+.prompt.hidden {
+  display: none;
+}
+
+@keyframes prompt-pulse {
+  0%,
+  100% {
+    transform: translateX(-50%) scale(1);
+  }
+  50% {
+    transform: translateX(-50%) scale(1.06);
+  }
+}

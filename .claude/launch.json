@@ -14,6 +14,12 @@
       "port": 5173
     },
     {
+      "name": "squirrel-glider",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "squirrel-glider", "run", "dev"],
+      "port": 5173
+    },
+    {
       "name": "site",
       "runtimeExecutable": "npm",
       "runtimeArgs": ["--prefix", "site", "run", "serve"],
