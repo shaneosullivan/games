@@ -1,6 +1,6 @@
 # Squirrel Glider
 
-A squirrel that glides between the trees.
+Squirrel glider.
 
 Nothing of it is built yet: what is here is the template's starter scene. See
 `docs/plan-for-app.md` — write the game down there before building it.
