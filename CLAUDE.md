@@ -49,10 +49,14 @@ import from above them would resolve to the one at the repo root and bundle a
 second three into the game — where nothing is quite the same class as anything
 else. Each game's `vite.config.ts` therefore **aliases `three` to its own
 copy**, which pins any import made from up here to the three that game is
-already bundling. The root's `three` and `@types/three` exist only so
-`shared/` typechecks; the alias means they are never bundled. If you add a
-game, copy that alias across, and check afterwards that its built
-`index.html` contains one three and not two.
+already bundling. Each game's tsconfig pins the _types_ the same way, at its own
+`@types/three` — TypeScript otherwise walks up to the repo root, which a
+deploy never installs, and a green local build becomes a red one on Vercel.
+
+Both are in the new-game template, so a game scaffolded with
+`npm run new-game` is born with them. Worth checking anyway once a new game
+imports anything from `shared/`: its built `index.html` should contain one
+three and not two.
 
 `fadeInFront.ts` needs none of that and describes the shapes it wants
 structurally instead — a real `THREE.Vector3` satisfies its `Vec3Like` without

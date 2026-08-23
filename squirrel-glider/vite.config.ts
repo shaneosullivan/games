@@ -9,11 +9,12 @@ export default defineConfig({
   /**
    * `three` always means this game's own copy.
    *
-   * The shared widgets in the repo's shared/ folder import three like anybody
-   * else, but they sit above this folder, so a bare import from up there
-   * resolves to whatever is at the repo root — a second copy, bundled
-   * alongside this one, where nothing is quite the same class as anything
-   * else. Pinning it here means shared code gets ours.
+   * The shared widgets live above this folder, and a bare import of three from
+   * up there resolves to whatever sits at the repo root — a second copy,
+   * bundled alongside this one, where nothing is quite the same class as
+   * anything else. Pinning it here means shared code can import three like
+   * anybody else and still get ours. Every game carries this; see the repo's
+   * CLAUDE.md.
    */
   resolve: {
     alias: {
