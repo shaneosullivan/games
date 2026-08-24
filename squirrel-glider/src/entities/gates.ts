@@ -37,6 +37,7 @@ export class Gates {
     private readonly roomAt: (z: number) => number,
     private readonly lineAt: (z: number) => number,
     reach: number,
+    private readonly draftAt: (z: number) => {side: number; top: number} | null,
   ) {
     // As many as fit inside the flyable valley, rather than a fixed number:
     // see GATES.until.
@@ -70,13 +71,24 @@ export class Gates {
     // nobody could take.
     const room = Math.max(0, this.roomAt(z) - radius - GATES.wallGap);
     const side = this.rng.range(-GATES.sideWander, GATES.sideWander);
+
+    // Where a draft runs, hang the arch up in it: out against that wall and
+    // near the top of the lift, so the only way to it is to go and ride the
+    // rising air. Elsewhere, some sit low and the rest on the ramp.
+    const draft = this.rng.next() < GATES.highChance ? this.draftAt(z) : null;
+    let x = this.lineAt(z) + side;
+    let y =
+      this.pathAt(z) + this.rng.range(-GATES.heightWander, GATES.heightWander);
+    if (draft) {
+      x = draft.side * (this.roomAt(z) - GATES.highWallGap);
+      y = draft.top * GATES.highOfCeiling;
+    } else if (this.rng.next() < GATES.lowChance) {
+      y -= GATES.lowDrop;
+    }
+
     const at = new THREE.Vector3(
-      Math.max(-room, Math.min(room, this.lineAt(z) + side)),
-      Math.max(
-        radius * GATES.heightScale + 2,
-        this.pathAt(z) +
-          this.rng.range(-GATES.heightWander, GATES.heightWander),
-      ),
+      Math.max(-room, Math.min(room, x)),
+      Math.max(radius * GATES.heightScale + 2, y),
       z,
     );
 

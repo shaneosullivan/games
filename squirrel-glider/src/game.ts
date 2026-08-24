@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import {CAMERA, CONTROL, FEEL, LANDING, SIM, WORLD} from "./config";
+import {CAMERA, CONTROL, DRAFT, FEEL, LANDING, SIM, WORLD} from "./config";
 import {GameLoop} from "./core/loop";
 import {Joystick} from "./core/input";
 import {Rng} from "./core/rng";
@@ -9,6 +9,7 @@ import {Squirrel} from "./entities/squirrel";
 import {Gates} from "./entities/gates";
 import {Nuts} from "./entities/nuts";
 import {Streaks} from "./entities/streaks";
+import {Drafts} from "./entities/drafts";
 import {Wind} from "./core/audio";
 import {Hud} from "./ui/hud";
 import {Overlay} from "./ui/overlays";
@@ -32,6 +33,7 @@ export class Game {
   readonly squirrel: Squirrel;
   readonly gates: Gates;
   readonly nuts: Nuts;
+  readonly drafts: Drafts;
   readonly streaks: Streaks;
   readonly wind: Wind;
   readonly hud: Hud;
@@ -65,12 +67,26 @@ export class Game {
 
     this.stage = new Stage(host);
     this.terrain = new Terrain(rng);
+    this.drafts = new Drafts(
+      rng,
+      z => this.terrain.wallAt(z),
+      z => this.terrain.glidePathAt(z),
+      this.terrain.reach,
+    );
+    // After the drafts, because some arches are hung up in the rising air and
+    // need to know where it is.
     this.gates = new Gates(
       rng,
       z => this.terrain.rampAt(z),
       z => this.terrain.wallAt(z),
       z => this.terrain.ribbonAt(z),
       this.terrain.reach,
+      z => {
+        const band = this.drafts.bandAt(z);
+        return band
+          ? {side: band.side, top: this.terrain.glidePathAt(z) + DRAFT.ceiling}
+          : null;
+      },
     );
     this.nuts = new Nuts(
       rng,
@@ -89,6 +105,7 @@ export class Game {
     this.stage.scene.add(this.terrain.group);
     this.stage.scene.add(this.gates.group);
     this.stage.scene.add(this.nuts.group);
+    this.stage.scene.add(this.drafts.group);
     this.stage.scene.add(this.squirrel.group);
     this.stage.scene.add(this.streaks.group);
 
@@ -103,7 +120,7 @@ export class Game {
     this.intro = new Overlay(
       ui,
       "Squirrel Glider",
-      "You are a flying squirrel on the edge of a huge cliff. Tap to jump off, then drag to fly. Drag up and you tip your nose down and dive, fast. Drag down and you throw your belly out into the wind and slow right down. Drag left or right to lean into a turn. Follow the floating acorns — they lead you through every glowing arch.",
+      "You are a flying squirrel on the edge of a huge cliff. Tap to jump off, then drag to fly. Drag down and you tip your nose down and dive, fast. Drag up and you throw your belly out into the wind and slow right down. Drag left or right to lean into a turn. Follow the floating acorns, and look for the white lines of rising air by the walls — fly into those and they will carry you up.",
       "Ready",
       () => this.begin(),
     );
@@ -196,28 +213,36 @@ export class Game {
     // projection — unlike the crawling game the shot is always behind the
     // animal, so screen-right and its own right are the same thing.
     //
-    // Not negated, and the plan is exact about why: the stick reads positive
-    // when it is pulled *back*, and pulling back is what raises the head and
-    // slows it down. Pushing forward points the head at the ground and lets it
-    // run. That is also which way round a real one works.
+    // The pitch axis is negated, because the stick reads positive *downward*
+    // in screen axes and the squirrel reads positive as nose-up. Dragging up
+    // the screen therefore has to become a positive number here, and it means
+    // what it looks like it means: drag up and the squirrel comes up — head
+    // and belly into the wind, slowing — and drag down and it puts its nose
+    // down and dives.
     this.dir.set(
       expo(this.stick.x, CONTROL.bankExpo),
-      expo(this.stick.y, CONTROL.pitchExpo),
+      expo(-this.stick.y, CONTROL.pitchExpo),
       0,
     );
 
     this.from.copy(this.squirrel.position);
-    this.squirrel.update(dt, this.dir);
+    // The air the squirrel is flying through, which near a wall may be going
+    // up. It is handed to the glider as wind rather than as a force: see
+    // Drafts, and Squirrel.update, which adds it to the height and otherwise
+    // carries on gliding down exactly as it would have.
+    const p = this.squirrel.position;
+    this.squirrel.update(dt, this.dir, this.drafts.liftAt(p.x, p.y, p.z));
     this.gates.check(this.from, this.squirrel.position);
     this.nuts.check(this.from, this.squirrel.position);
     this.nuts.update(dt);
+    this.drafts.update(dt);
 
     // Nothing to land on until it has left the ledge.
     if (this.squirrel.perched) {
       return;
     }
 
-    this.hitWall();
+    this.hitWall(dt);
 
     const floor = this.terrain.groundAt();
     if (this.squirrel.position.y <= floor + LANDING.height) {
@@ -228,27 +253,30 @@ export class Game {
   /**
    * Into the side of the valley.
    *
-   * Gently, because nothing in this game is allowed to end a flight by
-   * surprise: the squirrel is held off the rock, turned back toward the middle
-   * and loses some of its speed to the scrape. That is a real cost — speed is
-   * the whole currency of a glide — without being a wall that kills you.
+   * The squirrel is held off the rock and scuffs some speed off, and that is
+   * all that happens. It is not turned, not bounced and not stopped.
+   *
+   * It used to be turned, by a fixed amount every frame, which came to about
+   * three radians a second — lean on a wall for half a second and you were
+   * pointed back up the valley with no idea why. That was survivable while the
+   * walls were only scenery to be avoided. It stopped being survivable the
+   * moment the drafts went in, because a draft is the game telling a player to
+   * go and fly along a wall and stay there.
+   *
+   * The scuff is per second rather than per frame for the same reason: at the
+   * old rate a second of contact left two per cent of your speed.
    *
    * The wall is where Terrain says it is, so the thing being drawn and the
    * thing being hit cannot drift apart.
    */
-  private hitWall(): void {
+  private hitWall(dt: number): void {
     const s = this.squirrel;
     const wall = this.terrain.wallAt(s.position.z) - WORLD.wallClearance;
     if (Math.abs(s.position.x) < wall) {
       return;
     }
-    const side = Math.sign(s.position.x);
-    s.position.x = side * wall;
-    s.speed *= WORLD.wallScrub;
-    // Turned back in by a fixed amount rather than reflected: a bounce off a
-    // wall at sixty units a second would spin a child round to face the way
-    // they came, which is far worse than being nudged straight.
-    s.heading += -side * WORLD.wallTurn;
+    s.position.x = Math.sign(s.position.x) * wall;
+    s.speed *= Math.pow(WORLD.wallScrub, dt);
   }
 
   /**
@@ -295,7 +323,7 @@ export class Game {
     this.done.setBody(
       everything
         ? `Every single arch — all ${this.gates.total} of them — and every last acorn. ${far} There is nothing left out there to catch.`
-        : `${far} You flew through ${arches} of the ${this.gates.total} arches and caught ${nuts} of the ${this.nuts.total} acorns. Follow the acorns and they will take you through all of them. Drag down to slow yourself and line up a tricky arch; drag up to dive and go fast. Let go and you will glide the furthest of all.`,
+        : `${far} You flew through ${arches} of the ${this.gates.total} arches and caught ${nuts} of the ${this.nuts.total} acorns. Follow the acorns and they will take you to most of them. Drag up to slow yourself and line up a tricky arch; drag down to dive and go fast. The white lines by the walls are rising air — fly into one and it will carry you back up. Let go of everything and you will glide the furthest of all.`,
     );
     this.done.show();
   }
@@ -394,9 +422,15 @@ export class Game {
     // rather than in units — so the shake carries a term for how close the
     // ground is as well as one for how fast the squirrel is going. Squared, so
     // gentle flying is perfectly steady and only a real dive is felt.
-    const low =
-      1 -
-      Math.min(1, (s.position.y - this.terrain.groundAt()) / CAMERA.shakeFrom);
+    // ...and the ground-proximity term least of all once it is *on* the
+    // ground, where it would otherwise sit at full strength for ever.
+    const low = s.landed
+      ? 0
+      : 1 -
+        Math.min(
+          1,
+          (s.position.y - this.terrain.groundAt()) / CAMERA.shakeFrom,
+        );
     const trauma = Math.min(1, fast + low * CAMERA.shakeLow);
     const shake = trauma * trauma * CAMERA.shake;
     if (shake > 0.0001) {
@@ -411,6 +445,13 @@ export class Game {
    * one number every cue in the game takes its reading from.
    */
   private run(): number {
+    // Nothing is running once it is down. A landed squirrel is never updated
+    // again, so its speed stays frozen at whatever it arrived at — without
+    // this the lens stayed wide, the streaks kept tearing past and the wind
+    // kept howling, all at touchdown speed, for as long as the card was up.
+    if (this.squirrel.landed) {
+      return 0;
+    }
     return Math.min(
       1,
       Math.max(0, (this.squirrel.speed - FEEL.slow) / (FEEL.fast - FEEL.slow)),

@@ -68,10 +68,19 @@ export const WORLD = {
   wallRocks: 90,
   /** How near the rock the squirrel may fly before it is scraping it. */
   wallClearance: 3,
-  /** What a scrape costs in speed, and how far it turns you back toward the
-   *  middle. Gentle: see Game.hitWall. */
-  wallScrub: 0.94,
-  wallTurn: 0.05,
+  /**
+   * What a scrape costs in speed, as a fraction of it kept per second.
+   *
+   * Per second and not per frame, which is what it used to be: 0.94 a frame is
+   * 0.94 to the sixtieth a second, which is to say two per cent of your speed
+   * left after one second of contact. A wall did not scuff you, it stopped
+   * you dead. There is also no longer any turning — brushing a wall used to
+   * add a fixed amount to the heading every frame, some three radians a
+   * second, which spun the squirrel bodily round to face back up the valley.
+   * Both mattered much more once the drafts arrived, because the drafts are
+   * the game asking you to fly along a wall on purpose.
+   */
+  wallScrub: 0.75,
   /** Trees on the valley floor, purely to give the ground a scale to read
    *  height against — from 150 up, bare ground says nothing about how high
    *  you are. */
@@ -528,6 +537,38 @@ export const GATES = {
    *  next bead on the string of acorns, not a separate errand. */
   sideWander: 1.5,
   heightWander: 2,
+  /**
+   * Arches that are not on the easy line at all.
+   *
+   * Every arch sitting on the ramp made a chain you could fly with one hand:
+   * the whole valley at one height, and no reason ever to touch the pitch
+   * control. Some sit low now, which is a dive and costs you nothing but
+   * height you were spending anyway — and some are hung right up in the rising
+   * air along a wall, which you cannot reach at all without going and finding
+   * the draft and riding it. That is the one place in the game where the two
+   * halves of it, the flying and the reading of the valley, have to be done
+   * together.
+   */
+  lowChance: 0.25,
+  /** Just far enough below the ramp to sit outside an arch, so it takes a
+   *  deliberate nudge forward and never a whole manoeuvre. An arch is about
+   *  eighteen units tall from the middle; this is a little more than that. */
+  lowDrop: 20,
+  /**
+   * How often an arch over a draft is actually hung up in it.
+   *
+   * Not every time. With one on every draft, six arches of ten were up in the
+   * rising air and steering straight down the valley took three — the game had
+   * quietly become a game about drafts, when the arches are meant to be the
+   * part a child gets right while they are still learning to steer. A couple
+   * up there is a reward for spotting the white lines; most of them up there
+   * is a tax on not having.
+   */
+  highChance: 0.45,
+  /** How near the top of a draft an arch hung in one sits, and how far out
+   *  toward the rock. */
+  highOfCeiling: 0.82,
+  highWallGap: 26,
   /** How far clear of the rock a ring must hang. */
   wallGap: 6,
   /** How thick the ring itself is. */
@@ -711,6 +752,101 @@ export const WIND = {
   /** How quickly it answers a change of speed. Slower than the flight, so it
    *  swells rather than flickering with every gust of stick. */
   rate: 2.4,
+  /** How quickly it dies when the flight ends. Much faster: once you are down
+   *  the wind should be gone before you have read the card, not sighing away
+   *  behind it. Still a fade and not a cut, because wind that stops dead in
+   *  one frame sounds like something broke. */
+  hushRate: 6,
   /** How long the noise loop is. Long enough not to hear it repeat. */
   loopSeconds: 3,
+} as const;
+
+/**
+ * The rising air along the valley walls.
+ *
+ * Real, and the oldest trick in gliding: wind meeting a ridge has nowhere to go
+ * but up, so there is a band of lift running along the face of it. Pilots call
+ * it ridge soaring and they will fly a ridge for hours on it.
+ *
+ * Bands and not columns, deliberately. A column is something you cross in a
+ * second and a bit at gliding speed, which is barely worth turning for; a band
+ * running a couple of hundred units along the rock is something you commit to,
+ * lean into and *ride*, and it rewards flying close to a wall — which is the
+ * one place in the valley where there is anything near enough to make speed
+ * feel like speed.
+ *
+ * The air rises. The squirrel is not touched: it goes on gliding down through
+ * air that happens to be going up faster than it is coming down, which is
+ * exactly what really happens and means nothing in the flight model has to
+ * know this exists.
+ */
+export const DRAFT = {
+  /** How many stretches of wall have lift on them, and how long each runs. */
+  count: 7,
+  firstAt: 300,
+  lengthMin: 210,
+  lengthMax: 330,
+  /** How far in from the rock the lift reaches. Wide enough to find without
+   *  scraping, narrow enough that you have to mean it. */
+  width: 40,
+  /**
+   * ...and never more than this share of the half-width, whatever `width`
+   * says.
+   *
+   * The valley closes to under forty units in places, and a fixed forty-wide
+   * band there reaches the middle of it — so the easy line down the centre was
+   * being lifted by drafts nobody had gone looking for. It carried the
+   * squirrel above the acorns, which hang on the line a glide without any lift
+   * would have taken, and a flight that steered and did nothing else went from
+   * twenty-five acorns to eleven. A draft has to be a place you go, so it has
+   * to stay against the rock.
+   */
+  maxShare: 0.45,
+  /**
+   * How fast the air goes up at the rock face.
+   *
+   * Sink at an easy glide is about twelve, so this is a net climb of nearly
+   * fifty a second — the squirrel does not drift upward, it is picked up and
+   * thrown. That is the point: a draft has to be worth crossing a valley for,
+   * and at half this it read as the glide merely going shallow for a moment.
+   * The ceiling is what keeps it honest.
+   */
+  strength: 62,
+  /**
+   * How far above the glide line the lift keeps working.
+   *
+   * Every draft has to have a top or the game has no end: a squirrel that can
+   * climb for ever never lands. Measured from the line a glide would have been
+   * on anyway, so a draft is also a way to get back what a bad patch of flying
+   * cost you.
+   */
+  ceiling: 120,
+  /** How gently the lift dies out at the top and at the inner edge. */
+  fade: 40,
+
+  /**
+   * What it looks like: pale streaks of air standing on end and sliding
+   * upward.
+   *
+   * A draft has to be visible from far enough off to turn towards, and it has
+   * to read instantly as *up* — which a scatter of drifting specks does not.
+   * Vertical lines do, because nothing else in the valley is vertical: the
+   * rock leans, the trees are little cones, the arches are rings. A column of
+   * upright white dashes climbing a wall is unmistakable at any distance.
+   *
+   * They stand on the valley floor and climb the wall from there, rather than
+   * hanging in a patch of sky wherever the squirrel happens to be. That is
+   * what the air is actually doing — it comes up off the ground and up the
+   * rock — and it means a draft is something a player looks *down* at, spots
+   * from a long way off, and decides to go down to. Rising air is worth most
+   * to somebody who is running out of height, so the place to put it is at the
+   * bottom where they are.
+   */
+  lines: 460,
+  lineRise: 19,
+  lineLength: 10,
+  /** Strong enough to read against pale grey rock, which is most of what they
+   *  are seen against. */
+  lineOpacity: 0.7,
+  lineColour: 0xffffff,
 } as const;

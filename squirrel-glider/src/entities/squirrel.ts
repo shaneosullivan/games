@@ -217,6 +217,8 @@ export class Squirrel {
    *
    * The model is the standard three-degree-of-freedom glider:
    *
+   * `updraft` is the air going up where it is, which near a wall it may be.
+   *
    *     dv     = -g sin(gamma) - drag
    *     dgamma = (lift cos(bank) - g cos(gamma)) / v
    *     dpsi   =  lift sin(bank) / (v cos(gamma))
@@ -225,7 +227,7 @@ export class Squirrel {
    * pull-up, turns that tighten as they slow — comes out of those three lines
    * rather than being written down anywhere.
    */
-  update(dt: number, dir: THREE.Vector3): void {
+  update(dt: number, dir: THREE.Vector3, updraft = 0): void {
     this.prevPosition.copy(this.position);
     this.prevGamma = this.gamma;
     this.prevBank = this.bank;
@@ -343,7 +345,12 @@ export class Squirrel {
     const along = this.speed * Math.cos(this.gamma) * dt;
     this.position.x += Math.sin(this.heading) * along;
     this.position.z += Math.cos(this.heading) * along;
-    this.position.y += this.speed * Math.sin(this.gamma) * dt;
+    // The air itself, on top of the glide. A squirrel in rising air is not
+    // flying any differently — it is sinking through the air at exactly the
+    // rate it always did, and the air is going up faster than that. Adding it
+    // here and nowhere else means a draft cannot leave the squirrel at a speed
+    // or an attitude it could not otherwise have reached. See Drafts.
+    this.position.y += (this.speed * Math.sin(this.gamma) + updraft) * dt;
 
     this.bob += dt * SQUIRREL.bobRate;
   }

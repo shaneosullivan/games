@@ -91,7 +91,8 @@ export class Wind {
   /** `run` is 0 at trim and 1 flat out. */
   update(dt: number, run: number): void {
     const want = this.hushed ? 0 : run;
-    this.level += (want - this.level) * Math.min(1, WIND.rate * dt);
+    const rate = this.hushed ? WIND.hushRate : WIND.rate;
+    this.level += (want - this.level) * Math.min(1, rate * dt);
     if (!this.gain || !this.filter || this.muted) {
       return;
     }
