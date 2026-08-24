@@ -27,7 +27,7 @@ export const WORLD = {
    * when the game flew one at startup. This only has to be comfortably longer
    * than that, so the world does not run out under a good flight.
    */
-  length: 1750,
+  length: 2400,
   /** How wide the floor of the valley is, and how far out the walls stand. */
   halfWidth: 60,
   /**
@@ -44,8 +44,8 @@ export const WORLD = {
   /** Fog, sized to the valley: it should hide where the world stops and
    *  nothing nearer. At the old 120/620 it was eating the middle distance of
    *  a valley three times longer than the one it was set for. */
-  fogNear: 320,
-  fogFar: 1700,
+  fogNear: 400,
+  fogFar: 2350,
   /**
    * The walls, as one solid ridge each side rather than a scatter of peaks.
    *
@@ -75,7 +75,7 @@ export const WORLD = {
   /** Trees on the valley floor, purely to give the ground a scale to read
    *  height against — from 150 up, bare ground says nothing about how high
    *  you are. */
-  trees: 520,
+  trees: 700,
 } as const;
 
 /**
@@ -112,20 +112,26 @@ export const GLIDE = {
    * wingsuit has ever been flown on purpose.
    */
   liftPerV2: 0.00615,
-  dragPerV2: 0.000871,
+  dragPerV2: 0.000622,
   /**
    * Induced drag: the price of lift. Drag rises with the square of the lift
    * coefficient, which is why hauling back on the stick both floats you and
    * scrubs your speed off.
    *
    * These three together settle the glide, because at a steady glide the
-   * descent is simply drag over lift. As set they give three forward for one
-   * down at trim — a good wingsuit, which runs between two and three to one,
-   * rather than a paper aeroplane or a hawk — and, deliberately, trim sits
-   * exactly at the best glide the wing has, so hands off is also the furthest
-   * a child can get without learning anything.
+   * descent is simply drag over lift. As set they give four and a fifth
+   * forward for one down at trim, and, deliberately, trim sits exactly at the
+   * best glide the wing has — so hands off is also the furthest a child can
+   * get without having to learn anything.
+   *
+   * Four is a long way for a wingsuit and it is not a made-up number: an
+   * ordinary suit runs between two and three to one, and 4.0 is what the wind
+   * tunnel work gives an elite pilot in a high-performance suit. The
+   * competition distance record implies six. The lift is untouched, so the
+   * squirrel still flies at the same speeds and feels the same — it is only
+   * the drag that came off, which is exactly what a better suit is.
    */
-  inducedDrag: 0.001205,
+  inducedDrag: 0.000861,
 
   /**
    * What the stick asks the membrane for, as a lift coefficient.
@@ -242,8 +248,16 @@ export const GLIDE = {
    */
   brakeDrag: 0.0024,
 
-  /** Speed it can never exceed, however long the dive. Terminal velocity, in
-   *  effect: drag would do it anyway, but a hard cap keeps the camera sane. */
+  /**
+   * Speed it can never exceed, however long the dive.
+   *
+   * This does real work now rather than being a backstop. With the drag down
+   * where a four-to-one glide needs it, a squirrel pointed straight at the
+   * ground would keep accelerating to 448km/h, well past anything a person has
+   * ever flown a suit at. The cap holds it to 378, which is within a whisker
+   * of the world speed record of 374.8 — so the fastest the game goes is about
+   * the fastest the thing has ever been done.
+   */
   maxSpeed: 105,
 
   /** What the leap off the ledge gives it: forward, and a little up. */
@@ -371,11 +385,19 @@ export const NUTS = {
    *  flight can get. See the same note on GATES.until. */
   until: 0.95,
   /** Along a run, and between runs. */
-  spacing: 11,
-  runMin: 4,
-  runMax: 9,
-  gapMin: 30,
-  gapMax: 70,
+  spacing: 14,
+  runMin: 3,
+  runMax: 6,
+  /**
+   * The quiet between runs, and it is most of the valley now.
+   *
+   * A longer glide made a hundred of these on its own, which is an acorn every
+   * second or so for the whole flight — at that rate they stop being something
+   * you go and get and become weather. Long gaps make each run something you
+   * spot ahead and turn towards, which is the job they are here to do.
+   */
+  gapMin: 120,
+  gapMax: 200,
   /** How far a run may sit off the line — see LINE. Small, now that there is
    *  a line for them to sit on: the wander used to *be* the shape of the
    *  route, and a route made of independent random offsets is a zigzag no
@@ -424,23 +446,31 @@ export const GATES = {
    * of a number that cannot be got is not a score.
    */
   until: 0.97,
-  /** How far apart they are down the valley, and how far that may vary. */
-  spacing: 62,
-  spacingJitter: 18,
+  /**
+   * How far apart they are down the valley, and how far that may vary.
+   *
+   * Far apart, and far further than they were. A longer glide made more of
+   * them automatically — twenty-five in one flight — and an arch every three
+   * seconds is not a thing you aim at, it is a thing that keeps happening to
+   * you. A dozen, well spaced, each one visible from a long way off and worth
+   * lining up for.
+   */
+  spacing: 150,
+  spacingJitter: 40,
   /** The first is well clear of the ledge, so there is time to find the
    *  controls before there is anything to aim at. */
   firstAt: 150,
   /**
    * How big the hole is, and how much that varies.
    *
-   * Generous, and measured: everything in the valley hangs at the height a
-   * hands-off glide passes through, so a child who leaves the pitch alone and
-   * only steers takes the lot. The size is what buys room for one who does
-   * not. Eight units is about five squirrels across — a hoop, plainly, and
-   * plainly one you can miss.
+   * Big, and meant to be. Getting through an arch should be the easy,
+   * satisfying part of the flight — the thing a child succeeds at while they
+   * are still learning to steer — and the difficulty, such as it is, belongs
+   * to finding the line and holding it. Eleven units across is nearly six
+   * squirrels wide, and taller again.
    */
-  radius: 8,
-  sizeJitter: 1.6,
+  radius: 10.5,
+  sizeJitter: 1.4,
   /**
    * How much taller than wide an arch is.
    *
@@ -454,12 +484,12 @@ export const GATES = {
    * Height is the axis pitch moves you along, so height is the axis with the
    * room in it. A tall arch is also simply what an arch looks like.
    */
-  heightScale: 1.9,
+  heightScale: 1.7,
   /** How far a ring may sit off the line — see LINE — and off the height the
    *  glide will actually be at by then. Both small: a ring is meant to be the
    *  next bead on the string of acorns, not a separate errand. */
-  sideWander: 2.5,
-  heightWander: 3,
+  sideWander: 1.5,
+  heightWander: 2,
   /** How far clear of the rock a ring must hang. */
   wallGap: 6,
   /** How thick the ring itself is. */
@@ -625,12 +655,21 @@ export const STREAKS = {
  * eyes on something else.
  */
 export const WIND = {
-  /** Loudness at trim and flat out. Never silent in flight, never shouting. */
-  gainSlow: 0.05,
-  gainFast: 0.5,
-  /** The filter, which is what turns a hiss into a roar. */
-  cutoffSlow: 420,
-  cutoffFast: 3200,
+  /**
+   * Loudness at trim and flat out.
+   *
+   * Well under what it was. A dive is the loudest thing in the game and it was
+   * drowning it: this is a game a child plays with the tablet a foot from
+   * their face, and the wind is meant to tell them they are going fast, not to
+   * be the reason they turn the sound off. It still more than triples between
+   * an easy glide and a full dive, which is all the cue has to do.
+   */
+  gainSlow: 0.04,
+  gainFast: 0.17,
+  /** The filter, which is what turns a hiss into a roar. Kept off the top end
+   *  for the same reason — it is bright air, not static. */
+  cutoffSlow: 380,
+  cutoffFast: 2200,
   /** How quickly it answers a change of speed. Slower than the flight, so it
    *  swells rather than flickering with every gust of stick. */
   rate: 2.4,

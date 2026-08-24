@@ -62,8 +62,11 @@ dpsi   =  lift sin(bank) / (v cos(gamma))
 Everything the game feels comes out of those three lines: the speed a dive
 builds, the float of a pull-up, turns that tighten as they slow. Nothing
 scripts any of it. The coefficients in `GLIDE` are set from measured wingsuit
-flight — about 150km/h and three-to-one hands off, and a vertical dive that
-runs out at 378km/h against a world record of 374.8.
+flight — about 150km/h hands off, and a vertical dive capped at 378km/h
+against a world speed record of 374.8. The glide is four and a fifth to one,
+which is the wind-tunnel figure for an elite pilot in a high-performance suit
+(an ordinary one runs two to three, and the competition distance record implies
+six).
 
 Seven things this has already caught someone out on, each with the symptom:
 
