@@ -27,7 +27,7 @@ export const WORLD = {
    * when the game flew one at startup. This only has to be comfortably longer
    * than that, so the world does not run out under a good flight.
    */
-  length: 2400,
+  length: 2050,
   /** How wide the floor of the valley is, and how far out the walls stand. */
   halfWidth: 60,
   /**
@@ -44,8 +44,8 @@ export const WORLD = {
   /** Fog, sized to the valley: it should hide where the world stops and
    *  nothing nearer. At the old 120/620 it was eating the middle distance of
    *  a valley three times longer than the one it was set for. */
-  fogNear: 400,
-  fogFar: 2350,
+  fogNear: 370,
+  fogFar: 2000,
   /**
    * The walls, as one solid ridge each side rather than a scatter of peaks.
    *
@@ -75,7 +75,7 @@ export const WORLD = {
   /** Trees on the valley floor, purely to give the ground a scale to read
    *  height against — from 150 up, bare ground says nothing about how high
    *  you are. */
-  trees: 700,
+  trees: 620,
 } as const;
 
 /**
@@ -112,26 +112,27 @@ export const GLIDE = {
    * wingsuit has ever been flown on purpose.
    */
   liftPerV2: 0.00615,
-  dragPerV2: 0.000622,
+  dragPerV2: 0.000726,
   /**
    * Induced drag: the price of lift. Drag rises with the square of the lift
    * coefficient, which is why hauling back on the stick both floats you and
    * scrubs your speed off.
    *
    * These three together settle the glide, because at a steady glide the
-   * descent is simply drag over lift. As set they give four and a fifth
+   * descent is simply drag over lift. As set they give three and three fifths
    * forward for one down at trim, and, deliberately, trim sits exactly at the
    * best glide the wing has — so hands off is also the furthest a child can
    * get without having to learn anything.
    *
-   * Four is a long way for a wingsuit and it is not a made-up number: an
-   * ordinary suit runs between two and three to one, and 4.0 is what the wind
-   * tunnel work gives an elite pilot in a high-performance suit. The
-   * competition distance record implies six. The lift is untouched, so the
-   * squirrel still flies at the same speeds and feels the same — it is only
-   * the drag that came off, which is exactly what a better suit is.
+   * That is a long way for a wingsuit and it is not a made-up number: an
+   * ordinary suit runs between two and three to one, and the wind tunnel work
+   * gives 4.0 to an elite pilot in a high-performance suit. It was briefly set
+   * to that 4.0 and the flight came out at a minute, which is a long time to
+   * ask a child to hold one line — this is the same glide pulled back until
+   * the valley ends when it should. The lift is untouched throughout, so the
+   * squirrel flies at the same speeds and feels the same; only the drag moves.
    */
-  inducedDrag: 0.000861,
+  inducedDrag: 0.001005,
 
   /**
    * What the stick asks the membrane for, as a lift coefficient.
@@ -143,6 +144,19 @@ export const GLIDE = {
   clTrim: 0.85,
   clMin: 0.12,
   clMax: 1.5,
+  /**
+   * How far past clMax the *snap* is allowed to go, for the moment it lasts.
+   *
+   * clMax is what the wing will hold all day. This is what it will do for half
+   * a second when the squirrel throws itself back, and it has to be a lot more
+   * or the flare has no punch: the snap was being clamped to clMax, which is
+   * barely above trim, so pulling back flattened the glide and slowed it down
+   * but could never actually lift. A real wing pitched up sharply makes far
+   * more lift than its steady state for a beat, and this is that beat. It
+   * washes out on its own, and the g cap still holds it, so it buys a flare
+   * and never a way to fly for free.
+   */
+  clSnapMax: 5.2,
   /**
    * How fast the membrane answers.
    *
@@ -177,10 +191,12 @@ export const GLIDE = {
    * moment — and, being lift, it is charged induced drag like any other. Hold
    * the stick anywhere and you get exactly the glide that position deserves.
    */
-  snap: 1.7,
-  /** How quickly the snap fades: about half a second, which is roughly how
-   *  long a held input lasts before it stops being a movement. */
-  washRate: 2.2,
+  snap: 3.6,
+  /** How quickly the snap fades — about four fifths of a second, which is how
+   *  long a flare wants to last: long enough for the nose to come up and the
+   *  squirrel to actually balloon over the top, short enough that holding the
+   *  stick there afterwards buys nothing but the drag. */
+  washRate: 1.25,
   /**
    * How far the wing will go the *wrong* way for a moment.
    *
@@ -198,7 +214,7 @@ export const GLIDE = {
    * swoop that still takes a moment. It only bites in a fast dive, which is
    * the only place it should.
    */
-  nMax: 4,
+  nMax: 5.5,
   /** The same, pushing over. Smaller, as it is on anything with a pilot in
    *  it: negative g is far less comfortable than positive. */
   nMin: 1.6,
@@ -247,6 +263,19 @@ export const GLIDE = {
    * needs from a flying game when it is all getting away from them.
    */
   brakeDrag: 0.0024,
+  /**
+   * How quickly the brake actually arrives — about six tenths of a second.
+   *
+   * The wing bites the instant the stick moves, but a belly does not: the
+   * animal has to physically come round broadside before it is a parachute,
+   * and that takes a moment. Giving the form drag its own lag is what finally
+   * made a flare *lift*. Without it the brake came on with the lift and bled
+   * the speed as fast as the nose came up, so a pull-back settled at exactly
+   * level flight and hung there — measured, dead on 0.0 degrees, every time.
+   * With it there is half a second of nose-up before the drag catches on, and
+   * the squirrel balloons over the top the way it should.
+   */
+  brakeRate: 1.6,
 
   /**
    * Speed it can never exceed, however long the dive.
@@ -285,7 +314,7 @@ export const GLIDE = {
  */
 export const AOA = {
   tucked: -0.2,
-  flared: 0.85,
+  flared: 1,
   /** Bends the middle of the range down, so an ordinary glide sits at a
    *  natural ten degrees or so and the drama is saved for the ends of the
    *  stick. */
@@ -370,6 +399,15 @@ export const LINE = {
   share: 0.36,
   /** How far clear of the rock the line stays. */
   wallGap: 14,
+  /**
+   * How far the arches' steady downward ramp may sit off the line a glide
+   * actually traces. See Terrain.rampAt.
+   *
+   * Comfortably inside an arch's half height, so straightening the chain out
+   * never costs anybody an arch — which is the whole trap this sort of change
+   * walks into.
+   */
+  ramp: 7,
 } as const;
 
 /**
@@ -418,7 +456,7 @@ export const NUTS = {
   catchRadius: 5,
   /** And more room again in height, for the same reason the arches are tall:
    *  pitch is what moves a player off the line. See GATES.heightScale. */
-  catchHeightScale: 1.8,
+  catchHeightScale: 2.1,
   size: 0.72,
   /** Turning and bobbing, so they hang rather than sit. */
   spinRate: 1.4,

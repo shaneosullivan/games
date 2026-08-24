@@ -21,6 +21,8 @@ export class Wind {
   private filter: BiquadFilterNode | null = null;
   private source: AudioBufferSourceNode | null = null;
   private muted = false;
+  /** The flight is over: fade out and stay out. See hush(). */
+  private hushed = false;
   /** Follows the speed, but lazily. See WIND.rate. */
   private level = 0;
 
@@ -74,14 +76,28 @@ export class Wind {
     this.source.start();
   }
 
+  /**
+   * The flight is over — down the valley or down early, it makes no odds.
+   *
+   * Wanted because a landed squirrel stops being simulated, so its speed
+   * freezes at whatever it touched down at and the wind howls on underneath
+   * the card at exactly that pitch, for as long as the card is up. Fades
+   * rather than cuts: wind that stops dead sounds like a bug.
+   */
+  hush(): void {
+    this.hushed = true;
+  }
+
   /** `run` is 0 at trim and 1 flat out. */
   update(dt: number, run: number): void {
-    this.level += (run - this.level) * Math.min(1, WIND.rate * dt);
+    const want = this.hushed ? 0 : run;
+    this.level += (want - this.level) * Math.min(1, WIND.rate * dt);
     if (!this.gain || !this.filter || this.muted) {
       return;
     }
     const t = Math.min(1, Math.max(0, this.level));
-    this.gain.gain.value = WIND.gainSlow + t * (WIND.gainFast - WIND.gainSlow);
+    const floor = this.hushed ? 0 : WIND.gainSlow;
+    this.gain.gain.value = floor + t * (WIND.gainFast - floor);
     this.filter.frequency.value =
       WIND.cutoffSlow + t * (WIND.cutoffFast - WIND.cutoffSlow);
   }

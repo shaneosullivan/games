@@ -31,7 +31,7 @@ export class Stage {
     // but clipping it would show as a hard edge on the furthest peaks. It has
     // to be past WORLD.fogFar and was not — at 1400 against a fog that reaches
     // 1700 the valley was being cut off while still visible.
-    this.camera = new THREE.PerspectiveCamera(CAMERA.fov, 1, 0.4, 2600);
+    this.camera = new THREE.PerspectiveCamera(CAMERA.fov, 1, 0.4, 2250);
 
     // Bright from above and cool from below, which is what a valley under an
     // open sky actually looks like.

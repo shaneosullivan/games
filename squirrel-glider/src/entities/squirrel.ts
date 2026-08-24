@@ -8,6 +8,10 @@ const FUR_DARK = 0x8f5528;
 const BELLY = 0xe8cfa8;
 const EYE = 0x241a1a;
 const NOSE = 0x3b2a24;
+/** The goggles: a dark leather strap, brass rims and a glint on the glass. */
+const STRAP = 0x4a3524;
+const BRASS = 0xd6a52e;
+const GLASS = 0x9fdcef;
 
 /**
  * The flying squirrel, and the glide.
@@ -46,6 +50,9 @@ export class Squirrel {
   private prevCl: number = GLIDE.clTrim;
   /** The stick, lagged. The gap between it and the stick is the snap. */
   private stickLag = 0;
+  /** How far the belly has actually come round into the wind. See
+   *  GLIDE.brakeRate. */
+  private belly = 0;
   private bob = 0;
 
   private readonly body: THREE.Group;
@@ -96,6 +103,34 @@ export class Squirrel {
       const eye = new THREE.SphereGeometry(0.11, 7, 6);
       eye.translate(side * 0.36, 0.27, 2.16);
       parts.push(paint(eye, EYE));
+
+      // Goggles. Open rims rather than solid lenses: a child should still be
+      // able to see the squirrel's eyes, and a filled disc hides the whole
+      // face at this size.
+      const rim = new THREE.TorusGeometry(0.26, 0.055, 6, 16);
+      rim.translate(side * 0.35, 0.27, 2.09);
+      parts.push(paint(rim, BRASS));
+
+      // One glint across the top of each lens, which is what actually says
+      // "glass" — the rim alone reads as a pair of spectacles.
+      const glint = new THREE.TorusGeometry(0.22, 0.03, 5, 10, Math.PI * 0.5);
+      glint.rotateZ(Math.PI * 0.2);
+      glint.translate(side * 0.35, 0.27, 2.12);
+      parts.push(paint(glint, GLASS));
+    }
+
+    // The strap, round the back of the head from one rim to the other.
+    //
+    // An arc and not a ring: a full torus would lie straight across the face.
+    // The arc is swept round so its gap sits at the front — see the note on
+    // strapArc for the arithmetic.
+    parts.push(paint(strapShape(), STRAP));
+
+    // The little buckles where the strap meets each rim.
+    for (const side of [-1, 1]) {
+      const buckle = new THREE.BoxGeometry(0.1, 0.13, 0.13);
+      buckle.translate(side * 0.58, 0.27, 1.98);
+      parts.push(paint(buckle, BRASS));
     }
 
     const merged = mergeGeometries(parts);
@@ -142,6 +177,7 @@ export class Squirrel {
     this.cl = GLIDE.clTrim;
     this.prevCl = GLIDE.clTrim;
     this.stickLag = 0;
+    this.belly = 0;
     this.bank = 0;
     this.prevBank = 0;
     this.perched = true;
@@ -252,7 +288,10 @@ export class Squirrel {
     const held = Math.max(
       Math.max(GLIDE.clFloor, gFloor),
       Math.min(
-        GLIDE.clMax,
+        // clSnapMax and not clMax, because the snap is a transient and this is
+        // the ceiling on transients. `this.cl` alone can never exceed clMax,
+        // so once the snap has washed out this clamps at clMax anyway.
+        GLIDE.clSnapMax,
         gCap,
         (this.cl + snap) / Math.max(GLIDE.bankHold, Math.cos(this.bank)),
       ),
@@ -267,14 +306,22 @@ export class Squirrel {
     // is a real cost and it is already charged as induced drag; charging it as
     // an air brake as well would mean every turn slammed the belly out, and
     // turning is the whole game.
+    // Off the settled lift and deliberately not off the snap. The snap is the
+    // wing biting hard for a moment; the air brake is the body sitting
+    // broadside, which is a posture and takes a moment to arrive. Charging the
+    // brake against the snap killed the very speed the flare needs to make its
+    // lift out of, so a pull-back flattened the glide and never lifted.
     const flare = Math.max(
       0,
-      (this.cl + snap - GLIDE.clTrim) / (GLIDE.clMax - GLIDE.clTrim),
+      (this.cl - GLIDE.clTrim) / (GLIDE.clMax - GLIDE.clTrim),
     );
+    // ...and it arrives late. See GLIDE.brakeRate: the belly has to come round
+    // before it is a parachute, and that half second is the whole flare.
+    this.belly += (flare - this.belly) * Math.min(1, GLIDE.brakeRate * dt);
     const drag =
       (GLIDE.dragPerV2 +
         GLIDE.inducedDrag * held * held +
-        GLIDE.brakeDrag * flare * flare) *
+        GLIDE.brakeDrag * this.belly * this.belly) *
       v *
       v;
 
@@ -360,6 +407,27 @@ function angleOfAttack(cl: number): number {
   const t = (cl - GLIDE.clMin) / (GLIDE.clMax - GLIDE.clMin);
   const eased = Math.pow(Math.max(0, Math.min(1, t)), AOA.curve);
   return AOA.tucked + eased * (AOA.flared - AOA.tucked);
+}
+
+/**
+ * The goggle strap: an arc round the back of the head, with the gap at the
+ * front where the lenses are.
+ *
+ * A torus is built in the XY plane sweeping from angle zero. Laid flat with
+ * rotateX it becomes a band round the head, where angle zero points right and
+ * a quarter turn points forward. Turning the whole thing by half the arc plus
+ * a quarter turn centres the sweep on the back of the head, which is where a
+ * strap goes.
+ */
+function strapShape(): THREE.BufferGeometry {
+  const arc = Math.PI * 1.25;
+  const strap = new THREE.TorusGeometry(0.58, 0.07, 5, 20, arc);
+  strap.rotateX(Math.PI / 2);
+  strap.rotateY(arc / 2 + Math.PI / 2);
+  // Squashed to sit against the head, which is itself not round.
+  strap.scale(1.04, 1, 1.06);
+  strap.translate(0, 0.28, 1.7);
+  return strap;
 }
 
 /** One limb: a stubby leg with a paw, pointing out from the body. */

@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import {mergeGeometries} from "three/examples/jsm/utils/BufferGeometryUtils.js";
-import {LINE, SIM, WORLD} from "../config";
+import {GATES, LINE, SIM, WORLD} from "../config";
 import {Squirrel} from "./squirrel";
 import {paint, vertexToon} from "../render/materials";
 import {Rng} from "../core/rng";
@@ -132,6 +132,34 @@ export class Terrain {
    * rather than a number somebody picked.
    */
   reach = 0;
+
+  /**
+   * The height the arches and the acorns hang at: a steady diagonal ramp down
+   * the valley, rather than the exact line a glide happens to trace.
+   *
+   * A hands-off flight is not a straight line and never will be. It leaves the
+   * cliff below flying speed, dives to find it, pulls out, floats, and settles
+   * — the long slow porpoise every glider does, and a real one. Hanging the
+   * arches on it exactly meant they rose and fell with it, and from the air a
+   * chain that bobs reads as scattered rather than as a route.
+   *
+   * So this is the straight line from the first arch to the last, pulled back
+   * toward the real path wherever the two disagree by more than LINE.ramp. The
+   * result descends steadily the whole way — which is the thing you can see and
+   * aim down — while never sitting further off the flyable line than an arch
+   * can swallow. The clamp is well inside an arch's half height, so a squirrel
+   * flying the glide passes through every one of them.
+   */
+  rampAt(z: number): number {
+    const first = GATES.firstAt;
+    const last = Math.max(first + 1, this.reach * GATES.until);
+    const t = Math.max(0, Math.min(1, (-z - first) / (last - first)));
+    const straight =
+      this.glidePathAt(-first) +
+      (this.glidePathAt(-last) - this.glidePathAt(-first)) * t;
+    const real = this.glidePathAt(z);
+    return Math.max(real - LINE.ramp, Math.min(real + LINE.ramp, straight));
+  }
 
   /**
    * The line the game wants you to fly, side to side. See LINE in the config.

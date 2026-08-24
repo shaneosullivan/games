@@ -67,13 +67,16 @@ export class Game {
     this.terrain = new Terrain(rng);
     this.gates = new Gates(
       rng,
-      z => this.terrain.glidePathAt(z),
+      z => this.terrain.rampAt(z),
       z => this.terrain.wallAt(z),
       z => this.terrain.ribbonAt(z),
       this.terrain.reach,
     );
     this.nuts = new Nuts(
       rng,
+      // The real flown line, not the arches' tidy diagonal. An arch is 18 units
+      // tall and can swallow the difference; an acorn is a bead you have to
+      // actually touch, so it belongs exactly where the squirrel will be.
       z => this.terrain.glidePathAt(z),
       z => this.terrain.wallAt(z),
       z => this.terrain.ribbonAt(z),
@@ -262,6 +265,10 @@ export class Game {
     this.stick.enabled = false;
     this.stick.release();
     this.runOut = 0;
+    // The wind goes with the flight. A landed squirrel is never updated again,
+    // so without this its speed stays frozen at whatever it arrived at and the
+    // wind keeps howling at that pitch under the card.
+    this.wind.hush();
   }
 
   /**
