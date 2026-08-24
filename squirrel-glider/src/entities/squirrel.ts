@@ -373,7 +373,12 @@ export class Squirrel {
     const gamma = THREE.MathUtils.lerp(this.prevGamma, this.gamma, alpha);
     const bank = THREE.MathUtils.lerp(this.prevBank, this.bank, alpha);
     const cl = THREE.MathUtils.lerp(this.prevCl, this.cl, alpha);
-    const pitch = gamma + angleOfAttack(cl);
+    // Never past straight down. A steep dive and a deep tuck add up, and
+    // without this the nose swings under and the squirrel is drawn on its back.
+    const pitch = Math.max(
+      -Math.PI / 2,
+      Math.min(1.15, gamma + angleOfAttack(cl)),
+    );
 
     // YXZ so the yaw goes on first and the pitch is about the squirrel's own
     // axis, not the world's — otherwise a banked turn also pitches it.

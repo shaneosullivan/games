@@ -346,12 +346,30 @@ export const GLIDE = {
  * a squirrel putting the brakes on and looks like one.
  */
 export const AOA = {
-  tucked: -0.2,
+  /**
+   * Nose-down when the membrane is asked for nothing.
+   *
+   * Deep, and it has to be. Measured on screen, a squirrel pushed a third of
+   * the way forward used to dip its nose three degrees and one pushed most of
+   * the way twelve — because the camera follows the flight path, so most of a
+   * dive is cancelled before it ever reaches the frame, and what is left has
+   * to come from the animal's own attitude. Thirty degrees below its own path
+   * is what a squirrel tucking to fall actually looks like, and it survives
+   * the camera.
+   */
+  tucked: -0.55,
   flared: 1,
-  /** Bends the middle of the range down, so an ordinary glide sits at a
-   *  natural ten degrees or so and the drama is saved for the ends of the
-   *  stick. */
-  curve: 1.6,
+  /**
+   * Bends the middle of the range, so an ordinary glide still sits at a
+   * natural ten degrees or so and the drama is saved for the ends of the
+   * stick.
+   *
+   * Retuned when `tucked` was deepened: dropping that end of the range pulled
+   * the whole curve down with it, and the squirrel glided along permanently
+   * twenty degrees nose-down. This is the exponent that puts trim back where
+   * it was while leaving the new depth at the tucked end untouched.
+   */
+  curve: 1.16,
 } as const;
 
 /**
@@ -686,9 +704,10 @@ export const CAMERA = {
    * shot pinned exactly to the path never shows the attitude change: the
    * squirrel would sit at the same angle in the frame whatever it was doing.
    * Most of that job belongs to AOA now, which swings the body against its own
-   * path, so this only has to keep the animal in shot.
+   * path, so this only has to keep the animal in shot — and it must not do
+   * that so completely that it cancels the dive it is following.
    */
-  pathFollow: 0.72,
+  pathFollow: 0.62,
   /**
    * How much the lens trembles flat out, and how much of that is owed to
    * flying low.
