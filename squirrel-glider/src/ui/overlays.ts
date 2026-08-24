@@ -37,6 +37,15 @@ export class Overlay {
     this.root.classList.add("hidden");
   }
 
+  /** The finish card says something different depending on how it ended, so
+   *  the heading has to move too. */
+  setTitle(text: string): void {
+    const h = this.root.querySelector("h1");
+    if (h) {
+      h.textContent = text;
+    }
+  }
+
   setBody(text: string): void {
     const p = this.root.querySelector("p");
     if (p) {

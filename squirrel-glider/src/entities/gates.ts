@@ -36,13 +36,14 @@ export class Gates {
     private readonly pathAt: (z: number) => number,
     private readonly roomAt: (z: number) => number,
     private readonly lineAt: (z: number) => number,
-    reach: number,
+    until: number,
     private readonly draftAt: (z: number) => {side: number; top: number} | null,
   ) {
     // As many as fit inside the flyable valley, rather than a fixed number:
-    // see GATES.until.
+    // see GATES.until. `until` already accounts for the net standing at the
+    // end — an arch hung inside it would be unflyable and would look absurd.
     let z = -GATES.firstAt;
-    while (z > -reach * GATES.until) {
+    while (z > -until) {
       this.build(z);
       z -= GATES.spacing + this.rng.range(0, GATES.spacingJitter);
     }

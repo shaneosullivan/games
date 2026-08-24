@@ -1,5 +1,16 @@
 import * as THREE from "three";
-import {CAMERA, CONTROL, DRAFT, FEEL, LANDING, SIM, WORLD} from "./config";
+import {
+  CAMERA,
+  CONTROL,
+  DRAFT,
+  FEEL,
+  GATES,
+  LANDING,
+  NET,
+  NUTS,
+  SIM,
+  WORLD,
+} from "./config";
 import {GameLoop} from "./core/loop";
 import {Joystick} from "./core/input";
 import {Rng} from "./core/rng";
@@ -10,6 +21,12 @@ import {Gates} from "./entities/gates";
 import {Nuts} from "./entities/nuts";
 import {Streaks} from "./entities/streaks";
 import {Drafts} from "./entities/drafts";
+import {Net} from "./entities/net";
+import {
+  createFireworks,
+  FIREWORK_PALETTE,
+  ParticleBurst,
+} from "../../shared/particles";
 import {Wind} from "./core/audio";
 import {Hud} from "./ui/hud";
 import {Overlay} from "./ui/overlays";
@@ -34,6 +51,8 @@ export class Game {
   readonly gates: Gates;
   readonly nuts: Nuts;
   readonly drafts: Drafts;
+  readonly net: Net;
+  readonly sparks: ParticleBurst;
   readonly streaks: Streaks;
   readonly wind: Wind;
   readonly hud: Hud;
@@ -61,6 +80,12 @@ export class Game {
    *  the camera uses so the shot swings under it rather than snapping. */
   private lift = 0;
   private dipped = 0;
+  /** Seconds since the net caught it, or null if it never did. */
+  private netting: number | null = null;
+  /** How far the shot has swung round to look at the net. See followCamera. */
+  private finishing = 0;
+  /** Whether the flight ended in the net rather than on the ground. */
+  private caught = false;
   /** The heading and climb the *camera* is using, which lag the squirrel's.
    *  See followCamera. */
   private camHeading = Math.PI;
@@ -83,6 +108,29 @@ export class Game {
     // acorns.
     this.terrain.refly((x, y, z) => this.drafts.liftAt(x, y, z));
 
+    // The net stands where the glide has come down to the height of its own
+    // legs, so the legs reach the ground and a flight arrives at the rim
+    // rather than over the top of it or under it.
+    let netZ = -(this.terrain.reach - NET.before);
+    for (let z = -200; z > -this.terrain.reach; z -= 10) {
+      if (this.terrain.glidePathAt(z) <= NET.legHeight) {
+        netZ = z;
+        break;
+      }
+    }
+    this.net = new Net(
+      new THREE.Vector3(
+        this.terrain.ribbonAt(netZ),
+        WORLD.floorY + NET.legHeight,
+        netZ,
+      ),
+    );
+    this.sparks = createFireworks();
+
+    // Nothing is placed inside the net or in the last stretch before it: an
+    // acorn hanging in the cloth is absurd and an arch there is unflyable.
+    const clearOfNet = -netZ - NET.size / 2 - 25;
+
     // After the drafts, because some arches are hung up in the rising air and
     // need to know where it is.
     this.gates = new Gates(
@@ -90,7 +138,7 @@ export class Game {
       z => this.terrain.rampAt(z),
       z => this.terrain.wallAt(z),
       z => this.terrain.ribbonAt(z),
-      this.terrain.reach,
+      Math.min(this.terrain.reach * GATES.until, clearOfNet),
       z => {
         const band = this.drafts.bandAt(z);
         return band
@@ -106,8 +154,9 @@ export class Game {
       z => this.terrain.glidePathAt(z),
       z => this.terrain.wallAt(z),
       z => this.terrain.ribbonAt(z),
-      this.terrain.reach,
+      Math.min(this.terrain.reach * NUTS.until, clearOfNet),
     );
+
     this.squirrel = new Squirrel();
     this.streaks = new Streaks(rng);
     this.wind = new Wind();
@@ -116,6 +165,8 @@ export class Game {
     this.stage.scene.add(this.gates.group);
     this.stage.scene.add(this.nuts.group);
     this.stage.scene.add(this.drafts.group);
+    this.stage.scene.add(this.net.group);
+    this.stage.scene.add(this.sparks.mesh);
     this.stage.scene.add(this.squirrel.group);
     this.stage.scene.add(this.streaks.group);
 
@@ -130,7 +181,7 @@ export class Game {
     this.intro = new Overlay(
       ui,
       "Squirrel Glider",
-      "You are a flying squirrel on the edge of a huge cliff. Tap to jump off, then drag to fly. Pull back and you rear up into the wind and slow right down. Push forward and you tip your nose down and dive, fast. Drag left or right to lean into a turn. Follow the floating acorns, and look for the white lines of rising air by the walls — fly into those and they will carry you up.",
+      "You are a flying squirrel on the edge of a huge cliff. Tap to jump off, then drag to fly. Pull back and you rear up into the wind and slow right down. Push forward and you tip your nose down and dive, fast. Drag left or right to lean into a turn. Follow the floating acorns, look for the white lines of rising air — fly into those and they will carry you up — and land in the big red net at the end of the valley.",
       "Ready",
       () => this.begin(),
     );
@@ -207,6 +258,28 @@ export class Game {
       return;
     }
 
+    // Lying in the net: the cloth has it, and it sinks in and settles while
+    // the sheet throws its wave out to the corners and back.
+    if (this.netting !== null) {
+      this.netting += dt;
+      this.net.update(dt);
+      this.sparks.update(dt);
+      const s = this.squirrel;
+      this.net.press(s.position);
+      // Riding the sag rather than being parked on top of it.
+      const rest = this.net.heightAt(s.position.x, s.position.z) + 1.1;
+      s.position.y += (rest - s.position.y) * Math.min(1, 7 * dt);
+      s.speed *= Math.pow(NET.grab, dt);
+      s.position.x += Math.sin(s.heading) * s.speed * dt;
+      s.position.z += Math.cos(s.heading) * s.speed * dt;
+      s.prevPosition.copy(s.position);
+      if (this.netting > LANDING.runOut + 1.1) {
+        this.netting = null;
+        this.showCard();
+      }
+      return;
+    }
+
     // The run-out after touchdown: the squirrel is down and sliding, and the
     // card waits until it has stopped. Landing is the end of the flight, not
     // the end of the moment.
@@ -249,9 +322,21 @@ export class Game {
     this.nuts.check(this.from, this.squirrel.position);
     this.nuts.update(dt);
     this.drafts.update(dt);
+    this.net.update(dt);
+    this.sparks.update(dt);
 
     // Nothing to land on until it has left the ledge.
     if (this.squirrel.perched) {
+      return;
+    }
+
+    // Into the net, which is the ending the game is for.
+    if (
+      !this.squirrel.landed &&
+      this.net.covers(this.squirrel.position.x, this.squirrel.position.z) &&
+      this.squirrel.position.y <= this.net.at.y + 3
+    ) {
+      this.catchInNet();
       return;
     }
 
@@ -299,6 +384,34 @@ export class Game {
   }
 
   /**
+   * Caught.
+   *
+   * The ending the game is actually for. A glide that runs out and puts you
+   * down in the trees ends by stopping; the net ends it by arriving. Fireworks
+   * because the bee game has them, and a child who has flown the whole valley
+   * has earned the same noise.
+   */
+  private catchInNet(): void {
+    const s = this.squirrel;
+    this.caught = true;
+    s.landed = true;
+    this.stick.enabled = false;
+    this.stick.release();
+    this.wind.hush();
+    this.netting = 0;
+    this.sparks.burst(s.position, {
+      color: FIREWORK_PALETTE,
+      count: 90,
+      speed: 13,
+      lift: 7,
+      gravity: 9,
+      ttl: 1.5,
+      size: 1.5,
+      spherical: 1,
+    });
+  }
+
+  /**
    * Down.
    *
    * Gently either way: a fast arrival is a tumble and a slow one is a slide,
@@ -332,17 +445,21 @@ export class Game {
     const arches = this.gates.passed;
     const nuts = this.nuts.eaten;
     const everything = arches === this.gates.total && nuts === this.nuts.total;
-    const far =
-      along > 0.97
-        ? "You flew the whole valley, right to the end of it."
+    this.done.setTitle(
+      this.caught ? "You landed right in the net!" : "You landed!",
+    );
+    const landing = this.caught
+      ? "You flew the whole valley and dropped straight into the net."
+      : along > 0.97
+        ? "You flew the whole valley, right to the end of it — but you came down beside the net rather than in it."
         : along > 0.7
-          ? "You got most of the way down the valley."
-          : "You came down early — there is a lot more valley out there.";
+          ? "You got most of the way down the valley. The big red net is right at the end of it."
+          : "You came down early — there is a lot more valley out there, and a net at the end to land in.";
 
     this.done.setBody(
       everything
-        ? `Every single arch — all ${this.gates.total} of them — and every last acorn. ${far} There is nothing left out there to catch.`
-        : `${far} You flew through ${arches} of the ${this.gates.total} arches and caught ${nuts} of the ${this.nuts.total} acorns. Follow the acorns and they will take you to most of them. Pull back to slow yourself and line up a tricky arch; push forward to dive and go fast. The white lines by the walls are rising air — fly into one and it will carry you back up. Let go of everything and you will glide the furthest of all.`,
+        ? `Every single arch — all ${this.gates.total} of them — and every last acorn. ${landing} There is nothing left out there to catch.`
+        : `${landing} You flew through ${arches} of the ${this.gates.total} arches and caught ${nuts} of the ${this.nuts.total} acorns. Follow the acorns and they will take you to most of them. Pull back to slow yourself and line up a tricky arch; push forward to dive and go fast. The white lines by the walls are rising air — fly into one and it will carry you back up. Let go of everything and you will glide the furthest of all.`,
     );
     this.done.show();
   }
@@ -374,6 +491,29 @@ export class Game {
    */
   private followCamera(dt: number): void {
     const s = this.squirrel;
+
+    // Caught: leave the chase behind and go and look at it. See
+    // CAMERA.finishBack for why the ordinary shot will not do here.
+    if (this.netting !== null) {
+      this.finishing +=
+        (1 - this.finishing) * (1 - Math.exp(-CAMERA.finishRate * dt));
+      const back = this.net.at.z + CAMERA.finishBack;
+      this.wantEye.set(
+        this.net.at.x + CAMERA.finishBack * 0.5,
+        this.net.at.y + CAMERA.finishUp,
+        back,
+      );
+      const camera = this.stage.camera;
+      camera.position.lerp(this.wantEye, this.finishing);
+      this.smoothedLook.lerp(
+        s.group.position,
+        1 - Math.exp(-CAMERA.finishRate * dt),
+      );
+      camera.lookAt(this.smoothedLook);
+      camera.fov += (CAMERA.fovSlow - camera.fov) * (1 - Math.exp(-2 * dt));
+      camera.updateProjectionMatrix();
+      return;
+    }
     const fast = this.run();
     const distance = CAMERA.distance + fast * CAMERA.speedPullback;
 

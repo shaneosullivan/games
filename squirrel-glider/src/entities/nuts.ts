@@ -42,12 +42,12 @@ export class Nuts {
     pathAt: (z: number) => number,
     roomAt: (z: number) => number,
     lineAt: (z: number) => number,
-    reach: number,
+    until: number,
   ) {
     // Strung in short lines rather than scattered: a run of them reads as a
     // route to follow, and scattered ones read as litter.
     let z = -NUTS.firstAt;
-    while (z > -reach * NUTS.until) {
+    while (z > -until) {
       const runLength = this.rng.int(NUTS.runMin, NUTS.runMax);
       const side = this.rng.range(-NUTS.sideWander, NUTS.sideWander);
       const lift = this.rng.range(-NUTS.heightWander, NUTS.heightWander);

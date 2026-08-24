@@ -731,6 +731,21 @@ export const CAMERA = {
    * made timid, because a timid dip does not show the climb.
    */
   clearance: 7,
+  /**
+   * The shot for the net: how far back and how far above the squirrel it
+   * swings once the cloth has it, and how quickly it gets there.
+   *
+   * The ordinary chase camera sits nine units behind and two above, which at
+   * the moment of the catch means a lens down at cloth level with a red sheet
+   * filling the whole frame and the fireworks going off somewhere behind it.
+   * The one thing worth seeing at the end of a flight is the squirrel lying in
+   * the net, so the camera goes and looks at it — and it has to go a long way,
+   * because the cloth is seventy-eight units across and at thirty units back
+   * it still more than filled the frame.
+   */
+  finishBack: 68,
+  finishUp: 42,
+  finishRate: 1.5,
 
   shake: 0.16,
   shakeLow: 0.55,
@@ -927,4 +942,58 @@ export const DRAFT = {
    *  are seen against. */
   lineOpacity: 0.7,
   lineColour: 0xffffff,
+} as const;
+
+/**
+ * The safety net at the end of the valley.
+ *
+ * Somewhere to aim. A glide that simply runs out and puts you down in the
+ * trees is a flight that ends by stopping; a net you can see from a long way
+ * off and drop into is a flight that ends by *arriving*, which is a much
+ * better last five seconds for a child.
+ *
+ * The cloth is simulated rather than animated — a grid of points on springs,
+ * pinned to the frame, relaxed a few times a step. It is worth doing properly
+ * because the whole reward is the moment it takes your weight: a net that
+ * played a canned wobble would look like a canned wobble, and a real one sags
+ * where you hit it, throws a wave out to the corners and comes back.
+ */
+export const NET = {
+  /** How far short of the end of the valley it stands, so a good glide meets
+   *  it rather than overshooting into the trees. */
+  before: 90,
+  /** How big the square of cloth is, and how finely it is divided. Twenty by
+   *  twenty is 400 points and 1,160 springs, which is nothing at sixty frames
+   *  a second and is enough that the sag reads as cloth and not as a sheet of
+   *  rubber. */
+  size: 56,
+  grid: 20,
+  /** How tall the legs are, and how far their feet splay out past the rim —
+   *  four legs raked out diagonally, which is what stops the whole thing
+   *  looking like a table. */
+  legHeight: 46,
+  legSplay: 26,
+  legRadius: 1.9,
+
+  /** The cloth. `slack` is how much longer each link is than the spacing it
+   *  sits at, which is the difference between a trampoline and a hammock. */
+  slack: 1.13,
+  gravity: 26,
+  /** How much speed the cloth keeps each step, and how many times the links
+   *  are pulled back to length. More passes is a stiffer net. */
+  damping: 0.972,
+  relax: 5,
+
+  /** How hard the squirrel pushes the cloth down, and how wide a dent it
+   *  makes. */
+  punch: 4.5,
+  dent: 15,
+  /** How much of its speed the net takes away each second once it is in. */
+  grab: 0.06,
+  /** Under this it has stopped bouncing and the card can come up. */
+  still: 3,
+
+  colour: 0xf25c54,
+  rimColour: 0xd94a42,
+  legColour: 0x6b4a35,
 } as const;
