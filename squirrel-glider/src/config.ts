@@ -266,11 +266,31 @@ export const GLIDE = {
    * How much of the lift a hard bank is allowed to cost.
    *
    * The floor on cos(bank) when the squirrel pulls through a turn — see the
-   * note in Squirrel.update. Below this it stops being able to hold itself up
-   * and the turn starts costing height, which is what should happen; above it,
-   * a turn is simply a turn.
+   * note in Squirrel.update. At 0.62 it stopped compensating somewhere around
+   * fifty degrees of bank, so a full-lock turn was holding up only three
+   * fifths of its own weight: measured, six seconds of it cost 73 units of
+   * height against 15 for flying straight. A turn that drops you out of the
+   * sky is a control a child stops using.
+   *
+   * Just under cos(bankMax) now, so the squirrel can hold itself up at any
+   * bank it is able to reach.
    */
-  bankHold: 0.62,
+  bankHold: 0.34,
+  /**
+   * How much of a turn's extra drag is actually charged.
+   *
+   * A game concession, and worth naming as one rather than dressing it up.
+   * The physics is not in doubt: holding height in a sixty-nine degree bank is
+   * very nearly three g, and induced drag goes with the square of that, so a
+   * real hard turn costs about eight times the induced drag of straight
+   * flight. That is correct and it is miserable — the turn is the whole game,
+   * and every use of it was punished.
+   *
+   * So a third of the extra is charged and the rest is waved through. Turning
+   * still costs something, and a hard turn still costs more than a gentle one,
+   * but it no longer drops a child out of the air for steering.
+   */
+  turnCost: 0.35,
 
   /**
    * How far it can lean, how fast it gets there, and how fast it comes back

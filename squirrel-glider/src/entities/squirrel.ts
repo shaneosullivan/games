@@ -298,6 +298,15 @@ export class Squirrel {
         (this.cl + snap) / Math.max(GLIDE.bankHold, Math.cos(this.bank)),
       ),
     );
+    // What the wing is charged for. The lift a turn needs is real and the
+    // squirrel makes it, but only part of the extra drag that comes with it is
+    // billed — see GLIDE.turnCost, which is a stated concession and not a
+    // claim about aerodynamics.
+    const asked = Math.max(0, this.cl + snap);
+    const forDrag = Math.sqrt(
+      asked * asked + GLIDE.turnCost * Math.max(0, held * held - asked * asked),
+    );
+
     const lift = lifting * held * stalled;
     // The air brake: how far past an ordinary glide the *player* is asking for,
     // squared, because a belly turned into the wind is form drag and form drag
@@ -322,7 +331,7 @@ export class Squirrel {
     this.belly += (flare - this.belly) * Math.min(1, GLIDE.brakeRate * dt);
     const drag =
       (GLIDE.dragPerV2 +
-        GLIDE.inducedDrag * held * held +
+        GLIDE.inducedDrag * forDrag * forDrag +
         GLIDE.brakeDrag * this.belly * this.belly) *
       v *
       v;
