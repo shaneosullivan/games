@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import {DRAFT, WORLD} from "../config";
+import {DRAFT, LINE, WORLD} from "../config";
 import {Rng} from "../core/rng";
 
 /** A thermal standing in the open valley. See DRAFT.columns. */
@@ -64,13 +64,22 @@ export class Drafts {
       z -= length + rng.range(70, 130);
     }
 
-    // Thermals standing in the open, between the wall bands.
+    // Thermals standing in the open, between the wall bands — and clear of the
+    // line the acorns run down, so that flying into one is a decision. See
+    // DRAFT.columnClear.
     let cz = -DRAFT.columnFirstAt;
     for (let i = 0; i < DRAFT.columns && cz > last; i++) {
-      this.columns.push({
-        x: rng.range(-DRAFT.columnWander, DRAFT.columnWander),
-        z: cz,
-      });
+      const side = rng.next() < 0.5 ? -1 : 1;
+      const inner = LINE.wander + DRAFT.columnRadius * 0.55 + DRAFT.columnClear;
+      const outer = Math.min(
+        wallAt(cz, pathAt(cz), side) - DRAFT.columnRadius * 0.7,
+        inner + DRAFT.columnReach,
+      );
+      // Where the valley is too narrow to hold one out of the way, it simply
+      // does not get one.
+      if (outer > inner) {
+        this.columns.push({x: side * rng.range(inner, outer), z: cz});
+      }
       cz -= rng.range(DRAFT.columnGapMin, DRAFT.columnGapMax);
     }
 
@@ -131,16 +140,26 @@ export class Drafts {
       return thermal;
     }
     // On the correct side of the valley, and how far in from that rock face.
+    //
+    // These fall back to the thermal rather than to nothing, which they did
+    // not, and it made whole columns of white lines completely dead: a thermal
+    // standing in a stretch of valley that also has a ridge band gets here,
+    // fails the band's side or width test, and used to return zero — throwing
+    // away lift that had already been worked out and that the player could see
+    // the lines of.
     if (Math.sign(x) !== band.side || x === 0) {
-      return 0;
+      return thermal;
     }
     const width = this.widthAt(z, y, band.side);
     const inward = this.wallAt(z, y, band.side) - Math.abs(x);
     if (inward < 0 || inward > width) {
-      return 0;
+      return thermal;
     }
-    // Full strength against the rock, fading over the last stretch inward.
-    const edge = Math.min(1, (width - inward) / DRAFT.fade);
+    // Full strength against the rock, fading over the outer share of the band.
+    const edge = Math.min(
+      1,
+      (width - inward) / Math.max(1, width * DRAFT.edgeShare),
+    );
     return Math.max(thermal, DRAFT.strength * edge * this.lidAt(y, z));
   }
 
@@ -152,8 +171,13 @@ export class Drafts {
       if (away > DRAFT.columnRadius) {
         continue;
       }
-      // Strongest in the core and dying away at the edge, the way a thermal is.
-      const core = Math.min(1, (DRAFT.columnRadius - away) / DRAFT.fade);
+      // Strongest through the core and dying away over the outer share of it,
+      // the way a thermal is.
+      const core = Math.min(
+        1,
+        (DRAFT.columnRadius - away) /
+          Math.max(1, DRAFT.columnRadius * DRAFT.edgeShare),
+      );
       best = Math.max(best, DRAFT.columnStrength * core * this.lidAt(y, z));
     }
     return best;

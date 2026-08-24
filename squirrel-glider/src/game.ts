@@ -5,6 +5,7 @@ import {
   DRAFT,
   FEEL,
   GATES,
+  GLIDE,
   LANDING,
   NET,
   NUTS,
@@ -82,6 +83,8 @@ export class Game {
   private dipped = 0;
   /** Seconds since the net caught it, or null if it never did. */
   private netting: number | null = null;
+  /** How fast it is dropping into the cloth. See the netting branch. */
+  private netFall = 0;
   /** How far the shot has swung round to look at the net. See followCamera. */
   private finishing = 0;
   /** Whether the flight ended in the net rather than on the ground. */
@@ -106,7 +109,15 @@ export class Game {
     // below is hung on the result — see Terrain.refly, and the note there for
     // what happens if a draft in the middle lifts the flight off its own
     // acorns.
-    this.terrain.refly((x, y, z) => this.drafts.liftAt(x, y, z));
+    // Three times, not once. The lift a draft gives depends on how high the
+    // glide was going to be anyway — the ceiling is measured from the path —
+    // so re-flying changes the path, which changes the drafts, which changes
+    // the path. One pass left the reference flight 400 units short of what the
+    // game actually does, and everything hung on it was in the wrong place.
+    // It settles after two or three.
+    for (let pass = 0; pass < 3; pass++) {
+      this.terrain.refly((x, y, z) => this.drafts.liftAt(x, y, z));
+    }
 
     // The net stands where the glide has come down to the height of its own
     // legs, so the legs reach the ground and a flight arrives at the rim
@@ -265,10 +276,27 @@ export class Game {
       this.net.update(dt);
       this.sparks.update(dt);
       const s = this.squirrel;
-      this.net.press(s.position);
-      // Riding the sag rather than being parked on top of it.
-      const rest = this.net.heightAt(s.position.x, s.position.z) + 1.1;
-      s.position.y += (rest - s.position.y) * Math.min(1, 7 * dt);
+
+      // It falls, and the cloth stops it. That way round, and only that way
+      // round: see NET.press for the version where the cloth chased the
+      // squirrel down and the squirrel chased the cloth, and both went
+      // through the floor.
+      this.netFall -= GLIDE.gravity * dt;
+      s.position.y += this.netFall * dt;
+
+      const surface = this.net.heightAt(s.position.x, s.position.z) + NET.ride;
+      if (s.position.y <= surface) {
+        // Everything it is still carrying downward goes into the sheet, plus
+        // its weight, which is what keeps a hollow under it while it lies
+        // there.
+        const hit = Math.max(0, -this.netFall);
+        this.net.press(s.position, (hit * NET.press + NET.weight) * dt);
+        s.position.y = surface;
+        // A bounce while there is anything left to bounce with, and then it
+        // simply lies in it.
+        this.netFall = hit > NET.settle ? hit * NET.bounce : 0;
+      }
+
       s.speed *= Math.pow(NET.grab, dt);
       s.position.x += Math.sin(s.heading) * s.speed * dt;
       s.position.z += Math.cos(s.heading) * s.speed * dt;
@@ -399,6 +427,9 @@ export class Game {
     this.stick.release();
     this.wind.hush();
     this.netting = 0;
+    // It arrives carrying whatever it was descending at, and the sheet gets
+    // all of it.
+    this.netFall = -Math.max(0, -s.speed * Math.sin(s.gamma));
     this.sparks.burst(s.position, {
       color: FIREWORK_PALETTE,
       count: 90,

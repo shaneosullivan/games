@@ -33,12 +33,18 @@ export const WORLD = {
   /**
    * The launch ledge, and the valley floor it looks down on.
    *
-   * The plan asks for a far, far taller cliff, and this is one: a hundred and
-   * fifty times the squirrel's own length, high enough that the valley floor
-   * is a texture rather than a place when you are stood on the edge of it.
-   * Everything else is measured off it — see `length`.
+   * The plan asks for a far, far taller cliff, and this is one: still some
+   * hundred and thirty times the squirrel's own length, high enough that the
+   * valley floor is a texture rather than a place when you are stood on the
+   * edge of it. Everything else is measured off it — see `length`.
+   *
+   * It came down from 620 when the whole flight was slowed. Height is what
+   * buys time in the air, and a gentler sink over the same drop is simply a
+   * longer flight — 78 seconds of it, which is a long while to hold one line.
+   * Taking the cliff down shortens the flight without touching the speed or
+   * the sink, which are the two things that were being asked for.
    */
-  cliffHeight: 620,
+  cliffHeight: 470,
   floorY: 0,
   skyColour: 0xbfe4f5,
   /** Fog, sized to the valley: it should hide where the world stops and
@@ -144,8 +150,8 @@ export const GLIDE = {
    * record of 374.8. The old set glided at 107km/h, which is slower than a
    * wingsuit has ever been flown on purpose.
    */
-  liftPerV2: 0.00615,
-  dragPerV2: 0.000726,
+  liftPerV2: 0.00998,
+  dragPerV2: 0.001179,
   /**
    * Induced drag: the price of lift. Drag rises with the square of the lift
    * coefficient, which is why hauling back on the stick both floats you and
@@ -159,13 +165,16 @@ export const GLIDE = {
    *
    * That is a long way for a wingsuit and it is not a made-up number: an
    * ordinary suit runs between two and three to one, and the wind tunnel work
-   * gives 4.0 to an elite pilot in a high-performance suit. It was briefly set
-   * to that 4.0 and the flight came out at a minute, which is a long time to
-   * ask a child to hold one line — this is the same glide pulled back until
-   * the valley ends when it should. The lift is untouched throughout, so the
-   * squirrel flies at the same speeds and feels the same; only the drag moves.
+   * gives 4.0 to an elite pilot in a high-performance suit.
+   *
+   * Lift and drag were then raised *together*, by the same factor, which is
+   * the one change that makes the squirrel fall more gently without sending it
+   * any further: the ratio between them is the glide, so the valley still ends
+   * where it ended, but everything happens slower. Trim came down from 43 to
+   * 34 units a second and the sink with it, from 11.6 to 9.1 — a fifth longer
+   * in the air over the same ground.
    */
-  inducedDrag: 0.001005,
+  inducedDrag: 0.001631,
 
   /**
    * What the stick asks the membrane for, as a lift coefficient.
@@ -259,7 +268,7 @@ export const GLIDE = {
    * it recovers itself, because this is a game for a child. Raised with the
    * rest of the envelope: a real suit goes mushy around 30, which is 113km/h.
    */
-  stallSpeed: 30,
+  stallSpeed: 24,
   stallLoss: 0.55,
 
   /**
@@ -315,7 +324,7 @@ export const GLIDE = {
    * numbers and could not be felt, and "slow down" is the one thing a child
    * needs from a flying game when it is all getting away from them.
    */
-  brakeDrag: 0.0024,
+  brakeDrag: 0.0039,
   /**
    * How quickly the brake actually arrives — about six tenths of a second.
    *
@@ -340,7 +349,7 @@ export const GLIDE = {
    * of the world speed record of 374.8 — so the fastest the game goes is about
    * the fastest the thing has ever been done.
    */
-  maxSpeed: 105,
+  maxSpeed: 82,
 
   /** What the leap off the ledge gives it: forward, and a little up. */
   jumpSpeed: 9,
@@ -564,7 +573,7 @@ export const GATES = {
    * you. A dozen, well spaced, each one visible from a long way off and worth
    * lining up for.
    */
-  spacing: 150,
+  spacing: 108,
   spacingJitter: 40,
   /** The first is well clear of the ledge, so there is time to find the
    *  controls before there is anything to aim at. */
@@ -602,16 +611,17 @@ export const GATES = {
   /**
    * Arches that are not on the easy line at all.
    *
-   * Every arch sitting on the ramp made a chain you could fly with one hand:
-   * the whole valley at one height, and no reason ever to touch the pitch
-   * control. Some sit low now, which is a dive and costs you nothing but
-   * height you were spending anyway — and some are hung right up in the rising
-   * air along a wall, which you cannot reach at all without going and finding
-   * the draft and riding it. That is the one place in the game where the two
-   * halves of it, the flying and the reading of the valley, have to be done
-   * together.
+   * Both nought, deliberately. Arches that sat low or hung up in a draft were
+   * variety, and they were also the difference between taking nine arches of
+   * nine and taking four: every one of them off the line is one a child has to
+   * spot, judge and manoeuvre for, and the arches are meant to be the part
+   * they get right while they are still learning to steer. The acorns are
+   * where the work is.
+   *
+   * Left here rather than deleted because the placement code is worth keeping
+   * — turn either of these up and the variety comes straight back.
    */
-  lowChance: 0.25,
+  lowChance: 0,
   /** Just far enough below the ramp to sit outside an arch, so it takes a
    *  deliberate nudge forward and never a whole manoeuvre. An arch is about
    *  eighteen units tall from the middle; this is a little more than that. */
@@ -626,11 +636,32 @@ export const GATES = {
    * up there is a reward for spotting the white lines; most of them up there
    * is a tax on not having.
    */
-  highChance: 0.45,
+  highChance: 0,
   /** How near the top of a draft an arch hung in one sits, and how far out
    *  toward the rock. */
   highOfCeiling: 0.82,
   highWallGap: 26,
+  /**
+   * How often an arch sits out toward a wall rather than on the middle line.
+   *
+   * Sideways is the one direction that is free. Height has to be climbed for
+   * and costs a glide something it may not have, but a squirrel can always
+   * steer — so an arch out by the rock is a real decision and a real turn, and
+   * still an arch anybody can take. It sits at the same height as all the
+   * others, on the ramp.
+   */
+  sideChance: 0.4,
+  /** How far out toward the rock a side arch stands, as a share of the room
+   *  there is at that point. */
+  sideOut: 0.5,
+  /**
+   * How much of the valley is left plain before any of that starts.
+   *
+   * The opening arches are where a child is still working out that dragging
+   * sideways turns them at all, and an arch away across the valley during that
+   * lesson is one they miss without understanding why.
+   */
+  easyUntil: 620,
   /** How far clear of the rock a ring must hang. */
   wallGap: 6,
   /** How thick the ring itself is. */
@@ -665,8 +696,8 @@ export const GATES = {
  * never opened once. These are the speeds a flight actually moves between.
  */
 export const FEEL = {
-  slow: 32,
-  fast: 78,
+  slow: 25,
+  fast: 61,
 } as const;
 
 /** The camera: behind and a little above, looking where the squirrel is going. */
@@ -827,7 +858,7 @@ export const LANDING = {
   /** Below this speed it is a landing; above it, a tumble. Neither hurts —
    *  see the note in Game.land. Moved up with the rest of the envelope: at the
    *  old thirty every arrival was a tumble. */
-  gentle: 46,
+  gentle: 36,
   /** How long the squirrel slides or rolls before the card comes up. */
   runOut: 1.6,
 } as const;
@@ -855,8 +886,8 @@ export const STREAKS = {
    *  see them at all. Below `from` there are none: standing still in a snow of
    *  streaks would look like the squirrel was the thing that had stopped. */
   length: 4,
-  from: 34,
-  full: 78,
+  from: 27,
+  full: 61,
   /** Faint. They are meant to be felt at the edge of the eye and not looked
    *  at: any more than this and a dive reads as flying through rain. */
   opacity: 0.3,
@@ -944,13 +975,19 @@ export const DRAFT = {
   /**
    * How fast the air goes up at the rock face.
    *
-   * Sink at an easy glide is about twelve, so this is a net climb of nearly
-   * fifty a second — the squirrel does not drift upward, it is picked up and
-   * thrown. That is the point: a draft has to be worth crossing a valley for,
-   * and at half this it read as the glide merely going shallow for a moment.
-   * The ceiling is what keeps it honest.
+   * Sink at an easy glide is about nine, so this is a net climb of some forty
+   * a second — the squirrel does not drift upward, it is picked up and thrown.
+   * That is the point: a draft has to be worth crossing a valley for, and at
+   * half this it read as the glide merely going shallow for a moment. The
+   * ceiling is what keeps it honest.
+   *
+   * Scaled down with the flight when the whole thing was slowed: a draft is
+   * only worth anything measured against the sink it is beating, and leaving
+   * these where they were while the sink dropped a fifth turned an ordinary
+   * flight into one that was carried 40% further than the valley it was
+   * supposed to end in.
    */
-  strength: 62,
+  strength: 33,
   /**
    * How far above the glide line the lift keeps working.
    *
@@ -959,9 +996,20 @@ export const DRAFT = {
    * on anyway, so a draft is also a way to get back what a bad patch of flying
    * cost you.
    */
-  ceiling: 120,
-  /** How gently the lift dies out at the top and at the inner edge. */
+  ceiling: 85,
+  /** How gently the lift dies out at the top, in units of height. */
   fade: 40,
+  /**
+   * How much of a draft's width is the fade at its edge, as a share.
+   *
+   * A share and not a distance, and that mattered: the fade used to be a flat
+   * forty units, which is wider than the drafts themselves, so the lift never
+   * reached full strength anywhere — a thermal gave three fifths of its rated
+   * lift dead centre and dwindled to nothing well inside its own visible
+   * lines. Being inside the white lines has to mean being in the lift, or the
+   * lines are lying about where the air is.
+   */
+  edgeShare: 0.45,
 
   /**
    * Thermals: columns of rising air standing in the open middle of the valley,
@@ -979,8 +1027,28 @@ export const DRAFT = {
   columnGapMin: 130,
   columnGapMax: 250,
   columnRadius: 24,
+  /**
+   * How far clear of the valley's flight line a thermal has to stand.
+   *
+   * They used to be placed within a couple of dozen units of the middle, which
+   * is exactly where the line of acorns runs — so every ordinary flight was
+   * carried by air it had never gone looking for, and the whole valley
+   * stretched by three quarters. Rising air has to be somewhere you *choose*
+   * to go, or it is not a decision, it is weather.
+   */
+  columnClear: 8,
+  /**
+   * ...and how far out it may go beyond that.
+   *
+   * A thermal has to be a detour a child will actually take. Measured off the
+   * width of the valley alone, they ended up as far as 150 units off the
+   * middle — out on the open mountainside above the walls, where the room
+   * genuinely is once the rock has leaned back, and where nobody was ever
+   * going to fly. An ordinary flight spent nought seconds in rising air.
+   */
+  columnReach: 45,
   /** Stronger than a ridge band, because you are only in it for a moment. */
-  columnStrength: 78,
+  columnStrength: 42,
   /** How far off the middle a column may stand. */
   columnWander: 22,
 
@@ -1051,10 +1119,32 @@ export const NET = {
   damping: 0.972,
   relax: 5,
 
-  /** How hard the squirrel pushes the cloth down, and how wide a dent it
-   *  makes. */
-  punch: 4.5,
+  /**
+   * How hard the squirrel shoves the cloth on the way in, and how wide the
+   * dent is.
+   *
+   * A shove and not a position. The first version set the cloth to sit a fixed
+   * distance under the squirrel and set the squirrel to sit a fixed distance
+   * above the cloth, which is a loop: each frame the cloth moved down to meet
+   * the squirrel, the squirrel moved down to meet the cloth, and the pair of
+   * them sank through the floor together. Nothing was wrong with either rule
+   * on its own.
+   *
+   * So the cloth is pushed, in proportion to how fast the squirrel is coming
+   * down, and then the links hold it — which is a real impact and cannot run
+   * away, because the cloth pushes back.
+   */
+  press: 1.1,
+  /** What the squirrel goes on being worth once it is lying there. This is
+   *  what keeps a hollow under it instead of it perching on a flat sheet. */
+  weight: 7,
   dent: 15,
+  /** How high it rides above the cloth beneath it. */
+  ride: 1,
+  /** How much of the drop it gives back as a bounce, and the speed below which
+   *  it has stopped bouncing and just lies there. */
+  bounce: 0.3,
+  settle: 5,
   /** How much of its speed the net takes away each second once it is in. */
   grab: 0.06,
   /** Under this it has stopped bouncing and the card can come up. */

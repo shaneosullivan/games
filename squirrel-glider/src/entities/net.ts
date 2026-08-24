@@ -186,15 +186,22 @@ export class Net {
   }
 
   /**
-   * The squirrel pressing into the cloth.
+   * The squirrel shoving into the cloth.
    *
-   * Pushed down rather than collided against: the animal is small next to the
-   * mesh and what matters is that the sheet dents where it lands and the dent
-   * spreads. Returns how deep into the net it is, which is what tells the game
-   * it has been caught.
+   * A push, not a placement. `force` is how far to move the cloth this step,
+   * strongest under the squirrel and fading to nothing at the edge of the
+   * dent — in Verlet a moved point *is* a moving point, so this arrives as
+   * momentum and the links then argue with it. That is what makes the sheet
+   * take the blow, throw a wave out to the corners and come back.
+   *
+   * See NET.press for why this is not allowed to be "sit this far below the
+   * squirrel": the squirrel is being told to sit just above the cloth, and the
+   * two rules together are a loop that sinks both of them through the floor.
    */
-  press(at: THREE.Vector3): number {
-    let deepest = 0;
+  press(at: THREE.Vector3, force: number): void {
+    if (force <= 0) {
+      return;
+    }
     for (let i = 0; i < this.points.length; i++) {
       if (this.pinned[i]) {
         continue;
@@ -204,16 +211,9 @@ export class Net {
       if (away > NET.dent) {
         continue;
       }
-      // A soft round dent, deepest under the squirrel and fading to nothing at
-      // its edge, so the cloth is pushed rather than punctured.
       const bite = 1 - away / NET.dent;
-      const want = at.y - NET.punch * bite * bite;
-      if (want < p.y) {
-        deepest = Math.max(deepest, p.y - want);
-        p.y = want;
-      }
+      p.y -= force * bite * bite;
     }
-    return deepest;
   }
 
   /** Is this point over the mouth of the net? */

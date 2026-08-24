@@ -73,9 +73,10 @@ export class Gates {
     const room = Math.max(0, this.roomAt(z) - radius - GATES.wallGap);
     const side = this.rng.range(-GATES.sideWander, GATES.sideWander);
 
-    // Where a draft runs, hang the arch up in it: out against that wall and
-    // near the top of the lift, so the only way to it is to go and ride the
-    // rising air. Elsewhere, some sit low and the rest on the ramp.
+    // The height comes from the ramp and nothing moves it, so every arch sits
+    // at the height a glide is already going to be at. The variety is
+    // sideways, which is the one direction that costs a glider nothing — see
+    // GATES.sideChance, and easyUntil for why the opening ones are left plain.
     const draft = this.rng.next() < GATES.highChance ? this.draftAt(z) : null;
     let x = this.lineAt(z) + side;
     let y =
@@ -83,8 +84,13 @@ export class Gates {
     if (draft) {
       x = draft.side * (this.roomAt(z) - GATES.highWallGap);
       y = draft.top * GATES.highOfCeiling;
-    } else if (this.rng.next() < GATES.lowChance) {
-      y -= GATES.lowDrop;
+    } else {
+      if (-z > GATES.easyUntil && this.rng.next() < GATES.sideChance) {
+        x = (this.rng.next() < 0.5 ? -1 : 1) * this.roomAt(z) * GATES.sideOut;
+      }
+      if (this.rng.next() < GATES.lowChance) {
+        y -= GATES.lowDrop;
+      }
     }
 
     const at = new THREE.Vector3(
