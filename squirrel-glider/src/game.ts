@@ -587,11 +587,42 @@ export class Game {
       s.position.x + Math.sin(s.heading) * CAMERA.lookAhead * flat,
       // Aimed a little above the squirrel while it is being lifted, so the
       // shot looks up the way it is going.
-      s.position.y + CAMERA.lookAhead * climb + dip * 0.45,
+      s.position.y + CAMERA.lookAhead * climb + dip * CAMERA.draftAim,
       s.position.z + Math.cos(s.heading) * CAMERA.lookAhead * flat,
     );
     this.smoothedLook.lerp(this.lookAt, 1 - Math.exp(-CAMERA.lookLerp * dt));
-    this.stage.camera.lookAt(this.smoothedLook);
+
+    // Whatever all of that added up to, the squirrel stays on the screen.
+    // See CAMERA.frameLimit: the aim is pulled back here until it is inside
+    // the window, so every offset above can be chosen for how it feels.
+    const shot = this.stage.camera;
+    const flat2 = Math.hypot(
+      s.group.position.x - shot.position.x,
+      s.group.position.z - shot.position.z,
+    );
+    if (flat2 > 0.5) {
+      const half = (shot.fov * Math.PI) / 360;
+      const limit = half * CAMERA.frameLimit;
+      const toSquirrel = Math.atan2(
+        s.group.position.y - shot.position.y,
+        flat2,
+      );
+      const lookFlat = Math.hypot(
+        this.smoothedLook.x - shot.position.x,
+        this.smoothedLook.z - shot.position.z,
+      );
+      const toLook = Math.atan2(
+        this.smoothedLook.y - shot.position.y,
+        Math.max(0.5, lookFlat),
+      );
+      const off = toSquirrel - toLook;
+      if (Math.abs(off) > limit) {
+        const want = toSquirrel - Math.sign(off) * limit;
+        this.smoothedLook.y =
+          shot.position.y + Math.tan(want) * Math.max(0.5, lookFlat);
+      }
+    }
+    shot.lookAt(this.smoothedLook);
 
     // The lens opens as it runs. See CAMERA.fovFast: this is most of what
     // makes ninety units a second feel like ninety units a second, because the

@@ -749,7 +749,35 @@ export const CAMERA = {
    * the squirrel with the rock going down past the lens, which is what
    * climbing looks like.
    */
-  draftDip: 0.9,
+  draftDip: 0.78,
+  /**
+   * How much of that drop the aim follows.
+   *
+   * Nearly all of it. The camera dropping below the squirrel is the whole
+   * point, but if it goes on aiming where it aimed before, the squirrel rides
+   * up out of the frame — measured at 0.95 of the way to the top edge in a
+   * strong draft, which is off the screen for anything with a size. Aiming
+   * down-range by very nearly the same amount the eye dropped keeps it in
+   * shot, and you still see it from underneath, which is what says climbing.
+   * The small remainder is what lets it drift up the frame as it rises.
+   */
+  draftAim: 0.88,
+  /**
+   * How far from the middle of the screen the squirrel is ever allowed to sit,
+   * as a share of half the vertical field of view.
+   *
+   * A backstop, and the reason it exists is that the shot is now the sum of
+   * several independent offsets — how steep the path is, how fast it is going,
+   * how hard the air is lifting it — and any two of them can agree to push the
+   * same way. They did: a steep dive *inside* a draft put the squirrel a
+   * frame and a half below the bottom edge, having earlier put it at the top.
+   *
+   * So rather than tuning each offset against the others for ever, the aim is
+   * pulled back at the end until the squirrel is inside this window. Every
+   * offset can then be chosen for how it feels, and none of them can lose the
+   * animal off the screen.
+   */
+  frameLimit: 0.5,
   draftRate: 1.6,
   /**
    * What counts as "fully in the lift" for the sake of the dip.
