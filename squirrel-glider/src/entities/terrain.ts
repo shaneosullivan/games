@@ -15,6 +15,15 @@ const PATH_GAIN = 2.2;
 const PATH_STEP = 5;
 
 const ROCK_COLOURS = [0x8e8b86, 0x9b978f, 0x807d78, 0xa39d93];
+/**
+ * The face, bottom to top: damp shadowed stone in the bottom of the valley,
+ * bare rock up the middle, then sun-bleached and weathered near the ridge.
+ * Banding it by height is most of what stops a mountainside reading as one
+ * flat sheet of grey.
+ */
+const FACE_COLOURS = [
+  0x5c5f5b, 0x6d706a, 0x7f8079, 0x8e8b86, 0x9d988e, 0xaea79a,
+];
 const SNOW = 0xeef4f7;
 const GRASS = 0x6f9a52;
 const TRUNK = 0x6b4f3a;
@@ -242,16 +251,25 @@ export class Terrain {
    *
    * The valley is not a straight corridor: the walls close in and open out, so
    * that flying it is a thing you have to steer rather than a tube you fall
-   * along. One function, used three times over — to build the wall, to
-   * decorate it, and to know when the squirrel has hit it.
+   * along. One function, used throughout — to build the wall, to decorate it,
+   * to hang the rising air on it, and to know when the squirrel has hit it.
+   *
+   * It also leans. The rock stands further out the higher you are, which is
+   * what a mountainside does and means the valley is a V that closes on you as
+   * you come down it. Called without a height it gives the *foot* of the
+   * slope, which is the narrowest the valley ever gets there — so everything
+   * that is placed rather than flown can go on using the one-argument form and
+   * be certain of clearing the rock at any height.
    */
-  wallAt(z: number): number {
+  wallAt(z: number, y: number = WORLD.floorY, side: number = 1): number {
     const along = -z;
-    return (
+    const foot =
       WORLD.halfWidth +
       Math.sin(along * 0.0075) * WORLD.wallWander +
-      Math.sin(along * 0.021 + 1.7) * WORLD.wallWander * 0.4
-    );
+      Math.sin(along * 0.021 + 1.7) * WORLD.wallWander * 0.4;
+    const ridge = this.wallHeight(z, side);
+    const t = Math.max(0, Math.min(1, (y - WORLD.floorY) / Math.max(1, ridge)));
+    return foot + WORLD.wallSlope * ridge * wallProfile(t);
   }
 
   /** How high the wall is at a point, which is its silhouette. */
@@ -290,38 +308,74 @@ export class Terrain {
 
       for (let z = from; z > to; z -= WORLD.wallStep) {
         const zNext = z - WORLD.wallStep;
-        const x0 = side * this.wallAt(z);
-        const x1 = side * this.wallAt(zNext);
         const h0 = this.wallHeight(z, side);
         const h1 = this.wallHeight(zNext, side);
-        // Out and up: the ridge leans away from the valley, so what the player
-        // sees is a slope rather than a wall of card.
-        const ox0 = x0 + side * WORLD.wallThickness;
-        const ox1 = x1 + side * WORLD.wallThickness;
 
-        // The inner face, floor to ridge.
+        // The face, as a stack of bands climbing away from the valley. Each
+        // band leans further out than the one below it — see WORLD.wallCurve —
+        // and each is roughened outward, which is what turns a smooth ramp
+        // into a mountainside.
+        for (let b = 0; b < WORLD.wallBands; b++) {
+          const t0 = b / WORLD.wallBands;
+          const t1 = (b + 1) / WORLD.wallBands;
+          const y00 = WORLD.floorY + h0 * t0;
+          const y01 = WORLD.floorY + h0 * t1;
+          const y10 = WORLD.floorY + h1 * t0;
+          const y11 = WORLD.floorY + h1 * t1;
+          const a0 = side * (this.wallAt(z, y00, side) + crag(z, t0));
+          const a1 = side * (this.wallAt(z, y01, side) + crag(z, t1));
+          const b0 = side * (this.wallAt(zNext, y10, side) + crag(zNext, t0));
+          const b1 = side * (this.wallAt(zNext, y11, side) + crag(zNext, t1));
+
+          quad(
+            face,
+            [a0, y00, z],
+            [b0, y10, zNext],
+            [b1, y11, zNext],
+            [a1, y01, z],
+          );
+
+          // Dark and damp at the foot, bare stone up the middle, bleached and
+          // then snow-capped where it catches the weather.
+          const shade =
+            t1 > 0.93 && h0 > WORLD.wallHeight + WORLD.wallRelief * 0.35
+              ? SNOW
+              : FACE_COLOURS[
+                  Math.min(
+                    FACE_COLOURS.length - 1,
+                    Math.floor(t0 * FACE_COLOURS.length),
+                  )
+                ];
+          for (let i = 0; i < 6; i++) {
+            colours.push(shade as number);
+          }
+        }
+
+        // And the shoulder, ridge to the back, so the far side is never a
+        // paper edge against the sky.
+        const top0 = side * this.wallAt(z, WORLD.floorY + h0, side);
+        const top1 = side * this.wallAt(zNext, WORLD.floorY + h1, side);
         quad(
           face,
-          [x0, WORLD.floorY, z],
-          [x1, WORLD.floorY, zNext],
-          [x1, h1, zNext],
-          [x0, h0, z],
+          [top0, WORLD.floorY + h0, z],
+          [top1, WORLD.floorY + h1, zNext],
+          [
+            top1 + side * WORLD.wallThickness,
+            WORLD.floorY + h1 - WORLD.wallDrop,
+            zNext,
+          ],
+          [
+            top0 + side * WORLD.wallThickness,
+            WORLD.floorY + h0 - WORLD.wallDrop,
+            z,
+          ],
         );
-        // And the shoulder, ridge to the back.
-        quad(
-          face,
-          [x0, h0, z],
-          [x1, h1, zNext],
-          [ox1, h1 - WORLD.wallDrop, zNext],
-          [ox0, h0 - WORLD.wallDrop, z],
-        );
-
-        const rock =
-          h0 > WORLD.wallHeight + WORLD.wallRelief * 0.55
+        const cap =
+          h0 > WORLD.wallHeight + WORLD.wallRelief * 0.35
             ? SNOW
-            : ROCK_COLOURS[0];
-        for (let i = 0; i < 12; i++) {
-          colours.push(rock as number);
+            : FACE_COLOURS[3];
+        for (let i = 0; i < 6; i++) {
+          colours.push(cap as number);
         }
       }
 
@@ -334,12 +388,14 @@ export class Terrain {
       // it, so the ridge has a scale and is not one smooth sheet of grey.
       for (let i = 0; i < WORLD.wallRocks; i++) {
         const z = this.rng.range(to, from);
-        const up = this.rng.range(0.05, 0.8);
+        const up = this.rng.range(0.05, 0.85);
         const h = this.wallHeight(z, side);
-        const x = side * (this.wallAt(z) + this.rng.range(0, 5));
+        const y = WORLD.floorY + h * up;
+        // On the face at that height, now that the face leans.
+        const x = side * (this.wallAt(z, y, side) + this.rng.range(-1, 5));
         const r = this.rng.range(3, 9);
         const rock = new THREE.IcosahedronGeometry(r, 0);
-        rock.translate(x, WORLD.floorY + h * up, z);
+        rock.translate(x, y, z);
         decor.push(paint(rock, this.rng.pick(ROCK_COLOURS)));
       }
     }
@@ -395,6 +451,30 @@ export class Terrain {
 }
 
 /** Two triangles, wound so the face looks into the valley. */
+/**
+ * The shape of the mountainside from foot to ridge: 0 at the bottom, 1 at the
+ * top. See WORLD.wallCurve — above one it is near vertical at the foot and
+ * flares out higher, which is the scooped section a glacier leaves behind.
+ */
+function wallProfile(t: number): number {
+  return Math.pow(Math.max(0, Math.min(1, t)), WORLD.wallCurve);
+}
+
+/**
+ * How far the crags stand proud of that smooth profile.
+ *
+ * Never negative, and that is the whole point: the rock that is drawn may
+ * stand further out than the boundary the squirrel is stopped at but never
+ * further in, so a crag can never swallow a squirrel that the game says is
+ * still flying in clear air.
+ */
+function crag(z: number, t: number): number {
+  const a = 0.5 + 0.5 * Math.sin(-z * 0.061 + t * 8.3);
+  const b = 0.5 + 0.5 * Math.sin(-z * 0.017 + t * 3.1 + 2.2);
+  const c = 0.5 + 0.5 * Math.sin(-z * 0.0091 + t * 15.7);
+  return WORLD.wallCrag * (a * 0.45 + b * 0.35 + c * 0.2);
+}
+
 function quad(
   out: Array<number>,
   a: Array<number>,

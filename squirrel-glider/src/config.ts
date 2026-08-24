@@ -58,6 +58,30 @@ export const WORLD = {
    *  should be a thing you steer, not a tube you fall down. */
   wallWander: 22,
   wallHeight: 210,
+  /**
+   * How far the mountainside leans back as it rises, per unit of height.
+   *
+   * The walls used to go straight up from the valley floor like a stage flat,
+   * which is the one shape a mountain never is. Half a unit out for every unit
+   * up puts the ridge some hundred units further back than its foot — a real
+   * valley section, and one that closes in on you as you come down it.
+   */
+  wallSlope: 0.55,
+  /**
+   * The bend in that lean. Above one, the foot is near vertical and the slope
+   * flares out higher up, which is the scooped profile a glacier leaves and
+   * what nearly every mountain valley actually looks like. It also happens to
+   * be the right shape for the game: tight and gorge-like down where the
+   * flying gets desperate, open and forgiving up where it starts.
+   */
+  wallCurve: 1.6,
+  /** How many bands the face is built from. Each is its own run of quads, so
+   *  this is both how much detail there is and how many ledges break it up. */
+  wallBands: 7,
+  /** How far the crags stand out from the smooth profile. Outward only —
+   *  never inward — so the rock that is drawn can never poke through the
+   *  boundary the squirrel is actually stopped at. */
+  wallCrag: 13,
   /** How much the ridge line rises and falls, which is its silhouette. */
   wallRelief: 90,
   /** How far the shoulder leans away behind the ridge, and how far it drops
@@ -675,6 +699,39 @@ export const CAMERA = {
    * needs the help. Below `shakeFrom` off the deck the shake comes up whatever
    * the speed. Squared where it is used, so an easy glide is perfectly still.
    */
+  /**
+   * How far the shot drops below the squirrel when the air is carrying it, and
+   * how quickly it gets there and back.
+   *
+   * Riding a draft is the one moment in the game where the squirrel goes *up*,
+   * and from a camera sat above and behind it that reads as almost nothing —
+   * the ground is a long way off and there is no horizon to measure against.
+   * Dropping the shot underneath turns it into the thing it is: you look up at
+   * the squirrel with the rock going down past the lens, which is what
+   * climbing looks like.
+   */
+  draftDip: 0.9,
+  draftRate: 1.6,
+  /**
+   * What counts as "fully in the lift" for the sake of the dip.
+   *
+   * A fraction of DRAFT.strength rather than all of it, because the strength
+   * is the figure at the rock face with nothing fading it, and a squirrel
+   * actually riding a band sits in the falloff and sees about half. Measured
+   * against the full figure the shot barely moved.
+   */
+  draftFull: 0.45,
+  /**
+   * How far the shot is kept off the rock and off the floor.
+   *
+   * A guard, and the dip is what made it necessary: a draft always runs along
+   * a wall, so dropping the camera below a squirrel that is riding one puts it
+   * straight inside a mountain that leans out over it. The screen filled with
+   * brown. The eye is pulled back into open air here rather than the dip being
+   * made timid, because a timid dip does not show the climb.
+   */
+  clearance: 7,
+
   shake: 0.16,
   shakeLow: 0.55,
   shakeFrom: 40,

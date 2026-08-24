@@ -38,7 +38,7 @@ export class Drafts {
 
   constructor(
     rng: Rng,
-    private readonly wallAt: (z: number) => number,
+    private readonly wallAt: (z: number, y: number, side: number) => number,
     private readonly pathAt: (z: number) => number,
     reach: number,
   ) {
@@ -105,8 +105,8 @@ export class Drafts {
     if (Math.sign(x) !== band.side || x === 0) {
       return 0;
     }
-    const width = this.widthAt(z);
-    const inward = this.wallAt(z) - Math.abs(x);
+    const width = this.widthAt(z, y, band.side);
+    const inward = this.wallAt(z, y, band.side) - Math.abs(x);
     if (inward < 0 || inward > width) {
       return 0;
     }
@@ -119,8 +119,8 @@ export class Drafts {
 
   /** How far in from the rock the lift reaches here. Never more than a share
    *  of the half-width — see DRAFT.maxShare. */
-  private widthAt(z: number): number {
-    return Math.min(DRAFT.width, this.wallAt(z) * DRAFT.maxShare);
+  private widthAt(z: number, y: number, side: number): number {
+    return Math.min(DRAFT.width, this.wallAt(z, y, side) * DRAFT.maxShare);
   }
 
   /** The band covering a point down the valley, if there is one. */
@@ -147,7 +147,6 @@ export class Drafts {
         continue;
       }
       const z = band.from + (band.to - band.from) * this.along[i];
-      const x = band.side * (this.wallAt(z) - this.inward[i] * this.widthAt(z));
 
       // Up off the valley floor and round again at the lid, so the whole
       // standing column is drawn and the top of a draft is a thing you can see
@@ -159,6 +158,13 @@ export class Drafts {
         this.rise[i] -= 1;
       }
       const y = WORLD.floorY + this.rise[i] * span;
+      // Against the rock at *this* height, because the wall leans back as it
+      // rises: a column drawn on the foot of the slope would hang in open air
+      // with the mountain well behind it.
+      const x =
+        band.side *
+        (this.wallAt(z, y, band.side) -
+          this.inward[i] * this.widthAt(z, y, band.side));
 
       this.positions[o] = x;
       this.positions[o + 1] = y;

@@ -57,6 +57,10 @@ export class Game {
   private readonly smoothedLook = new THREE.Vector3();
   private readonly from = new THREE.Vector3();
   private shakeClock = 0;
+  /** How hard the air is lifting the squirrel right now, and the lagged copy
+   *  the camera uses so the shot swings under it rather than snapping. */
+  private lift = 0;
+  private dipped = 0;
   /** The heading and climb the *camera* is using, which lag the squirrel's.
    *  See followCamera. */
   private camHeading = Math.PI;
@@ -69,7 +73,7 @@ export class Game {
     this.terrain = new Terrain(rng);
     this.drafts = new Drafts(
       rng,
-      z => this.terrain.wallAt(z),
+      (z, y, side) => this.terrain.wallAt(z, y, side),
       z => this.terrain.glidePathAt(z),
       this.terrain.reach,
     );
@@ -231,7 +235,8 @@ export class Game {
     // Drafts, and Squirrel.update, which adds it to the height and otherwise
     // carries on gliding down exactly as it would have.
     const p = this.squirrel.position;
-    this.squirrel.update(dt, this.dir, this.drafts.liftAt(p.x, p.y, p.z));
+    this.lift = this.drafts.liftAt(p.x, p.y, p.z);
+    this.squirrel.update(dt, this.dir, this.lift);
     this.gates.check(this.from, this.squirrel.position);
     this.nuts.check(this.from, this.squirrel.position);
     this.nuts.update(dt);
@@ -271,11 +276,17 @@ export class Game {
    */
   private hitWall(dt: number): void {
     const s = this.squirrel;
-    const wall = this.terrain.wallAt(s.position.z) - WORLD.wallClearance;
+    // At the squirrel's own height and on its own side, because the wall
+    // leans: stopping it at the foot of the slope would put an invisible
+    // barrier a hundred units out from the rock it can plainly see.
+    const side = Math.sign(s.position.x) || 1;
+    const wall =
+      this.terrain.wallAt(s.position.z, s.position.y, side) -
+      WORLD.wallClearance;
     if (Math.abs(s.position.x) < wall) {
       return;
     }
-    s.position.x = Math.sign(s.position.x) * wall;
+    s.position.x = side * wall;
     s.speed *= Math.pow(WORLD.wallScrub, dt);
   }
 
@@ -383,12 +394,35 @@ export class Game {
     // going, not level with it.
     const climb = Math.sin(this.camGamma) * CAMERA.pathFollow;
     const flat = Math.cos(Math.asin(climb));
+    // Under the squirrel while the air is carrying it. See CAMERA.draftDip:
+    // a climb seen from above and behind barely reads as a climb at all.
+    const want = s.landed
+      ? 0
+      : Math.min(1, this.lift / (DRAFT.strength * CAMERA.draftFull));
+    this.dipped +=
+      (want - this.dipped) * (1 - Math.exp(-CAMERA.draftRate * dt));
+    const dip = this.dipped * CAMERA.draftDip * distance;
+
     const backX = -Math.sin(this.camHeading) * flat;
     const backZ = -Math.cos(this.camHeading) * flat;
     this.wantEye.set(
       s.position.x + backX * distance,
-      s.position.y + CAMERA.height - climb * distance,
+      s.position.y + CAMERA.height - climb * distance - dip,
       s.position.z + backZ * distance,
+    );
+    // Keep the shot out of the scenery. The valley leans out over its own
+    // floor, so an eye placed below and behind a squirrel flying near a wall
+    // is very often inside the mountain — see CAMERA.clearance.
+    const eyeSide = Math.sign(this.wantEye.x) || 1;
+    const rock =
+      this.terrain.wallAt(this.wantEye.z, this.wantEye.y, eyeSide) -
+      CAMERA.clearance;
+    if (Math.abs(this.wantEye.x) > rock) {
+      this.wantEye.x = eyeSide * rock;
+    }
+    this.wantEye.y = Math.max(
+      this.terrain.groundAt() + CAMERA.clearance,
+      this.wantEye.y,
     );
     this.stage.camera.position.copy(this.wantEye);
 
@@ -403,7 +437,9 @@ export class Game {
     // the camera spent an afternoon aimed up the valley at the cliff.
     this.lookAt.set(
       s.position.x + Math.sin(s.heading) * CAMERA.lookAhead * flat,
-      s.position.y + CAMERA.lookAhead * climb,
+      // Aimed a little above the squirrel while it is being lifted, so the
+      // shot looks up the way it is going.
+      s.position.y + CAMERA.lookAhead * climb + dip * 0.45,
       s.position.z + Math.cos(s.heading) * CAMERA.lookAhead * flat,
     );
     this.smoothedLook.lerp(this.lookAt, 1 - Math.exp(-CAMERA.lookLerp * dt));
