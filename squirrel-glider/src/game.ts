@@ -77,6 +77,12 @@ export class Game {
       z => this.terrain.glidePathAt(z),
       this.terrain.reach,
     );
+    // Now the valley knows where its rising air is, fly it again. Everything
+    // below is hung on the result — see Terrain.refly, and the note there for
+    // what happens if a draft in the middle lifts the flight off its own
+    // acorns.
+    this.terrain.refly((x, y, z) => this.drafts.liftAt(x, y, z));
+
     // After the drafts, because some arches are hung up in the rising air and
     // need to know where it is.
     this.gates = new Gates(
@@ -124,7 +130,7 @@ export class Game {
     this.intro = new Overlay(
       ui,
       "Squirrel Glider",
-      "You are a flying squirrel on the edge of a huge cliff. Tap to jump off, then drag to fly. Drag down and you tip your nose down and dive, fast. Drag up and you throw your belly out into the wind and slow right down. Drag left or right to lean into a turn. Follow the floating acorns, and look for the white lines of rising air by the walls — fly into those and they will carry you up.",
+      "You are a flying squirrel on the edge of a huge cliff. Tap to jump off, then drag to fly. Pull back and you rear up into the wind and slow right down. Push forward and you tip your nose down and dive, fast. Drag left or right to lean into a turn. Follow the floating acorns, and look for the white lines of rising air by the walls — fly into those and they will carry you up.",
       "Ready",
       () => this.begin(),
     );
@@ -217,15 +223,17 @@ export class Game {
     // projection — unlike the crawling game the shot is always behind the
     // animal, so screen-right and its own right are the same thing.
     //
-    // The pitch axis is negated, because the stick reads positive *downward*
-    // in screen axes and the squirrel reads positive as nose-up. Dragging up
-    // the screen therefore has to become a positive number here, and it means
-    // what it looks like it means: drag up and the squirrel comes up — head
-    // and belly into the wind, slowing — and drag down and it puts its nose
-    // down and dives.
+    // Not negated, and it is worth being exact about why, because this has
+    // been the wrong way round twice.
+    //
+    // Joystick.y is positive *downward* in screen axes, so a thumb pulled back
+    // toward the player — down the screen — arrives here positive. Positive is
+    // what the squirrel reads as nose-up. So pulling back rears it up into the
+    // wind and slows it, and pushing forward tips its nose down and dives it,
+    // which is how a stick has worked since there were sticks.
     this.dir.set(
       expo(this.stick.x, CONTROL.bankExpo),
-      expo(-this.stick.y, CONTROL.pitchExpo),
+      expo(this.stick.y, CONTROL.pitchExpo),
       0,
     );
 
@@ -334,7 +342,7 @@ export class Game {
     this.done.setBody(
       everything
         ? `Every single arch — all ${this.gates.total} of them — and every last acorn. ${far} There is nothing left out there to catch.`
-        : `${far} You flew through ${arches} of the ${this.gates.total} arches and caught ${nuts} of the ${this.nuts.total} acorns. Follow the acorns and they will take you to most of them. Drag up to slow yourself and line up a tricky arch; drag down to dive and go fast. The white lines by the walls are rising air — fly into one and it will carry you back up. Let go of everything and you will glide the furthest of all.`,
+        : `${far} You flew through ${arches} of the ${this.gates.total} arches and caught ${nuts} of the ${this.nuts.total} acorns. Follow the acorns and they will take you to most of them. Pull back to slow yourself and line up a tricky arch; push forward to dive and go fast. The white lines by the walls are rising air — fly into one and it will carry you back up. Let go of everything and you will glide the furthest of all.`,
     );
     this.done.show();
   }

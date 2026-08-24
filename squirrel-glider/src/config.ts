@@ -882,6 +882,27 @@ export const DRAFT = {
   fade: 40,
 
   /**
+   * Thermals: columns of rising air standing in the open middle of the valley,
+   * as against the bands that run along the walls.
+   *
+   * Also real, and the other half of how gliders stay up — sun-warmed ground
+   * lets go of a bubble of air and it goes up in a column. They do a different
+   * job from the ridge bands: a band is a commitment, a long lean along the
+   * rock that you ride for hundreds of units, where a column is a thing you
+   * spot ahead, aim at, and pass through. Having both means the valley is
+   * never asking the same question twice.
+   */
+  columns: 7,
+  columnFirstAt: 230,
+  columnGapMin: 130,
+  columnGapMax: 250,
+  columnRadius: 24,
+  /** Stronger than a ridge band, because you are only in it for a moment. */
+  columnStrength: 78,
+  /** How far off the middle a column may stand. */
+  columnWander: 22,
+
+  /**
    * What it looks like: pale streaks of air standing on end and sliding
    * upward.
    *

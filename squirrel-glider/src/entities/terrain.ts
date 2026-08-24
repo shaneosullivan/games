@@ -80,7 +80,7 @@ export class Terrain {
    * be measured by the same flight, or they are answers to different
    * questions.
    */
-  private readonly path: Array<number> = [];
+  private path: Array<number> = [];
 
   glidePathAt(z: number): number {
     const i = Math.max(
@@ -90,16 +90,37 @@ export class Terrain {
     return this.path[i];
   }
 
-  private flyThePath(): void {
+  /**
+   * Fly it again, this time through the rising air.
+   *
+   * The drafts cannot exist until the valley does, and the valley's own idea
+   * of where a glide goes cannot be right until it accounts for the drafts —
+   * so it is flown twice. The first flight is the provisional one that lets
+   * the drafts be placed; this is the real one, and it is what the arches and
+   * the acorns are then hung on.
+   *
+   * Without it, a draft anywhere near the middle of the valley lifted the
+   * ordinary flight clean off the line its own acorns were sitting on.
+   */
+  refly(lift: (x: number, y: number, z: number) => number): void {
+    this.flyThePath(lift);
+  }
+
+  private flyThePath(lift?: (x: number, y: number, z: number) => number): void {
     const squirrel = new Squirrel();
     squirrel.place(new THREE.Vector3(0, WORLD.cliffHeight + 2.5, -2));
     squirrel.jump();
     const stick = new THREE.Vector3();
+    // Built to one side and swapped in at the end. The lift this flight is
+    // being flown through asks where the old path was — see DRAFT.ceiling —
+    // and reading an array that is halfway through being rebuilt would give it
+    // nonsense.
+    const path: Array<number> = [];
     let next = 0;
     for (let i = 0; i < 60 * 120; i++) {
       const along = -squirrel.position.z;
-      while (along >= next * PATH_STEP && this.path.length <= next) {
-        this.path.push(squirrel.position.y);
+      while (along >= next * PATH_STEP && path.length <= next) {
+        path.push(squirrel.position.y);
         next++;
       }
       if (squirrel.position.y <= WORLD.floorY + 1) {
@@ -120,16 +141,18 @@ export class Terrain {
         off += Math.PI * 2;
       }
       stick.set(Math.max(-1, Math.min(1, -off * PATH_GAIN)), 0, 0);
-      squirrel.update(SIM.step, stick);
+      const p = squirrel.position;
+      squirrel.update(SIM.step, stick, lift ? lift(p.x, p.y, p.z) : 0);
     }
     // Anything past where the glide reached sits just above the floor, so a
     // gate placed down there is still something a good flight can catch.
     if (this.reach <= 0) {
       this.reach = WORLD.length;
     }
-    while (this.path.length < Math.ceil(WORLD.length / PATH_STEP) + 2) {
-      this.path.push(WORLD.floorY + 14);
+    while (path.length < Math.ceil(WORLD.length / PATH_STEP) + 2) {
+      path.push(WORLD.floorY + 14);
     }
+    this.path = path;
   }
 
   /**
