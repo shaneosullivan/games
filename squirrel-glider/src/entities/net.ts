@@ -254,8 +254,12 @@ export class Net {
       if (d < radius && d > 1e-6) {
         const out = radius / d;
         p.x = centre.x + dx * out;
-        p.y = centre.y + dy * out;
         p.z = centre.z + dz * out;
+        // Shouldered aside and downward, never upward. Pushing a cord up out
+        // of the body draws it across the front of the squirrel, which looks
+        // exactly like an animal hanging underneath a net — the very thing
+        // the wrap is here to avoid.
+        p.y = Math.min(p.y, centre.y + dy * out);
       }
     }
   }
@@ -281,6 +285,29 @@ export class Net {
 
   restHeightAt(x: number, z: number): number {
     return this.rest[this.nearest(x, z)];
+  }
+
+  /**
+   * How high the net is *around* a point — the cords that actually carry a
+   * weight, rather than the ones directly beneath it.
+   *
+   * Sampled in a ring, and it has to be. The cords right under the squirrel
+   * have been shoved down by its own body (see wrap), so asking them where the
+   * net is gets the answer "just below you, wherever you are", which supports
+   * nothing and lets it sink for ever. A net holds you by the mesh around you.
+   */
+  supportAt(x: number, z: number): number {
+    const r = NET.bodyRadius * 1.6;
+    let sum = 0;
+    for (const [dx, dz] of [
+      [r, 0],
+      [-r, 0],
+      [0, r],
+      [0, -r],
+    ]) {
+      sum += this.points[this.nearest(x + dx, z + dz)].y;
+    }
+    return sum / 4;
   }
 
   /** How high the cloth is under a point, so the squirrel can rest on it. */

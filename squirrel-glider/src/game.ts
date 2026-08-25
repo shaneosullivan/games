@@ -276,28 +276,27 @@ export class Game {
       this.sparks.update(dt);
       const s = this.squirrel;
 
-      // Nothing stops it. It falls, the net stretches under it, and the
-      // further the net is stretched the harder it pulls back — which is what
-      // a net under tension does, and is the whole catch. There is no moment
-      // where the squirrel is put anywhere; see NET.stiffness for the hard
-      // stop this replaced and why the first contact used to feel like hitting
-      // a table when everything after it moved like cloth.
+      // It falls, and it rides on the net. Nothing here is sprung and nothing
+      // is clamped to a height of its own: the softness of the catch comes
+      // from the *cords*, which its arrival shoves down hard, which carry it
+      // down with them, and whose own tension brings the pair to a halt.
       //
-      // The stretch is measured against where the cloth hangs *empty*, not
-      // against where it is now: the net is being dragged down by the squirrel,
-      // so measured live it would always read as slack and never pull at all.
-      const rest = this.net.restHeightAt(s.position.x, s.position.z) + NET.ride;
-      const stretch = Math.max(0, rest - s.position.y);
-      this.netFall += (NET.stiffness * stretch - GLIDE.gravity) * dt;
-      this.netFall *= Math.pow(NET.springDamp, dt);
+      // The support is read from the ring of cords around the squirrel rather
+      // than the ones under it — see Net.supportAt, and NET.lean for the
+      // spring this replaced, which held the squirrel at a height of its own
+      // choosing and finished sixteen units below the net.
+      this.netFall -= GLIDE.gravity * dt;
       s.position.y += this.netFall * dt;
 
-      // What it is doing to the cloth: the shove of its arrival and its
-      // weight, and then its body, which the net closes around. See Net.wrap.
-      if (stretch > 0) {
+      const carry = this.net.supportAt(s.position.x, s.position.z) + NET.ride;
+      if (s.position.y <= carry) {
+        // Its arrival, and then its weight for as long as it lies there.
         const push = Math.max(0, -this.netFall);
-        this.net.press(s.position, (push * NET.press + NET.weight) * dt);
+        this.net.press(s.position, (push * NET.press + NET.lean) * dt);
         this.net.wrap(s.position, NET.bodyRadius);
+        // Lying on them: it goes where they go, and it has stopped falling.
+        s.position.y = carry;
+        this.netFall = 0;
       }
 
       s.speed *= Math.pow(NET.grab, dt);

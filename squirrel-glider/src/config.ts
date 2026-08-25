@@ -1156,17 +1156,17 @@ export const NET = {
   press: 1.1,
   /** What the squirrel goes on being worth once it is lying there. This is
    *  what keeps a hollow under it instead of it perching on a flat sheet. */
-  weight: 52,
+  weight: 20,
   dent: 15,
   /**
-   * How high it rides above the cords beneath it.
+   * How high it rides relative to the cords around it — see Net.supportAt.
    *
-   * Positive, and that matters more than it sounds. At -1.4 the squirrel's
-   * middle sat *below* the cords, so the net was drawn across the front of it
-   * — which looks exactly like an animal that has gone through and is hanging
-   * underneath. It lies in the pocket the cords make, not beneath them.
+   * Slightly below them, because the ring of cords that carries it stands
+   * higher than the pocket it is lying in. It must never be far enough below
+   * to be drawn behind the mesh, which looks exactly like an animal that has
+   * gone through and is hanging underneath.
    */
-  ride: 1.2,
+  ride: 1.3,
   /**
    * The size of the body the net has to get out of the way of.
    *
@@ -1182,23 +1182,21 @@ export const NET = {
    * stretched below where it hangs on its own — and how quickly that motion
    * dies away.
    *
-   * This is the whole of the catch now, and it replaced a hard stop. The
-   * squirrel used to be snapped to the surface of the cloth the instant it
-   * touched and handed an upward bounce, which is why the first contact read
-   * as hitting something solid while everything after it moved like cloth:
-   * the first contact was not physics, it was a clamp.
+   * How hard the squirrel leans on the cords while it is lying in them.
    *
-   * Now nothing stops it. The net stretches, and the further it is stretched
-   * the harder it pulls — a spring, which is what a net under tension is. The
-   * squirrel sinks in, is slowed over about a second, overshoots a little and
-   * comes back up, exactly as something dropped into a hammock does.
+   * There is no spring holding the squirrel up any more, and there is no hard
+   * stop either. It rides on the net: it falls under gravity, and the moment
+   * it meets the cords it rests on them and goes wherever they go. The catch
+   * is soft not because the squirrel is sprung but because the *net* is — its
+   * arrival shoves the cords down hard, they carry it down with them, and
+   * their own tension brings the pair of them to a halt.
    *
-   * `stiffness` sets how far past the empty sag it settles: gravity divided by
-   * it, so 9.81 over 0.8 is about twelve units of stretch on top of the eight
-   * the net hangs at on its own.
+   * The spring this replaced held the squirrel at a height of its own
+   * choosing, with no relation to where the cloth actually was. Measured, it
+   * ended up sixteen units *below* the cords with the net floating above it,
+   * which is precisely the thing it was meant to prevent.
    */
-  stiffness: 0.8,
-  springDamp: 0.5,
+  lean: 78,
   /** How much of its speed the net takes away each second once it is in. */
   grab: 0.06,
   /**
