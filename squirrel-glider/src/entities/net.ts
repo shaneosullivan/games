@@ -223,6 +223,34 @@ export class Net {
     }
   }
 
+  /**
+   * The squirrel's body, shouldering the net out of the way.
+   *
+   * Any point of cloth found inside the body is moved to the nearest point on
+   * its surface — the ball-collision trick from the standard three.js cloth
+   * demo. The shove in `press` gives the sheet the impact; this is what makes
+   * it close around the squirrel afterwards instead of merely dipping beneath
+   * it.
+   */
+  wrap(centre: THREE.Vector3, radius: number): void {
+    for (let i = 0; i < this.points.length; i++) {
+      if (this.pinned[i]) {
+        continue;
+      }
+      const p = this.points[i];
+      const dx = p.x - centre.x;
+      const dy = p.y - centre.y;
+      const dz = p.z - centre.z;
+      const d = Math.hypot(dx, dy, dz);
+      if (d < radius && d > 1e-6) {
+        const out = radius / d;
+        p.x = centre.x + dx * out;
+        p.y = centre.y + dy * out;
+        p.z = centre.z + dz * out;
+      }
+    }
+  }
+
   /** Is this point over the mouth of the net? */
   covers(x: number, z: number): boolean {
     const half = NET.size / 2;

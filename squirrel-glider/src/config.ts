@@ -1102,7 +1102,16 @@ export const NET = {
    *  a second and is enough that the sag reads as cloth and not as a sheet of
    *  rubber. */
   size: 56,
-  grid: 20,
+  /**
+   * How many squares across.
+   *
+   * Coarse on purpose. At twenty the weave was fine enough to read as fabric —
+   * a mesh that tight looks like a solid thing with a pattern on it. At twelve
+   * the holes are four or five units across, which is a rope net: you can see
+   * the forest through it, and it is plainly something slung between four
+   * poles rather than a sheet.
+   */
+  grid: 12,
   /** How tall the legs are, and how far their feet splay out past the rim —
    *  four legs raked out diagonally, which is what stops the whole thing
    *  looking like a table. */
@@ -1112,12 +1121,14 @@ export const NET = {
 
   /** The cloth. `slack` is how much longer each link is than the spacing it
    *  sits at, which is the difference between a trampoline and a hammock. */
-  slack: 1.22,
+  slack: 1.38,
   gravity: 26,
   /** How much speed the cloth keeps each step, and how many times the links
    *  are pulled back to length. More passes is a stiffer net. */
   damping: 0.988,
-  relax: 3,
+  /** How many times the cords are pulled back to length each step. Fewer is
+   *  floppier — this is a net, not a drum skin. */
+  relax: 2,
 
   /**
    * How hard the squirrel shoves the cloth on the way in, and how wide the
@@ -1137,10 +1148,23 @@ export const NET = {
   press: 1.1,
   /** What the squirrel goes on being worth once it is lying there. This is
    *  what keeps a hollow under it instead of it perching on a flat sheet. */
-  weight: 7,
+  weight: 52,
   dent: 15,
-  /** How high it rides above the cloth beneath it. */
-  ride: 1,
+  /**
+   * How high it rides above the cloth beneath it — negative, so it sits *in*
+   * the pocket rather than perched on top of the sheet.
+   */
+  ride: -1.4,
+  /**
+   * The size of the body the net has to get out of the way of.
+   *
+   * Borrowed from the standard three.js cloth demo, which drops a ball into a
+   * sheet: any point of cloth found inside the body is moved to the nearest
+   * point on its surface. It is two lines and it is the difference between the
+   * net dipping in a smooth cone somewhere under the squirrel and the net
+   * actually *wrapping* it.
+   */
+  bodyRadius: 4.2,
   /**
    * How much of the drop it gives back as a bounce, the most it may ever
    * bounce, and the speed below which it has stopped bouncing and just lies

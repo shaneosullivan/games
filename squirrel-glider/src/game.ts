@@ -291,6 +291,9 @@ export class Game {
         // there.
         const hit = Math.max(0, -this.netFall);
         this.net.press(s.position, (hit * NET.press + NET.weight) * dt);
+        // ...and the body itself, which the net has to close around rather
+        // than merely dip under. See Net.wrap.
+        this.net.wrap(s.position, NET.bodyRadius);
         s.position.y = surface;
         // A bounce while there is anything left to bounce with, and then it
         // simply lies in it.
@@ -375,7 +378,11 @@ export class Game {
     if (
       !this.squirrel.landed &&
       this.net.covers(p2.x, p2.z) &&
-      p2.y <= this.net.heightAt(p2.x, p2.z) + NET.ride
+      // Over the mouth and at or below the rim is *in* the net — the cloth
+      // itself hangs twenty units further down, and testing against that alone
+      // let a squirrel arriving level with the rim cross the whole net before
+      // it had sunk far enough to touch anything.
+      p2.y <= this.net.at.y
     ) {
       this.catchInNet();
       return;
