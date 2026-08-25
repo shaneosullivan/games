@@ -1133,7 +1133,9 @@ export const NET = {
   gravity: 26,
   /** How much speed the cloth keeps each step, and how many times the links
    *  are pulled back to length. More passes is a stiffer net. */
-  damping: 0.988,
+  /** How much speed the cloth keeps each step. Some way under one, or the wave
+   *  the squirrel sets off when it lands never dies away. */
+  damping: 0.955,
   /** How many times the cords are pulled back to length each step. Fewer is
    *  floppier — this is a net, not a drum skin. */
   relax: 2,
@@ -1153,7 +1155,7 @@ export const NET = {
    * down, and then the links hold it — which is a real impact and cannot run
    * away, because the cloth pushes back.
    */
-  press: 1.1,
+  press: 3.2,
   /** What the squirrel goes on being worth once it is lying there. This is
    *  what keeps a hollow under it instead of it perching on a flat sheet. */
   weight: 20,
@@ -1182,7 +1184,15 @@ export const NET = {
    * stretched below where it hangs on its own — and how quickly that motion
    * dies away.
    *
-   * How hard the squirrel leans on the cords while it is lying in them.
+   * How hard the squirrel leans on the cords while it is lying in them, as an
+   * acceleration — the same kind of quantity as NET.gravity, applied the same
+   * way.
+   *
+   * That mix-up was the buzzing. It used to go in as a *displacement* every
+   * frame: 78 over 60, or 1.3 units of cloth moved per frame, against
+   * gravity's 26 over 3600, or 0.007. Nearly two hundred times too strong,
+   * shoved in every frame for the solver to fight, which is the recipe for a
+   * mesh that shivers.
    *
    * There is no spring holding the squirrel up any more, and there is no hard
    * stop either. It rides on the net: it falls under gravity, and the moment
@@ -1196,7 +1206,7 @@ export const NET = {
    * ended up sixteen units *below* the cords with the net floating above it,
    * which is precisely the thing it was meant to prevent.
    */
-  lean: 78,
+  lean: 240,
   /** How much of its speed the net takes away each second once it is in. */
   grab: 0.06,
   /**

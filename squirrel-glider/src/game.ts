@@ -84,6 +84,9 @@ export class Game {
   private netting: number | null = null;
   /** How fast it is dropping into the cloth. See the netting branch. */
   private netFall = 0;
+  /** Where the cords carrying it were last step, so their own speed can be
+   *  read off and handed to the squirrel. */
+  private netCarry: number | null = null;
   /** How far the shot has swung round to look at the net. See followCamera. */
   private finishing = 0;
   /** Whether the flight ended in the net rather than on the ground. */
@@ -290,14 +293,24 @@ export class Game {
 
       const carry = this.net.supportAt(s.position.x, s.position.z) + NET.ride;
       if (s.position.y <= carry) {
-        // Its arrival, and then its weight for as long as it lies there.
+        // Its arrival as an impulse — a speed handed to the cloth — and its
+        // weight as an acceleration, the same kind of quantity as the cloth's
+        // own gravity. Mixing those two up is what made the net shiver: see
+        // NET.lean.
         const push = Math.max(0, -this.netFall);
-        this.net.press(s.position, (push * NET.press + NET.lean) * dt);
+        this.net.press(s.position, push * NET.press * dt + NET.lean * dt * dt);
         this.net.wrap(s.position, NET.bodyRadius);
-        // Lying on them: it goes where they go, and it has stopped falling.
+        // It rides the cords rather than stopping on them. Taking their
+        // downward speed is what keeps the first contact soft: the cloth is
+        // still going down hard at that moment, so the squirrel carries on
+        // down with it instead of arriving at a dead halt, which is what read
+        // as hitting something solid.
+        const clothFall =
+          this.netCarry === null ? 0 : (carry - this.netCarry) / dt;
+        this.netFall = Math.min(0, clothFall);
         s.position.y = carry;
-        this.netFall = 0;
       }
+      this.netCarry = carry;
 
       s.speed *= Math.pow(NET.grab, dt);
       s.position.x += Math.sin(s.heading) * s.speed * dt;
@@ -448,6 +461,7 @@ export class Game {
     this.stick.release();
     this.wind.hush();
     this.netting = 0;
+    this.netCarry = null;
     // It arrives carrying whatever it was descending at, and the sheet gets
     // all of it.
     this.netFall = -Math.max(0, -s.speed * Math.sin(s.gamma));
