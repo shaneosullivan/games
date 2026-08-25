@@ -33,6 +33,18 @@ export class Net {
   private readonly points: Array<THREE.Vector3> = [];
   private readonly was: Array<THREE.Vector3> = [];
   private readonly pinned: Array<boolean> = [];
+  /**
+   * Cords the squirrel is lying against, which the solver leaves alone until
+   * it moves off them.
+   *
+   * Without this the two of them fight: the solver pulls a contact cord back
+   * toward its neighbours, the body shoulders it out again, and the pair trade
+   * the same tenth of a unit back and forth every other frame for ever. It is
+   * a *positional* argument, so no amount of damping touches it — one side has
+   * to give way, and the right one is the solver, because a rope with a
+   * squirrel lying on it genuinely is held where the squirrel is.
+   */
+  private readonly held: Array<boolean> = [];
   private readonly links: Array<Link> = [];
   private readonly cloth: THREE.LineSegments;
   private readonly positions: Float32Array;
@@ -59,6 +71,7 @@ export class Net {
         this.pinned.push(
           row === 0 || col === 0 || row === NET.grid || col === NET.grid,
         );
+        this.held.push(false);
       }
     }
 
@@ -185,12 +198,12 @@ export class Net {
         const ax = dx * pull;
         const ay = dy * pull;
         const az = dz * pull;
-        if (!this.pinned[link.a]) {
+        if (!this.pinned[link.a] && !this.held[link.a]) {
           a.x += ax;
           a.y += ay;
           a.z += az;
         }
-        if (!this.pinned[link.b]) {
+        if (!this.pinned[link.b] && !this.held[link.b]) {
           b.x -= ax;
           b.y -= ay;
           b.z -= az;
@@ -198,6 +211,9 @@ export class Net {
       }
     }
 
+    // Let go of whatever the body was holding: wrap() decides again, after
+    // this, which cords it is lying against this frame.
+    this.held.fill(false);
     this.write();
   }
 
@@ -251,16 +267,47 @@ export class Net {
       const dy = p.y - centre.y;
       const dz = p.z - centre.z;
       const d = Math.hypot(dx, dy, dz);
-      if (d < radius && d > 1e-6) {
-        const out = radius / d;
-        p.x = centre.x + dx * out;
-        p.z = centre.z + dz * out;
-        // Shouldered aside and downward, never upward. Pushing a cord up out
-        // of the body draws it across the front of the squirrel, which looks
-        // exactly like an animal hanging underneath a net — the very thing
-        // the wrap is here to avoid.
-        p.y = Math.min(p.y, centre.y + dy * out);
+      if (d >= radius) {
+        continue;
       }
+      // A cord that has drifted to the very middle has no sensible direction
+      // to be pushed in, and normalising a near-zero vector throws it a long
+      // way. Those go straight down, which is where the body is bearing anyway.
+      let tx: number;
+      let ty: number;
+      let tz: number;
+      if (d > 0.4) {
+        const out = radius / d;
+        tx = centre.x + dx * out;
+        ty = centre.y + dy * out;
+        tz = centre.z + dz * out;
+      } else {
+        tx = p.x;
+        ty = centre.y - radius;
+        tz = p.z;
+      }
+      // Eased rather than placed — see NET.wrapEase, which is what stopped the
+      // mesh fighting its own solver — and shouldered aside and downward,
+      // never upward: a cord pushed up out of the body is drawn across the
+      // front of the squirrel, which looks exactly like an animal hanging
+      // underneath a net.
+      p.x += (tx - p.x) * NET.wrapEase;
+      p.z += (tz - p.z) * NET.wrapEase;
+      p.y = Math.min(p.y, p.y + (ty - p.y) * NET.wrapEase);
+
+      // The contact is inelastic: a cord resting against the body keeps no
+      // speed of its own. In Verlet a point's speed *is* the gap between where
+      // it is and where it was, so closing that gap is how a collision is
+      // damped, and without it the cord and the solver trade the same energy
+      // back and forth for ever. Measured, a cord half a unit from the
+      // squirrel's middle sat in a perfect three-frame cycle — 32.86, 32.65,
+      // 32.71, over and over — long after the squirrel had stopped moving.
+      const was = this.was[i];
+      was.x += (p.x - was.x) * NET.wrapGrip;
+      was.y += (p.y - was.y) * NET.wrapGrip;
+      was.z += (p.z - was.z) * NET.wrapGrip;
+      // ...and the solver leaves this one alone next step. See `held`.
+      this.held[i] = true;
     }
   }
 

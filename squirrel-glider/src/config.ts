@@ -1135,10 +1135,10 @@ export const NET = {
    *  are pulled back to length. More passes is a stiffer net. */
   /** How much speed the cloth keeps each step. Some way under one, or the wave
    *  the squirrel sets off when it lands never dies away. */
-  damping: 0.955,
+  damping: 0.93,
   /** How many times the cords are pulled back to length each step. Fewer is
    *  floppier — this is a net, not a drum skin. */
-  relax: 2,
+  relax: 3,
 
   /**
    * How hard the squirrel shoves the cloth on the way in, and how wide the
@@ -1179,6 +1179,23 @@ export const NET = {
    * actually *wrapping* it.
    */
   bodyRadius: 4.2,
+  /**
+   * How much of the way a cord is moved out of the body each step.
+   *
+   * Eased, not teleported, and this was the shivering. Setting a cord straight
+   * onto the surface of the body flings it out — a cord that has drifted to
+   * within a tenth of a unit of the middle gets thrown four units in one frame
+   * — and the constraint solver then hauls it back in, and the next frame
+   * throws it out again. The two of them fought at up to 2.3 units a frame for
+   * seconds after the squirrel had stopped moving.
+   *
+   * A quarter of the way each step lets them settle into a balance instead.
+   */
+  wrapEase: 0.15,
+  /** How much of its own speed a cord loses while it is lying against the
+   *  squirrel. One would pin it dead; this leaves the contact soft while
+   *  still bleeding off the energy that kept it ringing. */
+  wrapGrip: 0.8,
   /**
    * How hard the net pulls back on the squirrel, per unit it has been
    * stretched below where it hangs on its own — and how quickly that motion
