@@ -1105,13 +1105,14 @@ export const NET = {
   /**
    * How many squares across.
    *
-   * Coarse on purpose. At twenty the weave was fine enough to read as fabric —
-   * a mesh that tight looks like a solid thing with a pattern on it. At twelve
-   * the holes are four or five units across, which is a rope net: you can see
-   * the forest through it, and it is plainly something slung between four
-   * poles rather than a sheet.
+   * A balance between two ways of looking wrong. Too fine and the weave reads
+   * as fabric — a mesh that tight is a solid thing with a pattern on it. Too
+   * coarse and the holes are wider than the squirrel, so it looks as though it
+   * could drop straight between the cords: at twelve the holes were 4.7 across
+   * and the animal is 3.7 long. At eighteen they are 3.1, comfortably smaller
+   * than the squirrel and still open enough to see the forest through.
    */
-  grid: 12,
+  grid: 18,
   /** How tall the legs are, and how far their feet splay out past the rim —
    *  four legs raked out diagonally, which is what stops the whole thing
    *  looking like a table. */
@@ -1151,10 +1152,14 @@ export const NET = {
   weight: 52,
   dent: 15,
   /**
-   * How high it rides above the cloth beneath it — negative, so it sits *in*
-   * the pocket rather than perched on top of the sheet.
+   * How high it rides above the cords beneath it.
+   *
+   * Positive, and that matters more than it sounds. At -1.4 the squirrel's
+   * middle sat *below* the cords, so the net was drawn across the front of it
+   * — which looks exactly like an animal that has gone through and is hanging
+   * underneath. It lies in the pocket the cords make, not beneath them.
    */
-  ride: -1.4,
+  ride: 1.2,
   /**
    * The size of the body the net has to get out of the way of.
    *
