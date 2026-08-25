@@ -34,8 +34,11 @@ export class Net {
   private readonly was: Array<THREE.Vector3> = [];
   private readonly pinned: Array<boolean> = [];
   private readonly links: Array<Link> = [];
-  private readonly cloth: THREE.Mesh;
+  private readonly cloth: THREE.LineSegments;
   private readonly positions: Float32Array;
+  /** The pairs of points that get a cord drawn between them: the weave only,
+   *  not the shear and bend links, which are structure rather than rope. */
+  private readonly cords: Array<number> = [];
   private readonly n = NET.grid + 1;
 
   constructor(centre: THREE.Vector3) {
@@ -90,34 +93,38 @@ export class Net {
       }
     }
 
-    // The sheet itself. Its positions are rewritten from the simulation every
-    // frame, so the geometry is built once and only the numbers move.
-    const geometry = new THREE.PlaneGeometry(
-      NET.size,
-      NET.size,
-      NET.grid,
-      NET.grid,
-    );
-    this.positions = geometry.attributes.position.array as Float32Array;
-    geometry.boundingSphere = new THREE.Sphere(centre.clone(), NET.size * 1.5);
-    // The toon material reads a colour attribute, and a bare PlaneGeometry has
-    // none — which reads as black, not as untinted. The plane has to stay
-    // indexed so its vertices line up one for one with the simulation, so it
-    // cannot go through paint(), which de-indexes.
-    const tint = new THREE.Color(NET.colour);
-    const count = geometry.attributes.position.count;
-    const colours = new Float32Array(count * 3);
-    for (let i = 0; i < count; i++) {
-      colours[i * 3] = tint.r;
-      colours[i * 3 + 1] = tint.g;
-      colours[i * 3 + 2] = tint.b;
+    // The net, drawn as its cords with the holes left open.
+    //
+    // It was a solid sheet, and a solid sheet is a tarpaulin: it hid its own
+    // movement, because a flat surface with no features on it looks the same
+    // whatever shape it is. Drawing the weave means every sag and every wave
+    // is visible as the grid distorting, which is the whole reason for
+    // simulating it.
+    for (let row = 0; row <= NET.grid; row++) {
+      for (let col = 0; col <= NET.grid; col++) {
+        const i = row * this.n + col;
+        if (col < NET.grid) {
+          this.cords.push(i, i + 1);
+        }
+        if (row < NET.grid) {
+          this.cords.push(i, i + this.n);
+        }
+      }
     }
-    geometry.setAttribute("color", new THREE.BufferAttribute(colours, 3));
-    const material = vertexToon();
-    // A sheet has no back and no front: you see it from above on the way in
-    // and from below once you are lying in it.
-    material.side = THREE.DoubleSide;
-    this.cloth = new THREE.Mesh(geometry, material);
+
+    this.positions = new Float32Array(this.cords.length * 3);
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute(
+      "position",
+      new THREE.BufferAttribute(this.positions, 3),
+    );
+    // It moves every frame, so a bounding sphere fitted once is a lie.
+    geometry.boundingSphere = new THREE.Sphere(centre.clone(), NET.size * 1.5);
+
+    this.cloth = new THREE.LineSegments(
+      geometry,
+      new THREE.LineBasicMaterial({color: NET.cordColour, fog: false}),
+    );
     this.cloth.frustumCulled = false;
     this.group.add(this.cloth);
 
@@ -236,16 +243,15 @@ export class Net {
     return this.points[i].y;
   }
 
-  /** Copy the simulation into the geometry the renderer reads. */
+  /** Copy the simulation into the cords the renderer draws. */
   private write(): void {
-    for (let i = 0; i < this.points.length; i++) {
-      const p = this.points[i];
-      this.positions[i * 3] = p.x;
-      this.positions[i * 3 + 1] = p.y;
-      this.positions[i * 3 + 2] = p.z;
+    for (let c = 0; c < this.cords.length; c++) {
+      const p = this.points[this.cords[c]];
+      this.positions[c * 3] = p.x;
+      this.positions[c * 3 + 1] = p.y;
+      this.positions[c * 3 + 2] = p.z;
     }
     this.cloth.geometry.attributes.position.needsUpdate = true;
-    this.cloth.geometry.computeVertexNormals();
   }
 }
 

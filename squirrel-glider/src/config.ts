@@ -1112,12 +1112,12 @@ export const NET = {
 
   /** The cloth. `slack` is how much longer each link is than the spacing it
    *  sits at, which is the difference between a trampoline and a hammock. */
-  slack: 1.13,
+  slack: 1.22,
   gravity: 26,
   /** How much speed the cloth keeps each step, and how many times the links
    *  are pulled back to length. More passes is a stiffer net. */
-  damping: 0.972,
-  relax: 5,
+  damping: 0.988,
+  relax: 3,
 
   /**
    * How hard the squirrel shoves the cloth on the way in, and how wide the
@@ -1141,15 +1141,37 @@ export const NET = {
   dent: 15,
   /** How high it rides above the cloth beneath it. */
   ride: 1,
-  /** How much of the drop it gives back as a bounce, and the speed below which
-   *  it has stopped bouncing and just lies there. */
+  /**
+   * How much of the drop it gives back as a bounce, the most it may ever
+   * bounce, and the speed below which it has stopped bouncing and just lies
+   * there.
+   *
+   * The cap matters. A share of the arrival speed is fine at ordinary speeds
+   * and absurd at high ones: a steep dive into the net came in at fifty and
+   * was fired back out of it hard enough to be sitting *above* the rim six
+   * seconds later, which reads as the net spitting the squirrel out.
+   */
   bounce: 0.3,
+  maxBounce: 7,
   settle: 5,
   /** How much of its speed the net takes away each second once it is in. */
   grab: 0.06,
+  /**
+   * How quickly it slides down into the hollow.
+   *
+   * Anything resting on a sagging sheet ends up at the bottom of the sag, and
+   * without this the squirrel simply stopped wherever it first touched — which
+   * for anything arriving at the near edge meant perching on the pinned rim,
+   * looking like it had landed on the frame rather than in the net.
+   */
+  slide: 1.1,
   /** Under this it has stopped bouncing and the card can come up. */
   still: 3,
 
+  /** How thick the cords are drawn, as a share of the gap between them. The
+   *  net is drawn as its cords with the holes left open — a solid sheet reads
+   *  as a tarpaulin, not as something you would fall into. */
+  cordColour: 0xff5d4d,
   colour: 0xf25c54,
   rimColour: 0xd94a42,
   legColour: 0x6b4a35,

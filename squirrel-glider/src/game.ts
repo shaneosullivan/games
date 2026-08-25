@@ -294,12 +294,18 @@ export class Game {
         s.position.y = surface;
         // A bounce while there is anything left to bounce with, and then it
         // simply lies in it.
-        this.netFall = hit > NET.settle ? hit * NET.bounce : 0;
+        this.netFall =
+          hit > NET.settle ? Math.min(hit * NET.bounce, NET.maxBounce) : 0;
       }
 
       s.speed *= Math.pow(NET.grab, dt);
       s.position.x += Math.sin(s.heading) * s.speed * dt;
       s.position.z += Math.cos(s.heading) * s.speed * dt;
+      // ...and down into the hollow, the way anything on a sagging sheet ends
+      // up at the bottom of the sag. See NET.slide.
+      const sink = Math.min(1, NET.slide * dt);
+      s.position.x += (this.net.at.x - s.position.x) * sink;
+      s.position.z += (this.net.at.z - s.position.z) * sink;
       s.prevPosition.copy(s.position);
       if (this.netting > LANDING.runOut + 1.1) {
         this.netting = null;
@@ -359,10 +365,17 @@ export class Game {
     }
 
     // Into the net, which is the ending the game is for.
+    //
+    // Caught by touching the *cloth*, not by happening to be level with the
+    // rim. The rim test was three units wide, so a squirrel arriving any
+    // higher than that sailed straight over the top of the net and carried on
+    // to the ground — which from the player's seat looks exactly like falling
+    // through it. Coming down onto the sheet from any height now lands in it.
+    const p2 = this.squirrel.position;
     if (
       !this.squirrel.landed &&
-      this.net.covers(this.squirrel.position.x, this.squirrel.position.z) &&
-      this.squirrel.position.y <= this.net.at.y + 3
+      this.net.covers(p2.x, p2.z) &&
+      p2.y <= this.net.heightAt(p2.x, p2.z) + NET.ride
     ) {
       this.catchInNet();
       return;
