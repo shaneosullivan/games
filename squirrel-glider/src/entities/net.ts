@@ -129,6 +129,15 @@ export class Net {
     this.group.add(this.cloth);
 
     this.group.add(new THREE.Mesh(frameShape(centre), vertexToon()));
+
+    // Let it hang and settle, then remember the shape it settles into. That is
+    // what the squirrel's weight is measured against — see restHeightAt.
+    for (let i = 0; i < 240; i++) {
+      this.update(1 / 60);
+    }
+    for (const p of this.points) {
+      this.rest.push(p.y);
+    }
     this.write();
   }
 
@@ -259,16 +268,36 @@ export class Net {
     );
   }
 
+  /**
+   * Where the cloth hangs when nothing is in it.
+   *
+   * Sampled once, after letting it settle, and kept — because the squirrel's
+   * support has to be measured against something the squirrel is not itself
+   * dragging around. Measuring the stretch against the live cloth is circular:
+   * the net follows the squirrel down, so it always reads as unstretched and
+   * never pulls back.
+   */
+  private readonly rest: Array<number> = [];
+
+  restHeightAt(x: number, z: number): number {
+    return this.rest[this.nearest(x, z)];
+  }
+
   /** How high the cloth is under a point, so the squirrel can rest on it. */
   heightAt(x: number, z: number): number {
+    return this.points[this.nearest(x, z)].y;
+  }
+
+  /** The grid point nearest a place on the net. */
+  private nearest(x: number, z: number): number {
     const half = NET.size / 2;
     const step = NET.size / NET.grid;
     const col = Math.round((x - (this.at.x - half)) / step);
     const row = Math.round((z - (this.at.z - half)) / step);
-    const i =
+    return (
       Math.max(0, Math.min(NET.grid, row)) * this.n +
-      Math.max(0, Math.min(NET.grid, col));
-    return this.points[i].y;
+      Math.max(0, Math.min(NET.grid, col))
+    );
   }
 
   /** Copy the simulation into the cords the renderer draws. */

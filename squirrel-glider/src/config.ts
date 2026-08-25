@@ -686,7 +686,7 @@ export const GATES = {
 /**
  * How fast counts as fast.
  *
- * The camera, the lens, the shake, the streaks and the wind all read the
+ * The camera, the lens, the streaks and the wind all read the
  * flight through this one pair of numbers, so they cannot disagree about it.
  *
  * Measured off real flights rather than taken from the ends of the envelope,
@@ -844,10 +844,6 @@ export const CAMERA = {
   finishBack: 68,
   finishUp: 42,
   finishRate: 1.5,
-
-  shake: 0.16,
-  shakeLow: 0.55,
-  shakeFrom: 40,
 } as const;
 
 /** The end of the flight: what counts as landing, and how it plays out. */
@@ -1122,7 +1118,18 @@ export const NET = {
 
   /** The cloth. `slack` is how much longer each link is than the spacing it
    *  sits at, which is the difference between a trampoline and a hammock. */
-  slack: 1.38,
+  /**
+   * How much longer each cord is than the gap it spans.
+   *
+   * Modest, because the deep pocket is supposed to be the squirrel's doing.
+   * At 1.38 the net hung 23 units low with nothing in it, so the weight of an
+   * animal landing in it barely changed the shape — and worse, the spring that
+   * holds the squirrel up only starts pulling below wherever the net already
+   * hangs, so it came to rest 45 units down, which is the ground. An empty net
+   * that hangs shallow and stretches visibly when something lands in it is
+   * both the right picture and the right physics.
+   */
+  slack: 1.12,
   gravity: 26,
   /** How much speed the cloth keeps each step, and how many times the links
    *  are pulled back to length. More passes is a stiffer net. */
@@ -1171,18 +1178,27 @@ export const NET = {
    */
   bodyRadius: 4.2,
   /**
-   * How much of the drop it gives back as a bounce, the most it may ever
-   * bounce, and the speed below which it has stopped bouncing and just lies
-   * there.
+   * How hard the net pulls back on the squirrel, per unit it has been
+   * stretched below where it hangs on its own — and how quickly that motion
+   * dies away.
    *
-   * The cap matters. A share of the arrival speed is fine at ordinary speeds
-   * and absurd at high ones: a steep dive into the net came in at fifty and
-   * was fired back out of it hard enough to be sitting *above* the rim six
-   * seconds later, which reads as the net spitting the squirrel out.
+   * This is the whole of the catch now, and it replaced a hard stop. The
+   * squirrel used to be snapped to the surface of the cloth the instant it
+   * touched and handed an upward bounce, which is why the first contact read
+   * as hitting something solid while everything after it moved like cloth:
+   * the first contact was not physics, it was a clamp.
+   *
+   * Now nothing stops it. The net stretches, and the further it is stretched
+   * the harder it pulls — a spring, which is what a net under tension is. The
+   * squirrel sinks in, is slowed over about a second, overshoots a little and
+   * comes back up, exactly as something dropped into a hammock does.
+   *
+   * `stiffness` sets how far past the empty sag it settles: gravity divided by
+   * it, so 9.81 over 0.8 is about twelve units of stretch on top of the eight
+   * the net hangs at on its own.
    */
-  bounce: 0.3,
-  maxBounce: 7,
-  settle: 5,
+  stiffness: 0.8,
+  springDamp: 0.5,
   /** How much of its speed the net takes away each second once it is in. */
   grab: 0.06,
   /**

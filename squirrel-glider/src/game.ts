@@ -76,7 +76,6 @@ export class Game {
   private readonly lookAt = new THREE.Vector3();
   private readonly smoothedLook = new THREE.Vector3();
   private readonly from = new THREE.Vector3();
-  private shakeClock = 0;
   /** How hard the air is lifting the squirrel right now, and the lagged copy
    *  the camera uses so the shot swings under it rather than snapping. */
   private lift = 0;
@@ -277,28 +276,28 @@ export class Game {
       this.sparks.update(dt);
       const s = this.squirrel;
 
-      // It falls, and the cloth stops it. That way round, and only that way
-      // round: see NET.press for the version where the cloth chased the
-      // squirrel down and the squirrel chased the cloth, and both went
-      // through the floor.
-      this.netFall -= GLIDE.gravity * dt;
+      // Nothing stops it. It falls, the net stretches under it, and the
+      // further the net is stretched the harder it pulls back — which is what
+      // a net under tension does, and is the whole catch. There is no moment
+      // where the squirrel is put anywhere; see NET.stiffness for the hard
+      // stop this replaced and why the first contact used to feel like hitting
+      // a table when everything after it moved like cloth.
+      //
+      // The stretch is measured against where the cloth hangs *empty*, not
+      // against where it is now: the net is being dragged down by the squirrel,
+      // so measured live it would always read as slack and never pull at all.
+      const rest = this.net.restHeightAt(s.position.x, s.position.z) + NET.ride;
+      const stretch = Math.max(0, rest - s.position.y);
+      this.netFall += (NET.stiffness * stretch - GLIDE.gravity) * dt;
+      this.netFall *= Math.pow(NET.springDamp, dt);
       s.position.y += this.netFall * dt;
 
-      const surface = this.net.heightAt(s.position.x, s.position.z) + NET.ride;
-      if (s.position.y <= surface) {
-        // Everything it is still carrying downward goes into the sheet, plus
-        // its weight, which is what keeps a hollow under it while it lies
-        // there.
-        const hit = Math.max(0, -this.netFall);
-        this.net.press(s.position, (hit * NET.press + NET.weight) * dt);
-        // ...and the body itself, which the net has to close around rather
-        // than merely dip under. See Net.wrap.
+      // What it is doing to the cloth: the shove of its arrival and its
+      // weight, and then its body, which the net closes around. See Net.wrap.
+      if (stretch > 0) {
+        const push = Math.max(0, -this.netFall);
+        this.net.press(s.position, (push * NET.press + NET.weight) * dt);
         this.net.wrap(s.position, NET.bodyRadius);
-        s.position.y = surface;
-        // A bounce while there is anything left to bounce with, and then it
-        // simply lies in it.
-        this.netFall =
-          hit > NET.settle ? Math.min(hit * NET.bounce, NET.maxBounce) : 0;
       }
 
       s.speed *= Math.pow(NET.grab, dt);
@@ -310,7 +309,10 @@ export class Game {
       s.position.x += (this.net.at.x - s.position.x) * sink;
       s.position.z += (this.net.at.z - s.position.z) * sink;
       s.prevPosition.copy(s.position);
-      if (this.netting > LANDING.runOut + 1.1) {
+      // Long enough to watch it come to rest: the sink takes some two and a
+      // half seconds to stop, and the card used to arrive while it was still
+      // going down.
+      if (this.netting > LANDING.runOut + 1.9) {
         this.netting = null;
         this.showCard();
       }
@@ -682,33 +684,18 @@ export class Game {
     const camera = this.stage.camera;
     camera.fov += (open - camera.fov) * (1 - Math.exp(-CAMERA.fovRate * dt));
     camera.updateProjectionMatrix();
-
-    // A trembling lens, and it is worth the two lines. Flying low feels fast
-    // and flying high feels slow — the eye reads speed in eye-heights a second
-    // rather than in units — so the shake carries a term for how close the
-    // ground is as well as one for how fast the squirrel is going. Squared, so
-    // gentle flying is perfectly steady and only a real dive is felt.
-    // ...and the ground-proximity term least of all once it is *on* the
-    // ground, where it would otherwise sit at full strength for ever.
-    const low = s.landed
-      ? 0
-      : 1 -
-        Math.min(
-          1,
-          (s.position.y - this.terrain.groundAt()) / CAMERA.shakeFrom,
-        );
-    const trauma = Math.min(1, fast + low * CAMERA.shakeLow);
-    const shake = trauma * trauma * CAMERA.shake;
-    if (shake > 0.0001) {
-      this.shakeClock += dt;
-      camera.position.x += Math.sin(this.shakeClock * 37.1) * shake;
-      camera.position.y += Math.sin(this.shakeClock * 51.7) * shake;
-    }
   }
 
   /**
-   * How hard it is running, 0 at an easy glide and 1 flat out. See FEEL: the
-   * one number every cue in the game takes its reading from.
+   * How hard it is running, 0 at an easy glide and 1 flat out.
+   *
+   * The camera used to tremble on this as well, harder the nearer the ground
+   * — on the grounds that speed is read in eye-heights a second and this game
+   * happens a long way above anything. It read as the picture vibrating rather
+   * than as going fast, so it is gone. The lens opening, the streaks and the
+   * wind carry that job between them.
+   *
+   * See FEEL: the one number every cue in the game takes its reading from.
    */
   private run(): number {
     // Nothing is running once it is down. A landed squirrel is never updated
