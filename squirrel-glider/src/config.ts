@@ -1129,8 +1129,8 @@ export const NET = {
    * that hangs shallow and stretches visibly when something lands in it is
    * both the right picture and the right physics.
    */
-  slack: 1.12,
-  gravity: 26,
+  slack: 1.42,
+  gravity: 7,
   /** How much speed the cloth keeps each step, and how many times the links
    *  are pulled back to length. More passes is a stiffer net. */
   /** How much speed the cloth keeps each step. Some way under one, or the wave
@@ -1159,7 +1159,7 @@ export const NET = {
   /** What the squirrel goes on being worth once it is lying there. This is
    *  what keeps a hollow under it instead of it perching on a flat sheet. */
   weight: 20,
-  dent: 15,
+  dent: 24,
   /**
    * How high it rides relative to the cords around it — see Net.supportAt.
    *
@@ -1223,7 +1223,7 @@ export const NET = {
    * ended up sixteen units *below* the cords with the net floating above it,
    * which is precisely the thing it was meant to prevent.
    */
-  lean: 240,
+  lean: 1100,
   /** How much of its speed the net takes away each second once it is in. */
   grab: 0.06,
   /**
