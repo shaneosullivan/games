@@ -125,13 +125,32 @@ export function causticTexture(): THREE.Texture {
 }
 
 /**
- * Slides the dapple along, which is the whole of the animation.
+ * Slides the dapple along — which is the whole of the animation, and now the
+ * whole of what ties it to the water overhead.
  *
- * Two different rates on the two axes: equal ones would read as the sea floor
- * sliding diagonally rather than as light shifting on it.
+ * It travels in the leading wave's direction at that wave's own speed, and
+ * surges back and forth with its phase. Before this it slid at a constant rate
+ * of its own choosing, which meant the light on the sand and the swell casting
+ * it were two animations that merely shared a scene. Locking them is the
+ * cheapest real gain available here: nobody can name what changed, and
+ * everybody can see that it did.
+ *
+ * The speed is turned into texture space by `causticScale`, which is how many
+ * times the tile repeats over a unit of floor — so the pattern slides across
+ * the sand exactly as fast as the crests slide across the sky.
  */
-export function driftCaustics(texture: THREE.Texture, time: number): void {
-  texture.offset.set(time * WATER.causticDriftX, time * WATER.causticDriftZ);
+export function driftCaustics(
+  texture: THREE.Texture,
+  time: number,
+  swell: {dx: number; dz: number; speed: number; k: number},
+  phase: number,
+): void {
+  const travelled = (swell.speed / swell.k) * time * WATER.causticScale;
+  const surge = Math.sin(phase) * WATER.causticSurge;
+  texture.offset.set(
+    swell.dx * travelled + surge,
+    swell.dz * travelled + Math.cos(phase) * WATER.causticSurge,
+  );
 }
 
 /**

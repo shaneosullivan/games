@@ -246,19 +246,48 @@ export const WATER = {
   deepColour: 0x11578a,
   colourDepth: 88,
 
-  /** The surface plane: how big, how coarse, and the two wave trains crossing
-   *  on it. Small waves, as the plan asks — this is a calm day. */
+  /** The surface plane: how big and how coarse. */
   surfaceSpan: 2200,
   surfaceCell: 40,
-  waveHeight: 1.5,
-  waveLength: 95,
-  waveSpeed: 0.6,
 
-  /** The dappled light. `causticScale` is how many times the pattern repeats
-   *  over 100 units of floor; the drifts are how fast it slides. */
+  /**
+   * The swell, as four Gerstner waves.
+   *
+   * Gerstner rather than a sum of sines, which is what this was. A plain sine
+   * only moves a vertex up and down, so every crest is as round as every
+   * trough and the sea looks like corrugated iron with the corrugations
+   * softened. A Gerstner wave also moves the vertex *along* its own direction,
+   * bunching water at the crests and stretching it in the troughs — sharp
+   * peaks, flat valleys — which is what a real swell looks like and is most of
+   * why it reads as water. It costs one extra cosine per wave per vertex.
+   *
+   * `steep` is how far it leans, 0 for a plain sine and 1 for a peak sharp
+   * enough to be about to break. Past a point the surface folds through
+   * itself, so the four together are kept well under it.
+   *
+   * Four, and none of the wavelengths a multiple of another — two waves alone
+   * beat against each other visibly, and matching lengths make a repeating
+   * grid appear on the water.
+   */
+  gerstner: [
+    {angle: 0.15, length: 118, height: 0.62, steep: 0.9, speed: 0.5},
+    {angle: 1.25, length: 73, height: 0.42, steep: 0.85, speed: 0.66},
+    {angle: -0.85, length: 167, height: 0.5, steep: 0.72, speed: 0.4},
+    {angle: 2.5, length: 41, height: 0.18, steep: 0.95, speed: 0.95},
+  ],
+
+  /**
+   * The dappled light. `causticScale` is how many times the pattern repeats
+   * over 100 units of floor.
+   *
+   * The drift is no longer a rate of its own: the dapple travels with the
+   * swell that casts it, at the first Gerstner wave's own direction and speed,
+   * and `causticSurge` is how much it also breathes in and out with that
+   * wave's phase. Sliding it at some unrelated constant rate was two
+   * animations that happened to be in the same scene.
+   */
   causticScale: 0.055,
-  causticDriftX: 0.011,
-  causticDriftZ: 0.017,
+  causticSurge: 0.06,
 
   /** Above the water: the sky, and how much further you can see in air. The
    *  fog has to open right out or the world ends a few lengths from the
@@ -284,6 +313,16 @@ export const WATER = {
   shafts: 26,
   shaftWidth: 26,
   shaftSway: 0.16,
+  /**
+   * How much each beam brightens and dims with the water directly above it.
+   *
+   * The light in a beam is light that got through a patch of surface, so a
+   * crest passing overhead should put it out and a trough should let it
+   * through. 0 is a beam of constant strength, 1 one that goes out
+   * altogether. They swayed as a rigid group before, which moved them without
+   * connecting them to anything.
+   */
+  shaftFlicker: 0.55,
 } as const;
 
 /**

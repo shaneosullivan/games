@@ -44,7 +44,42 @@ export class Reef {
   private readonly kelpBase: Array<Planted> = [];
   /** The bunches everything grows in. See REEF.gardens. */
   private readonly gardens: Array<{x: number; z: number}> = [];
+  /** How bright a sunbeam is with clear water over it. Everything else is a
+   *  fraction of this — see the flicker in update(). */
+  private readonly shaftBase = 0.34;
   private readonly shafts: THREE.Group;
+  /**
+   * The swell, worked out once.
+   *
+   * Every term here is fixed for the run, and the surface loop runs this over
+   * three thousand vertices a frame — recomputing a wavenumber from a
+   * wavelength three thousand times is the kind of thing that turns a cheap
+   * effect into an expensive one.
+   */
+  private readonly swell = WATER.gerstner.map(w => {
+    const k = TAU / w.length;
+    return {
+      k,
+      dx: Math.sin(w.angle),
+      dz: Math.cos(w.angle),
+      height: w.height,
+      // The horizontal shove, and the whole point of a Gerstner wave.
+      //
+      // A wave folds through itself once the shove reaches 1/k, so `steep` is
+      // given as a fraction of that and the limit never has to be remembered
+      // at the call site. Divided by the number of waves because they all add
+      // up and it is the *total* that must stay under one — with four of them
+      // summing to 2.9 unshared, the sea would have turned itself inside out.
+      //
+      // Written as `(steep / k) * (height * k)` first, which cancels the k and
+      // leaves `steep * height` — a third of a unit of shove where fourteen
+      // were wanted. Measured, the surface was still 49.9% above its own mean,
+      // which is to say still a sine.
+      pinch: w.steep / (k * WATER.gerstner.length),
+      speed: Math.sqrt(9.8 * k) * w.speed,
+    };
+  });
+
   private readonly m = new THREE.Matrix4();
   private readonly q = new THREE.Quaternion();
   private readonly e = new THREE.Euler();
@@ -123,19 +158,57 @@ export class Reef {
   }
 
   /**
-   * The height of the water at a point — the same two wave trains the surface
-   * mesh is built from.
+   * Where the water goes at a point, as a displacement from it.
+   *
+   * The sum of the Gerstner waves in WATER.gerstner. Each contributes a rise
+   * and a shove along its own direction; the shove is what sharpens the crests
+   * and is the whole reason for using these rather than sines.
+   *
+   * `out` is set to (dx, dy, dz) — the vertex at (x, z) belongs at
+   * (x + dx, dy, z + dz).
+   */
+  waveDisplacement(
+    x: number,
+    z: number,
+    time: number,
+    out: THREE.Vector3,
+  ): THREE.Vector3 {
+    out.set(0, 0, 0);
+    for (const w of this.swell) {
+      const phase = w.k * (w.dx * x + w.dz * z) - w.speed * time;
+      const cos = Math.cos(phase);
+      out.x += w.pinch * w.dx * cos;
+      out.z += w.pinch * w.dz * cos;
+      out.y += w.height * Math.sin(phase);
+    }
+    return out;
+  }
+
+  /**
+   * The height of the water at a point.
    *
    * Public because the gulls sit on it. A bird bobbing to its own idea of
    * where the water is, half a unit off the water the player can see, is worse
    * than a bird that does not bob at all.
+   *
+   * This reads the height at the *undisplaced* point rather than solving for
+   * which bit of water ended up here, which a Gerstner surface cannot be asked
+   * directly. For something floating on it the difference is a fraction of a
+   * unit and nobody will ever see it.
    */
   waveAt(x: number, z: number, time: number): number {
-    const a = (x / WATER.waveLength) * TAU + time * WATER.waveSpeed;
-    const b =
-      ((z * 0.82 + x * 0.3) / (WATER.waveLength * 1.4)) * TAU +
-      time * WATER.waveSpeed * 0.73;
-    return (Math.sin(a) + Math.sin(b)) * 0.5 * WATER.waveHeight;
+    let y = 0;
+    for (const w of this.swell) {
+      y += w.height * Math.sin(w.k * (w.dx * x + w.dz * z) - w.speed * time);
+    }
+    return y;
+  }
+
+  /** The leading wave's phase at a point. The dapple and the sunbeams both
+   *  ride it, so that the light under the water belongs to the water. */
+  swellPhase(x: number, z: number, time: number): number {
+    const w = this.swell[0];
+    return w.k * (w.dx * x + w.dz * z) - w.speed * time;
   }
 
   /** 0 at the start of the reef, 1 at the finish. For the bar along the top. */
@@ -165,7 +238,14 @@ export class Reef {
    * clock here, so a paused game has a still sea.
    */
   update(time: number, centre: THREE.Vector3): void {
-    driftCaustics(this.caustics, time);
+    // The dapple travels with the wave that casts it, and breathes with its
+    // phase — see WATER.causticSurge.
+    driftCaustics(
+      this.caustics,
+      time,
+      this.swell[0],
+      this.swellPhase(centre.x, centre.z, time),
+    );
 
     // The surface is a patch, not the whole ocean: it is moved to sit over the
     // whale, and the waves are computed from world coordinates so it does not
@@ -174,17 +254,37 @@ export class Reef {
     const pos = this.surface.geometry.attributes.position;
     const arr = pos.array as Float32Array;
     for (let i = 0; i < arr.length; i += 3) {
-      // Two trains crossing at an angle. One alone reads as corrugated iron.
-      arr[i + 2] = this.waveAt(
-        this.surfaceRest[i] + centre.x,
-        this.surfaceRest[i + 1] + centre.z,
-        time,
-      );
+      // The plane is built in XY and laid flat by a -90° turn about X, which
+      // sends its local y to world -z and its local z to world y. So the wave
+      // is asked about a world point, and its answer is unpacked back into
+      // that frame — the horizontal part of a Gerstner wave has to go
+      // somewhere, and getting this wrong shears the sea sideways.
+      const wx = this.surfaceRest[i] + centre.x;
+      const wz = centre.z - this.surfaceRest[i + 1];
+      this.waveDisplacement(wx, wz, time, this.v);
+      arr[i] = this.surfaceRest[i] + this.v.x;
+      arr[i + 1] = this.surfaceRest[i + 1] - this.v.z;
+      arr[i + 2] = this.v.y;
     }
     pos.needsUpdate = true;
 
     this.shafts.position.set(centre.x, 0, centre.z);
     this.shafts.rotation.z = Math.sin(time * 0.21) * WATER.shaftSway;
+    // Each beam is the light that got through one patch of surface, so a crest
+    // passing over it puts it out and a trough lets it through. Read at the
+    // beam's own place in the world, which is what stops them all pulsing
+    // together like a light on a timer.
+    for (const beam of this.shafts.children) {
+      const phase = this.swellPhase(
+        centre.x + beam.position.x,
+        centre.z + beam.position.z,
+        time,
+      );
+      const open = 0.5 + 0.5 * Math.sin(phase);
+      const mat = (beam as THREE.Mesh).material as THREE.MeshBasicMaterial;
+      mat.opacity =
+        this.shaftBase * (1 - WATER.shaftFlicker + WATER.shaftFlicker * open);
+    }
 
     // The weed and the kelp lean, which is the only motion on the sea floor
     // and does more for "this is under water" than anything else here. The
@@ -509,31 +609,35 @@ export class Reef {
    */
   private buildShafts(rng: Rng): THREE.Group {
     const group = new THREE.Group();
-    const mat = new THREE.MeshBasicMaterial({
-      map: shaftTexture(),
-      color: 0xeafaff,
-      transparent: true,
-      opacity: 0.34,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false,
-      side: THREE.DoubleSide,
-    });
     for (let i = 0; i < WATER.shafts; i++) {
       const height = rng.range(80, 150);
       const width = WATER.shaftWidth * rng.range(0.5, 1.2);
-      const beam = new THREE.Group();
-      // Two planes crossed at a right angle, so the beam has a width from
-      // wherever you happen to be looking. A single plane vanishes edge-on,
-      // which for a thing scattered all round the whale means half of them
-      // blink out every time it turns.
+      // Two planes crossed at a right angle, merged into one geometry. A
+      // single plane vanishes edge-on, which for beams scattered all round the
+      // whale means half of them blinking out every time it turns — and merged
+      // rather than parented, because these were two meshes apiece and the
+      // sunbeams alone were most of the game's draw calls.
+      const planes: Array<THREE.BufferGeometry> = [];
       for (const turn of [0, Math.PI / 2]) {
-        const plane = new THREE.Mesh(
-          new THREE.PlaneGeometry(width, height),
-          mat,
-        );
-        plane.rotation.y = turn;
-        beam.add(plane);
+        const plane = new THREE.PlaneGeometry(width, height);
+        plane.rotateY(turn);
+        planes.push(plane);
       }
+      const beam = new THREE.Mesh(
+        mergeGeometries(planes, false),
+        // A material each, because each one is dimmed by the water directly
+        // above it and they are not all under the same wave. Same shader, so
+        // they still batch as far as anything cares.
+        new THREE.MeshBasicMaterial({
+          map: shaftTexture(),
+          color: 0xeafaff,
+          transparent: true,
+          opacity: this.shaftBase,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false,
+          side: THREE.DoubleSide,
+        }),
+      );
       // Tops just *under* the surface. Sitting them at the waterline put a
       // white additive smudge on the sea in every shot taken from the air.
       beam.position.set(
