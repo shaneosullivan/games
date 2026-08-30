@@ -127,7 +127,9 @@ export class Whale {
    * the roll instead of hovering over an idea of where the whale is.
    */
   back(out: THREE.Vector3): THREE.Vector3 {
-    out.set(0, 6.1, -1.5);
+    // Standing *on* the back, not in it: the barrel's top is at about 6.1
+    // here, and a gull is a bit over a unit from its feet to its middle.
+    out.set(0, 7.4, -1.5);
     return this.body.localToWorld(out);
   }
 

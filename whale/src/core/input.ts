@@ -13,10 +13,16 @@ export interface StickInput {
 }
 
 /**
- * Floating thumbstick. The base is planted wherever the finger lands in the
- * lower-left region rather than living in a fixed corner, so a child never has
- * to find a control before they can move. Tracks a single pointerId, so the
- * second thumb on the depth slider can't steal it.
+ * Floating thumbstick. The base is planted wherever the finger lands —
+ * anywhere on the glass, not in a corner and not in a corner's worth of it —
+ * so a child never has to find a control before they can move. Tracks a single
+ * pointerId, so the second thumb on the depth slider can't steal it.
+ *
+ * There is no zone. The bee's version owned the lower-left only, to keep out
+ * of its altitude slider's way; here the slider and the buttons opt out for
+ * themselves by carrying `ui-interactive`, which `onDown` checks below and the
+ * slider backs up by stopping the event itself. So the whole screen can be the
+ * stick without the two thumbs ever meeting.
  *
  * This is the bee game's stick, brought over whole: the plan asks for the
  * bee's controls by name, and a child who has played that game should not have
@@ -62,26 +68,12 @@ export class Joystick {
     window.addEventListener("keyup", this.onKey);
   }
 
-  /**
-   * Whether the stick will plant itself under a finger landing here.
-   *
-   * The lower-left region owns it, which leaves the right of the screen free
-   * for the depth slider. Both thumbs are in use in this game, so the two
-   * halves have to stay out of each other's way.
-   */
-  private inZone(x: number, y: number): boolean {
-    return x < window.innerWidth * 0.55 && y > window.innerHeight * 0.3;
-  }
-
   private onDown = (e: PointerEvent): void => {
     if (!this.enabled || this.pointerId !== null) {
       return;
     }
     // Ignore taps on HUD buttons.
     if ((e.target as HTMLElement)?.closest?.(".ui-interactive")) {
-      return;
-    }
-    if (!this.inZone(e.clientX, e.clientY)) {
       return;
     }
     e.preventDefault();

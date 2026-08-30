@@ -39,7 +39,7 @@ On a laptop, WASD or the arrow keys swim and Q and E change depth.
   shy and scatter when you get close.
 - **Drifting plastic** — bottles, bags and six-pack rings. Eating one ends the
   run.
-- **A pink coral arch** at the far end, which is the finish.
+- **An arch of rock** at the far end, coral grown all over it, which is the finish.
 - **The surface**, which is somewhere you can actually get to. A whale
   breathes air: take the slider to the top and it puts its back out, blows a
   spout and takes a breath, and the shot comes up out of the water with it.
@@ -71,7 +71,7 @@ fixed-timestep loop (`SIM.step`, 1/60) with an interpolated render — so actors
 keep a `prevPosition` and a `render(alpha)`. Every tunable number is in
 [src/config.ts](src/config.ts).
 
-Twelve things that have already caught somebody out here:
+Fourteen things that have already caught somebody out here:
 
 - **The floor is a function first and a mesh second.** `Reef.floorAt` is what
   the whale, the coral, the fish and the camera all ask; the mesh is only that
@@ -88,6 +88,15 @@ Twelve things that have already caught somebody out here:
 - **A share of the gap per frame is not a rate.** The depth follow was written
   that way and sank faster on a 120Hz iPad than on a 60Hz laptop. Anything
   eased here uses `1 - exp(-rate·dt)` or a plain rate per second.
+- **An InstancedMesh is culled by its geometry's bounds, not its instances'.**
+  One plant's sphere, a few units across and sitting at the world origin —
+  so the renderer decides the whole mesh is off screen the moment you swim
+  away from the origin, and every kelp, coral and weed vanishes at once. They
+  are five draw calls between them and always have something on screen, so
+  `keepDrawn` simply turns culling off for all of them.
+- **A stand has to be planted as one.** The kelp drew its stand's centre once
+  per _plant_ rather than once per stand, so a "thicket" was a band of open
+  water a hundred and fifty units wide with eighteen lone plants in it.
 - **The surface is a ceiling.** Any ray heading upward meets it before it
   meets anything tall and far away, so an opaque surface hides the finish arch
   behind a sheet of water for the whole approach. It is deliberately thin from

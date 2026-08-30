@@ -20,6 +20,8 @@ interface Gull {
   airborne: number;
   /** Standing on the whale. See perchOn(). */
   perched: boolean;
+  /** 0 wings out, 1 wings folded away. Eased, so the fold is watchable. */
+  fold: number;
   /** Where it is heading while it is up. */
   away: THREE.Vector3;
 }
@@ -57,6 +59,8 @@ export class Sky {
   private readonly qFlap = new THREE.Quaternion();
   private readonly e = new THREE.Euler();
   private readonly one = new THREE.Vector3(1, 1, 1);
+  /** The wings' scale, which is not uniform once they start folding. */
+  private readonly span = new THREE.Vector3();
   private readonly here = new THREE.Vector3();
   private readonly flat = new THREE.Vector3();
   /** Where a gull should come and stand, or null. See perchOn(). */
@@ -122,6 +126,7 @@ export class Sky {
         },
         sitting: !flying,
         perched: false,
+        fold: 0,
         airborne: 0,
         away: new THREE.Vector3(),
       });
@@ -186,6 +191,9 @@ export class Sky {
       }
       gull.beat +=
         (SKY.glideBeat + gull.flap * (SKY.flapBeat - SKY.glideBeat)) * TAU * dt;
+      // Wings away when it is standing on something, out the rest of the time.
+      const want = gull.perched ? 1 : 0;
+      gull.fold += (want - gull.fold) * (1 - Math.exp(-SKY.foldRate * dt));
       this.drawGull(i, gull);
     }
     this.bodies.instanceMatrix.needsUpdate = true;
@@ -363,12 +371,29 @@ export class Sky {
     // In this order the flap (about Z) is applied to the wing *before* the
     // turn (about Y) — and a rotation about Y preserves height. The tip goes
     // up, then gets carried to the other side still up. Same sign, both sides.
-    const lift = Math.sin(gull.beat) * (0.28 + gull.flap * 0.95);
+    //
+    // Folding runs on the same Y axis as the turn: sweeping the wing back
+    // means adding to it on the right and subtracting on the left, since the
+    // left one is already pointing the other way. Away from the beat, too —
+    // a folded wing is still, so the flap fades out as it goes.
+    const out = 1 - gull.fold;
+    const lift =
+      Math.sin(gull.beat) * (0.28 + gull.flap * 0.95) * out +
+      SKY.foldDrop * gull.fold;
+    const sweep = SKY.foldSweep * gull.fold;
     for (const side of [0, 1]) {
-      this.e.set(0, side === 0 ? 0 : Math.PI, lift, "YZX");
+      const sign = side === 0 ? 1 : -1;
+      this.e.set(0, (side === 0 ? 0 : Math.PI) + sign * sweep, lift, "YZX");
       this.qFlap.setFromEuler(this.e);
       this.qFlap.premultiply(this.q);
-      this.m.compose(gull.position, this.qFlap, this.one);
+      // Shortened along its own span as it folds: a wing tucked away bunches
+      // up, and one that kept its full length reached past the tail.
+      this.span.set(
+        SKY.gullSize * (1 - SKY.foldIn * gull.fold),
+        SKY.gullSize,
+        SKY.gullSize,
+      );
+      this.m.compose(gull.position, this.qFlap, this.span);
       this.wings.setMatrixAt(i * 2 + side, this.m);
     }
   }
@@ -400,50 +425,65 @@ function cloud(): THREE.BufferGeometry {
  */
 function gullBody(): THREE.BufferGeometry {
   const parts: Array<THREE.BufferGeometry> = [];
-  // Short and deep rather than long and thin. A gull's body is a compact
-  // barrel with the length in its wings and its tail, and the first pass at
-  // slimming it went too far the other way and produced a torpedo.
-  const body = new THREE.SphereGeometry(0.34, 10, 8);
-  body.scale(0.66, 0.72, 1.32);
+
+  // Plump and round rather than streamlined. Everything below leans the same
+  // way: a big head, big eyes, a short beak and a small body — which is the
+  // whole recipe for cute and is exactly what a real gull is not.
+  const body = new THREE.SphereGeometry(0.34, 12, 9);
+  body.scale(0.74, 0.8, 1.18);
   parts.push(paint(body, 0xffffff));
 
   // The grey mantle across the back and shoulders, a shell just inside the
   // body's surface — coplanar faces z-fight, so it sits 0.01 in.
-  const back = new THREE.SphereGeometry(0.33, 10, 6, 0, TAU, 0, 0.85);
-  back.scale(0.66, 0.72, 1.2);
+  const back = new THREE.SphereGeometry(0.33, 12, 7, 0, TAU, 0, 0.8);
+  back.scale(0.74, 0.8, 1.08);
   back.translate(0, 0.02, -0.03);
-  parts.push(paint(back, 0xb8c6d0));
+  parts.push(paint(back, 0xbfccd6));
 
-  // Neck and head, tucked in close. A gull at rest has almost no neck at all
-  // — the head sits straight on the shoulders — and the first version gave it
-  // a swan's, which read as a goose.
-  const neck = new THREE.SphereGeometry(0.155, 8, 6);
-  neck.scale(1, 1, 1.05);
-  neck.translate(0, 0.13, 0.24);
-  parts.push(paint(neck, 0xffffff));
-
-  const head = new THREE.SphereGeometry(0.16, 8, 6);
-  head.translate(0, 0.21, 0.36);
+  // Head: nearly as wide as the body and sat right on it, no neck to speak
+  // of. A gull's head is a third of this size and further forward.
+  const head = new THREE.SphereGeometry(0.235, 12, 9);
+  head.scale(1, 0.96, 0.96);
+  head.translate(0, 0.23, 0.3);
   parts.push(paint(head, 0xffffff));
 
-  const beak = new THREE.ConeGeometry(0.05, 0.28, 5);
+  // A short, deep, slightly upturned beak — a stub rather than a dagger.
+  const beak = new THREE.ConeGeometry(0.085, 0.2, 6);
   beak.rotateX(Math.PI / 2);
-  beak.translate(0, 0.18, 0.59);
-  parts.push(paint(beak, 0xf5a623));
+  beak.rotateX(-0.22);
+  beak.scale(1, 0.8, 1);
+  beak.translate(0, 0.185, 0.53);
+  parts.push(paint(beak, 0xf6a521));
 
   for (const side of [-1, 1]) {
-    const eye = new THREE.SphereGeometry(0.035, 5, 4);
-    eye.translate(side * 0.105, 0.24, 0.45);
-    parts.push(paint(eye, 0x2b333b));
+    // Big, round and set well forward, which is what makes a face read as
+    // young. Set proud of the head rather than sunk into it.
+    const eye = new THREE.SphereGeometry(0.072, 8, 7);
+    eye.translate(side * 0.135, 0.275, 0.44);
+    parts.push(paint(eye, 0x24303a));
+    // The catchlight. One small white dot up and out, and the whole bird goes
+    // from beady to friendly.
+    const spark = new THREE.SphereGeometry(0.026, 6, 5);
+    spark.translate(side * 0.16, 0.315, 0.485);
+    parts.push(paint(spark, 0xffffff));
   }
 
-  // The tail: a flat wedge, long enough to balance the wings. A gull's is
-  // squared off rather than pointed, so this is wide at the back.
-  const tail = new THREE.ConeGeometry(0.19, 0.62, 4);
+  // The tail: short and cocked up a little, the way a bird stands.
+  const tail = new THREE.ConeGeometry(0.17, 0.44, 4);
   tail.rotateX(-Math.PI / 2);
-  tail.scale(1, 0.22, 1);
-  tail.translate(0, 0.02, -0.66);
+  tail.scale(1, 0.24, 1);
+  tail.rotateX(0.28);
+  tail.translate(0, 0.09, -0.56);
   parts.push(paint(tail, 0xeef4f8));
+
+  // Feet, tucked under. Barely visible in the air and exactly what is wanted
+  // when the bird is standing on a whale.
+  for (const side of [-1, 1]) {
+    const foot = new THREE.SphereGeometry(0.06, 6, 5);
+    foot.scale(0.7, 0.45, 1.5);
+    foot.translate(side * 0.09, -0.24, 0.08);
+    parts.push(paint(foot, 0xf6a521));
+  }
 
   return mergeGeometries(parts, false);
 }

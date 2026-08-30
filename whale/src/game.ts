@@ -142,7 +142,7 @@ export class Game {
     this.intro = new Overlay(
       ui,
       "Whale",
-      "You are a beluga whale on a coral reef. Drag on the left to swim, and slide the bar on the right to go deeper or up to the top. A whale breathes air, so take the slider right to the sun now and then and pop your head out for a puff. Eat the fish that swim into your mouth — some of them are shy and will dart away. Don't eat the plastic bottles and bags: swim right round those. The reef ends at a big pink arch, and that is where you are going.",
+      "You are a beluga whale on a coral reef. Drag on the left to swim, and slide the bar on the right to go deeper or up to the top. A whale breathes air, so take the slider right to the sun now and then and pop your head out for a puff. Eat the fish that swim into your mouth — some of them are shy and will dart away. Don't eat the plastic bottles and bags: swim right round those. The reef ends at a great arch of rock with coral all over it, and that is where you are going.",
       "Dive in",
       () => this.begin(),
     );

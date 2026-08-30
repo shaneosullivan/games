@@ -403,6 +403,20 @@ export const SKY = {
    *  near it has to get before it counts as down. */
   perchSpeed: 34,
   perchNear: 3,
+  /**
+   * Folding the wings, once it is down.
+   *
+   * A standing bird does not hold its wings out. `foldSweep` is how far back
+   * they swing — 1.5 radians is a right angle and a bit, which lays them along
+   * the body pointing at the tail — `foldDrop` how far they settle onto the
+   * flanks, and `foldIn` how much of their span is left showing, since a
+   * folded wing bunches up rather than staying its full length.
+   */
+  foldSweep: 1.55,
+  foldDrop: -0.3,
+  foldIn: 0.6,
+  /** How quickly they fold and unfold. Fast: it is a flick, not a stretch. */
+  foldRate: 5,
 } as const;
 
 /**

@@ -328,6 +328,7 @@ export class Reef {
         mesh.setColorAt(i, colour);
       }
       mesh.instanceMatrix.needsUpdate = true;
+      keepDrawn(mesh);
       group.add(mesh);
     }
 
@@ -338,6 +339,7 @@ export class Reef {
       rocks.setColorAt(i, colour);
     }
     rocks.instanceMatrix.needsUpdate = true;
+    keepDrawn(rocks);
     group.add(rocks);
 
     return group;
@@ -373,6 +375,7 @@ export class Reef {
       mesh.setColorAt(i, colour);
     }
     mesh.instanceMatrix.needsUpdate = true;
+    keepDrawn(mesh);
     return mesh;
   }
 
@@ -398,6 +401,7 @@ export class Reef {
       colour.set(rng.pick(greens)).convertSRGBToLinear();
       mesh.setColorAt(i, colour);
     }
+    keepDrawn(mesh);
     return mesh;
   }
 
@@ -421,10 +425,19 @@ export class Reef {
     const colour = new THREE.Color();
     const perStand = Math.ceil(REEF.kelp / REEF.kelpStands);
 
+    // The middle of each stand, drawn once. Drawing it per plant instead —
+    // which is what this did — gave every plant its own centre, so a "stand"
+    // was a band of open water a hundred and fifty units wide with eighteen
+    // lone plants in it. A thicket you can swim into has to be planted as one.
+    const middles: Array<number> = [];
+    for (let n = 0; n < REEF.kelpStands; n++) {
+      middles.push(rng.range(-REEF.halfWidth, REEF.halfWidth) * 0.8);
+    }
+
     for (let i = 0; i < REEF.kelp; i++) {
       const stand = Math.floor(i / perStand) % REEF.kelpStands;
       const along = (stand + 0.5) / REEF.kelpStands;
-      const cx = rng.range(-REEF.halfWidth, REEF.halfWidth) * 0.8;
+      const cx = middles[stand];
       const cz = 40 + (this.finishZ - 100) * along;
       const x = cx + rng.range(-REEF.kelpSpread, REEF.kelpSpread);
       const z = cz + rng.range(-REEF.kelpSpread, REEF.kelpSpread);
@@ -441,6 +454,7 @@ export class Reef {
       colour.set(rng.pick(golds)).convertSRGBToLinear();
       mesh.setColorAt(i, colour);
     }
+    keepDrawn(mesh);
     return mesh;
   }
 
@@ -543,38 +557,100 @@ export class Reef {
   private buildFinish(): THREE.Group {
     const group = new THREE.Group();
     const floor = this.floorAt(0, this.finishZ);
-    const span = 60;
-    const legHeight = 16;
+    const span = 62;
+    const legHeight = 17;
+    const rng = new Rng(66001);
 
-    const arch = paint(
-      new THREE.TorusGeometry(span / 2, 4.6, 10, 26, Math.PI),
-      0xffb3d1,
-    );
-    const parts: Array<THREE.BufferGeometry> = [arch];
+    // An arch of rock that coral has grown over, rather than a smooth pink
+    // croquet hoop. The hoop was the first version and read as playground
+    // equipment: perfectly round, one colour, and the same thickness the whole
+    // way over, which nothing in the sea is.
+    const parts: Array<THREE.BufferGeometry> = [];
+
+    // The span itself, as a chain of lumps of rock following a curve. Each is
+    // a different size and sits a little off the line, so the arch has a bulge
+    // and a narrow point like a thing that grew.
+    const bands = 15;
+    for (let i = 0; i <= bands; i++) {
+      const t = i / bands;
+      const a = Math.PI * t;
+      const lump = new THREE.IcosahedronGeometry(
+        4.2 + Math.sin(t * Math.PI) * 1.6 + rng.range(-0.9, 0.9),
+        0,
+      );
+      lump.scale(1, 1, rng.range(0.7, 1.3));
+      lump.rotateY(rng.range(0, TAU));
+      lump.translate(
+        Math.cos(a) * (span / 2) + rng.range(-1.2, 1.2),
+        Math.sin(a) * (span / 2) * 0.92 + rng.range(-1, 1),
+        rng.range(-2.2, 2.2),
+      );
+      parts.push(paint(lump, 0x9c8f7d));
+    }
+
+    // The two feet, thicker than the span and buried in the sand.
     for (const side of [-1, 1]) {
-      const leg = new THREE.CylinderGeometry(5.2, 7.4, legHeight, 10);
-      leg.translate((side * span) / 2, -legHeight / 2, 0);
-      parts.push(paint(leg, 0xff8fbe));
-      // Knobbles up the legs, so the arch reads as grown rather than built.
       for (let i = 0; i < 3; i++) {
-        const bud = new THREE.IcosahedronGeometry(3.4, 0);
-        bud.translate((side * span) / 2 + side * 4, -legHeight + 3 + i * 7, 0);
-        parts.push(paint(bud, 0xffd166));
+        const foot = new THREE.IcosahedronGeometry(rng.range(5.5, 8), 0);
+        foot.scale(1, 0.85, 1);
+        foot.translate(
+          (side * span) / 2 + rng.range(-2.5, 2.5),
+          -legHeight + i * 6 + rng.range(-1, 1),
+          rng.range(-3, 3),
+        );
+        parts.push(paint(foot, 0x8d8271));
       }
     }
-    const mesh = new THREE.Mesh(
+
+    const rock = new THREE.Mesh(
       mergeGeometries(parts, false),
       new THREE.MeshToonMaterial({
         vertexColors: true,
         gradientMap: toonRamp(),
       }),
     );
-    // The origin is where the arch springs from the tops of the legs, so this
-    // is the leg height above the sand and no more. Hanging it any higher
-    // leaves the legs floating, and any higher again pushes the crown up
-    // through the surface, where the translucent water washes it out.
-    mesh.position.set(0, floor + legHeight, this.finishZ);
-    group.add(mesh);
+    rock.position.set(0, floor + legHeight, this.finishZ);
+    group.add(rock);
+
+    // And the coral growing all over it, which is what makes it the end of a
+    // reef rather than a rock. Pink and gold, thick enough to see from a long
+    // way off — this is the thing a child is aiming at.
+    const kinds = coralKinds();
+    const bright = [0xff5fa2, 0xe8397a, 0xff9ec2, 0xffc65e, 0xff7a3d];
+    const encrust = new THREE.InstancedMesh(
+      kinds[1],
+      new THREE.MeshToonMaterial({
+        vertexColors: true,
+        gradientMap: toonRamp(),
+      }),
+      54,
+    );
+    const colour = new THREE.Color();
+    for (let i = 0; i < 54; i++) {
+      // Round the arch, facing out of it — coral on an arch grows away from
+      // the stone, so each one is tipped along the outward normal.
+      const t = rng.next();
+      const a = Math.PI * t;
+      const out = rng.range(-1, 1);
+      this.v.set(
+        Math.cos(a) * (span / 2 + rng.range(-1, 4)),
+        Math.sin(a) * (span / 2) * 0.92 + rng.range(-2, 3),
+        out * rng.range(2, 5),
+      );
+      this.v.y += floor + legHeight;
+      this.v.z += this.finishZ;
+      this.e.set(rng.range(-0.6, 0.6), rng.range(0, TAU), a - Math.PI / 2);
+      this.q.setFromEuler(this.e);
+      this.one.setScalar(rng.range(0.6, 1.5));
+      this.m.compose(this.v, this.q, this.one);
+      encrust.setMatrixAt(i, this.m);
+      colour.set(rng.pick(bright)).convertSRGBToLinear();
+      encrust.setColorAt(i, colour);
+    }
+    encrust.instanceMatrix.needsUpdate = true;
+    keepDrawn(encrust);
+    group.add(encrust);
+
     return group;
   }
 
@@ -607,6 +683,22 @@ export class Reef {
       z: Math.max(this.finishZ - 40, Math.min(40, garden.z + dz)),
     };
   }
+}
+
+/**
+ * Never cull one of these as a whole.
+ *
+ * An InstancedMesh's bounding volume is its *geometry's* — one plant's, a few
+ * units across and sitting at the world origin — and not the volume its three
+ * hundred instances actually occupy, which here is the entire reef. So the
+ * renderer decides the whole mesh is off screen the moment you swim away from
+ * the origin, and every kelp, coral and weed in the game vanishes at once.
+ *
+ * These are five draw calls between them and they always have something on
+ * screen, so there was never anything to win by culling them.
+ */
+function keepDrawn(mesh: THREE.InstancedMesh): void {
+  mesh.frustumCulled = false;
 }
 
 /** Something growing out of the sand, kept so its sway can be rebuilt. */
