@@ -46,6 +46,18 @@ On a laptop, WASD or the arrow keys swim and Q and E change depth.
 - **Sky**: clouds, gulls wheeling above the waves, and gulls sitting on the
   water that get up and go when a whale comes up underneath them. None of it
   is drawn while the camera is under.
+- **A kelp forest** in stands you swim into — long golden stipes with blades
+  hung off them, each blade carrying the gas bladder that holds the plant up.
+  Each plant is scaled to the water above it, so a stand in a trench is a tall
+  wood and one on a sandbank is a low one.
+- **Gardens.** Coral, rock and weed come in bunches with bare sand between
+  them rather than evenly scattered. A reef laid out at random reads as
+  wallpaper.
+- **Something to find by doing nothing.** Stop on the surface and after five
+  seconds a gull comes down and rides on the whale's back until it moves off.
+  Stop underwater and one or two fish leave their school, come over and nibble
+  at its skin, and the whale blows the odd bubble. Nothing is gained by it and
+  nothing is lost by never doing it.
 - **Breaching.** Hold the climb and it builds — the first second is a whale
   rising and the fourth is a whale coming up like a torpedo, nose swinging to
   seventy-five degrees. Arrive at the surface fast enough and it leaves the
@@ -59,7 +71,7 @@ fixed-timestep loop (`SIM.step`, 1/60) with an interpolated render — so actors
 keep a `prevPosition` and a `render(alpha)`. Every tunable number is in
 [src/config.ts](src/config.ts).
 
-Nine things that have already caught somebody out here:
+Twelve things that have already caught somebody out here:
 
 - **The floor is a function first and a mesh second.** `Reef.floorAt` is what
   the whale, the coral, the fish and the camera all ask; the mesh is only that
@@ -94,6 +106,23 @@ Nine things that have already caught somebody out here:
 - **`camPitch` is a ratio against the base climb rate, so it must be
   clamped.** A breach leaves the water at nearly four times that rate, which
   put the eye sixty-eight units below the whale and aimed it at the sky.
+- **Turning a wing round does not turn its flap round.** The gulls' wings are
+  one geometry pointing along +X, and the left one is rotated by π about Y to
+  face the other way — so it looks as though its flap needs the opposite sign
+  too. It does not: the flap is applied before the turn, and a rotation about
+  Y preserves height, so the tip goes up and is then carried across still up.
+  With the sign flipped the birds rowed along like pairs of oars.
+- **Scale a plant in one axis and you scale its leaves too.** The kelp was
+  built at unit height so the reef could stretch each plant in Y to fit its
+  water — which stretched every blade by a factor of seventy, into threads a
+  fraction of a unit wide and sixty long. The forest came out as a stand of
+  bare wires. It is built at a real size now and fitted with one uniform
+  scale.
+- **Fish will swim straight through a whale.** `Fish.keepOut` treats the whale
+  as an ellipsoid in its own frame: divide a point by the half-extents and
+  anything inside the unit sphere is inside the whale, so push it back out
+  along the same direction. The same arithmetic run forwards is what puts the
+  two nibblers _on_ the skin.
 - **Coral is the triangle budget.** Each one is a branching structure of forty
   twigs, and there are hundreds. Open-ended cylinders and one fork level fewer
   took the reef from 1,258k triangles to 395k with no visible difference — the

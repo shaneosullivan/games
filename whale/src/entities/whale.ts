@@ -119,6 +119,18 @@ export class Whale {
     return this.body.localToWorld(out);
   }
 
+  /**
+   * A spot on the whale's back, in the world — where a gull stands when it
+   * comes down on a whale that has stopped.
+   *
+   * Read through the body, like the blowhole, so the bird rides the bob and
+   * the roll instead of hovering over an idea of where the whale is.
+   */
+  back(out: THREE.Vector3): THREE.Vector3 {
+    out.set(0, 6.1, -1.5);
+    return this.body.localToWorld(out);
+  }
+
   /** A mouthful. Opens the jaw; it shuts itself. */
   gulp(): void {
     this.chomp = 1;

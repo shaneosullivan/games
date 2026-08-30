@@ -3,6 +3,7 @@ import {mergeGeometries} from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import {REEF, WATER} from "../config";
 import {Rng} from "../core/rng";
 import {coralKinds, coralRock} from "./coral";
+import {bladeMaterial, KELP_HEIGHT, kelpPlant, weedTuft} from "./flora";
 import {
   causticTexture,
   driftCaustics,
@@ -36,12 +37,13 @@ export class Reef {
   private readonly above = new THREE.Color(WATER.fromAboveColour);
   private readonly surfaceRest: Float32Array;
   private readonly weeds: THREE.InstancedMesh;
-  private readonly weedBase: Array<{
-    pos: THREE.Vector3;
-    scale: number;
-    lean: number;
-    phase: number;
-  }> = [];
+  private readonly kelp: THREE.InstancedMesh;
+  /** Rest poses for the two things on the floor that move. Rebuilt into
+   *  matrices every frame, so they have to be kept as well as drawn. */
+  private readonly weedBase: Array<Planted> = [];
+  private readonly kelpBase: Array<Planted> = [];
+  /** The bunches everything grows in. See REEF.gardens. */
+  private readonly gardens: Array<{x: number; z: number}> = [];
   private readonly shafts: THREE.Group;
   private readonly m = new THREE.Matrix4();
   private readonly q = new THREE.Quaternion();
@@ -50,12 +52,25 @@ export class Reef {
   private readonly one = new THREE.Vector3();
 
   constructor(rng: Rng) {
+    // Before anything is planted: the gardens are what everything else is
+    // placed relative to.
+    for (let i = 0; i < REEF.gardens; i++) {
+      const along = (i + 0.5) / REEF.gardens;
+      this.gardens.push({
+        x: rng.range(-REEF.halfWidth, REEF.halfWidth) * 0.92,
+        z: 20 + (this.finishZ - 60) * along + rng.range(-40, 40),
+      });
+    }
+
     this.group.add(this.buildFloor());
     this.group.add(this.buildCoral(rng));
     this.group.add(this.buildRocks(rng));
 
     this.weeds = this.buildWeeds(rng);
     this.group.add(this.weeds);
+
+    this.kelp = this.buildKelp(rng);
+    this.group.add(this.kelp);
 
     this.surface = this.buildSurface();
     this.surfaceMat = this.surface.material as THREE.MeshBasicMaterial;
@@ -171,18 +186,32 @@ export class Reef {
     this.shafts.position.set(centre.x, 0, centre.z);
     this.shafts.rotation.z = Math.sin(time * 0.21) * WATER.shaftSway;
 
-    // The weeds lean, which is the only motion on the sea floor and does more
-    // for "this is under water" than anything else here.
-    for (let i = 0; i < this.weedBase.length; i++) {
-      const w = this.weedBase[i];
-      const lean = w.lean + Math.sin(time * 0.9 + w.phase) * 0.16;
-      this.e.set(0, w.phase, lean);
+    // The weed and the kelp lean, which is the only motion on the sea floor
+    // and does more for "this is under water" than anything else here. The
+    // kelp swings further and slower: it is forty units of rope with floats on
+    // it, and it moves like one.
+    this.sway(this.weeds, this.weedBase, time, 0.9, 0.16);
+    this.sway(this.kelp, this.kelpBase, time, 0.42, 0.12);
+  }
+
+  /** Rebuilds a planted thing's matrices with a lean on them. */
+  private sway(
+    mesh: THREE.InstancedMesh,
+    base: Array<Planted>,
+    time: number,
+    rate: number,
+    amount: number,
+  ): void {
+    for (let i = 0; i < base.length; i++) {
+      const w = base[i];
+      const lean = w.lean + Math.sin(time * rate + w.phase) * amount;
+      this.e.set(Math.cos(w.phase) * lean * 0.6, w.phase, lean);
       this.q.setFromEuler(this.e);
       this.one.setScalar(w.scale);
       this.m.compose(w.pos, this.q, this.one);
-      this.weeds.setMatrixAt(i, this.m);
+      mesh.setMatrixAt(i, this.m);
     }
-    this.weeds.instanceMatrix.needsUpdate = true;
+    mesh.instanceMatrix.needsUpdate = true;
   }
 
   // ---- building ------------------------------------------------------------
@@ -351,28 +380,12 @@ export class Reef {
    *  are the one thing on the floor that moves and the sway is rebuilt every
    *  frame from the rest pose. */
   private buildWeeds(rng: Rng): THREE.InstancedMesh {
-    const blades: Array<THREE.BufferGeometry> = [];
-    for (let i = 0; i < 7; i++) {
-      const h = 4 + (i % 3) * 2.2;
-      const blade = new THREE.CylinderGeometry(0.12, 0.42, h, 4, 1);
-      blade.translate(
-        Math.cos((i / 7) * TAU) * 1.1,
-        h / 2,
-        Math.sin((i / 7) * TAU) * 1.1,
-      );
-      blade.rotateZ(Math.cos(i * 2.1) * 0.22);
-      blades.push(paint(blade, i % 2 === 0 ? 0xffffff : 0xc9c9c9));
-    }
-    const geo = mergeGeometries(blades, false);
     const mesh = new THREE.InstancedMesh(
-      geo,
-      new THREE.MeshToonMaterial({
-        vertexColors: true,
-        gradientMap: toonRamp(),
-      }),
+      weedTuft(),
+      bladeMaterial(toonRamp()),
       REEF.weeds,
     );
-    const greens = [0x4f9e5c, 0x76b84a, 0x3f8f77, 0x9dc45a];
+    const greens = [0x4f9e5c, 0x76b84a, 0x3f8f77, 0x9dc45a, 0x2f7f62];
     const colour = new THREE.Color();
     for (let i = 0; i < REEF.weeds; i++) {
       const {x, z} = this.scatter(rng);
@@ -383,6 +396,49 @@ export class Reef {
         phase: rng.range(0, TAU),
       });
       colour.set(rng.pick(greens)).convertSRGBToLinear();
+      mesh.setColorAt(i, colour);
+    }
+    return mesh;
+  }
+
+  /**
+   * The kelp forest.
+   *
+   * In stands rather than scattered, because that is the whole point of kelp:
+   * a thicket you swim into and cannot see through, with open water either
+   * side. Each plant is built at unit height and scaled to the water it is
+   * standing in, so a stand in a trench is a tall wood and one on a sandbank
+   * is a low one — which is what real kelp does, growing until it reaches the
+   * light and then stopping.
+   */
+  private buildKelp(rng: Rng): THREE.InstancedMesh {
+    const mesh = new THREE.InstancedMesh(
+      kelpPlant(),
+      bladeMaterial(toonRamp()),
+      REEF.kelp,
+    );
+    const golds = [0xe6cf6a, 0xf0dd88, 0xd2bb52, 0xe8d878, 0xc9c563];
+    const colour = new THREE.Color();
+    const perStand = Math.ceil(REEF.kelp / REEF.kelpStands);
+
+    for (let i = 0; i < REEF.kelp; i++) {
+      const stand = Math.floor(i / perStand) % REEF.kelpStands;
+      const along = (stand + 0.5) / REEF.kelpStands;
+      const cx = rng.range(-REEF.halfWidth, REEF.halfWidth) * 0.8;
+      const cz = 40 + (this.finishZ - 100) * along;
+      const x = cx + rng.range(-REEF.kelpSpread, REEF.kelpSpread);
+      const z = cz + rng.range(-REEF.kelpSpread, REEF.kelpSpread);
+      // Sized to the water above it: how far up toward the light it gets,
+      // divided by how tall the model is. One number, all three axes.
+      const floor = this.floorAt(x, z);
+      const reach = rng.range(REEF.kelpReachLow, REEF.kelpReachHigh);
+      this.kelpBase.push({
+        pos: new THREE.Vector3(x, floor - 1, z),
+        scale: Math.max(0.35, Math.min(1.6, (-floor * reach) / KELP_HEIGHT)),
+        lean: rng.range(-0.05, 0.05),
+        phase: rng.range(0, TAU),
+      });
+      colour.set(rng.pick(golds)).convertSRGBToLinear();
       mesh.setColorAt(i, colour);
     }
     return mesh;
@@ -525,15 +581,40 @@ export class Reef {
   /**
    * A spot on the floor to put something on.
    *
-   * Out to the ridges rather than only inside the lane, so the sides of the
-   * reef are furnished too — a bare grey wall either side would undo the work
-   * the coral is doing.
+   * Mostly in a garden — coral comes in heads and thickets with bare sand
+   * between them, and a reef laid out at random reads as wallpaper. A `loose`
+   * share ignores the gardens so the gaps between them are not too tidy, and
+   * everything may go out to the ridges rather than only inside the lane: a
+   * bare grey wall either side would undo the work the coral is doing.
    */
   private scatter(rng: Rng): {x: number; z: number} {
     const reach = REEF.halfWidth + REEF.ridgeWidth * 0.7;
+    if (rng.next() < REEF.loose || this.gardens.length === 0) {
+      return {
+        x: rng.range(-reach, reach),
+        z: rng.range(40, this.finishZ - 40),
+      };
+    }
+    const garden = rng.pick(this.gardens);
+    // Two draws added together rather than one: it heaps things toward the
+    // middle of the bunch instead of filling a disc evenly, which is the
+    // difference between a thicket and a circle.
+    const spread = REEF.gardenSpread;
+    const dx = rng.range(-spread, spread) + rng.range(-spread, spread);
+    const dz = rng.range(-spread, spread) + rng.range(-spread, spread);
     return {
-      x: rng.range(-reach, reach),
-      z: rng.range(40, this.finishZ - 40),
+      x: Math.max(-reach, Math.min(reach, garden.x + dx)),
+      z: Math.max(this.finishZ - 40, Math.min(40, garden.z + dz)),
     };
   }
+}
+
+/** Something growing out of the sand, kept so its sway can be rebuilt. */
+interface Planted {
+  pos: THREE.Vector3;
+  /** Uniform, always. Kelp is fitted to its water by choosing this, never by
+   *  stretching one axis — see kelpPlant. */
+  scale: number;
+  lean: number;
+  phase: number;
 }

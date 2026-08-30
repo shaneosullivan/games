@@ -205,13 +205,32 @@ export const REEF = {
    *  distances. */
   cell: 10,
 
-  /** How many of each thing is scattered on the floor. */
-  /** Corals are the most expensive thing on the reef — each one is a branching
-   *  structure of forty-odd twigs — so this is a triangle budget as much as a
-   *  look. Measured: see the note in the README. */
+  /** How many of each thing grows on the floor. Coral is the most expensive
+   *  of them — each one is a branching structure of forty-odd twigs — so that
+   *  number is a triangle budget as much as a look. */
   coral: 440,
   rocks: 190,
-  weeds: 320,
+  weeds: 300,
+
+  /**
+   * Gardens: the bunches everything grows in.
+   *
+   * Coral does not come one at a time evenly spaced — it comes in heads and
+   * thickets with bare sand between them, and a reef laid out at random reads
+   * as wallpaper. Most of what grows picks a garden and sits near it, and a
+   * `loose` share ignores them entirely so the gaps are not too tidy.
+   */
+  gardens: 58,
+  gardenSpread: 21,
+  loose: 0.16,
+
+  /** Kelp: how many plants, in how many stands, and how much of the water
+   *  above them they fill. A stand is a thicket you swim through. */
+  kelp: 300,
+  kelpStands: 17,
+  kelpSpread: 24,
+  kelpReachLow: 0.55,
+  kelpReachHigh: 0.88,
 } as const;
 
 /** The water itself: what you see and how far. */
@@ -268,6 +287,76 @@ export const WATER = {
 } as const;
 
 /**
+ * Holding still.
+ *
+ * A whale that stops gets visited. Wait on the surface and a gull comes down
+ * and rides on its back; wait under it and the little fish come and nibble at
+ * it, and it blows the odd bubble. None of it does anything — there is nothing
+ * to gain by stopping and nothing lost by never stopping — and that is the
+ * point. A child who parks the whale to look around should find that the reef
+ * notices.
+ */
+export const IDLE = {
+  /** How still counts as still, on the thumbstick. */
+  stick: 0.06,
+  /** Seconds of it before the fish come, and before a gull comes down. The
+   *  gull waits longer: it has further to come, and a bird landing on you the
+   *  instant you stop would read as scripted rather than as luck. */
+  fish: 3,
+  gull: 5,
+  /** A bubble every so often, and how deep it has to be for one to make sense
+   *  — a whale sitting at the surface is breathing, not bubbling. */
+  bubbleEvery: 1.7,
+  minDepth: 12,
+  /**
+   * How many fish come over. Two, not a school.
+   *
+   * A whole school swarming the whale looked like a shoal that had lost its
+   * mind. One or two sidling up to a stopped animal and hanging there is what
+   * actually happens, and it is a much quieter thing to watch.
+   */
+  nibblers: 2,
+  /**
+   * Where they nibble, as directions in the whale's own frame: x across, y up,
+   * z forward. They are put on the *skin* — the point where each direction
+   * meets the body ellipsoid below — because a fish nibbling a whale is
+   * touching it, and two fish hanging eleven units off its flank looked like
+   * an escort rather than a nibble.
+   *
+   * All four are behind the middle and low on the flank. The mouth reaches 14
+   * units forward and takes anything inside 7.5 of that; the furthest forward
+   * of these sits at z = -3 on a body half-length of 18, so the nearest fish
+   * is still a clear 20 units from being eaten.
+   */
+  nibbleSpots: [
+    {x: 1, y: 0.12, z: -0.2},
+    {x: -1, y: 0.1, z: -0.35},
+    {x: 0.8, y: -0.5, z: -0.55},
+    {x: -0.85, y: -0.45, z: -0.15},
+  ],
+  /** How far off the skin they sit, so they touch rather than sink in — half
+   *  a fish, near enough. */
+  nibbleClear: 1.6,
+  /** How far they bob in and out while nibbling, and how fast. */
+  nibblePeck: 1.1,
+  nibblePeckRate: 3.1,
+  /** How fast a nibbler closes on its station. */
+  nibbleSpeed: 3.4,
+  /** How close a fish has to be to bother coming over at all. */
+  nibbleRange: 130,
+  /**
+   * The whale, as an ellipsoid, for keeping fish out of it.
+   *
+   * The body is 34 long and about 13 across, so these are its half-extents
+   * with a little margin. Nothing is allowed inside: a fish that swam through
+   * the whale on its way to a station gave the game away completely.
+   */
+  bodyX: 7.5,
+  bodyY: 8,
+  bodyZ: 18,
+} as const;
+
+/**
  * The sky, which you only ever see with your head out of the water.
  *
  * Clouds, gulls wheeling about above the waves, and gulls sitting on the water
@@ -309,6 +398,11 @@ export const SKY = {
    *  ahead of the whale they settle. */
   settle: 5.5,
   landAhead: 320,
+
+  /** How fast a gull flies over to land on a waiting whale's back, and how
+   *  near it has to get before it counts as down. */
+  perchSpeed: 34,
+  perchNear: 3,
 } as const;
 
 /**

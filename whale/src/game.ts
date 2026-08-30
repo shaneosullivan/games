@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import {BREACH, BREATH, CAMERA, DEPTH, REEF, SIM, SWIM} from "./config";
+import {BREACH, BREATH, CAMERA, DEPTH, IDLE, REEF, SIM, SWIM} from "./config";
 import {GameLoop} from "./core/loop";
 import {Joystick} from "./core/input";
 import {DepthStick} from "./core/depthStick";
@@ -76,12 +76,17 @@ export class Game {
   private flight: number | null = null;
   /** How far the shot is out of the water, 0..1. Drives the sky. */
   private air = 0;
+  /** Seconds the whale has been holding still. See loiter(). */
+  private still = 0;
+  /** Seconds until the next idle bubble. */
+  private bubbleIn = 0;
 
   private readonly forward = new THREE.Vector3();
   private readonly right = new THREE.Vector3();
   private readonly want = new THREE.Vector3();
   private readonly mouth = new THREE.Vector3();
   private readonly hole = new THREE.Vector3();
+  private readonly perch = new THREE.Vector3();
   private readonly eye = new THREE.Vector3();
   private readonly look = new THREE.Vector3();
   /** The heading the *camera* is using, which lags the whale's. See
@@ -227,6 +232,7 @@ export class Game {
       return;
     }
 
+    this.loiter(dt);
     this.reef.update(this.time, this.whale.position);
     this.sky.update(dt, this.time, this.whale.position, (x, z) =>
       this.reef.waveAt(x, z, this.time),
@@ -455,6 +461,61 @@ export class Game {
       size: 7,
       spherical: 0.35,
     });
+  }
+
+  /**
+   * Holding still, and what comes of it.
+   *
+   * Nothing here changes the game — there is nothing to gain by stopping and
+   * nothing lost by never stopping. It is here because a reef that carries on
+   * without you is scenery, and one that notices you have stopped is a place.
+   *
+   * On the surface, a gull comes down and stands on the whale's back. Under
+   * it, the nearest school comes over for a look and the whale blows the odd
+   * bubble. Move the stick and all of it goes back to what it was doing.
+   */
+  private loiter(dt: number): void {
+    const moving = this.stick.magnitude > IDLE.stick || this.flight !== null;
+    this.still = moving ? 0 : this.still + dt;
+
+    const depth = -this.whale.position.y;
+    const up = depth <= BREATH.depth;
+
+    // A gull, if the whale is up and has been up a while.
+    if (!moving && up && this.still > IDLE.gull) {
+      this.whale.back(this.perch);
+      this.sky.perchOn(this.perch, this.whale.heading);
+    } else {
+      this.sky.perchOn(null, 0);
+    }
+
+    // Fish, if it is down and has been down a while. They are handed the
+    // whale's own middle and heading and work out where to hang from that —
+    // off its flank, behind the mouth and outside its body.
+    if (!moving && !up && depth > IDLE.minDepth && this.still > IDLE.fish) {
+      this.fish.nibble(this.whale.position, this.whale.heading);
+
+      this.bubbleIn -= dt;
+      if (this.bubbleIn <= 0) {
+        this.bubbleIn = IDLE.bubbleEvery;
+        this.whale.blowhole(this.hole);
+        this.bubbles.burst(this.hole, {
+          color: [0xdffcff, 0xffffff],
+          count: 4,
+          speed: 2,
+          lift: 3,
+          // Negative, so they rise. Slowly — this is a whale sighing, not a
+          // whale breathing out.
+          gravity: -5,
+          ttl: 2.4,
+          size: 5,
+          spherical: 0.7,
+        });
+      }
+    } else {
+      this.fish.nibble(null, 0);
+      this.bubbleIn = 0;
+    }
   }
 
   /** Ate a bag. Gentle about it — the card does the talking. */

@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import {mergeGeometries} from "three/examples/jsm/utils/BufferGeometryUtils.js";
-import {FISH, REEF, WHALE} from "../config";
+import {FISH, IDLE, REEF, WHALE} from "../config";
 import {Rng} from "../core/rng";
 import {paint, toonRamp} from "../render/materials";
 
@@ -58,6 +58,26 @@ export class Fish {
   private readonly scale = new THREE.Vector3();
   private readonly want = new THREE.Vector3();
   private readonly away = new THREE.Vector3();
+  /** The stopped whale the fish have come to look at, and which way it is
+   *  facing. See nibble(). */
+  private readonly curious = new THREE.Vector3();
+  private curiousHeading = 0;
+  private nibbling = false;
+  /** Which fish came over. Indices into `fish`, at most IDLE.nibblers. */
+  private nibblers: Array<number> = [];
+  private readonly station = new THREE.Vector3();
+  private readonly local = new THREE.Vector3();
+  private readonly outward = new THREE.Vector3();
+  /** The whale as an ellipsoid, for putting fish on it and keeping them out
+   *  of it. See IDLE.bodyX. */
+  private readonly extents = new THREE.Vector3(
+    IDLE.bodyX,
+    IDLE.bodyY,
+    IDLE.bodyZ,
+  );
+  /** Where the nibblers are in their pecking, so they are not both at the
+   *  same point of it. */
+  private peck = 0;
 
   constructor(
     rng: Rng,
@@ -125,6 +145,114 @@ export class Fish {
   }
 
   /**
+   * A whale has stopped, and one or two fish may come and have a look at it.
+   *
+   * `at` is the whale's middle and `heading` the way it is pointing; pass null
+   * when it moves off and they go back to their own business.
+   *
+   * The pair is chosen once, when the whale first stops, and then they are the
+   * pair — they leave their school and hold station off its flank until it
+   * swims away. Shy fish never volunteer: one would be trying to flee the same
+   * whale it had come to look at, and the two urges would fight.
+   */
+  nibble(at: THREE.Vector3 | null, heading: number): void {
+    if (at === null) {
+      this.nibbling = false;
+      this.nibblers = [];
+      return;
+    }
+    this.curious.copy(at);
+    this.curiousHeading = heading;
+    if (this.nibbling) {
+      return;
+    }
+    this.nibbling = true;
+
+    // The nearest few un-shy fish, once. Sorted rather than scanned for a
+    // minimum, because we want the closest *two* and not the closest one.
+    const near: Array<{i: number; d: number}> = [];
+    for (let i = 0; i < this.fish.length; i++) {
+      const f = this.fish[i];
+      if (f.eaten || this.schools[f.school].shy) {
+        continue;
+      }
+      const d = f.position.distanceTo(at);
+      if (d < IDLE.nibbleRange) {
+        near.push({i, d});
+      }
+    }
+    near.sort((a, b) => a.d - b.d);
+    this.nibblers = near.slice(0, IDLE.nibblers).map(n => n.i);
+  }
+
+  /**
+   * Where a nibbler sits: on the whale's skin.
+   *
+   * The spot is a direction in the whale's own frame; scaling that direction
+   * by the body's half-extents lands it on the ellipsoid, which is the surface
+   * the fish should be resting against. Then it is pushed a fish's width back
+   * out, and bobbed in and out a little so it looks like nibbling rather than
+   * like something stuck on.
+   */
+  private stationFor(slot: number, out: THREE.Vector3): THREE.Vector3 {
+    const spot = IDLE.nibbleSpots[slot % IDLE.nibbleSpots.length];
+    this.outward.set(spot.x, spot.y, spot.z).normalize();
+    this.local.copy(this.outward).multiply(this.extents);
+    // Off the skin by a fish's width, bobbing in and out — out along the same
+    // direction, so it comes off the surface rather than sliding along it.
+    const bob =
+      IDLE.nibbleClear + Math.sin(this.peck + slot * 2.1) * IDLE.nibblePeck;
+    this.local.addScaledVector(this.outward, bob);
+
+    // And out of the whale's frame into the world.
+    const fx = Math.sin(this.curiousHeading);
+    const fz = Math.cos(this.curiousHeading);
+    return out.set(
+      this.curious.x + this.local.x * -fz + this.local.z * fx,
+      this.curious.y + this.local.y,
+      this.curious.z + this.local.x * fx + this.local.z * fz,
+    );
+  }
+
+  /**
+   * Shoves a fish out of the whale.
+   *
+   * The whale as an ellipsoid in its own coordinates: scale a point by the
+   * reciprocal of the half-extents and anything inside the unit sphere is
+   * inside the whale. Push it back out along the same direction and it comes
+   * to rest on the surface rather than jumping to a corner.
+   *
+   * Applied to every fish and not only the two visitors, because a school
+   * looping past a stopped whale went straight through it just as happily.
+   */
+  private keepOut(at: THREE.Vector3): void {
+    const dx = at.x - this.curious.x;
+    const dy = at.y - this.curious.y;
+    const dz = at.z - this.curious.z;
+    const fx = Math.sin(this.curiousHeading);
+    const fz = Math.cos(this.curiousHeading);
+    // Into the whale's frame: forward is +Z, its right is -Z x up.
+    const alongZ = dx * fx + dz * fz;
+    const alongX = dx * -fz + dz * fx;
+
+    this.local.set(alongX / IDLE.bodyX, dy / IDLE.bodyY, alongZ / IDLE.bodyZ);
+    const inside = this.local.length();
+    if (inside >= 1 || inside < 1e-4) {
+      return;
+    }
+    this.local.multiplyScalar(1 / inside);
+    const outX = this.local.x * IDLE.bodyX;
+    const outY = this.local.y * IDLE.bodyY;
+    const outZ = this.local.z * IDLE.bodyZ;
+    // And back out of the whale's frame.
+    at.set(
+      this.curious.x + outX * -fz + outZ * fx,
+      this.curious.y + outY,
+      this.curious.z + outX * fx + outZ * fz,
+    );
+  }
+
+  /**
    * Swim the schools, and eat whatever ends up in the whale's mouth.
    *
    * Returns how many went down this step, so the game can make a noise about
@@ -146,14 +274,35 @@ export class Fish {
       }
     }
 
+    this.peck += IDLE.nibblePeckRate * dt;
+
     const bite = WHALE.mouthRadius + FISH.size * 0.5;
     const biteSq = bite * bite;
     let taken = 0;
 
-    for (const f of this.fish) {
+    for (let index = 0; index < this.fish.length; index++) {
+      const f = this.fish[index];
       if (f.eaten) {
         continue;
       }
+
+      // The one or two that came over hold station off the whale instead of
+      // swimming with their school.
+      const slot = this.nibbling ? this.nibblers.indexOf(index) : -1;
+      if (slot >= 0) {
+        this.stationFor(slot, this.station);
+        this.want.copy(this.station).sub(f.position);
+        f.position.addScaledVector(
+          this.want,
+          Math.min(1, IDLE.nibbleSpeed * dt),
+        );
+        if (this.want.lengthSq() > 0.02) {
+          f.heading = Math.atan2(this.want.x, this.want.z);
+        }
+        this.keepOut(f.position);
+        continue;
+      }
+
       const school = this.schools[f.school];
 
       this.want.copy(school.centre).add(f.offset).sub(f.position);
@@ -174,6 +323,10 @@ export class Fish {
 
       if (this.want.lengthSq() > 0.02) {
         f.heading = Math.atan2(this.want.x, this.want.z);
+      }
+
+      if (this.nibbling) {
+        this.keepOut(f.position);
       }
 
       if (f.position.distanceToSquared(mouth) < biteSq) {
