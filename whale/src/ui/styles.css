@@ -1,0 +1,296 @@
+/*
+ * The glass: the HUD, the two sticks and the overlays.
+ *
+ * Lifted from the squirrel game so the shelf of games looks like one shelf —
+ * same panel, same big button, same floating stick. What is new is the depth
+ * slider down the right and the ink, which is a deep sea-blue here because
+ * everything in this game is read against blue-green water rather than sky.
+ */
+
+:root {
+  --safe-t: env(safe-area-inset-top, 0px);
+  --safe-b: env(safe-area-inset-bottom, 0px);
+  --safe-l: env(safe-area-inset-left, 0px);
+  --safe-r: env(safe-area-inset-right, 0px);
+  --ink: #123449;
+  --panel: rgba(255, 255, 255, 0.84);
+}
+
+html,
+body,
+#app {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: #2f9fbe;
+  font-family:
+    "Nunito",
+    "Avenir Next",
+    "Segoe UI",
+    system-ui,
+    -apple-system,
+    sans-serif;
+  color: var(--ink);
+  /* The game is driven by dragging; never let a drag scroll or zoom the page. */
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* The UI layer is see-through to the pointer, so a drag anywhere on the water
+   reaches the thumbstick. Only the things a finger is meant to press opt in. */
+.ui {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.ui-interactive {
+  pointer-events: auto;
+}
+
+/* ---------- The cards ---------- */
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  padding: 24px;
+  text-align: center;
+  background: rgba(226, 246, 252, 0.82);
+  backdrop-filter: blur(6px);
+  pointer-events: auto;
+  transition: opacity 320ms ease-out;
+}
+
+.overlay.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.overlay h1 {
+  margin: 0;
+  font-size: clamp(30px, 7vw, 62px);
+  line-height: 1.05;
+}
+
+.overlay p {
+  margin: 0;
+  max-width: 22em;
+  font-size: clamp(17px, 2.6vw, 24px);
+  line-height: 1.45;
+}
+
+.big-button {
+  border: none;
+  border-radius: 999px;
+  padding: 18px 46px;
+  font: inherit;
+  font-size: clamp(20px, 3vw, 28px);
+  font-weight: 800;
+  color: #fff;
+  background: #2f9fbe;
+  box-shadow: 0 6px 0 #1d738c;
+  cursor: pointer;
+}
+
+.big-button:active {
+  transform: translateY(4px);
+  box-shadow: 0 2px 0 #1d738c;
+}
+
+/* ---------- The thumbstick ---------- */
+
+.stick {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+  opacity: 0;
+  transition: opacity 130ms ease-out;
+  pointer-events: none;
+}
+
+.stick.active {
+  opacity: 1;
+}
+
+.stick-ring {
+  position: absolute;
+  width: 136px;
+  height: 136px;
+  margin: -68px 0 0 -68px;
+  border-radius: 50%;
+  border: 3px solid rgba(255, 255, 255, 0.6);
+  background: rgba(255, 255, 255, 0.14);
+  backdrop-filter: blur(2px);
+}
+
+.stick-knob {
+  position: absolute;
+  width: 58px;
+  height: 58px;
+  margin: -29px 0 0 -29px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.28);
+}
+
+/* ---------- The depth slider ---------- */
+
+/* Down the right-hand side, where the other thumb is. Tall, because the whole
+   range of the sea is on it and a child should be able to ask for the middle
+   of it without precision. */
+.depth {
+  position: absolute;
+  right: calc(var(--safe-r) + 22px);
+  top: 50%;
+  transform: translateY(-50%);
+  width: 62px;
+  height: min(56vh, 380px);
+  display: grid;
+  place-items: center;
+  touch-action: none;
+}
+
+.depth-track {
+  position: absolute;
+  inset: 26px 20px;
+  border-radius: 999px;
+  border: 3px solid rgba(255, 255, 255, 0.6);
+  background: rgba(255, 255, 255, 0.16);
+  overflow: hidden;
+  backdrop-filter: blur(2px);
+}
+
+/* Fills downward from the top: the deeper you ask to go, the more of the
+   column is water above you. */
+.depth-fill {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  background: rgba(255, 255, 255, 0.34);
+}
+
+.depth-rail {
+  position: absolute;
+  inset: 26px 0;
+}
+
+.depth-knob {
+  position: absolute;
+  left: 50%;
+  width: 46px;
+  height: 46px;
+  margin: -23px 0 0 -23px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.28);
+}
+
+.depth-knob.active {
+  transform: scale(1.08);
+}
+
+/* Where the whale actually is, as against where it was asked to be. Over a
+   sandbank the floor stops it short, and this is the only thing on screen
+   that explains why. */
+.depth-current {
+  position: absolute;
+  left: 50%;
+  width: 22px;
+  height: 4px;
+  margin: -2px 0 0 -11px;
+  border-radius: 2px;
+  background: rgba(18, 52, 73, 0.5);
+}
+
+.depth-cap {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 17px;
+  line-height: 1;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.depth-cap-top {
+  top: 0;
+}
+
+.depth-cap-bottom {
+  bottom: 0;
+}
+
+/* ---------- The corner buttons ---------- */
+
+.corner-buttons {
+  position: absolute;
+  top: calc(var(--safe-t) + 12px);
+  right: calc(var(--safe-r) + 12px);
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.icon-button {
+  /* Border-box, because the shared sound button next to it is one: an anchor
+     is not, so without this the two discs differ by the two pixels of their
+     border and sit a pixel out of line. */
+  box-sizing: border-box;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: 1px solid var(--stroke, rgba(255, 255, 255, 0.22));
+  background: var(--panel);
+  color: var(--ink, #fff);
+  font-size: 20px;
+  line-height: 1;
+  display: grid;
+  place-items: center;
+  text-decoration: none;
+  backdrop-filter: blur(8px);
+  cursor: pointer;
+}
+
+.icon-button:active {
+  transform: scale(0.93);
+}
+
+/* ---------- The readouts ---------- */
+
+.hud {
+  position: absolute;
+  top: calc(var(--safe-t) + 12px);
+  left: calc(var(--safe-l) + 12px);
+  right: calc(var(--safe-r) + 130px);
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.hud.hidden {
+  display: none;
+}
+
+/* Tabular figures so a changing count doesn't shuffle the pill's width. */
+.readout {
+  padding: 7px 14px;
+  border-radius: 999px;
+  background: var(--panel);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.18);
+  font-size: 20px;
+  font-weight: 800;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  backdrop-filter: blur(3px);
+  white-space: nowrap;
+}
