@@ -2,6 +2,7 @@ import * as THREE from "three";
 import {mergeGeometries} from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import {REEF, WATER} from "../config";
 import {Rng} from "../core/rng";
+import {coralKinds, coralRock} from "./coral";
 import {
   causticTexture,
   driftCaustics,
@@ -30,6 +31,9 @@ export class Reef {
 
   private readonly caustics = causticTexture();
   private readonly surface: THREE.Mesh;
+  private readonly surfaceMat: THREE.MeshBasicMaterial;
+  private readonly below = new THREE.Color(WATER.fromBelowColour);
+  private readonly above = new THREE.Color(WATER.fromAboveColour);
   private readonly surfaceRest: Float32Array;
   private readonly weeds: THREE.InstancedMesh;
   private readonly weedBase: Array<{
@@ -54,6 +58,7 @@ export class Reef {
     this.group.add(this.weeds);
 
     this.surface = this.buildSurface();
+    this.surfaceMat = this.surface.material as THREE.MeshBasicMaterial;
     this.surfaceRest = Float32Array.from(
       this.surface.geometry.attributes.position.array,
     );
@@ -96,13 +101,45 @@ export class Reef {
     }
 
     // Never let a ridge break the surface. An island would be a lovely thing
-    // to swim round and a terrible thing to find out about by hitting it.
-    return -Math.max(9, depth);
+    // to swim round and a terrible thing to find out about by hitting it —
+    // and it is thirteen rather than nine because the coral standing on the
+    // ridge tops is ten units tall, and at nine it grew out into the air.
+    return -Math.max(13, depth);
+  }
+
+  /**
+   * The height of the water at a point — the same two wave trains the surface
+   * mesh is built from.
+   *
+   * Public because the gulls sit on it. A bird bobbing to its own idea of
+   * where the water is, half a unit off the water the player can see, is worse
+   * than a bird that does not bob at all.
+   */
+  waveAt(x: number, z: number, time: number): number {
+    const a = (x / WATER.waveLength) * TAU + time * WATER.waveSpeed;
+    const b =
+      ((z * 0.82 + x * 0.3) / (WATER.waveLength * 1.4)) * TAU +
+      time * WATER.waveSpeed * 0.73;
+    return (Math.sin(a) + Math.sin(b)) * 0.5 * WATER.waveHeight;
   }
 
   /** 0 at the start of the reef, 1 at the finish. For the bar along the top. */
   progressAt(z: number): number {
     return Math.min(1, Math.max(0, z / this.finishZ));
+  }
+
+  /**
+   * Which side of the surface the camera is on, 0 under and 1 over.
+   *
+   * Everything about the surface changes with it: from below it is a thin
+   * bright ceiling you can see the arch through, and from above it is the sea.
+   */
+  setAir(air: number): void {
+    const a = Math.min(1, Math.max(0, air));
+    this.surfaceMat.color.copy(this.below).lerp(this.above, a);
+    this.surfaceMat.opacity =
+      WATER.fromBelowOpacity +
+      (WATER.fromAboveOpacity - WATER.fromBelowOpacity) * a;
   }
 
   /**
@@ -122,14 +159,12 @@ export class Reef {
     const pos = this.surface.geometry.attributes.position;
     const arr = pos.array as Float32Array;
     for (let i = 0; i < arr.length; i += 3) {
-      const wx = this.surfaceRest[i] + centre.x;
-      const wz = this.surfaceRest[i + 1] + centre.z;
       // Two trains crossing at an angle. One alone reads as corrugated iron.
-      const a = (wx / WATER.waveLength) * TAU + time * WATER.waveSpeed;
-      const b =
-        ((wz * 0.82 + wx * 0.3) / (WATER.waveLength * 1.4)) * TAU +
-        time * WATER.waveSpeed * 0.73;
-      arr[i + 2] = (Math.sin(a) + Math.sin(b)) * 0.5 * WATER.waveHeight;
+      arr[i + 2] = this.waveAt(
+        this.surfaceRest[i] + centre.x,
+        this.surfaceRest[i + 1] + centre.z,
+        time,
+      );
     }
     pos.needsUpdate = true;
 
@@ -226,41 +261,56 @@ export class Reef {
    */
   private buildCoral(rng: Rng): THREE.Group {
     const group = new THREE.Group();
-    const kinds = [
-      branchCoral(),
-      brainCoral(),
-      fanCoral(),
-      pipeCoral(),
-    ] as const;
+    const kinds = coralKinds();
+    // Straight out of the reference photographs: pinks, magentas, purples,
+    // oranges and reds, and exactly one blue. Bright, because a reef is.
     const palette = [
-      0xff7fa8, 0xff9d5c, 0xffd166, 0x9d6bff, 0x59d6c0, 0xff6b6b, 0xf5f0e6,
-      0x6fb1ff,
+      0xff5fa2, 0xe8397a, 0xa64bd6, 0x7b5bd6, 0xff7a3d, 0xe8452c, 0xff9ec2,
+      0xc44bb0, 0x3fa9e8,
     ];
+    const rockColours = [0xb9ad96, 0x9a8f7c, 0xc8bda6, 0x8b8477];
 
     const share = Math.ceil(REEF.coral / kinds.length);
+    const total = share * kinds.length;
     const mat = new THREE.MeshToonMaterial({
       vertexColors: true,
       gradientMap: toonRamp(),
     });
 
-    for (const geo of kinds) {
-      const mesh = new THREE.InstancedMesh(geo, mat, share);
-      const colour = new THREE.Color();
+    // Every coral's transform, kept so the rocks can be put under them. The
+    // rock is a separate mesh because it shares the transform and not the
+    // colour — a coral is magenta and the boulder it grew on is not.
+    const placed: Array<THREE.Matrix4> = [];
+    const colour = new THREE.Color();
+
+    for (let k = 0; k < kinds.length; k++) {
+      const mesh = new THREE.InstancedMesh(kinds[k], mat, share);
       for (let i = 0; i < share; i++) {
         const {x, z} = this.scatter(rng);
         const y = this.floorAt(x, z);
         this.v.set(x, y - 0.4, z);
         this.e.set(0, rng.range(0, TAU), 0);
         this.q.setFromEuler(this.e);
-        this.one.setScalar(rng.range(0.7, 2.1));
+        this.one.setScalar(rng.range(0.8, 2));
         this.m.compose(this.v, this.q, this.one);
         mesh.setMatrixAt(i, this.m);
+        placed.push(this.m.clone());
         colour.set(rng.pick(palette)).convertSRGBToLinear();
         mesh.setColorAt(i, colour);
       }
       mesh.instanceMatrix.needsUpdate = true;
       group.add(mesh);
     }
+
+    const rocks = new THREE.InstancedMesh(coralRock(), mat, total);
+    for (let i = 0; i < total; i++) {
+      rocks.setMatrixAt(i, placed[i]);
+      colour.set(rng.pick(rockColours)).convertSRGBToLinear();
+      rocks.setColorAt(i, colour);
+    }
+    rocks.instanceMatrix.needsUpdate = true;
+    group.add(rocks);
+
     return group;
   }
 
@@ -362,15 +412,15 @@ export class Reef {
       geo,
       new THREE.MeshBasicMaterial({
         map,
-        color: 0xcaf6ff,
+        color: WATER.fromBelowColour,
         side: THREE.DoubleSide,
         transparent: true,
-        // Not opaque, and this is not only prettier. From below, the surface
-        // is a ceiling: any ray heading upward meets it before it meets
-        // anything tall and far away, so an opaque one would hide the finish
-        // arch behind a sheet of water for the whole of the approach. Letting
-        // some light through is what lets a child see where they are going.
-        opacity: 0.62,
+        // Not opaque from below, and this is not only prettier: the surface is
+        // a ceiling, and any ray heading upward meets it before it meets
+        // anything tall and far away. An opaque one would hide the finish arch
+        // behind a sheet of water for the whole approach. See setAir for what
+        // happens to it when the whale puts its head out.
+        opacity: WATER.fromBelowOpacity,
       }),
     );
     // The plane is built in XY and laid flat here, which is why `update` reads
@@ -414,9 +464,11 @@ export class Reef {
         plane.rotation.y = turn;
         beam.add(plane);
       }
+      // Tops just *under* the surface. Sitting them at the waterline put a
+      // white additive smudge on the sea in every shot taken from the air.
       beam.position.set(
         rng.range(-280, 280),
-        -height / 2 + 1,
+        -height / 2 - 1.5,
         rng.range(-280, 280),
       );
       beam.rotation.z = rng.range(-0.16, 0.16);
@@ -484,67 +536,4 @@ export class Reef {
       z: rng.range(40, this.finishZ - 40),
     };
   }
-}
-
-// ---- the four corals -------------------------------------------------------
-
-/** Branching: a trunk that forks, the classic reef silhouette. */
-function branchCoral(): THREE.BufferGeometry {
-  const parts: Array<THREE.BufferGeometry> = [];
-  const trunk = new THREE.CylinderGeometry(0.55, 0.95, 4, 6);
-  trunk.translate(0, 2, 0);
-  parts.push(paint(trunk, 0xd8d8d8));
-  for (let i = 0; i < 5; i++) {
-    const a = (i / 5) * TAU;
-    const h = 3 + (i % 3);
-    const arm = new THREE.CylinderGeometry(0.28, 0.6, h, 5);
-    arm.rotateZ(0.55);
-    arm.rotateY(a);
-    arm.translate(Math.cos(a) * 1.5, 3.6 + h / 3, Math.sin(a) * 1.5);
-    parts.push(paint(arm, 0xffffff));
-    const tip = new THREE.IcosahedronGeometry(0.75, 0);
-    tip.translate(Math.cos(a) * 2.7, 3.6 + h * 0.8, Math.sin(a) * 2.7);
-    parts.push(paint(tip, 0xffffff));
-  }
-  return mergeGeometries(parts, false);
-}
-
-/** Brain: a squashed dome with a groove round it. */
-function brainCoral(): THREE.BufferGeometry {
-  const parts: Array<THREE.BufferGeometry> = [];
-  const dome = new THREE.SphereGeometry(2.6, 14, 10);
-  dome.scale(1, 0.66, 1);
-  dome.translate(0, 1.5, 0);
-  parts.push(paint(dome, 0xffffff));
-  const groove = new THREE.TorusGeometry(1.9, 0.35, 6, 16);
-  groove.rotateX(Math.PI / 2);
-  groove.translate(0, 2.5, 0);
-  parts.push(paint(groove, 0xb4b4b4));
-  return mergeGeometries(parts, false);
-}
-
-/** Fan: a flat frill on a short stalk, facing whichever way it was planted. */
-function fanCoral(): THREE.BufferGeometry {
-  const parts: Array<THREE.BufferGeometry> = [];
-  const stalk = new THREE.CylinderGeometry(0.3, 0.6, 1.8, 5);
-  stalk.translate(0, 0.9, 0);
-  parts.push(paint(stalk, 0xbcbcbc));
-  const fan = new THREE.SphereGeometry(3, 12, 8, 0, Math.PI);
-  fan.scale(1, 1.15, 0.13);
-  fan.translate(0, 3.6, 0);
-  parts.push(paint(fan, 0xffffff));
-  return mergeGeometries(parts, false);
-}
-
-/** Pipes: a clump of open tubes, the loudest colour on the reef. */
-function pipeCoral(): THREE.BufferGeometry {
-  const parts: Array<THREE.BufferGeometry> = [];
-  for (let i = 0; i < 6; i++) {
-    const a = (i / 6) * TAU;
-    const h = 2.4 + ((i * 7) % 5) * 0.7;
-    const pipe = new THREE.CylinderGeometry(0.62, 0.72, h, 7, 1, true);
-    pipe.translate(Math.cos(a) * 1.3, h / 2, Math.sin(a) * 1.3);
-    parts.push(paint(pipe, i % 2 === 0 ? 0xffffff : 0xcdcdcd));
-  }
-  return mergeGeometries(parts, false);
 }

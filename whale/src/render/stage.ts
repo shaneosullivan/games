@@ -18,6 +18,7 @@ export class Stage {
   private readonly fog: THREE.Fog;
   private readonly shallow = new THREE.Color(WATER.shallowColour);
   private readonly deep = new THREE.Color(WATER.deepColour);
+  private readonly sky = new THREE.Color(WATER.skyColour);
   private readonly water = new THREE.Color();
 
   constructor(host: HTMLElement) {
@@ -48,17 +49,26 @@ export class Stage {
   }
 
   /**
-   * Tints the water for how deep the camera is.
+   * Tints the world for where the camera is.
    *
    * Green-blue near the surface, deep blue at the bottom. The sea floor and
    * the fog and the background are all one colour at any moment, so there is
    * never a horizon — the reef simply fades into water, which is what makes
    * the space read as an ocean and not as a room.
+   *
+   * `air` is 0 with the camera under the water and 1 with it clear of the
+   * waves. It has to move the fog's *distances* as well as its colour: water
+   * you cannot see a hundred units through is water, and air you cannot see a
+   * hundred units through is a bug.
    */
-  setDepth(depth: number): void {
+  setView(depth: number, air: number): void {
     const t = Math.min(1, Math.max(0, depth / WATER.colourDepth));
     this.water.copy(this.shallow).lerp(this.deep, t);
+    const a = Math.min(1, Math.max(0, air));
+    this.water.lerp(this.sky, a);
     this.fog.color.copy(this.water);
+    this.fog.near = WATER.fogNear + (WATER.airFogNear - WATER.fogNear) * a;
+    this.fog.far = WATER.fogFar + (WATER.airFogFar - WATER.fogFar) * a;
   }
 
   private resize(): void {

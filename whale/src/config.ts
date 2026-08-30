@@ -44,11 +44,39 @@ export const SWIM = {
   /** How far it leans into a turn, and how fast the lean arrives. */
   bankMax: 0.42,
   bankRate: 3.2,
-  /** Nose up or down while climbing and diving, radians at full rate. */
-  pitchMax: 0.5,
-  pitchRate: 3.4,
-  /** How fast it rises or sinks toward the depth the slider asked for. */
+  /** Nose up or down while climbing and diving, radians at the very top of
+   *  the climb range. 1.3 is about seventy-five degrees — all but vertical,
+   *  which is what a whale on its way up to a breach actually looks like. A
+   *  gentle rise never gets near it, because the pitch is read off the climb
+   *  rate and a gentle rise is a small fraction of it. */
+  pitchMax: 1.3,
+  pitchRate: 4.2,
+  /**
+   * How fast it rises or sinks toward the depth the slider asked for — and
+   * then how much faster than that a whale that has been climbing for a while
+   * is allowed to go.
+   *
+   * Holding the slider up is meant to build: the first second is a whale
+   * rising, and the fourth is a whale coming up like a torpedo. `urgeRate` is
+   * how long it takes to wind up (a second and four fifths to the top),
+   * `urgeFall` how quickly it lets go once you stop asking.
+   */
   climbSpeed: 17,
+  urgeMax: 2.7,
+  urgeRate: 0.55,
+  urgeFall: 2.2,
+  /**
+   * How far below the depth it was asked for the whale has to be for the
+   * wind-up to keep building.
+   *
+   * Small on purpose. It exists only so a slider parked at the top does not
+   * hold a surfaced whale wound tight and breach it over and over on the spot
+   * — at six it was doing real harm instead, unwinding over the last six units
+   * of the climb, which is exactly the water the whale has to be quickest in
+   * if it is ever going to leave it. It arrived at the surface at the breach
+   * threshold to four significant figures and never once got out.
+   */
+  urgeGap: 1.5,
   /** The idle bob, so a whale holding still is still alive. */
   bobAmplitude: 0.5,
   bobRate: 1.1,
@@ -56,6 +84,52 @@ export const SWIM = {
    *  fluke keeps moving when the whale is drifting. */
   fluke: 1.15,
   flukeIdle: 0.34,
+} as const;
+
+/**
+ * Breathing.
+ *
+ * Not a timer and not a thing you can fail at — there is no drowning in this
+ * game. It is what happens when a whale reaches the air: a spout, a sound, and
+ * the shot coming up out of the water with it.
+ */
+export const BREATH = {
+  /** How shallow counts as being up for air. */
+  depth: 6,
+  /** Seconds before it will blow again, so riding along the surface is one
+   *  breath every few seconds and not a fountain. */
+  cooldown: 3.2,
+  /** Where the blowhole is on the model, in the whale's own coordinates. */
+  hole: {x: 0, y: 5.8, z: 4.6},
+} as const;
+
+/**
+ * The breach.
+ *
+ * Come up fast enough and the whale does not stop at the surface — it leaves
+ * the water altogether, hangs, and comes down on its side in a great slap of
+ * white. It is the one thing in this game that is purely for the doing of it:
+ * there is nothing to win by it and nothing that needs it.
+ */
+export const BREACH = {
+  /** Vertical speed at the surface needed to get out of the water at all.
+   *  Reachable only with the climb wound most of the way up — see SWIM.urge. */
+  speed: 26,
+  /** How much of that speed carries into the air. */
+  launch: 1.36,
+  /**
+   * What pulls it back.
+   *
+   * These two are a pair and were solved rather than guessed: the apex is
+   * v²/2g and the airtime 2v/g, off a whale that arrives at the surface at
+   * about 47 and so leaves it at 63. Measured in the running game, that is 27
+   * units of air — four fifths of the whale's own length — and 2.1 seconds of
+   * it. A real humpback clears about two thirds of itself. Going higher only
+   * made it hang about in the sky.
+   */
+  gravity: 53,
+  /** How far it can be past the surface before the splash counts as over. */
+  land: 1,
 } as const;
 
 export const WHALE = {
@@ -78,7 +152,13 @@ export const WHALE = {
  * `floorClear` — which is what makes a shallow stretch feel shallow.
  */
 export const DEPTH = {
-  minDepth: 9,
+  /**
+   * The top of the slider, and it is the surface itself rather than a polite
+   * distance under it. A whale is an air-breathing animal: it has to be able
+   * to put its back and its blowhole out into the air, and a game that stopped
+   * it nine units short would be a game about a fish.
+   */
+  minDepth: 2,
   maxDepth: 76,
   /** Where the slider starts: a comfortable way down, with room either way. */
   start: 26,
@@ -126,7 +206,10 @@ export const REEF = {
   cell: 10,
 
   /** How many of each thing is scattered on the floor. */
-  coral: 620,
+  /** Corals are the most expensive thing on the reef — each one is a branching
+   *  structure of forty-odd twigs — so this is a triangle budget as much as a
+   *  look. Measured: see the note in the README. */
+  coral: 440,
   rocks: 190,
   weeds: 320,
 } as const;
@@ -158,10 +241,74 @@ export const WATER = {
   causticDriftX: 0.011,
   causticDriftZ: 0.017,
 
+  /** Above the water: the sky, and how much further you can see in air. The
+   *  fog has to open right out or the world ends a few lengths from the
+   *  whale's nose the moment its head is out. */
+  skyColour: 0xc4ecf9,
+  airFogNear: 260,
+  airFogFar: 1500,
+
+  /**
+   * The surface, from the two sides.
+   *
+   * From underneath it is a bright ceiling you want to see the reef and the
+   * finish arch through, so it is thin. From above it is the sea, and the sea
+   * is not a window: at the underneath figure the whole reef showed through it
+   * like a bleached aquarium. One material, swapped as the camera crosses.
+   */
+  fromBelowColour: 0xcaf6ff,
+  fromBelowOpacity: 0.62,
+  fromAboveColour: 0x3ea9c6,
+  fromAboveOpacity: 0.95,
+
   /** Sunbeams: how many, how wide at the surface, how far apart. */
   shafts: 26,
   shaftWidth: 26,
   shaftSway: 0.16,
+} as const;
+
+/**
+ * The sky, which you only ever see with your head out of the water.
+ *
+ * Clouds, gulls wheeling about above the waves, and gulls sitting on the water
+ * that get up and go when a whale surfaces underneath them. All of it is
+ * hidden while the camera is under, so none of it costs anything for the parts
+ * of the game that happen down on the reef.
+ */
+export const SKY = {
+  clouds: 16,
+  /** How high they sit and how big they are. Big and far: a cloud the size of
+   *  the whale reads as a balloon. */
+  cloudLow: 150,
+  cloudHigh: 320,
+  cloudSize: 46,
+  /** How far out clouds and gulls are scattered around the whale. The patch
+   *  travels with it, the same as the water surface does. */
+  spread: 900,
+  /** Cloud drift, units a second. Barely. */
+  cloudDrift: 2.2,
+
+  /** Gulls in the air, and the circles they wheel in. */
+  flying: 9,
+  gullSize: 4.4,
+  circleLow: 26,
+  circleHigh: 95,
+  circleRadius: 60,
+  circleSpeed: 0.34,
+  /** Wingbeats a second, gliding and flapping hard. */
+  glideBeat: 0.9,
+  flapBeat: 3.4,
+
+  /** Gulls sitting on the water. */
+  floating: 8,
+  /** How near the whale can get before they go, and how fast they leave. */
+  fleeRange: 62,
+  takeOff: 26,
+  climb: 11,
+  /** How long they stay up before finding somewhere new to sit, and how far
+   *  ahead of the whale they settle. */
+  settle: 5.5,
+  landAhead: 320,
 } as const;
 
 /**
@@ -225,9 +372,20 @@ export const CAMERA = {
    *  That one is written up in the squirrel game's notes. */
   headingLag: 3.4,
   pitchLag: 2.6,
-  /** Never let the shot go under the sand or out through the surface. */
+  /** Never let the shot go under the sand. */
   floorClear: 9,
+  /**
+   * The surface, from both sides.
+   *
+   * Below `breachDepth` the shot is held under the water, because a camera
+   * sitting in the plane of the surface shows half sky and half sea and reads
+   * as a bug. As the whale comes up for air the shot comes with it, ending
+   * `airClear` above the waves — which is the only time in the game you see
+   * the sky, and worth the trip.
+   */
+  breachDepth: 16,
   surfaceClear: 4,
+  airClear: 7,
 } as const;
 
 /** The sound: ambience, and the two things that ever happen. */

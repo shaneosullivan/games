@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import {CAMERA, DEPTH, REEF, SIM, SWIM} from "./config";
+import {BREACH, BREATH, CAMERA, DEPTH, REEF, SIM, SWIM} from "./config";
 import {GameLoop} from "./core/loop";
 import {Joystick} from "./core/input";
 import {DepthStick} from "./core/depthStick";
@@ -10,6 +10,7 @@ import {Reef} from "./entities/reef";
 import {Whale} from "./entities/whale";
 import {Fish} from "./entities/fish";
 import {Plastic} from "./entities/plastic";
+import {Sky} from "./entities/sky";
 import {
   createFireworks,
   FIREWORK_PALETTE,
@@ -39,6 +40,7 @@ export class Game {
   readonly whale: Whale;
   readonly fish: Fish;
   readonly plastic: Plastic;
+  readonly sky: Sky;
   readonly bubbles: ParticleBurst;
   readonly sparks: ParticleBurst;
   readonly ocean: Ocean;
@@ -65,11 +67,21 @@ export class Game {
    *  the gulp rises in pitch through a mouthful, and this is the mouthful. */
   private streak = 0;
   private streakLeft = 0;
+  /** Seconds until it will blow again. See breathe(). */
+  private breathLeft = 0;
+  /** How wound up the climb is, 0..1. See climbRate(). */
+  private urge = 0;
+  /** Vertical speed while the whale is out of the water, or null while it is
+   *  in it. See breach(). */
+  private flight: number | null = null;
+  /** How far the shot is out of the water, 0..1. Drives the sky. */
+  private air = 0;
 
   private readonly forward = new THREE.Vector3();
   private readonly right = new THREE.Vector3();
   private readonly want = new THREE.Vector3();
   private readonly mouth = new THREE.Vector3();
+  private readonly hole = new THREE.Vector3();
   private readonly eye = new THREE.Vector3();
   private readonly look = new THREE.Vector3();
   /** The heading the *camera* is using, which lags the whale's. See
@@ -97,6 +109,8 @@ export class Game {
       this.reef.finishZ,
     );
 
+    this.sky = new Sky(rng);
+
     // Bubbles rise, so their gravity is negative — the shared burst subtracts
     // it from the upward velocity every step, and a negative one adds.
     this.bubbles = new ParticleBurst(300, 0.11, false);
@@ -106,6 +120,7 @@ export class Game {
     this.stage.scene.add(this.whale.group);
     this.stage.scene.add(this.fish.mesh);
     this.stage.scene.add(this.plastic.group);
+    this.stage.scene.add(this.sky.group);
     this.stage.scene.add(this.bubbles.mesh);
     this.stage.scene.add(this.sparks.mesh);
 
@@ -122,7 +137,7 @@ export class Game {
     this.intro = new Overlay(
       ui,
       "Whale",
-      "You are a beluga whale on a coral reef. Drag on the left to swim, and slide the bar on the right to go deeper or come up to the sunshine. Eat the fish that swim into your mouth — some of them are shy and will dart away. Don't eat the plastic bottles and bags: swim right round those. The reef ends at a big pink arch, and that is where you are going.",
+      "You are a beluga whale on a coral reef. Drag on the left to swim, and slide the bar on the right to go deeper or up to the top. A whale breathes air, so take the slider right to the sun now and then and pop your head out for a puff. Eat the fish that swim into your mouth — some of them are shy and will dart away. Don't eat the plastic bottles and bags: swim right round those. The reef ends at a big pink arch, and that is where you are going.",
       "Dive in",
       () => this.begin(),
     );
@@ -197,13 +212,15 @@ export class Game {
     this.whale.update(
       dt,
       this.want,
-      this.climbRate(),
+      this.flight === null ? this.climbRate(dt) : this.flight,
       this.stick.magnitude > 0,
     );
+    this.breach(dt);
     this.keepInReef(dt);
 
     this.whale.mouth(this.mouth);
     this.eat(dt);
+    this.breathe(dt);
 
     if (this.plastic.update(dt, this.mouth)) {
       this.spoil();
@@ -211,6 +228,9 @@ export class Game {
     }
 
     this.reef.update(this.time, this.whale.position);
+    this.sky.update(dt, this.time, this.whale.position, (x, z) =>
+      this.reef.waveAt(x, z, this.time),
+    );
     this.bubbles.update(dt);
     this.sparks.update(dt);
     this.ocean.update(dt, this.whale.speed / SWIM.maxSpeed);
@@ -230,7 +250,7 @@ export class Game {
    * shallow here, which is the plan's "some bits are deeper than others" made
    * into something you can feel rather than only see.
    */
-  private climbRate(): number {
+  private climbRate(dt: number): number {
     const p = this.whale.position;
     const floorDepth = -this.reef.floorAt(p.x, p.z);
     const deepest = Math.min(
@@ -238,11 +258,99 @@ export class Game {
       Math.max(DEPTH.minDepth, floorDepth - DEPTH.floorClear),
     );
     const wantDepth = Math.min(this.depth.desiredDepth, deepest);
-    // Eased rather than jumped, and capped: a whale that snapped to the depth
-    // you asked for would have no weight to it at all. A rate per *second*,
-    // not a share of the gap per frame — see DEPTH.followRate.
-    const rate = (-wantDepth - p.y) * DEPTH.followRate;
-    return Math.max(-SWIM.climbSpeed, Math.min(SWIM.climbSpeed, rate));
+    // The wind-up. It builds only while the whale is a good way below what
+    // was asked for, so a slider parked at the top does not keep a surfaced
+    // whale wound tight — see SWIM.urgeGap.
+    const gap = -p.y - wantDepth;
+    const climbing = gap > SWIM.urgeGap;
+    this.urge = Math.max(
+      0,
+      Math.min(1, this.urge + (climbing ? SWIM.urgeRate : -SWIM.urgeFall) * dt),
+    );
+
+    // Eased rather than jumped: a whale that snapped to the depth you asked
+    // for would have no weight to it at all. A rate per *second*, not a share
+    // of the gap per frame — see DEPTH.followRate.
+    const eased = (-wantDepth - p.y) * DEPTH.followRate;
+    const top = SWIM.climbSpeed * (1 + this.urge * (SWIM.urgeMax - 1));
+    if (eased <= 0) {
+      return Math.max(-SWIM.climbSpeed, eased);
+    }
+    // The wind-up is a *floor* on the rise, not a ceiling on it. Left as a
+    // plain cap, the eased term still braked the whale to a crawl over the
+    // last few units — which is exactly the water it needs to be quickest in
+    // if it is ever going to leave it.
+    return Math.min(top, Math.max(eased, this.urge * top));
+  }
+
+  /**
+   * Out of the water and back into it.
+   *
+   * Hit the surface fast enough and the whale keeps going: the depth slider is
+   * out of it from that moment, and what happens next is a thrown object. It
+   * comes down where the arc puts it, and the sea gets the lot.
+   */
+  private breach(dt: number): void {
+    const p = this.whale.position;
+
+    if (this.flight === null) {
+      const rising = this.whale.velocity.y;
+      if (p.y >= -DEPTH.minDepth && rising >= BREACH.speed) {
+        this.flight = rising * BREACH.launch;
+        this.urge = 0;
+        this.ocean.breath();
+      }
+      return;
+    }
+
+    // Gravity only. The *move* has already happened: the whale was updated
+    // this step with `flight` as its climb rate, which is what put it where it
+    // is. Adding the same distance again here had it rising at twice the speed
+    // it was thrown at, and reaching an apex of fifty units off a launch that
+    // could only account for thirty-four.
+    this.flight -= BREACH.gravity * dt;
+
+    // Spray off the whale on the way up, thinning as it clears the water.
+    if (this.flight > 0 && p.y < 12) {
+      this.whale.blowhole(this.hole);
+      this.bubbles.burst(this.hole, {
+        color: [0xffffff, 0xeafaff],
+        count: 3,
+        speed: 6,
+        lift: 4,
+        gravity: 26,
+        ttl: 0.8,
+        size: 6,
+        spherical: 0.6,
+      });
+    }
+
+    if (this.flight < 0 && p.y <= -DEPTH.minDepth + BREACH.land) {
+      this.splash();
+    }
+  }
+
+  /** Back in. Everything the whale was carrying goes into the water. */
+  private splash(): void {
+    const p = this.whale.position;
+    const down = this.flight ?? 0;
+    this.flight = null;
+    this.urge = 0;
+    this.ocean.splash();
+    // At the waterline rather than at the whale, so the ring of white comes
+    // off the surface and not out of the middle of the animal.
+    this.hole.set(p.x, -DEPTH.minDepth, p.z);
+    this.bubbles.burst(this.hole, {
+      color: [0xffffff, 0xeafaff, 0xd2f2ff],
+      // Scaled to how hard it came down — a big one throws more water.
+      count: Math.round(40 + Math.min(60, -down * 1.6)),
+      speed: 24,
+      lift: 13,
+      gravity: 26,
+      ttl: 1.5,
+      size: 9,
+      spherical: 0.3,
+    });
   }
 
   /**
@@ -273,7 +381,9 @@ export class Game {
     if (p.y < floor) {
       p.y = floor;
     }
-    if (p.y > -DEPTH.minDepth) {
+    // The surface is a lid, except while the whale is over it: a breach is the
+    // one time in the game the whale is allowed out of the water.
+    if (this.flight === null && p.y > -DEPTH.minDepth) {
       p.y = -DEPTH.minDepth;
     }
   }
@@ -313,6 +423,37 @@ export class Game {
       ttl: 1.5,
       size: 8,
       spherical: 1,
+    });
+  }
+
+  /**
+   * Up for air.
+   *
+   * A beluga is an air-breathing animal, so the surface is somewhere it has to
+   * be able to get to — and this is what happens when it does. There is no
+   * timer and nothing to fail: you cannot drown in this game, and a child who
+   * wants to spend the whole swim along the top of the water is welcome to.
+   * The spout is the reward for going up, not the penalty for staying down.
+   */
+  private breathe(dt: number): void {
+    this.breathLeft = Math.max(0, this.breathLeft - dt);
+    if (-this.whale.position.y > BREATH.depth || this.breathLeft > 0) {
+      return;
+    }
+    this.breathLeft = BREATH.cooldown;
+    this.whale.blowhole(this.hole);
+    this.ocean.breath();
+    // Straight up and heavy: spray thrown into the air comes back down, which
+    // is the one thing in this game that behaves like it is not under water.
+    this.bubbles.burst(this.hole, {
+      color: [0xffffff, 0xeafaff, 0xd2f2ff],
+      count: 26,
+      speed: 5,
+      lift: 17,
+      gravity: 22,
+      ttl: 1.1,
+      size: 7,
+      spherical: 0.35,
     });
   }
 
@@ -369,7 +510,9 @@ export class Game {
   render = (alpha: number): void => {
     this.whale.render(alpha);
     this.followCamera(SIM.step);
-    this.stage.setDepth(-this.whale.position.y);
+    this.stage.setView(-this.whale.position.y, this.air);
+    this.reef.setAir(this.air);
+    this.sky.setAir(this.air);
     this.depth.setActualDepth(-this.whale.position.y);
     this.hud.update(
       this.reef.progressAt(this.whale.position.z),
@@ -397,7 +540,13 @@ export class Game {
     }
     this.camHeading += delta * (1 - Math.exp(-CAMERA.headingLag * dt));
 
-    const climb = this.whale.velocity.y / SWIM.climbSpeed;
+    // Clamped, and it has to be. This is a ratio against the *base* climb
+    // rate, and a breach leaves the water at nearly four times that — which
+    // put the eye sixty-eight units under the whale and aimed it at the sky.
+    const climb = Math.max(
+      -1,
+      Math.min(1, this.whale.velocity.y / SWIM.climbSpeed),
+    );
     this.camPitch +=
       (climb - this.camPitch) * (1 - Math.exp(-CAMERA.pitchLag * dt));
 
@@ -410,17 +559,27 @@ export class Game {
       p.z - fz * CAMERA.distance,
     );
 
-    // Never through the sand and never out through the surface. Both would
-    // show the player something that is not the game: a screen full of grit,
-    // or the sky.
+    // Never through the sand: a screen full of grit is not the game.
     const floor = this.reef.floorAt(this.eye.x, this.eye.z) + CAMERA.floorClear;
     if (this.eye.y < floor) {
       this.eye.y = floor;
     }
-    if (this.eye.y > -CAMERA.surfaceClear) {
-      this.eye.y = -CAMERA.surfaceClear;
-    }
+
+    // The surface, from both sides. Deep down the shot is held under the
+    // water; as the whale comes up for air the shot rises with it and finishes
+    // in the open air above the waves. The two are one interpolation rather
+    // than a switch, because a camera that jumped through the surface would
+    // cut from sea to sky in a single frame.
+    const depth = -this.whale.position.y;
+    const up = Math.min(1, Math.max(0, 1 - depth / CAMERA.breachDepth));
+    const line =
+      -CAMERA.surfaceClear + up * (CAMERA.airClear + CAMERA.surfaceClear);
+    this.eye.y =
+      up > 0 ? Math.max(this.eye.y, line) : Math.min(this.eye.y, line);
     this.stage.camera.position.copy(this.eye);
+    // How much sky to show. Off the eye's own height, not off the whale's, so
+    // the world turns back into water at the moment the lens goes under.
+    this.air = Math.min(1, Math.max(0, this.eye.y / CAMERA.airClear));
 
     this.look.set(
       p.x + fx * CAMERA.lookAhead,

@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import {mergeGeometries} from "three/examples/jsm/utils/BufferGeometryUtils.js";
-import {SWIM, WHALE} from "../config";
+import {BREATH, SWIM, WHALE} from "../config";
 import {paint, toonRamp} from "../render/materials";
 
 const TAU = Math.PI * 2;
@@ -106,6 +106,19 @@ export class Whale {
     return out.multiplyScalar(WHALE.mouthAhead).add(this.position);
   }
 
+  /**
+   * Where the blowhole is, in the world — the spout has to come out of the top
+   * of its head and not out of the middle of it.
+   *
+   * Read through the *body*, not the group: the body is what carries the bank,
+   * the pitch and the bob, so a whale rolling into a turn as it breathes blows
+   * where its head actually is.
+   */
+  blowhole(out: THREE.Vector3): THREE.Vector3 {
+    out.set(BREATH.hole.x, BREATH.hole.y, BREATH.hole.z);
+    return this.body.localToWorld(out);
+  }
+
   /** A mouthful. Opens the jaw; it shuts itself. */
   gulp(): void {
     this.chomp = 1;
@@ -167,8 +180,12 @@ export class Whale {
     // frame-rate independent — a fixed share per frame is a different curve on
     // a 120Hz iPad than on a 60Hz laptop.
     const wantBank = -turn * SWIM.bankMax;
+    // Read off the *top* of the climb range, not the base rate — so an
+    // ordinary rise lifts the nose a little and a wound-up one stands the
+    // whale on its tail.
+    const fastest = SWIM.climbSpeed * SWIM.urgeMax;
     const wantPitch =
-      Math.max(-1, Math.min(1, climb / SWIM.climbSpeed)) * SWIM.pitchMax;
+      Math.max(-1, Math.min(1, climb / fastest)) * SWIM.pitchMax;
     this.bank += (wantBank - this.bank) * ease(SWIM.bankRate, dt);
     this.pitch += (wantPitch - this.pitch) * ease(SWIM.pitchRate, dt);
 
