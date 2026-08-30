@@ -1,5 +1,7 @@
 # Plan for Whale
 
+In whale you eat fish and dodge the plasti
+
 > **Write the initial description of the app here.** This file is the starting
 > point for Whale — before any code, set down what you want it to be. Replace
 > everything below the line with your own words; it's only prompts to get you

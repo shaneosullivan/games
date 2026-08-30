@@ -248,17 +248,20 @@ export class Game {
     // moment in the game where any touch at all counts: a child on the ledge
     // has one thing to do, and hunting for a button to do it with would be a
     // strange way to start a game about jumping off a cliff.
-    this.prompt.classList.remove("hidden");
     const leap = (): void => {
       if (this.squirrel.perched) {
         this.squirrel.jump();
-        this.prompt.classList.add("hidden");
         // Here and not in the constructor: a browser will not start an audio
         // context outside a real gesture, and this is the gesture.
         this.wind.start();
       }
     };
     window.addEventListener("pointerdown", leap);
+    // And the raw touch as well as the pointer. Belt and braces on the one
+    // input in the game that has to work: a tablet that delivers touchstart
+    // without a pointerdown would otherwise leave a child tapping at a
+    // squirrel that never jumps.
+    window.addEventListener("touchstart", leap);
     window.addEventListener("keydown", event => {
       if (event.key === " ") {
         leap();
@@ -534,6 +537,13 @@ export class Game {
     this.squirrel.render(alpha);
     this.followCamera(SIM.step);
     const s = this.squirrel;
+
+    // The sign is a view of "still on the ledge", not a thing a tap switches
+    // off. Switching it off inside the tap handler meant the one path that
+    // took the squirrel off the cliff was also the only path that took the
+    // sign down, so any leap that arrived another way left it hanging over a
+    // squirrel already halfway down the valley.
+    this.prompt.classList.toggle("hidden", !this.running || !s.perched);
     this.streaks.update(s.group.position, s.heading, s.gamma, s.speed);
     this.wind.update(SIM.step, this.run());
     this.hud.update(
