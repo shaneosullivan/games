@@ -399,6 +399,15 @@ export class Reef {
     ];
     const rockColours = [0xb9ad96, 0x9a8f7c, 0xc8bda6, 0x8b8477];
 
+    // How tall each shape is at scale 1, so a coral over shallow water can be
+    // held down to the room it has. Measured off the geometry rather than
+    // written down here, because these are grown and their heights are not a
+    // number anybody chose.
+    const heights = kinds.map(geo => {
+      geo.computeBoundingBox();
+      return geo.boundingBox ? geo.boundingBox.max.y : 8;
+    });
+
     const share = Math.ceil(REEF.coral / kinds.length);
     const total = share * kinds.length;
     const mat = new THREE.MeshToonMaterial({
@@ -420,7 +429,12 @@ export class Reef {
         this.v.set(x, y - 0.4, z);
         this.e.set(0, rng.range(0, TAU), 0);
         this.q.setFromEuler(this.e);
-        this.one.setScalar(rng.range(0.8, 2));
+        this.one.setScalar(
+          Math.max(
+            0.3,
+            Math.min(rng.range(0.8, 2), this.fits(y, heights[k], 0.4)),
+          ),
+        );
         this.m.compose(this.v, this.q, this.one);
         mesh.setMatrixAt(i, this.m);
         placed.push(this.m.clone());
@@ -483,8 +497,11 @@ export class Reef {
    *  are the one thing on the floor that moves and the sway is rebuilt every
    *  frame from the rest pose. */
   private buildWeeds(rng: Rng): THREE.InstancedMesh {
+    const tuft = weedTuft();
+    tuft.computeBoundingBox();
+    const tall = tuft.boundingBox ? tuft.boundingBox.max.y : 7;
     const mesh = new THREE.InstancedMesh(
-      weedTuft(),
+      tuft,
       bladeMaterial(toonRamp()),
       REEF.weeds,
     );
@@ -492,9 +509,13 @@ export class Reef {
     const colour = new THREE.Color();
     for (let i = 0; i < REEF.weeds; i++) {
       const {x, z} = this.scatter(rng);
+      const floor = this.floorAt(x, z);
       this.weedBase.push({
-        pos: new THREE.Vector3(x, this.floorAt(x, z) - 0.5, z),
-        scale: rng.range(0.7, 1.9),
+        pos: new THREE.Vector3(x, floor - 0.5, z),
+        scale: Math.max(
+          0.25,
+          Math.min(rng.range(0.7, 1.9), this.fits(floor, tall, 0.5)),
+        ),
         lean: rng.range(-0.12, 0.12),
         phase: rng.range(0, TAU),
       });
@@ -545,9 +566,16 @@ export class Reef {
       // divided by how tall the model is. One number, all three axes.
       const floor = this.floorAt(x, z);
       const reach = rng.range(REEF.kelpReachLow, REEF.kelpReachHigh);
+      // The room above wins over the minimum size. A floor of 0.35 alone gave
+      // a twenty-one unit plant, which over the thirteen units of water on a
+      // ridge top stood eight units out into the air.
+      const wanted = Math.min(1.6, (-floor * reach) / KELP_HEIGHT);
       this.kelpBase.push({
         pos: new THREE.Vector3(x, floor - 1, z),
-        scale: Math.max(0.35, Math.min(1.6, (-floor * reach) / KELP_HEIGHT)),
+        scale: Math.min(
+          Math.max(0.35, wanted),
+          this.fits(floor, KELP_HEIGHT, 1),
+        ),
         lean: rng.range(-0.05, 0.05),
         phase: rng.range(0, TAU),
       });
@@ -756,6 +784,17 @@ export class Reef {
     group.add(encrust);
 
     return group;
+  }
+
+  /**
+   * The biggest a thing of this height may be scaled to here without its top
+   * coming out of the water.
+   *
+   * `sink` is how far below the floor the thing is planted, which every one of
+   * them is by a little so it does not appear to be balanced on the sand.
+   */
+  private fits(floorY: number, height: number, sink: number): number {
+    return (-REEF.surfaceClear - (floorY - sink)) / height;
   }
 
   /**

@@ -224,6 +224,20 @@ export const REEF = {
   gardenSpread: 21,
   loose: 0.16,
 
+  /**
+   * How far under the surface everything that grows has to stop.
+   *
+   * Nothing on the sea floor may break the water. Over the ridge tops, where
+   * there are only thirteen units of water, a coral scaled up twice and a kelp
+   * held at its minimum size both grew straight out into the air — which is
+   * the sort of thing you notice once and cannot stop noticing.
+   *
+   * So a plant's scale is capped by the room above it: `(depth - clear) /
+   * height`. In deep water the cap is never the binding constraint and
+   * everything is the size it wanted to be.
+   */
+  surfaceClear: 5,
+
   /** Kelp: how many plants, in how many stands, and how much of the water
    *  above them they fill. A stand is a thicket you swim through. */
   kelp: 300,
@@ -287,7 +301,19 @@ export const WATER = {
    * animations that happened to be in the same scene.
    */
   causticScale: 0.055,
-  causticSurge: 0.06,
+  /**
+   * What fraction of the swell's speed the dapple actually travels at.
+   *
+   * Light refracted through a wave really does run along with the crest, and
+   * at the full rate the pattern crossed a tile of sea floor every two and a
+   * half seconds, which is far busier than it sounds — the sand looked like it
+   * was boiling. This is a game for a child watching a reef, so it is slowed
+   * to a third. The *direction* and the phase are still the swell's, which is
+   * the part that matters.
+   */
+  causticFollow: 0.3,
+  /** How much it also breathes in and out with the leading wave's phase. */
+  causticSurge: 0.022,
 
   /** Above the water: the sky, and how much further you can see in air. The
    *  fog has to open right out or the world ends a few lengths from the

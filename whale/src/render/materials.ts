@@ -145,7 +145,11 @@ export function driftCaustics(
   swell: {dx: number; dz: number; speed: number; k: number},
   phase: number,
 ): void {
-  const travelled = (swell.speed / swell.k) * time * WATER.causticScale;
+  // The crest's own speed is its phase velocity, speed/k — taken at a fraction
+  // of it, because at the full rate the dapple crosses a whole tile of floor
+  // every couple of seconds. See WATER.causticFollow.
+  const travelled =
+    (swell.speed / swell.k) * WATER.causticFollow * time * WATER.causticScale;
   const surge = Math.sin(phase) * WATER.causticSurge;
   texture.offset.set(
     swell.dx * travelled + surge,
