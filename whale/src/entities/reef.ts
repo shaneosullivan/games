@@ -1,9 +1,10 @@
 import * as THREE from "three";
 import {mergeGeometries} from "three/examples/jsm/utils/BufferGeometryUtils.js";
-import {REEF, WATER} from "../config";
+import {DEPTH, REEF, WATER, WRECK} from "../config";
 import {Rng} from "../core/rng";
 import {coralKinds, coralRock} from "./coral";
 import {bladeMaterial, KELP_HEIGHT, kelpPlant, weedTuft} from "./flora";
+import {shipwreck} from "./wreck";
 import {
   causticTexture,
   driftCaustics,
@@ -29,6 +30,9 @@ export class Reef {
 
   /** Where the run ends, in z. Everything is placed clear of it. */
   readonly finishZ = -(REEF.length - 90);
+
+  /** Where the wreck lies, for anything that wants to keep away from it. */
+  readonly wreckAt = new THREE.Vector3();
 
   private readonly caustics = causticTexture();
   private readonly surface: THREE.Mesh;
@@ -97,6 +101,10 @@ export class Reef {
       });
     }
 
+    // Where the wreck will lie, worked out before anything is planted: the
+    // coral and the kelp have to know to keep off her.
+    this.wreckAt.copy(this.berth());
+
     this.group.add(this.buildFloor());
     this.group.add(this.buildCoral(rng));
     this.group.add(this.buildRocks(rng));
@@ -117,6 +125,7 @@ export class Reef {
     this.shafts = this.buildShafts(rng);
     this.group.add(this.shafts);
 
+    this.group.add(this.buildWreck());
     this.group.add(this.buildFinish());
   }
 
@@ -138,6 +147,13 @@ export class Reef {
       REEF.floorDune *
         Math.sin((x / REEF.floorDuneLength) * TAU) *
         Math.cos((z / REEF.floorDuneLength) * TAU * 0.8);
+
+    // The trenches. Cubed and clipped to the positive half, so this is nothing
+    // for most of the reef and then the floor drops away — see REEF.trenchDepth.
+    const cut = Math.sin((z / REEF.trenchLength) * TAU + 1.3);
+    if (cut > 0) {
+      depth += REEF.trenchDepth * cut * cut * cut;
+    }
 
     // Shallower toward the sides. Squared, so the middle of the lane stays
     // flat and the lift is all in the last third.
@@ -268,30 +284,50 @@ export class Reef {
     }
     pos.needsUpdate = true;
 
-    this.shafts.position.set(centre.x, 0, centre.z);
-    this.shafts.rotation.z = Math.sin(time * 0.21) * WATER.shaftSway;
-    // Each beam is the light that got through one patch of surface, so a crest
-    // passing over it puts it out and a trough lets it through. Read at the
-    // beam's own place in the world, which is what stops them all pulsing
-    // together like a light on a timer.
+    // The beams stand still in the world. One that has fallen far enough
+    // behind is moved the same distance ahead — a jump of fourteen hundred
+    // units, twice the fog's reach, so what moves is always something nobody
+    // can see. See WATER.shaftWrap.
     for (const beam of this.shafts.children) {
-      const phase = this.swellPhase(
-        centre.x + beam.position.x,
-        centre.z + beam.position.z,
-        time,
-      );
-      const open = 0.5 + 0.5 * Math.sin(phase);
+      const behind = beam.position.z - centre.z;
+      if (behind > WATER.shaftWrap) {
+        beam.position.z -= WATER.shaftWrap * 2;
+        beam.position.x = centre.x + (beam.position.x - centre.x);
+      } else if (behind < -WATER.shaftWrap) {
+        beam.position.z += WATER.shaftWrap * 2;
+      }
+
+      // Each beam is the light that got through one patch of surface, so a
+      // crest passing over it puts it out and a trough lets it through. Read
+      // at the beam's own place in the world, which is what stops them all
+      // pulsing together like a light on a timer.
+      const open =
+        0.5 +
+        0.5 * Math.sin(this.swellPhase(beam.position.x, beam.position.z, time));
       const mat = (beam as THREE.Mesh).material as THREE.MeshBasicMaterial;
       mat.opacity =
         this.shaftBase * (1 - WATER.shaftFlicker + WATER.shaftFlicker * open);
+      // Leaning, each on its own — the group used to be turned as one, which
+      // at this spread would have swung the far ones through the reef.
+      beam.rotation.z =
+        beam.userData.lean +
+        Math.sin(time * 0.21 + beam.userData.phase) * WATER.shaftSway;
     }
 
     // The weed and the kelp lean, which is the only motion on the sea floor
     // and does more for "this is under water" than anything else here. The
     // kelp swings further and slower: it is forty units of rope with floats on
     // it, and it moves like one.
-    this.sway(this.weeds, this.weedBase, time, 0.9, 0.16);
-    this.sway(this.kelp, this.kelpBase, time, 0.42, 0.12);
+    this.sway(
+      this.weeds,
+      this.weedBase,
+      time,
+      0.9,
+      0.16,
+      centre,
+      REEF.weedPartShare,
+    );
+    this.sway(this.kelp, this.kelpBase, time, 0.42, 0.12, centre, 1);
   }
 
   /** Rebuilds a planted thing's matrices with a lean on them. */
@@ -301,11 +337,33 @@ export class Reef {
     time: number,
     rate: number,
     amount: number,
+    centre: THREE.Vector3,
+    part: number,
   ): void {
+    const reach = REEF.partRadius;
     for (let i = 0; i < base.length; i++) {
       const w = base[i];
       const lean = w.lean + Math.sin(time * rate + w.phase) * amount;
-      this.e.set(Math.cos(w.phase) * lean * 0.6, w.phase, lean);
+      let tiltX = Math.cos(w.phase) * lean * 0.6;
+      let tiltZ = lean;
+
+      // Out of the whale's way. Read off the current distance every frame, so
+      // a plant bends as it is passed and stands back up behind — there is no
+      // state to keep and nothing to reset.
+      const dx = w.pos.x - centre.x;
+      const dz = w.pos.z - centre.z;
+      const d = Math.hypot(dx, dz);
+      if (d < reach && d > 0.001) {
+        const push = (1 - d / reach) * REEF.partLean * part;
+        // Leaning along +x is a turn about z, and along +z a turn about x.
+        tiltX += (dz / d) * push;
+        tiltZ -= (dx / d) * push;
+      }
+
+      // XZY, so the plant's own random yaw is applied first and the two tilts
+      // are then taken in world space. In the default order the yaw sits
+      // between them and a plant would lean off in a direction of its own.
+      this.e.set(tiltX, w.phase, tiltZ, "XZY");
       this.q.setFromEuler(this.e);
       this.one.setScalar(w.scale);
       this.m.compose(w.pos, this.q, this.one);
@@ -562,6 +620,18 @@ export class Reef {
       const cz = 40 + (this.finishZ - 100) * along;
       const x = cx + rng.range(-REEF.kelpSpread, REEF.kelpSpread);
       const z = cz + rng.range(-REEF.kelpSpread, REEF.kelpSpread);
+      if (!this.clearOfWreck(x, z)) {
+        // Scaled to nothing rather than skipped: an instanced mesh cannot skip
+        // an instance, and a stand that happens to fall on the wreck losing a
+        // few plants is exactly what should happen to it.
+        this.kelpBase.push({
+          pos: new THREE.Vector3(x, this.floorAt(x, z), z),
+          scale: 0,
+          lean: 0,
+          phase: 0,
+        });
+        continue;
+      }
       // Sized to the water above it: how far up toward the light it gets,
       // divided by how tall the model is. One number, all three axes.
       const floor = this.floorAt(x, z);
@@ -666,16 +736,72 @@ export class Reef {
           side: THREE.DoubleSide,
         }),
       );
-      // Tops just *under* the surface. Sitting them at the waterline put a
-      // white additive smudge on the sea in every shot taken from the air.
+      // In the world, not around the whale, and spread over the stretch of
+      // reef the wrapping keeps them in. Tops just *under* the surface:
+      // sitting them at the waterline put a white additive smudge on the sea
+      // in every shot taken from the air.
       beam.position.set(
-        rng.range(-280, 280),
+        rng.range(-WATER.shaftLane, WATER.shaftLane),
         -height / 2 - 1.5,
-        rng.range(-280, 280),
+        rng.range(-WATER.shaftWrap, WATER.shaftWrap),
       );
-      beam.rotation.z = rng.range(-0.16, 0.16);
+      beam.userData.lean = rng.range(-0.14, 0.14);
+      beam.userData.phase = rng.range(0, TAU);
+      beam.rotation.z = beam.userData.lean;
       group.add(beam);
     }
+    return group;
+  }
+
+  /**
+   * The wreck, laid on the bottom of the deepest trench she can be found in.
+   *
+   * Rolled onto her side and settled into the sand, and turned so the gap
+   * amidships faces down the reef — the way through has to be visible from
+   * where a whale is coming from, not from the side.
+   */
+  /**
+   * Where the wreck lies: deep water, but water the whale can get to the
+   * bottom of.
+   *
+   * The deepest trench on the reef is about a hundred and seventy down and the
+   * slider only reaches a hundred and ten, so a wreck put in the deepest spot
+   * available is a wreck nobody can ever swim through — which was the first
+   * version of this, sitting at a hundred and twenty-three. The search is for
+   * the deepest floor that still leaves her within reach.
+   */
+  private berth(): THREE.Vector3 {
+    const lowest = DEPTH.maxDepth - DEPTH.floorClear - WRECK.headroom;
+    let at = this.finishZ * 0.36;
+    let deepest = 0;
+    for (let z = this.finishZ * 0.2; z > this.finishZ * 0.6; z -= 6) {
+      const d = -this.floorAt(WRECK.offset, z);
+      if (d > deepest && d < lowest) {
+        deepest = d;
+        at = z;
+      }
+    }
+    return new THREE.Vector3(WRECK.offset, this.floorAt(WRECK.offset, at), at);
+  }
+
+  private buildWreck(): THREE.Group {
+    const group = new THREE.Group();
+    const at = this.wreckAt.z;
+
+    const hull = new THREE.Mesh(
+      shipwreck(),
+      new THREE.MeshToonMaterial({
+        vertexColors: true,
+        gradientMap: toonRamp(),
+      }),
+    );
+    // On her side, and heeled a little further so she leans into the slope.
+    hull.rotation.z = Math.PI * 0.42;
+    hull.rotation.y = 0.24;
+    // Half-buried: the floor takes the lower part of her, which is what stops
+    // her looking like a model on a shelf.
+    hull.position.set(WRECK.offset, this.wreckAt.y + WRECK.settle, at);
+    group.add(hull);
     return group;
   }
 
@@ -808,6 +934,26 @@ export class Reef {
    */
   private scatter(rng: Rng): {x: number; z: number} {
     const reach = REEF.halfWidth + REEF.ridgeWidth * 0.7;
+    // Up to a few tries to land somewhere that is not on top of the wreck. A
+    // handful is plenty — her clearing is a small share of a reef this long —
+    // and a bounded loop cannot hang however the numbers move later.
+    for (let attempt = 0; attempt < 6; attempt++) {
+      const spot = this.pick(rng, reach);
+      if (this.clearOfWreck(spot.x, spot.z)) {
+        return spot;
+      }
+    }
+    return this.pick(rng, reach);
+  }
+
+  /** True if a point is far enough from the wreck to plant something on. */
+  private clearOfWreck(x: number, z: number): boolean {
+    const dx = x - this.wreckAt.x;
+    const dz = z - this.wreckAt.z;
+    return dx * dx + dz * dz > WRECK.clearing * WRECK.clearing;
+  }
+
+  private pick(rng: Rng, reach: number): {x: number; z: number} {
     if (rng.next() < REEF.loose || this.gardens.length === 0) {
       return {
         x: rng.range(-reach, reach),

@@ -159,7 +159,15 @@ export const DEPTH = {
    * it nine units short would be a game about a fish.
    */
   minDepth: 2,
-  maxDepth: 76,
+  /**
+   * How deep the slider reaches.
+   *
+   * Not as deep as the deepest trench, on purpose. The floor drops to about a
+   * hundred and seventy in places and the whale can only get to a hundred and
+   * ten of it, so the bottom of a trench stays somewhere below you, fading
+   * out. Water you can touch the bottom of is not deep water.
+   */
+  maxDepth: 110,
   /** Where the slider starts: a comfortable way down, with room either way. */
   start: 26,
   floorClear: 7,
@@ -175,8 +183,8 @@ export const DEPTH = {
  * either side and a floor that rises into sandbanks and drops into trenches.
  */
 export const REEF = {
-  /** How far it runs. The finish sits at -(length - 60). */
-  length: 1560,
+  /** How far it runs. The finish sits at -(length - 90). */
+  length: 2400,
   /** Half-width of the swimmable lane. The ridges climb out of the floor
    *  beyond this, so the edge is something you can see rather than an
    *  invisible wall. */
@@ -193,6 +201,18 @@ export const REEF = {
   floorRollLength: 340,
   floorDune: 5,
   floorDuneLength: 71,
+
+  /**
+   * The trenches: the really deep parts.
+   *
+   * A separate term from the roll, and cubed, so it is nothing at all for most
+   * of the reef and then opens up. A sine on its own would make the whole
+   * floor undulate deeply; this leaves the ordinary reef where it was and cuts
+   * a few holes in it. At the bottom of one the floor is about a hundred and
+   * seventy down, which is sixty units below anywhere the whale can go.
+   */
+  trenchDepth: 78,
+  trenchLength: 560,
   /** The floor lifts toward the ridges, so the lane is a shallow valley. */
   floorEdgeLift: 26,
 
@@ -208,9 +228,9 @@ export const REEF = {
   /** How many of each thing grows on the floor. Coral is the most expensive
    *  of them — each one is a branching structure of forty-odd twigs — so that
    *  number is a triangle budget as much as a look. */
-  coral: 440,
-  rocks: 190,
-  weeds: 300,
+  coral: 600,
+  rocks: 260,
+  weeds: 410,
 
   /**
    * Gardens: the bunches everything grows in.
@@ -220,7 +240,7 @@ export const REEF = {
    * as wallpaper. Most of what grows picks a garden and sits near it, and a
    * `loose` share ignores them entirely so the gaps are not too tidy.
    */
-  gardens: 58,
+  gardens: 86,
   gardenSpread: 21,
   loose: 0.16,
 
@@ -240,11 +260,53 @@ export const REEF = {
 
   /** Kelp: how many plants, in how many stands, and how much of the water
    *  above them they fill. A stand is a thicket you swim through. */
-  kelp: 300,
-  kelpStands: 17,
+  kelp: 410,
+  kelpStands: 25,
   kelpSpread: 24,
   kelpReachLow: 0.55,
   kelpReachHigh: 0.88,
+
+  /**
+   * How the weed gets out of the way.
+   *
+   * A whale is a big animal and the water it shoves ahead of it is what
+   * actually bends the kelp; near enough, a plant leans away from the whale by
+   * an amount that falls off with distance. Kelp is long and light and gets
+   * pushed a long way; the seaweed on the floor is short and stiff and barely
+   * moves, so it gets a fraction of both numbers.
+   */
+  partRadius: 40,
+  partLean: 0.7,
+  weedPartShare: 0.35,
+} as const;
+
+/**
+ * The shipwreck.
+ *
+ * An old ship lying on her side in deep water with her back broken, and a gap
+ * amidships wide enough to swim through. She is the one thing in the game a
+ * whale goes *inside*.
+ */
+export const WRECK = {
+  /** How much water is wanted above her, over and above the whale's own
+   *  clearance from the floor. She has to sit in water the slider can reach
+   *  the bottom of, or the way through is somewhere nobody can ever be. */
+  headroom: 16,
+  /** How far off the middle of the lane she lies. */
+  offset: -16,
+  /** How much sea floor is kept clear around her. She is the one landmark on
+   *  the reef, and a kelp stand grew straight through her — you could not see
+   *  the ship for the weeds. */
+  clearing: 115,
+  /**
+   * How far her keel is buried.
+   *
+   * Enough that she is settled into the sand and not balanced on it, and no
+   * more. At nine she was sunk almost to the gunwale and most of the ship was
+   * underground — which loses the shape, and the shape is the whole reason
+   * she is there.
+   */
+  settle: 3,
 } as const;
 
 /** The water itself: what you see and how far. */
@@ -257,8 +319,8 @@ export const WATER = {
    *  deep blue at the bottom — and the depth by which it is fully the deep
    *  one. Sky and fog are the same colour, always. */
   shallowColour: 0x46c2d6,
-  deepColour: 0x11578a,
-  colourDepth: 88,
+  deepColour: 0x0b3f6b,
+  colourDepth: 105,
 
   /** The surface plane: how big and how coarse. */
   surfaceSpan: 2200,
@@ -335,10 +397,24 @@ export const WATER = {
   fromAboveColour: 0x3ea9c6,
   fromAboveOpacity: 0.95,
 
-  /** Sunbeams: how many, how wide at the surface, how far apart. */
-  shafts: 26,
+  /**
+   * Sunbeams: how many, how wide at the surface, and how far from the whale
+   * they are allowed to get before they are moved.
+   *
+   * They stand still in the world. They used to hang off the whale, which
+   * meant the light came along with you and the one thing in the scene that
+   * should have told you that you were moving told you that you were not.
+   *
+   * A beam that falls further behind than `shaftWrap` is picked up and put the
+   * same distance ahead. That is well past the fog, so it is never a beam
+   * moving — it is a beam you cannot see any more being reused somewhere you
+   * cannot see yet.
+   */
+  shafts: 34,
   shaftWidth: 26,
-  shaftSway: 0.16,
+  shaftWrap: 700,
+  shaftLane: 190,
+  shaftSway: 0.09,
   /**
    * How much each beam brightens and dims with the water directly above it.
    *
@@ -493,7 +569,7 @@ export const SKY = {
  * thing that happens.
  */
 export const FISH = {
-  schools: 22,
+  schools: 30,
   perSchool: 13,
   /** How wide a school spreads around its centre. */
   spread: 13,
@@ -522,7 +598,7 @@ export const FISH = {
  * that says so is friendly about it: this is a game for a child.
  */
 export const JUNK = {
-  count: 34,
+  count: 48,
   /** How fast a piece drifts, and how fast it turns over as it goes. */
   drift: 2.6,
   tumble: 0.5,
