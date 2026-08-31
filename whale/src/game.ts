@@ -604,7 +604,7 @@ export class Game {
     );
     this.dark += (want - this.dark) * (1 - Math.exp(-1.6 * dt));
 
-    this.sonar.update(dt, this.dark);
+    this.sonar.update(dt, this.dark, this.stage.camera);
     if (this.dark < 0.25) {
       this.clickIn = 0;
       return;

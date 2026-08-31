@@ -250,22 +250,32 @@ export const SONAR = {
   /** How thick the band of world a pulse lights up is. Wide enough to read as
    *  a wave washing over a surface rather than a wire drawn on it. */
   width: 22,
-  /** How many pulses can be out at once. Must match the array in the shader —
-   *  see render/sonar.ts. */
-  rings: 3,
+  /**
+   * How many pulses can be out at once. Sets the array size in the shader —
+   * see render/sonar.ts.
+   *
+   * A pulse lives reach/speed, which is a little over five seconds, and one
+   * goes out every 1.1 — so five slots is what it takes for a pulse to live
+   * its whole life instead of being recycled out from under itself.
+   */
+  rings: 5,
   /**
    * The rings drawn in the water so you can see the pulse leave the head — and
    * how far out they are still drawn.
    *
-   * Short, and much shorter than the pulse's own reach. The camera sits
-   * sixty-odd units behind the whale, so a ring that kept growing swept
-   * straight through it, and seen edge-on from the inside a ring is a bar
-   * across the whole screen. They fade out well before they get there; the
-   * pulse itself carries on, and what it lights up is the point.
+   * They run most of the way out now. The first version stopped them at 46
+   * units, which was a fix for one moment rather than for the problem: a ring
+   * expanding past the camera is a bar across the screen for the frame or two
+   * it is edge-on, so they were made to die before they got there — and a
+   * pulse you could only see for half a second was barely a pulse at all.
+   *
+   * They run most of the way out now. A ring turned to face the camera can
+   * never be edge-on to it, so there is no longer any angle to hide from and
+   * nothing stopping a pulse being watched the whole way — see entities/sonar.
    */
   showRings: true,
-  ringReach: 46,
-  ringFade: 0.8,
+  ringReach: 330,
+  ringFade: 1.1,
 } as const;
 
 /**

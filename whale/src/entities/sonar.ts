@@ -11,10 +11,22 @@ import {sonarOrigin, sonarRings} from "../render/sonar";
  * each one so the pulse is visible in the water on its way out, rather than
  * only being inferred from what it lights up.
  *
- * Crossed rings rather than a sphere. A sphere expanding from your own head
- * swallows the camera within a few frames and washes the screen; two circles
- * at right angles read as a pulse travelling outward from a point and never
- * fill the view, whichever way you are looking.
+ * Two rings per pulse, turned with the camera and each set forty-five degrees
+ * off it.
+ *
+ * Neither of the obvious constructions works. A sphere expanding from your own
+ * head swallows the camera in a few frames and washes the screen. Two rings
+ * crossed at right angles in *world* space seem to fix that and do not: a
+ * chase camera sits directly behind the whale, which is exactly the angle at
+ * which one of the pair is edge-on — and a torus seen edge-on is a bar
+ * straight up the middle of the screen, at every radius. That is not a moment
+ * to be hidden, it is the whole time.
+ *
+ * Turning the pair with the camera fixes the angle for good, and holding them
+ * at forty-five degrees either side of square-on keeps them a pair: each is
+ * foreshortened to an ellipse, neither can ever be edge-on, and between them
+ * they read as a wavefront with some depth to it rather than as a flat disc
+ * painted on the screen.
  */
 export class Sonar {
   readonly group = new THREE.Group();
@@ -41,10 +53,13 @@ export class Sonar {
 
     for (let i = 0; i < SONAR.rings; i++) {
       const pulse = new THREE.Group();
-      // Built at radius 1 and scaled, so one geometry serves every size.
-      for (const turn of [0, Math.PI / 2]) {
+      // Built at radius 1 and scaled, so one geometry serves every size. The
+      // two are turned a quarter-turn apart about the camera's own up axis and
+      // sit at forty-five degrees to the view, which is the angle at which a
+      // ring is unmistakably a ring and never a line.
+      for (const turn of [Math.PI / 4, -Math.PI / 4]) {
         const ring = new THREE.Mesh(
-          new THREE.TorusGeometry(1, 0.012, 4, 44),
+          new THREE.TorusGeometry(1, 0.014, 4, 54),
           this.material.clone(),
         );
         ring.rotation.y = turn;
@@ -80,7 +95,7 @@ export class Sonar {
    * fragment of every surface in the game, which is not a trade worth
    * refusing for a whale that moves at thirty units a second.
    */
-  update(dt: number, dark: number): void {
+  update(dt: number, dark: number, camera: THREE.Camera): void {
     const out = sonarRings.value;
 
     for (let i = 0; i < SONAR.rings; i++) {
@@ -99,7 +114,6 @@ export class Sonar {
       out[i] = this.radius[i];
 
       const pulse = this.rings[i];
-      // Only drawn while it is still near the head — see SONAR.ringReach.
       const near = 1 - this.radius[i] / SONAR.ringReach;
       pulse.visible = SONAR.showRings && dark > 0.05 && near > 0;
       if (!pulse.visible) {
@@ -107,6 +121,9 @@ export class Sonar {
       }
       pulse.position.copy(this.from[i]);
       pulse.scale.setScalar(this.radius[i]);
+      // The pair turns with the camera; their own forty-five degrees is baked
+      // into each child, so neither ever comes edge-on however the whale moves.
+      pulse.quaternion.copy(camera.quaternion);
       // Fading as it goes, and faster at the end, so it thins out rather than
       // switching off.
       const fade = Math.pow(Math.max(0, near), SONAR.ringFade) * dark;
