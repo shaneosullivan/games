@@ -1,5 +1,13 @@
 import "./ui/styles.css";
 import {Game} from "./game";
+import {lockZoom} from "./core/lockZoom";
+
+// Before anything else. On an iPad a stray pinch or a double tap zooms the
+// page, and a zoomed page puts the readouts and the corner buttons off the top
+// of the screen with no way to get them back — the game has no scrollbars and
+// nothing to grab. iOS has ignored `user-scalable=no` since iOS 10, so the
+// viewport meta tag on its own does nothing about it.
+lockZoom();
 
 const app = document.getElementById("app");
 if (!app) {

@@ -771,10 +771,16 @@ export class Game {
     const p = this.whale.group.position;
     const fx = Math.sin(this.camHeading);
     const fz = Math.cos(this.camHeading);
+    // Pulling back in the dark. There is nothing to look at close to down
+    // there and a great deal happening at range — see CAMERA.darkDistance.
+    const back =
+      CAMERA.distance + (CAMERA.darkDistance - CAMERA.distance) * this.dark;
+    const lift =
+      CAMERA.height + (CAMERA.darkHeight - CAMERA.height) * this.dark;
     this.eye.set(
-      p.x - fx * CAMERA.distance,
-      p.y + CAMERA.height - this.camPitch * CAMERA.distance * 0.35,
-      p.z - fz * CAMERA.distance,
+      p.x - fx * back,
+      p.y + lift - this.camPitch * back * 0.35,
+      p.z - fz * back,
     );
 
     // Never through the sand: a screen full of grit is not the game.

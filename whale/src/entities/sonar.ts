@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import {SONAR} from "../config";
-import {sonarDark, sonarOrigin, sonarRings} from "../render/sonar";
+import {sonarOrigin, sonarRings} from "../render/sonar";
 
 /**
  * The clicks themselves: the pulses going out, and the rings you can see them
@@ -81,7 +81,6 @@ export class Sonar {
    * refusing for a whale that moves at thirty units a second.
    */
   update(dt: number, dark: number): void {
-    sonarDark.value = dark;
     const out = sonarRings.value;
 
     for (let i = 0; i < SONAR.rings; i++) {

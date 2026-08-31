@@ -211,10 +211,21 @@ export const ABYSS = {
    *  the radius. Smaller is a sheerer drop. */
   lip: 0.55,
 
-  /** Where the light starts to go and where it has gone entirely. Depth, not
-   *  distance into the hole: you can be over the abyss in bright water. */
-  darkFrom: 105,
-  darkTo: 185,
+  /**
+   * Where the light starts to go and where it has gone entirely.
+   *
+   * Depth, and the *thing's own* depth rather than the camera's — so the hole
+   * is dark whether or not you are in it, and looking down into it from bright
+   * water you see a black pit rather than more reef. Darkness that only
+   * existed once you were inside it made the abyss something you fell into by
+   * accident instead of somewhere you could decide to go.
+   *
+   * Set below the abyss and above the deepest trench, so a trench merely goes
+   * gloomy — at 177 down the floor of one is a third of the way to black,
+   * which is about right for a trench — and only the hole goes out entirely.
+   */
+  darkFrom: 150,
+  darkTo: 235,
 } as const;
 
 /**
@@ -742,6 +753,16 @@ export const CAMERA = {
    *  That one is written up in the squirrel game's notes. */
   headingLag: 3.4,
   pitchLag: 2.6,
+  /**
+   * How far the shot pulls back in the dark.
+   *
+   * A whale in the abyss is a grey shape in a black room, and the room is the
+   * interesting part: the pulse goes out four hundred units and you want to
+   * see it land. Held at the daylight distance the screen is mostly whale.
+   */
+  darkDistance: 104,
+  darkHeight: 26,
+
   /** Never let the shot go under the sand. */
   floorClear: 9,
   /**

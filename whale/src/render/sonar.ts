@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import {SONAR} from "../config";
+import {ABYSS, SONAR} from "../config";
 
 /**
  * Beluga vision, as a patch applied to every material in the scene.
@@ -15,10 +15,12 @@ import {SONAR} from "../config";
  *
  * Three things make this work where a post-process would not:
  *
- * - It is inserted **before** the fog, so a revealed surface still fades with
- *   distance. That is not a compromise: a sonar return really does weaken with
- *   range, and it is what stops the far wall of the abyss lighting up as
- *   brightly as the squid in front of your nose.
+ * - It is inserted **after** the fog, which is what lets a dark place look
+ *   dark from outside it. Put before the fog, the blackness of the abyss was
+ *   mixed back toward the bright water between you and it, and from up on the
+ *   rim the hole read as more reef in a haze. Returns are faded with range
+ *   explicitly instead — see uSonarRange — which does the job the fog was
+ *   doing and does it where it is wanted.
  * - The darkening happens **here** rather than by turning the lights off. The
  *   shader needs the lit colour to make its grey out of, so it takes the lit
  *   colour, converts it, and then decides how much of it to show. Dimming the
@@ -40,10 +42,20 @@ export const sonarRings = {
   value: new Float32Array(SONAR.rings).fill(-1),
 };
 
-/** 0 in daylight, 1 in the dark of the abyss. */
-export const sonarDark = {value: 0};
+/**
+ * How dark a place is, as the two depths it fades between.
+ *
+ * Every fragment works out its own darkness from its own height, rather than
+ * being told one number for the whole scene. That is what makes the abyss look
+ * like a hole from above: the surfaces down in it are black while the reef
+ * around the rim is lit, in the same frame, from a camera in daylight.
+ */
+export const sonarDepths = {
+  value: new THREE.Vector2(ABYSS.darkFrom, ABYSS.darkTo),
+};
 
 const sonarWidth = {value: SONAR.width};
+const sonarRange = {value: SONAR.reach};
 
 const VERTEX_HEAD = /* glsl */ `
 varying vec3 vSonarWorld;
@@ -66,13 +78,20 @@ const FRAGMENT_HEAD = /* glsl */ `
 varying vec3 vSonarWorld;
 uniform vec3 uSonarOrigin;
 uniform float uSonarRings[${SONAR.rings}];
-uniform float uSonarDark;
+uniform vec2 uSonarDepths;
 uniform float uSonarWidth;
+uniform float uSonarRange;
 uniform float uSonarSelf;
 `;
 
 const FRAGMENT_BODY = /* glsl */ `
-if (uSonarDark > 0.001) {
+{
+  // How dark it is *here*, from this fragment's own depth.
+  float uSonarDark = clamp(
+    (-vSonarWorld.y - uSonarDepths.x) / (uSonarDepths.y - uSonarDepths.x),
+    0.0,
+    1.0
+  );
   float sonarD = distance(vSonarWorld, uSonarOrigin);
   float sonarHit = 0.0;
   for (int i = 0; i < ${SONAR.rings}; i++) {
@@ -84,6 +103,12 @@ if (uSonarDark > 0.001) {
       sonarHit = max(sonarHit, band * band);
     }
   }
+  // A return weakens with range, and this is now the only thing that makes it
+  // do so — see the note below about where this block sits. Squared, so the
+  // near wall of the abyss comes back far harder than the far one.
+  float sonarRange = 1.0 - clamp(sonarD / uSonarRange, 0.0, 1.0);
+  sonarHit *= sonarRange * sonarRange;
+
   // The surface's own brightness, turned to grey and pushed cold. A return
   // says how hard a thing is, not what colour it is.
   float sonarLum = dot(gl_FragColor.rgb, vec3(0.299, 0.587, 0.114));
@@ -121,8 +146,9 @@ function patch(material: THREE.Material): void {
 
     shader.uniforms.uSonarOrigin = sonarOrigin;
     shader.uniforms.uSonarRings = sonarRings;
-    shader.uniforms.uSonarDark = sonarDark;
+    shader.uniforms.uSonarDepths = sonarDepths;
     shader.uniforms.uSonarWidth = sonarWidth;
+    shader.uniforms.uSonarRange = sonarRange;
     shader.uniforms.uSonarSelf = self;
 
     shader.vertexShader = VERTEX_HEAD + shader.vertexShader;
@@ -135,7 +161,7 @@ function patch(material: THREE.Material): void {
     // Before the fog, so a revealed surface still fades with range.
     shader.fragmentShader = shader.fragmentShader.replace(
       "#include <fog_fragment>",
-      FRAGMENT_BODY + "#include <fog_fragment>",
+      "#include <fog_fragment>" + FRAGMENT_BODY,
     );
   };
   // Materials already compiled need telling.

@@ -2,6 +2,12 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <!--
+      viewport-fit=cover is what asks iOS for the whole screen in an installed
+      app, safe areas included. Deliberately nothing else: iOS has ignored
+      user-scalable and the scale locks since iOS 10, so adding them here would
+      only look like a fix. src/core/lockZoom.ts is what actually stops zooming.
+    -->
     <meta
       name="viewport"
       content="width=device-width, initial-scale=1, viewport-fit=cover" />
