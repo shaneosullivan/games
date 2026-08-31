@@ -282,7 +282,24 @@ export class Game {
     this.loiter(dt);
     this.listen(dt);
     this.reef.update(this.time, this.whale.position);
-    this.squid.update(this.time);
+    // The abyss has its own thing to catch. A squid taken by sonar alone is
+    // the reward for going down there, so it makes a bigger noise about it
+    // than a fish does.
+    const squid = this.squid.update(this.time, this.mouth);
+    if (squid > 0) {
+      this.whale.gulp();
+      this.ocean.gulp(6);
+      this.sparks.burst(this.mouth, {
+        color: [0xbfeaff, 0xffffff, 0x9fd8ff],
+        count: 46,
+        speed: 12,
+        lift: 4,
+        gravity: -6,
+        ttl: 1.6,
+        size: 8,
+        spherical: 1,
+      });
+    }
     this.sky.update(dt, this.time, this.whale.position, (x, z) =>
       this.reef.waveAt(x, z, this.time),
     );
@@ -640,11 +657,22 @@ export class Game {
     // as a fraction of that would turn a good swim into a bad mark.
     const all = this.fish.eaten === this.fish.total;
     const n = this.fish.eaten;
+    const squid = this.squid.eaten;
+    // The squid only get a mention if any were caught. Nobody who never found
+    // the abyss should be told what they missed on the card that congratulates
+    // them.
+    const alsoSquid =
+      squid === 0
+        ? ""
+        : squid === 1
+          ? " You even caught a squid down in the dark."
+          : ` You even caught ${squid} squid down in the dark.`;
     this.done.setTitle(all ? "Every last fish!" : "You made it!");
     this.done.setBody(
-      all
+      (all
         ? "You swam the whole reef and there is not one fish left on it."
-        : `You swam the whole reef, ate ${n} fish and never once ate the plastic.`,
+        : `You swam the whole reef, ate ${n} fish and never once ate the plastic.`) +
+        alsoSquid,
     );
   }
 
@@ -706,6 +734,7 @@ export class Game {
     this.hud.update(
       this.reef.progressAt(this.whale.position.z),
       this.fish.eaten,
+      this.squid.eaten,
     );
     this.stage.render();
   };

@@ -268,6 +268,10 @@ export const SONAR = {
  */
 export const SQUID = {
   count: 9,
+  /** How close the mouth has to get. Bigger than a fish's because a squid is
+   *  bigger, and because catching one in the dark by sonar alone deserves some
+   *  help — you are aiming at something you can only see every second. */
+  bite: 7,
   size: 1.7,
   /** How far off the floor of the hole they hang. */
   low: 14,
