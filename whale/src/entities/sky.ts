@@ -191,8 +191,10 @@ export class Sky {
       }
       gull.beat +=
         (SKY.glideBeat + gull.flap * (SKY.flapBeat - SKY.glideBeat)) * TAU * dt;
-      // Wings away when it is standing on something, out the rest of the time.
-      const want = gull.perched ? 1 : 0;
+      // Wings away whenever it is settled on something — a whale's back or
+      // the water, it makes no odds. Only `perched` counted before, so the
+      // gulls bobbing on the sea sat there with their wings held out.
+      const want = gull.perched || gull.sitting ? 1 : 0;
       gull.fold += (want - gull.fold) * (1 - Math.exp(-SKY.foldRate * dt));
       this.drawGull(i, gull);
     }
