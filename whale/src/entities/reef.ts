@@ -34,6 +34,17 @@ export class Reef {
   /** Where the wreck lies, for anything that wants to keep away from it. */
   readonly wreckAt = new THREE.Vector3();
 
+  /**
+   * The deepest sea floor anywhere on the map.
+   *
+   * Measured rather than written down, because it is the sum of five terms —
+   * the base, two rolls, a dune, a trench and the abyss — and what happens
+   * where they all line up is not a number anybody would get right by
+   * inspection. The depth slider's bottom is set from this, so it always
+   * reaches the sea bed wherever you are.
+   */
+  readonly deepestFloor: number;
+
   /** The middle of the abyss. Everything about it is measured from here. */
   readonly abyssCentre = new THREE.Vector3(
     0,
@@ -107,6 +118,19 @@ export class Reef {
         z: 20 + (this.finishZ - 60) * along + rng.range(-40, 40),
       });
     }
+
+    // How deep it gets. Sampled across the whole lane on a coarse grid — ten
+    // thousand-odd evaluations of a handful of sines, once, at startup.
+    let deepest = 0;
+    for (let z = 60; z >= this.finishZ - 40; z -= 6) {
+      for (let x = -REEF.halfWidth; x <= REEF.halfWidth; x += 10) {
+        const d = -this.floorAt(x, z);
+        if (d > deepest) {
+          deepest = d;
+        }
+      }
+    }
+    this.deepestFloor = deepest;
 
     // Where the wreck will lie, worked out before anything is planted: the
     // coral and the kelp have to know to keep off her.

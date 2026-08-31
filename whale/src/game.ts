@@ -95,6 +95,8 @@ export class Game {
   private air = 0;
   /** How dark it is down here, 0..1. Drives the sonar. */
   private dark = 0;
+  /** The deepest the whale may go anywhere on this map. See the constructor. */
+  private readonly deepest: number;
   /** Seconds until the next click. */
   private clickIn = 0;
   /** Seconds of fireworks left before the finish card, or null. */
@@ -166,7 +168,15 @@ export class Game {
     this.hud.mount(ui);
     this.stick = new Joystick(ui);
     this.stick.enabled = false;
-    this.depth = new DepthStick(ui, DEPTH.start);
+    // The bottom of the slider is the sea bed, wherever you are. Taken from
+    // the map rather than from a constant: the reef reaches 334 down where the
+    // abyss and a trench overlap, and a fixed cap at 240 left places you could
+    // see the bottom of and never touch.
+    this.deepest = Math.max(
+      DEPTH.maxDepth,
+      this.reef.deepestFloor - DEPTH.floorClear,
+    );
+    this.depth = new DepthStick(ui, DEPTH.start, this.deepest);
     this.depth.setVisible(false);
 
     this.intro = new Overlay(
@@ -326,7 +336,7 @@ export class Game {
     const p = this.whale.position;
     const floorDepth = -this.reef.floorAt(p.x, p.z);
     const deepest = Math.min(
-      DEPTH.maxDepth,
+      this.deepest,
       Math.max(DEPTH.minDepth, floorDepth - DEPTH.floorClear),
     );
     const wantDepth = Math.min(this.depth.desiredDepth, deepest);

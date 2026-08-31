@@ -172,12 +172,17 @@ export const DEPTH = {
    */
   curve: 2,
   /**
-   * How deep the slider reaches.
+   * The *least* deep the slider will ever reach.
    *
-   * Not as deep as the deepest trench, on purpose. The floor drops to about a
-   * hundred and seventy in places and the whale can only get to a hundred and
-   * ten of it, so the bottom of a trench stays somewhere below you, fading
-   * out. Water you can touch the bottom of is not deep water.
+   * The real bottom of the track is worked out from the map — Reef measures
+   * its own deepest floor and the game takes whichever is greater, so the
+   * slider always reaches the sea bed wherever you happen to be. This number
+   * only matters if the reef were ever shallower than it than everywhere,
+   * which it is not; it is here so the range can never collapse to nothing if
+   * the terrain is retuned.
+   *
+   * It used to be a hard cap, and a hard cap at 240 over a floor that reaches
+   * 334 meant there were places you could see the bottom of and never touch.
    */
   maxDepth: 240,
   /** Where the slider starts: a comfortable way down, with room either way. */

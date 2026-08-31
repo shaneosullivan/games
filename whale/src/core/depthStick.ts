@@ -26,7 +26,12 @@ export class DepthStick {
   private readonly current: HTMLDivElement;
   private readonly root: HTMLDivElement;
 
-  constructor(host: HTMLElement, startDepth: number) {
+  /** How deep the bottom of the track is. Handed in rather than read from the
+   *  config, because it comes from the map — see Reef.deepestFloor. */
+  private readonly deepest: number;
+
+  constructor(host: HTMLElement, startDepth: number, deepest: number) {
+    this.deepest = deepest;
     this.value = this.to01(startDepth);
 
     this.root = document.createElement("div");
@@ -75,7 +80,7 @@ export class DepthStick {
    */
   get desiredDepth(): number {
     const t = Math.pow(this.value, DEPTH.curve);
-    return DEPTH.minDepth + t * (DEPTH.maxDepth - DEPTH.minDepth);
+    return DEPTH.minDepth + t * (this.deepest - DEPTH.minDepth);
   }
 
   /** Where the whale actually is, for the ghost marker on the rail. */
@@ -91,7 +96,7 @@ export class DepthStick {
    *  actually is. */
   private to01(depth: number): number {
     const t = clamp01(
-      (depth - DEPTH.minDepth) / (DEPTH.maxDepth - DEPTH.minDepth),
+      (depth - DEPTH.minDepth) / (this.deepest - DEPTH.minDepth),
     );
     return Math.pow(t, 1 / DEPTH.curve);
   }
