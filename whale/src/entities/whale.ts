@@ -133,6 +133,18 @@ export class Whale {
     return this.body.localToWorld(out);
   }
 
+  /**
+   * The melon, in the world — the round forehead a beluga makes its clicks
+   * with, and where the sonar goes out from.
+   *
+   * Through the body like the blowhole, so a whale rolling into a turn clicks
+   * from where its head actually is.
+   */
+  melon(out: THREE.Vector3): THREE.Vector3 {
+    out.set(0, 1.4, 11);
+    return this.body.localToWorld(out);
+  }
+
   /** A mouthful. Opens the jaw; it shuts itself. */
   gulp(): void {
     this.chomp = 1;

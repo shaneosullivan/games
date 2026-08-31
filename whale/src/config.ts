@@ -160,6 +160,18 @@ export const DEPTH = {
    */
   minDepth: 2,
   /**
+   * The slider is not linear.
+   *
+   * It has to cover two hundred and forty units now that there is an abyss at
+   * the bottom of the map, and a linear slider over that range gives the whole
+   * ordinary reef — everything in the top eighty — a third of its travel, so
+   * picking a depth on a coral garden becomes a game of millimetres. Squared,
+   * the top half of the slider covers the first sixty units and the bottom
+   * half the remaining hundred and eighty, which is where the resolution is
+   * actually wanted.
+   */
+  curve: 2,
+  /**
    * How deep the slider reaches.
    *
    * Not as deep as the deepest trench, on purpose. The floor drops to about a
@@ -167,7 +179,7 @@ export const DEPTH = {
    * ten of it, so the bottom of a trench stays somewhere below you, fading
    * out. Water you can touch the bottom of is not deep water.
    */
-  maxDepth: 110,
+  maxDepth: 240,
   /** Where the slider starts: a comfortable way down, with room either way. */
   start: 26,
   floorClear: 7,
@@ -176,6 +188,91 @@ export const DEPTH = {
    *  on a 120Hz iPad than on a 60Hz laptop, and the whale would sink faster on
    *  the better machine. */
   followRate: 3.6,
+} as const;
+
+/**
+ * The abyss.
+ *
+ * A round hole in the middle of the reef, far deeper than anywhere else, where
+ * the light gives out. A beluga that swims down into it stops being able to
+ * see and starts using what it actually navigates with — see SONAR.
+ *
+ * Round on purpose: it is the one place on the map that is not a stretch of
+ * corridor, and coming over the lip of it from any direction should look the
+ * same.
+ */
+export const ABYSS = {
+  /** Where its middle is, as a fraction of the way down the reef. */
+  along: 0.62,
+  /** How wide the hole is, and how far the floor falls at the middle of it. */
+  radius: 300,
+  drop: 240,
+  /** How far the walls are drawn in — the shoulder of the hole, as a share of
+   *  the radius. Smaller is a sheerer drop. */
+  lip: 0.55,
+
+  /** Where the light starts to go and where it has gone entirely. Depth, not
+   *  distance into the hole: you can be over the abyss in bright water. */
+  darkFrom: 105,
+  darkTo: 185,
+} as const;
+
+/**
+ * Beluga vision.
+ *
+ * Belugas hunt in the dark under sea ice and do it by echolocation: they click,
+ * and they listen for what comes back. In the abyss the game switches to it —
+ * the picture goes black, and a pulse goes out from the melon every second and
+ * a half. Wherever it reaches, the world shows for a moment in grey, and the
+ * grey travels outward with the pulse.
+ *
+ * The reveal is spherical rather than a beam. A real click is directional, but
+ * a child needs to be able to find the wall behind them as much as the squid
+ * in front, and a torch is a less interesting thing to be given than a sense.
+ */
+export const SONAR = {
+  /** Seconds between clicks. */
+  every: 1.1,
+  /** How fast a pulse travels outward, and how far it gets before it dies. */
+  speed: 88,
+  reach: 460,
+  /** How thick the band of world a pulse lights up is. Wide enough to read as
+   *  a wave washing over a surface rather than a wire drawn on it. */
+  width: 22,
+  /** How many pulses can be out at once. Must match the array in the shader —
+   *  see render/sonar.ts. */
+  rings: 3,
+  /**
+   * The rings drawn in the water so you can see the pulse leave the head — and
+   * how far out they are still drawn.
+   *
+   * Short, and much shorter than the pulse's own reach. The camera sits
+   * sixty-odd units behind the whale, so a ring that kept growing swept
+   * straight through it, and seen edge-on from the inside a ring is a bar
+   * across the whole screen. They fade out well before they get there; the
+   * pulse itself carries on, and what it lights up is the point.
+   */
+  showRings: true,
+  ringReach: 46,
+  ringFade: 0.8,
+} as const;
+
+/**
+ * The squid at the bottom of the abyss.
+ *
+ * They are only ever seen as a sonar return, so they are shaped for that: a
+ * long mantle, two fins and a fan of arms, all of which read clearly as a
+ * silhouette washing past in grey. Colour barely matters — everything down
+ * there is grey by the time it is seen — but they carry one anyway, since a
+ * whale that comes down with a lamp is a thing somebody might want later.
+ */
+export const SQUID = {
+  count: 9,
+  size: 1.7,
+  /** How far off the floor of the hole they hang. */
+  low: 14,
+  high: 90,
+  palette: [0xc46a7a, 0xa8607f, 0xd0836a, 0x8c6f9e],
 } as const;
 
 /**
@@ -288,16 +385,21 @@ export const REEF = {
  * whale goes *inside*.
  */
 export const WRECK = {
-  /** How much water is wanted above her, over and above the whale's own
-   *  clearance from the floor. She has to sit in water the slider can reach
-   *  the bottom of, or the way through is somewhere nobody can ever be. */
-  headroom: 16,
+  /**
+   * The deepest water she may lie in.
+   *
+   * Not "as deep as the whale can go", which is now two hundred and forty and
+   * put her at a hundred and ninety — inside the dark, where she is a sonar
+   * return and not a shipwreck. She belongs in the lit reef, somewhere you
+   * come upon her; the abyss has its own thing to find.
+   */
+  deepest: 96,
   /** How far off the middle of the lane she lies. */
   offset: -16,
   /** How much sea floor is kept clear around her. She is the one landmark on
    *  the reef, and a kelp stand grew straight through her — you could not see
    *  the ship for the weeds. */
-  clearing: 115,
+  clearing: 175,
   /**
    * How far her keel is buried.
    *
@@ -605,6 +707,21 @@ export const JUNK = {
   /** Nothing in the first stretch, so a child gets a swim before a scare. */
   clearStart: 240,
   size: 5,
+} as const;
+
+/**
+ * Going through the arch.
+ *
+ * The card used to come up on the same frame the whale crossed the line, which
+ * meant the fireworks went off behind it and nobody ever saw them. The run is
+ * over either way; these are the seconds between finishing and being told so.
+ */
+export const FINISH = {
+  /** How long the whale swims on through the fireworks before the card. */
+  cheer: 2.2,
+  /** Seconds between bursts, and how far around the whale they go off. */
+  every: 0.22,
+  spread: 34,
 } as const;
 
 /** The camera: behind, a little above, looking where the whale is going. */

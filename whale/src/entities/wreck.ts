@@ -32,18 +32,37 @@ export function shipwreck(): THREE.BufferGeometry {
   const rng = new Rng(55001);
   const parts: Array<THREE.BufferGeometry> = [];
 
-  // Big. She wants to be several whales long or she is a rowing boat: the
-  // whale is 34 units, so this is five and a half of her nose to tail.
-  const length = 190;
-  const beam = 34;
-  const depth = 26;
+  // Big, and then bigger. The whale is 34 units nose to tail, so at 300 she is
+  // nearly nine whales long and reads as a ship rather than as a boat — the
+  // first pass at 190 was still small enough to lose against a sand hill.
+  const length = 300;
+  const beam = 54;
+  const depth = 40;
 
-  // Where the hull is broken open. Everything between these two is missing,
-  // and that hole is the way through — wide enough to take a whale and its
-  // flippers with room either side, which at 50 units is a comfortable one
-  // and a half of her length.
-  const gapFrom = -20;
-  const gapTo = 30;
+  // Where her back is broken. Everything between these is missing and that
+  // hole is the main way through, wide enough to take a whale across its
+  // flippers with room to spare.
+  const gapFrom = -34;
+  const gapTo = 46;
+
+  // And two more ways in, so she is something to explore rather than one arch
+  // to pass under: a hole stove in her side forward, and the open hold aft
+  // where the deck has gone. A wreck with a single doorway is a gate.
+  const holes: Array<[number, number]> = [
+    [-length / 2 + 34, -length / 2 + 78],
+    [96, 138],
+  ];
+  const isHole = (z: number): boolean => {
+    if (z > gapFrom && z < gapTo) {
+      return true;
+    }
+    for (const [from, to] of holes) {
+      if (z > from && z < to) {
+        return true;
+      }
+    }
+    return false;
+  };
 
   /** Half-width of the hull at a point along her length, 0 at the bow. */
   const widthAt = (z: number): number => {
@@ -56,10 +75,10 @@ export function shipwreck(): THREE.BufferGeometry {
 
   // The ribs, and the planking between them. Each rib is a half-ring; the
   // planks are thin boxes bent round the outside of them.
-  const ribs = 26;
+  const ribs = 34;
   for (let i = 0; i <= ribs; i++) {
     const z = -length / 2 + (i / ribs) * length;
-    if (z > gapFrom && z < gapTo) {
+    if (isHole(z)) {
       continue;
     }
     const w = widthAt(z);
@@ -72,9 +91,12 @@ export function shipwreck(): THREE.BufferGeometry {
 
   // Planking: strakes running the length of her, following the rib line. Two
   // runs, fore and aft of the gap, so the hole stays a hole.
+  // Planking, in the runs between the holes.
   for (const [from, to] of [
-    [-length / 2, gapFrom],
-    [gapTo, length / 2],
+    [-length / 2, holes[0][0]],
+    [holes[0][1], gapFrom],
+    [gapTo, holes[1][0]],
+    [holes[1][1], length / 2],
   ]) {
     const steps = 9;
     for (let s = 0; s <= steps; s++) {
@@ -94,9 +116,10 @@ export function shipwreck(): THREE.BufferGeometry {
   }
 
   // The deck, fore and aft, with the open hatch between them.
+  // Deck, in the two stretches that still have one.
   for (const [from, to] of [
-    [-length / 2 + 6, gapFrom],
-    [gapTo, length / 2 - 14],
+    [-length / 2 + 8, gapFrom],
+    [gapTo, holes[1][0]],
   ]) {
     const mid = (from + to) / 2;
     const deck = new THREE.BoxGeometry(widthAt(mid) * 1.85, 1.4, to - from);
@@ -139,9 +162,9 @@ export function shipwreck(): THREE.BufferGeometry {
   // the bottom has no rigging left, but the stumps are what make the shape
   // read as a ship from a distance rather than as a wooden barrel.
   for (const [z, height] of [
-    [50, 54],
-    [-26, 40],
-    [-70, 16],
+    [72, 82],
+    [-14, 62],
+    [-104, 26],
   ]) {
     const mast = new THREE.CylinderGeometry(1.5, 2.4, height, 7);
     mast.translate(0, height / 2, z);
@@ -153,17 +176,17 @@ export function shipwreck(): THREE.BufferGeometry {
   }
 
   // A yardarm still across the foremast, at an angle.
-  const yard = new THREE.CylinderGeometry(0.9, 0.9, 46, 6);
+  const yard = new THREE.CylinderGeometry(1.2, 1.2, 66, 6);
   yard.rotateZ(Math.PI / 2);
   yard.rotateY(0.2);
-  yard.translate(0, 40, 50);
+  yard.translate(0, 62, 72);
   parts.push(paint(yard, DARK));
 
   // Portholes down the side she is not lying on, so there is something to see
   // as you come past.
-  for (let i = 0; i < 11; i++) {
-    const z = -length / 2 + 16 + i * 16;
-    if (z > gapFrom && z < gapTo) {
+  for (let i = 0; i < 15; i++) {
+    const z = -length / 2 + 18 + i * 19;
+    if (isHole(z)) {
       continue;
     }
     const ring = new THREE.TorusGeometry(1.7, 0.4, 5, 10);

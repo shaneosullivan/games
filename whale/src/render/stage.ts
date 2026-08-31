@@ -61,14 +61,23 @@ export class Stage {
    * you cannot see a hundred units through is water, and air you cannot see a
    * hundred units through is a bug.
    */
-  setView(depth: number, air: number): void {
+  setView(depth: number, air: number, dark: number): void {
     const t = Math.min(1, Math.max(0, depth / WATER.colourDepth));
     this.water.copy(this.shallow).lerp(this.deep, t);
     const a = Math.min(1, Math.max(0, air));
     this.water.lerp(this.sky, a);
+    // Into the abyss the water itself goes out. The *surfaces* are darkened in
+    // the sonar shader rather than here, because that shader needs a lit
+    // colour to make its grey from — see render/sonar.ts. This is only the
+    // water between them, and the sky behind.
+    const d = Math.min(1, Math.max(0, dark));
+    this.water.multiplyScalar(1 - d);
     this.fog.color.copy(this.water);
     this.fog.near = WATER.fogNear + (WATER.airFogNear - WATER.fogNear) * a;
     this.fog.far = WATER.fogFar + (WATER.airFogFar - WATER.fogFar) * a;
+    // And it closes in, because there is nothing to see at range down there
+    // and a long throw would only show black.
+    this.fog.far *= 1 - d * 0.55;
   }
 
   private resize(): void {

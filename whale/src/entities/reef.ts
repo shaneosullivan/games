@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import {mergeGeometries} from "three/examples/jsm/utils/BufferGeometryUtils.js";
-import {DEPTH, REEF, WATER, WRECK} from "../config";
+import {ABYSS, REEF, WATER, WRECK} from "../config";
 import {Rng} from "../core/rng";
 import {coralKinds, coralRock} from "./coral";
 import {bladeMaterial, KELP_HEIGHT, kelpPlant, weedTuft} from "./flora";
@@ -33,6 +33,13 @@ export class Reef {
 
   /** Where the wreck lies, for anything that wants to keep away from it. */
   readonly wreckAt = new THREE.Vector3();
+
+  /** The middle of the abyss. Everything about it is measured from here. */
+  readonly abyssCentre = new THREE.Vector3(
+    0,
+    0,
+    -(REEF.length - 90) * ABYSS.along,
+  );
 
   private readonly caustics = causticTexture();
   private readonly surface: THREE.Mesh;
@@ -166,11 +173,37 @@ export class Reef {
       depth -= REEF.ridgeHeight * Math.min(1, out / REEF.ridgeWidth);
     }
 
+    // The abyss: a round hole, far deeper than anything else. Its wall is a
+    // smootherstep in from the rim so the floor rolls over the lip rather than
+    // meeting it at a corner, and the middle is flat-ish — the bottom of a
+    // hole should be a place, not a point.
+    const hole = this.abyssAt(x, z);
+    if (hole > 0) {
+      depth += ABYSS.drop * hole;
+    }
+
     // Never let a ridge break the surface. An island would be a lovely thing
     // to swim round and a terrible thing to find out about by hitting it —
     // and it is thirteen rather than nine because the coral standing on the
     // ridge tops is ten units tall, and at nine it grew out into the air.
     return -Math.max(13, depth);
+  }
+
+  /**
+   * How far into the abyss a point is: 0 outside it, 1 at the middle.
+   *
+   * Public because the darkness and the sonar both need to know, and because
+   * the squid live down there.
+   */
+  abyssAt(x: number, z: number): number {
+    const d = Math.hypot(x - this.abyssCentre.x, z - this.abyssCentre.z);
+    if (d >= ABYSS.radius) {
+      return 0;
+    }
+    // 0 at the rim, 1 across the flat middle, eased between.
+    const t = 1 - d / ABYSS.radius;
+    const e = Math.min(1, t / ABYSS.lip);
+    return e * e * (3 - 2 * e);
   }
 
   /**
@@ -771,12 +804,15 @@ export class Reef {
    * the deepest floor that still leaves her within reach.
    */
   private berth(): THREE.Vector3 {
-    const lowest = DEPTH.maxDepth - DEPTH.floorClear - WRECK.headroom;
     let at = this.finishZ * 0.36;
     let deepest = 0;
-    for (let z = this.finishZ * 0.2; z > this.finishZ * 0.6; z -= 6) {
+    for (let z = this.finishZ * 0.15; z > this.finishZ * 0.55; z -= 6) {
+      // Never in the hole: she is a thing to find in the light.
+      if (this.abyssAt(WRECK.offset, z) > 0.02) {
+        continue;
+      }
       const d = -this.floorAt(WRECK.offset, z);
-      if (d > deepest && d < lowest) {
+      if (d > deepest && d < WRECK.deepest) {
         deepest = d;
         at = z;
       }
@@ -946,11 +982,21 @@ export class Reef {
     return this.pick(rng, reach);
   }
 
-  /** True if a point is far enough from the wreck to plant something on. */
+  /**
+   * True if a point is somewhere a plant can live: clear of the wreck, and not
+   * far down inside the abyss.
+   *
+   * Sunlight does not reach the bottom of the hole and neither does anything
+   * that needs it. Coral growing down there would also undo the darkness — a
+   * garden lit by nothing is a garden nobody can see, so it is only cost.
+   */
   private clearOfWreck(x: number, z: number): boolean {
     const dx = x - this.wreckAt.x;
     const dz = z - this.wreckAt.z;
-    return dx * dx + dz * dz > WRECK.clearing * WRECK.clearing;
+    if (dx * dx + dz * dz <= WRECK.clearing * WRECK.clearing) {
+      return false;
+    }
+    return this.abyssAt(x, z) < 0.35;
   }
 
   private pick(rng: Rng, reach: number): {x: number; z: number} {

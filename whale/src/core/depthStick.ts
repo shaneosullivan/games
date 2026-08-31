@@ -66,9 +66,16 @@ export class DepthStick {
     this.draw();
   }
 
-  /** The depth the player is asking for, in units below the surface. */
+  /**
+   * The depth the player is asking for, in units below the surface.
+   *
+   * Curved, not linear. The track has to reach the bottom of the abyss, and a
+   * linear one over that range gives the whole ordinary reef a third of its
+   * travel — see DEPTH.curve.
+   */
   get desiredDepth(): number {
-    return DEPTH.minDepth + this.value * (DEPTH.maxDepth - DEPTH.minDepth);
+    const t = Math.pow(this.value, DEPTH.curve);
+    return DEPTH.minDepth + t * (DEPTH.maxDepth - DEPTH.minDepth);
   }
 
   /** Where the whale actually is, for the ghost marker on the rail. */
@@ -80,10 +87,13 @@ export class DepthStick {
     this.root.style.display = visible ? "" : "none";
   }
 
+  /** The inverse of `desiredDepth`, for putting the marker where the whale
+   *  actually is. */
   private to01(depth: number): number {
-    return clamp01(
+    const t = clamp01(
       (depth - DEPTH.minDepth) / (DEPTH.maxDepth - DEPTH.minDepth),
     );
+    return Math.pow(t, 1 / DEPTH.curve);
   }
 
   private setFromClientY(clientY: number): void {

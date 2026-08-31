@@ -1,5 +1,17 @@
 import * as THREE from "three";
-import {BREACH, BREATH, CAMERA, DEPTH, IDLE, REEF, SIM, SWIM} from "./config";
+import {
+  ABYSS,
+  BREACH,
+  BREATH,
+  CAMERA,
+  DEPTH,
+  FINISH,
+  IDLE,
+  REEF,
+  SIM,
+  SONAR,
+  SWIM,
+} from "./config";
 import {GameLoop} from "./core/loop";
 import {Joystick} from "./core/input";
 import {DepthStick} from "./core/depthStick";
@@ -11,6 +23,9 @@ import {Whale} from "./entities/whale";
 import {Fish} from "./entities/fish";
 import {Plastic} from "./entities/plastic";
 import {Sky} from "./entities/sky";
+import {Squid} from "./entities/squid";
+import {Sonar} from "./entities/sonar";
+import {selfLit, sonarise} from "./render/sonar";
 import {
   createFireworks,
   FIREWORK_PALETTE,
@@ -41,6 +56,8 @@ export class Game {
   readonly fish: Fish;
   readonly plastic: Plastic;
   readonly sky: Sky;
+  readonly squid: Squid;
+  readonly sonar: Sonar;
   readonly bubbles: ParticleBurst;
   readonly sparks: ParticleBurst;
   readonly ocean: Ocean;
@@ -76,6 +93,13 @@ export class Game {
   private flight: number | null = null;
   /** How far the shot is out of the water, 0..1. Drives the sky. */
   private air = 0;
+  /** How dark it is down here, 0..1. Drives the sonar. */
+  private dark = 0;
+  /** Seconds until the next click. */
+  private clickIn = 0;
+  /** Seconds of fireworks left before the finish card, or null. */
+  private cheering: number | null = null;
+  private burstIn = 0;
   /** Seconds the whale has been holding still. See loiter(). */
   private still = 0;
   /** Seconds until the next idle bubble. */
@@ -115,6 +139,10 @@ export class Game {
     );
 
     this.sky = new Sky(rng);
+    this.squid = new Squid(rng, this.reef.abyssCentre, (x, z) =>
+      this.reef.floorAt(x, z),
+    );
+    this.sonar = new Sonar();
 
     // Bubbles rise, so their gravity is negative — the shared burst subtracts
     // it from the upward velocity every step, and a negative one adds.
@@ -126,6 +154,8 @@ export class Game {
     this.stage.scene.add(this.fish.mesh);
     this.stage.scene.add(this.plastic.group);
     this.stage.scene.add(this.sky.group);
+    this.stage.scene.add(this.squid.mesh);
+    this.stage.scene.add(this.sonar.group);
     this.stage.scene.add(this.bubbles.mesh);
     this.stage.scene.add(this.sparks.mesh);
 
@@ -181,6 +211,14 @@ export class Game {
     // already, and it is worth not having twice.
     window.addEventListener("pagehide", () => this.ocean.stop());
 
+    // The whale is the one thing that stays visible in the dark, so it is
+    // flagged before the patch goes on — see selfLit.
+    selfLit(this.whale.group);
+    // Every material in the game learns to answer a sonar ping. Done here, in
+    // one pass over the finished scene, rather than at each of the twenty-odd
+    // places a material is made — nothing creates one after this point.
+    sonarise(this.stage.scene);
+
     this.snapCamera();
     this.loop = new GameLoop(this.update, this.render);
     this.loop.start();
@@ -197,7 +235,16 @@ export class Game {
   }
 
   update = (dt: number): void => {
-    if (!this.running || this.finished) {
+    if (!this.running) {
+      return;
+    }
+    // Through the arch and still going: the run is over but the fireworks are
+    // not, and the card waits until they are.
+    if (this.cheering !== null) {
+      this.celebrate(dt);
+      return;
+    }
+    if (this.finished) {
       return;
     }
     this.time += dt;
@@ -233,7 +280,9 @@ export class Game {
     }
 
     this.loiter(dt);
+    this.listen(dt);
     this.reef.update(this.time, this.whale.position);
+    this.squid.update(this.time);
     this.sky.update(dt, this.time, this.whale.position, (x, z) =>
       this.reef.waveAt(x, z, this.time),
     );
@@ -518,6 +567,40 @@ export class Game {
     }
   }
 
+  /**
+   * Beluga vision.
+   *
+   * How dark it is depends on depth alone, not on being over the hole: you can
+   * be above the abyss in bright water, and the light goes as you descend into
+   * it. It is eased rather than switched, so swimming down into the dark is
+   * something you watch happen.
+   *
+   * The clicks only start once it is properly dark. A whale that can see does
+   * not need to echolocate, and a pulse washing over a sunlit reef would be a
+   * special effect rather than a sense.
+   */
+  private listen(dt: number): void {
+    const depth = -this.whale.position.y;
+    const want = Math.min(
+      1,
+      Math.max(0, (depth - ABYSS.darkFrom) / (ABYSS.darkTo - ABYSS.darkFrom)),
+    );
+    this.dark += (want - this.dark) * (1 - Math.exp(-1.6 * dt));
+
+    this.sonar.update(dt, this.dark);
+    if (this.dark < 0.25) {
+      this.clickIn = 0;
+      return;
+    }
+
+    this.clickIn -= dt;
+    if (this.clickIn <= 0) {
+      this.clickIn = SONAR.every;
+      this.whale.melon(this.hole);
+      this.sonar.click(this.hole);
+    }
+  }
+
   /** Ate a bag. Gentle about it — the card does the talking. */
   private spoil(): void {
     this.finished = true;
@@ -538,22 +621,20 @@ export class Game {
     this.oops.show();
   }
 
-  /** Through the arch. */
+  /**
+   * Through the arch.
+   *
+   * The controls go, the whale coasts on through, and the sky over the arch
+   * goes up in colour for a couple of seconds before anybody is told anything.
+   */
   private win(): void {
     this.finished = true;
     this.stick.enabled = false;
     this.depth.setVisible(false);
     this.hud.setVisible(false);
-    this.sparks.burst(this.whale.position, {
-      color: FIREWORK_PALETTE,
-      count: 110,
-      speed: 16,
-      lift: 6,
-      gravity: -3,
-      ttl: 2,
-      size: 9,
-      spherical: 1,
-    });
+    this.cheering = FINISH.cheer;
+    this.burstIn = 0;
+    this.bang();
     // How many, not how many out of how many. There are a couple of hundred
     // fish on this reef and nobody is going to eat them all — a score printed
     // as a fraction of that would turn a good swim into a bad mark.
@@ -565,13 +646,60 @@ export class Game {
         ? "You swam the whole reef and there is not one fish left on it."
         : `You swam the whole reef, ate ${n} fish and never once ate the plastic.`,
     );
-    this.done.show();
+  }
+
+  /** One firework, somewhere around the whale. */
+  private bang(): void {
+    this.hole
+      .set(
+        (Math.random() - 0.5) * FINISH.spread,
+        (Math.random() - 0.5) * FINISH.spread * 0.7,
+        (Math.random() - 0.5) * FINISH.spread,
+      )
+      .add(this.whale.position);
+    this.sparks.burst(this.hole, {
+      color: FIREWORK_PALETTE,
+      count: 70,
+      speed: 17,
+      lift: 5,
+      // Barely falling: this is under water, and sparks that dropped like
+      // sparks would give away that they are the caterpillar game's fireworks
+      // with the gravity turned down.
+      gravity: -2,
+      ttl: 2.2,
+      size: 9,
+      spherical: 1,
+    });
+  }
+
+  /**
+   * The seconds between crossing the line and being told you have.
+   *
+   * The whale keeps its way on and the fireworks keep coming; nothing else in
+   * the game is ticked, because nothing else matters any more.
+   */
+  private celebrate(dt: number): void {
+    this.whale.update(dt, this.want.set(0, 0, 0), 0, false);
+    this.sparks.update(dt);
+    this.bubbles.update(dt);
+
+    this.burstIn -= dt;
+    if (this.burstIn <= 0) {
+      this.burstIn = FINISH.every;
+      this.bang();
+    }
+
+    this.cheering = (this.cheering ?? 0) - dt;
+    if (this.cheering <= 0) {
+      this.cheering = null;
+      this.done.show();
+    }
   }
 
   render = (alpha: number): void => {
     this.whale.render(alpha);
     this.followCamera(SIM.step);
-    this.stage.setView(-this.whale.position.y, this.air);
+    this.stage.setView(-this.whale.position.y, this.air, this.dark);
     this.reef.setAir(this.air);
     this.sky.setAir(this.air);
     this.depth.setActualDepth(-this.whale.position.y);
