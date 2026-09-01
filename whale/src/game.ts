@@ -106,6 +106,10 @@ export class Game {
   private still = 0;
   /** Seconds until the next idle bubble. */
   private bubbleIn = 0;
+  /** Whether fish are at the whale now, and how long until any will come
+   *  again. See loiter(). */
+  private nibbled = false;
+  private nibbleRest = 0;
 
   private readonly forward = new THREE.Vector3();
   private readonly right = new THREE.Vector3();
@@ -553,6 +557,7 @@ export class Game {
   private loiter(dt: number): void {
     const moving = this.stick.magnitude > IDLE.stick || this.flight !== null;
     this.still = moving ? 0 : this.still + dt;
+    this.nibbleRest = Math.max(0, this.nibbleRest - dt);
 
     const depth = -this.whale.position.y;
     const up = depth <= BREATH.depth;
@@ -568,7 +573,14 @@ export class Game {
     // Fish, if it is down and has been down a while. They are handed the
     // whale's own middle and heading and work out where to hang from that —
     // off its flank, behind the mouth and outside its body.
-    if (!moving && !up && depth > IDLE.minDepth && this.still > IDLE.fish) {
+    if (
+      !moving &&
+      !up &&
+      depth > IDLE.minDepth &&
+      this.still > IDLE.fish &&
+      (this.nibbled || this.nibbleRest === 0)
+    ) {
+      this.nibbled = true;
       this.fish.nibble(this.whale.position, this.whale.heading);
 
       this.bubbleIn -= dt;
@@ -589,6 +601,13 @@ export class Game {
         });
       }
     } else {
+      // They only start resting once they have actually been. Otherwise every
+      // second of ordinary swimming would set the timer and they would never
+      // come at all.
+      if (this.nibbled) {
+        this.nibbled = false;
+        this.nibbleRest = IDLE.nibbleRest;
+      }
       this.fish.nibble(null, 0);
       this.bubbleIn = 0;
     }

@@ -572,11 +572,28 @@ export const WATER = {
 export const IDLE = {
   /** How still counts as still, on the thumbstick. */
   stick: 0.06,
-  /** Seconds of it before the fish come, and before a gull comes down. The
-   *  gull waits longer: it has further to come, and a bird landing on you the
-   *  instant you stop would read as scripted rather than as luck. */
-  fish: 3,
+  /**
+   * Seconds of stillness before the fish come, and before a gull comes down.
+   *
+   * The fish waited three, which turned out to be about as long as an ordinary
+   * pause — lining up on an arch, looking around — so they came over
+   * constantly and what should have been a small piece of luck became the
+   * normal state of the game. Eight is long enough that you have plainly
+   * stopped on purpose.
+   *
+   * The gull is quicker off the mark than it used to be relative to the fish,
+   * but it still has to fly the distance, so it is never instant.
+   */
+  fish: 8,
   gull: 5,
+  /**
+   * And how long before they will come again.
+   *
+   * Without this, a whale nosing about a reef — stop, look, move a length,
+   * stop again — had the same two fish return every few seconds, which is the
+   * other half of "too often" and the half a longer wait does not fix.
+   */
+  nibbleRest: 26,
   /** A bubble every so often, and how deep it has to be for one to make sense
    *  — a whale sitting at the surface is breathing, not bubbling. */
   bubbleEvery: 1.7,
@@ -615,8 +632,10 @@ export const IDLE = {
   nibblePeckRate: 3.1,
   /** How fast a nibbler closes on its station. */
   nibbleSpeed: 3.4,
-  /** How close a fish has to be to bother coming over at all. */
-  nibbleRange: 130,
+  /** How close a fish has to be to bother coming over at all. Tighter than it
+   *  was: at 130 there was nearly always one within reach somewhere on a reef
+   *  this busy, so the distance was doing no work. */
+  nibbleRange: 80,
   /**
    * The whale, as an ellipsoid, for keeping fish out of it.
    *
