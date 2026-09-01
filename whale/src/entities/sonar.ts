@@ -59,7 +59,7 @@ export class Sonar {
       // ring is unmistakably a ring and never a line.
       for (const turn of [Math.PI / 4, -Math.PI / 4]) {
         const ring = new THREE.Mesh(
-          new THREE.TorusGeometry(1, 0.014, 4, 54),
+          new THREE.TorusGeometry(1, 0.019, 4, 54),
           this.material.clone(),
         );
         ring.rotation.y = turn;
@@ -129,7 +129,7 @@ export class Sonar {
       const fade = Math.pow(Math.max(0, near), SONAR.ringFade) * dark;
       for (const ring of pulse.children) {
         const mat = (ring as THREE.Mesh).material as THREE.MeshBasicMaterial;
-        mat.opacity = fade * 0.7;
+        mat.opacity = fade * 0.95;
       }
     }
   }

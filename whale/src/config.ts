@@ -251,10 +251,26 @@ export const SONAR = {
   every: 1.1,
   /** How fast a pulse travels outward, and how far it gets before it dies. */
   speed: 88,
-  reach: 460,
-  /** How thick the band of world a pulse lights up is. Wide enough to read as
-   *  a wave washing over a surface rather than a wire drawn on it. */
-  width: 22,
+  reach: 640,
+  /**
+   * The band of world a pulse lights up, ahead of the wavefront and behind it.
+   *
+   * Not symmetric. Ahead of the wave the light stops quickly — nothing has
+   * been reached yet — and behind it, it fades away over a long distance, so
+   * everything the pulse has already passed keeps a glow that dies slowly.
+   * That trailing half is what makes the abyss somewhere you can see rather
+   * than somewhere you get one flat photograph of every second.
+   */
+  width: 34,
+  trail: 190,
+  /**
+   * The faintest anything is ever lit down there.
+   *
+   * A floor under the whole effect, so between pulses the dark is a room you
+   * cannot see well rather than a room that is not there. Small: any higher
+   * and the sonar stops being the thing that shows you the place.
+   */
+  glow: 0.07,
   /**
    * How many pulses can be out at once. Sets the array size in the shader —
    * see render/sonar.ts.
@@ -279,7 +295,7 @@ export const SONAR = {
    * nothing stopping a pulse being watched the whole way — see entities/sonar.
    */
   showRings: true,
-  ringReach: 330,
+  ringReach: 470,
   ringFade: 1.1,
 } as const;
 

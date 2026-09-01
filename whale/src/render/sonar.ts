@@ -56,6 +56,8 @@ export const sonarDepths = {
 
 const sonarWidth = {value: SONAR.width};
 const sonarRange = {value: SONAR.reach};
+const sonarTrail = {value: SONAR.trail};
+const sonarGlow = {value: SONAR.glow};
 
 const VERTEX_HEAD = /* glsl */ `
 varying vec3 vSonarWorld;
@@ -80,6 +82,8 @@ uniform vec3 uSonarOrigin;
 uniform float uSonarRings[${SONAR.rings}];
 uniform vec2 uSonarDepths;
 uniform float uSonarWidth;
+uniform float uSonarTrail;
+uniform float uSonarGlow;
 uniform float uSonarRange;
 uniform float uSonarSelf;
 `;
@@ -97,9 +101,13 @@ const FRAGMENT_BODY = /* glsl */ `
   for (int i = 0; i < ${SONAR.rings}; i++) {
     float r = uSonarRings[i];
     if (r >= 0.0) {
-      // A soft band centred on the pulse, squared so it has a bright core and
-      // a long tail rather than an edge.
-      float band = 1.0 - clamp(abs(sonarD - r) / uSonarWidth, 0.0, 1.0);
+      // Lopsided on purpose: a short front edge, because nothing ahead of the
+      // wave has been reached yet, and a long fade behind it, so what the
+      // pulse has already washed over keeps a glow. Squared, for a bright core
+      // and a soft tail rather than an edge.
+      float band = sonarD > r
+        ? 1.0 - clamp((sonarD - r) / uSonarWidth, 0.0, 1.0)
+        : 1.0 - clamp((r - sonarD) / uSonarTrail, 0.0, 1.0);
       sonarHit = max(sonarHit, band * band);
     }
   }
@@ -108,12 +116,15 @@ const FRAGMENT_BODY = /* glsl */ `
   // near wall of the abyss comes back far harder than the far one.
   float sonarRange = 1.0 - clamp(sonarD / uSonarRange, 0.0, 1.0);
   sonarHit *= sonarRange * sonarRange;
+  // And never quite nothing, so the dark is a room you cannot see well rather
+  // than a room that is not there.
+  sonarHit = max(sonarHit, uSonarGlow * sonarRange);
 
   // The surface's own brightness, turned to grey and pushed cold. A return
   // says how hard a thing is, not what colour it is.
   float sonarLum = dot(gl_FragColor.rgb, vec3(0.299, 0.587, 0.114));
   vec3 sonarGrey =
-    mix(vec3(0.06, 0.09, 0.12), vec3(0.78, 0.88, 1.0), sonarLum) * sonarHit;
+    mix(vec3(0.12, 0.17, 0.22), vec3(1.05, 1.15, 1.3), sonarLum) * sonarHit;
   // The whale keeps a dim grey of its own between pulses. A child steering
   // something they cannot see is not navigating in the dark, they are lost —
   // and a real beluga knows perfectly well where its own body is.
@@ -149,6 +160,8 @@ function patch(material: THREE.Material): void {
     shader.uniforms.uSonarDepths = sonarDepths;
     shader.uniforms.uSonarWidth = sonarWidth;
     shader.uniforms.uSonarRange = sonarRange;
+    shader.uniforms.uSonarTrail = sonarTrail;
+    shader.uniforms.uSonarGlow = sonarGlow;
     shader.uniforms.uSonarSelf = self;
 
     shader.vertexShader = VERTEX_HEAD + shader.vertexShader;
