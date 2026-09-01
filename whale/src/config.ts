@@ -745,13 +745,51 @@ export const FISH = {
   loopRadius: 34,
   /** How fast a fish swims back to its place in the school. */
   gather: 2.4,
-  /** Shy schools: what fraction of them are shy, how far off they notice the
-   *  whale, and how hard they scatter. */
+  /**
+   * Bolting.
+   *
+   * A shy fish waits until the mouth is nearly on it and then darts. It used
+   * to be the whole school that went, and it went at sixty-two units — which
+   * is two whale-lengths, far enough away that a school simply evacuated
+   * before you arrived and there was no moment in it at all.
+   *
+   * Now it is per fish and late: `startle` is how close the mouth gets first.
+   * Twenty units against a bite that reaches nine means the fish moves at
+   * about the moment you were going to have it.
+   */
   shyShare: 0.45,
-  fleeRange: 62,
-  fleeSpeed: 30,
-  /** How long a scattered school takes to lose interest. */
-  calmTime: 2.4,
+  startle: 16,
+  /**
+   * How fast it goes and for how long.
+   *
+   * Deliberately only a little faster than the whale's own thirty, and over
+   * in three quarters of a second. A fish that simply outran you would make
+   * shy schools decoration; this one gets away if you charge it straight and
+   * is catchable if you have already been closing from an angle.
+   */
+  dartSpeed: 31,
+  dartTime: 0.6,
+  /**
+   * How long before the same fish can bolt again.
+   *
+   * The thing that makes it catchable at all. Without it a fish bolted, spent
+   * its three quarters of a second, found the mouth still inside its startle
+   * range and bolted again — for ever. Measured over ninety seconds of chasing
+   * that was a hundred and seventy-six bolts and two fish caught, which is not
+   * difficult, it is impossible.
+   *
+   * A burst is anaerobic and a real fish cannot repeat it either. Stay with
+   * one through its dart and the next second and a half is when you have it.
+   */
+  dartRest: 1.5,
+  /**
+   * How much of the dart is sideways rather than straight away.
+   *
+   * This is the whole of what makes it a chase rather than a race. Straight
+   * away is a race the whale loses by four units a second; a fish that breaks
+   * across your nose can be cut off, and cutting it off is the skill.
+   */
+  dartAcross: 1.05,
   /** Body length. Small enough that a school reads as a shimmer. */
   size: 3.4,
   palette: [0xffb03a, 0xff6f52, 0xffd85e, 0x6fd8ff, 0xff8fc4, 0x9be86a],

@@ -13,16 +13,22 @@ interface School {
   /** Where round the loop it is, and how fast it goes round. */
   phase: number;
   rate: number;
-  /** Shy schools scatter when the whale gets close. The plan asks for fish
-   *  that run away, and they are what make eating a thing you do rather than
-   *  a thing that happens to you. */
+  /** Shy schools bolt when the whale gets close. The plan asks for fish that
+   *  run away, and they are what make eating a thing you do rather than a
+   *  thing that happens to you. */
   shy: boolean;
-  /** Seconds of fright left. */
-  alarm: number;
   centre: THREE.Vector3;
 }
 
 interface Swimmer {
+  /** Seconds of bolt left, and the way it went. Per fish, not per school: a
+   *  shy fish reacts to the mouth being on *it*. */
+  dart: number;
+  dartDir: THREE.Vector3;
+  /** Seconds before it can bolt again. See FISH.dartRest. */
+  rest: number;
+  /** Which way this one breaks. Fixed, so a fish does not dither. */
+  across: number;
   school: number;
   /** Its place in the school, relative to the centre. */
   offset: THREE.Vector3;
@@ -58,6 +64,7 @@ export class Fish {
   private readonly scale = new THREE.Vector3();
   private readonly want = new THREE.Vector3();
   private readonly away = new THREE.Vector3();
+  private readonly side = new THREE.Vector3();
   /** The stopped whale the fish have come to look at, and which way it is
    *  facing. See nibble(). */
   private readonly curious = new THREE.Vector3();
@@ -105,7 +112,6 @@ export class Fish {
         phase: rng.range(0, TAU),
         rate: (FISH.driftSpeed / FISH.loopRadius) * rng.range(0.7, 1.3),
         shy: rng.next() < FISH.shyShare,
-        alarm: 0,
         centre: new THREE.Vector3(x, y, z),
       });
 
@@ -121,6 +127,10 @@ export class Fish {
           position: offset.clone().add(this.schools[s].centre),
           heading: rng.range(0, TAU),
           eaten: false,
+          dart: 0,
+          dartDir: new THREE.Vector3(),
+          rest: 0,
+          across: rng.next() < 0.5 ? -1 : 1,
         });
       }
     }
@@ -266,12 +276,6 @@ export class Fish {
         school.home.y + Math.sin(school.phase * 0.7) * 5,
         school.home.z + Math.sin(school.phase) * school.radius,
       );
-      if (school.shy) {
-        school.alarm = Math.max(0, school.alarm - dt);
-        if (school.centre.distanceTo(mouth) < FISH.fleeRange) {
-          school.alarm = FISH.calmTime;
-        }
-      }
     }
 
     this.peck += IDLE.nibblePeckRate * dt;
@@ -305,24 +309,44 @@ export class Fish {
 
       const school = this.schools[f.school];
 
-      this.want.copy(school.centre).add(f.offset).sub(f.position);
-      if (school.alarm > 0) {
-        // Frightened: away from the mouth, hard, and only loosely still in the
-        // school. A scattered school that kept perfect formation would look
-        // like the whole shoal had been dragged sideways.
+      // Bolting. A shy fish waits until the mouth is nearly on it, and then
+      // breaks — mostly away, partly across, which is what leaves the whale
+      // something to cut off. See FISH.dartAcross.
+      f.rest = Math.max(0, f.rest - dt);
+      if (f.dart > 0) {
+        f.dart -= dt;
+        if (f.dart <= 0) {
+          f.rest = FISH.dartRest;
+        }
+      } else if (
+        school.shy &&
+        f.rest === 0 &&
+        f.position.distanceTo(mouth) < FISH.startle
+      ) {
         this.away.copy(f.position).sub(mouth);
         const d = this.away.length();
         if (d > 0.001) {
           this.away.multiplyScalar(1 / d);
-          this.want.addScaledVector(this.away, FISH.fleeSpeed);
+          // Across the escape, in the horizontal plane: a fish breaks to one
+          // side, it does not reverse straight down its own line of flight.
+          this.side.set(-this.away.z, 0, this.away.x).multiplyScalar(f.across);
+          f.dartDir
+            .copy(this.away)
+            .addScaledVector(this.side, FISH.dartAcross)
+            .normalize();
+          f.dart = FISH.dartTime;
         }
       }
 
-      const move = Math.min(1, FISH.gather * dt);
-      f.position.addScaledVector(this.want, move);
-
-      if (this.want.lengthSq() > 0.02) {
-        f.heading = Math.atan2(this.want.x, this.want.z);
+      if (f.dart > 0) {
+        f.position.addScaledVector(f.dartDir, FISH.dartSpeed * dt);
+        f.heading = Math.atan2(f.dartDir.x, f.dartDir.z);
+      } else {
+        this.want.copy(school.centre).add(f.offset).sub(f.position);
+        f.position.addScaledVector(this.want, Math.min(1, FISH.gather * dt));
+        if (this.want.lengthSq() > 0.02) {
+          f.heading = Math.atan2(this.want.x, this.want.z);
+        }
       }
 
       if (this.nibbling) {
