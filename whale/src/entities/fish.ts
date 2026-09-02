@@ -18,6 +18,9 @@ interface School {
    *  thing that happens to you. */
   shy: boolean;
   centre: THREE.Vector3;
+  /** The whale is far enough from this school's centre that a fish which fled
+   *  can go back to its place. See FISH.regroup. */
+  clear: boolean;
 }
 
 interface Swimmer {
@@ -27,6 +30,9 @@ interface Swimmer {
   dartDir: THREE.Vector3;
   /** Seconds before it can bolt again. See FISH.dartRest. */
   rest: number;
+  /** Spooked: keeping its distance, and not going back to its place in the
+   *  school until the whale has left. See FISH.regroup. */
+  scattered: boolean;
   /** Which way this one breaks. Fixed, so a fish does not dither. */
   across: number;
   school: number;
@@ -86,11 +92,16 @@ export class Fish {
    *  same point of it. */
   private peck = 0;
 
+  /** Kept so a fish that has been chased off cannot drift into the sand or
+   *  out through the surface. See swimClear(). */
+  private readonly floorAt: (x: number, z: number) => number;
+
   constructor(
     rng: Rng,
     floorAt: (x: number, z: number) => number,
     finishZ: number,
   ) {
+    this.floorAt = floorAt;
     this.total = FISH.schools * FISH.perSchool;
 
     for (let s = 0; s < FISH.schools; s++) {
@@ -113,6 +124,7 @@ export class Fish {
         rate: (FISH.driftSpeed / FISH.loopRadius) * rng.range(0.7, 1.3),
         shy: rng.next() < FISH.shyShare,
         centre: new THREE.Vector3(x, y, z),
+        clear: true,
       });
 
       for (let i = 0; i < FISH.perSchool; i++) {
@@ -130,6 +142,7 @@ export class Fish {
           dart: 0,
           dartDir: new THREE.Vector3(),
           rest: 0,
+          scattered: false,
           across: rng.next() < 0.5 ? -1 : 1,
         });
       }
@@ -263,6 +276,18 @@ export class Fish {
   }
 
   /**
+   * Keeps a fleeing fish in the water.
+   *
+   * Fleeing is the only thing that moves a fish off its school's line, and a
+   * bolt aimed downward used to take it into the sand, where the chase ended
+   * in a fish you could see through the floor.
+   */
+  private swimClear(at: THREE.Vector3): void {
+    const floor = this.floorAt(at.x, at.z) + FISH.size;
+    at.y = Math.min(-FISH.size, Math.max(floor, at.y));
+  }
+
+  /**
    * Swim the schools, and eat whatever ends up in the whale's mouth.
    *
    * Returns how many went down this step, so the game can make a noise about
@@ -276,6 +301,11 @@ export class Fish {
         school.home.y + Math.sin(school.phase * 0.7) * 5,
         school.home.z + Math.sin(school.phase) * school.radius,
       );
+      // Measured to the school's centre, not to each fish: a fish rejoins when
+      // the place it would swim back to is safe. Measured to the fish itself,
+      // one that had fled sixty units decided the coast was clear and swam
+      // straight back through a mouth that had never moved.
+      school.clear = school.centre.distanceTo(mouth) > FISH.regroup;
     }
 
     this.peck += IDLE.nibblePeckRate * dt;
@@ -313,16 +343,14 @@ export class Fish {
       // breaks — mostly away, partly across, which is what leaves the whale
       // something to cut off. See FISH.dartAcross.
       f.rest = Math.max(0, f.rest - dt);
+      const toMouth = f.position.distanceTo(mouth);
       if (f.dart > 0) {
         f.dart -= dt;
         if (f.dart <= 0) {
           f.rest = FISH.dartRest;
         }
-      } else if (
-        school.shy &&
-        f.rest === 0 &&
-        f.position.distanceTo(mouth) < FISH.startle
-      ) {
+      } else if (school.shy && f.rest === 0 && toMouth < FISH.startle) {
+        f.scattered = true;
         this.away.copy(f.position).sub(mouth);
         const d = this.away.length();
         if (d > 0.001) {
@@ -338,12 +366,36 @@ export class Fish {
         }
       }
 
+      // Scattered fish only come back together once the whale has gone. Until
+      // then a school never re-forms in front of a mouth that is still there.
+      if (f.scattered && f.dart <= 0 && school.clear) {
+        f.scattered = false;
+      }
+
       if (f.dart > 0) {
         f.position.addScaledVector(f.dartDir, FISH.dartSpeed * dt);
         f.heading = Math.atan2(f.dartDir.x, f.dartDir.z);
+        this.swimClear(f.position);
+      } else if (f.scattered) {
+        // Only until it is clear of the whale. Left cruising it would put a
+        // spooked school over the horizon by the time you gave up on it — and
+        // then have to sprint the whole way back.
+        if (toMouth < FISH.regroup) {
+          f.position.addScaledVector(f.dartDir, FISH.scatterSpeed * dt);
+          f.heading = Math.atan2(f.dartDir.x, f.dartDir.z);
+          this.swimClear(f.position);
+        }
       } else {
         this.want.copy(school.centre).add(f.offset).sub(f.position);
-        f.position.addScaledVector(this.want, Math.min(1, FISH.gather * dt));
+        const home = this.want.length();
+        f.position.addScaledVector(
+          this.want,
+          Math.min(
+            1,
+            FISH.gather * dt,
+            (FISH.homeSpeed * dt) / Math.max(home, 1e-4),
+          ),
+        );
         if (this.want.lengthSq() > 0.02) {
           f.heading = Math.atan2(this.want.x, this.want.z);
         }

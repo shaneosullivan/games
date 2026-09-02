@@ -790,6 +790,36 @@ export const FISH = {
    * across your nose can be cut off, and cutting it off is the skill.
    */
   dartAcross: 1.05,
+  /**
+   * How far the whale has to go before a scattered fish rejoins its school.
+   *
+   * A fish that bolted used to swim straight back to its place the instant
+   * the dart ended, which put it back inside a mouth that had not moved — the
+   * school re-formed under the whale's chin and the scattering counted for
+   * nothing. Now a spooked fish keeps its distance until the whale has
+   * actually left the school: fifty-five units from the school's centre,
+   * against a startle of sixteen, so backing off a body-length is not enough
+   * to call them back.
+   */
+  regroup: 55,
+  /**
+   * How fast a scattered fish keeps going while it waits.
+   *
+   * A slow cruise on the line it broke along, not a stop — a fish holding
+   * perfectly still reads as a bug, and a fish still sprinting would be over
+   * the horizon by the time the whale gave up. At four units against the
+   * whale's thirty, following one is easy; it is catching it that is not.
+   */
+  scatterSpeed: 4,
+  /**
+   * How fast a fish swims back to its school when the whale has gone.
+   *
+   * `gather` is a rate, not a speed, so a fish that had been driven ninety
+   * units off closed the gap at over two hundred units a second — it teleported
+   * home the instant the coast was clear. This caps it at a fish's pace; the
+   * school gathers over a couple of seconds instead of snapping shut.
+   */
+  homeSpeed: 14,
   /** Body length. Small enough that a school reads as a shimmer. */
   size: 3.4,
   palette: [0xffb03a, 0xff6f52, 0xffd85e, 0x6fd8ff, 0xff8fc4, 0x9be86a],
