@@ -1,9 +1,9 @@
 import * as THREE from "three";
-import {CAMERA, FINISH, HILL, PROPS, SIM, SLIDE} from "./config";
+import {CAMERA, FINISH, HILL, PROPS, SIM, SLIDE, SOUND} from "./config";
 import {GameLoop} from "./core/loop";
 import {Joystick} from "./core/input";
 import {Rng} from "./core/rng";
-import {Bumps, Wind} from "./core/audio";
+import {bumpClips, chompClips, Clips, Wind} from "./core/audio";
 import {Stage} from "./render/stage";
 import {PALETTE} from "./render/materials";
 import {Hill} from "./entities/hill";
@@ -53,7 +53,8 @@ export class Game {
   readonly spray: ParticleBurst;
   readonly sparks: ParticleBurst;
   readonly wind: Wind;
-  readonly bumpSounds: Bumps;
+  readonly bumpSounds: Clips;
+  readonly chompSounds: Clips;
   readonly hud: Hud;
   readonly stick: Joystick;
   readonly loop: GameLoop;
@@ -143,7 +144,8 @@ export class Game {
     this.penguin.place(this.hill, this.hill.laneAt(-20), -20);
 
     this.wind = new Wind();
-    this.bumpSounds = new Bumps();
+    this.bumpSounds = bumpClips();
+    this.chompSounds = chompClips();
     this.hud = new Hud();
     this.hud.mount(ui);
     this.stick = new Joystick(ui);
@@ -174,6 +176,7 @@ export class Game {
       onToggle: muted => {
         this.wind.setMuted(muted);
         this.bumpSounds.setMuted(muted);
+        this.chompSounds.setMuted(muted);
       },
       className: "ui-interactive",
     });
@@ -187,6 +190,7 @@ export class Game {
     window.addEventListener("pagehide", () => {
       this.wind.stop();
       this.bumpSounds.stop();
+      this.chompSounds.stop();
     });
 
     this.snapCamera();
@@ -388,7 +392,11 @@ export class Game {
     }
     const taken = this.fish.update(dt, this.beak);
     for (let i = 0; i < taken; i++) {
-      this.wind.chirp(this.streak);
+      // A little higher for each fish in a run, so a whole trail taken on one
+      // pass runs up a scale instead of making the same noise four times.
+      this.chompSounds.play(
+        1 + Math.min(this.streak, SOUND.chompRiseMax) * SOUND.chompRise,
+      );
       this.streak++;
       this.streakLeft = 1.6;
     }

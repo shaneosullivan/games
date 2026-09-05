@@ -1,3 +1,5 @@
+import chomp1 from "../assets/chomp1.m4a";
+import chomp2 from "../assets/chomp2.m4a";
 import ow1 from "../assets/ow1.m4a";
 import ow2 from "../assets/ow2.m4a";
 import ow3 from "../assets/ow3.m4a";
@@ -90,34 +92,6 @@ export class Wind {
     const bright = this.level * this.level;
     this.filter.frequency.value =
       SOUND.cutoffMin + bright * (SOUND.cutoffMax - SOUND.cutoffMin);
-  }
-
-  /**
-   * A fish: a short bright note that rises.
-   *
-   * Pitched a step higher each time within a run of them, so scooping up four
-   * on the way past a bank sounds like a run up a scale rather than the same
-   * click four times. Capped, or a good run ends somewhere only a dog hears.
-   */
-  chirp(step: number): void {
-    const ctx = this.ctx;
-    if (!ctx || this.muted) {
-      return;
-    }
-    const now = ctx.currentTime;
-    const osc = ctx.createOscillator();
-    osc.type = "triangle";
-    const base = 520 * Math.pow(1.06, Math.min(11, step));
-    osc.frequency.setValueAtTime(base, now);
-    osc.frequency.exponentialRampToValueAtTime(base * 1.7, now + 0.08);
-    const g = ctx.createGain();
-    g.gain.setValueAtTime(0.0001, now);
-    g.gain.exponentialRampToValueAtTime(0.13, now + 0.01);
-    g.gain.exponentialRampToValueAtTime(0.0001, now + 0.18);
-    osc.connect(g);
-    g.connect(ctx.destination);
-    osc.start(now);
-    osc.stop(now + 0.2);
   }
 
   /**
@@ -240,37 +214,36 @@ export class Wind {
 }
 
 /**
- * The "ow" clips.
+ * A handful of recordings, one picked at random.
  *
- * Five recordings, one picked at random every time the penguin hits a tree or
- * a rock. Everything else in this game makes its own noise out of oscillators
- * and filtered noise; these are the one exception, and they earn it — a real
- * voice going "ow" is funnier than anything an oscillator can do, and the
- * whole point of hitting a tree in this game is that it is funny rather than
+ * Everything else in this game makes its own noise out of oscillators and
+ * filtered noise; these are the exception, and they earn it — a real voice
+ * going "ow" is funnier than anything an oscillator can do, and the whole
+ * point of hitting a tree in this game is that it is funny rather than
  * punishing.
  *
  * `Audio` elements rather than the WebAudio graph, the same as the caterpillar
  * game's bites: nothing here has to be mixed, positioned or timed against
  * anything else, and an element decodes and plays on its own.
  */
-export class Bumps {
-  private readonly clips: Array<Array<HTMLAudioElement>> = [];
+export class Clips {
+  private readonly voices: Array<Array<HTMLAudioElement>> = [];
   /** Which was used last, so the same one never comes round twice running. */
   private last = -1;
   /** Which copy of each clip to use next. See SOUND.bumpVoices. */
   private readonly next: Array<number> = [];
   private muted = false;
 
-  constructor() {
-    for (const url of [ow1, ow2, ow3, ow4, ow5]) {
+  constructor(urls: ReadonlyArray<string>, volume: number, copies: number) {
+    for (const url of urls) {
       const voices: Array<HTMLAudioElement> = [];
-      for (let i = 0; i < SOUND.bumpVoices; i++) {
+      for (let i = 0; i < copies; i++) {
         const voice = new Audio(url);
-        voice.volume = SOUND.bumpVolume;
+        voice.volume = volume;
         voice.preload = "auto";
         voices.push(voice);
       }
-      this.clips.push(voices);
+      this.voices.push(voices);
       this.next.push(0);
     }
   }
@@ -278,30 +251,35 @@ export class Bumps {
   /**
    * One of them, at random — but never the one that just played.
    *
-   * Picking from all five every time means the same clip comes up twice in a
-   * row one time in five, and two identical "ow"s a second apart do not sound
-   * random, they sound broken. Choosing among the other four is what actually
-   * feels like chance.
+   * Picking freely means the same clip comes up twice in a row one time in
+   * however many there are, and two identical noises a tenth of a second apart
+   * do not sound random, they sound broken. Choosing among the others is what
+   * actually feels like chance. With only two clips that makes it strict
+   * alternation, which for a trail of fish taken in quick succession is
+   * exactly what you want anyway.
+   *
+   * `pitch` plays it faster and higher; see the streak in Game.collect.
    */
-  play(): void {
-    if (this.muted || this.clips.length === 0) {
+  play(pitch = 1): void {
+    if (this.muted || this.voices.length === 0) {
       return;
     }
-    let pick = Math.floor(Math.random() * this.clips.length);
-    if (pick === this.last) {
+    let pick = Math.floor(Math.random() * this.voices.length);
+    if (pick === this.last && this.voices.length > 1) {
       pick =
-        (pick + 1 + Math.floor(Math.random() * (this.clips.length - 1))) %
-        this.clips.length;
+        (pick + 1 + Math.floor(Math.random() * (this.voices.length - 1))) %
+        this.voices.length;
     }
     this.last = pick;
 
-    const voices = this.clips[pick];
+    const voices = this.voices[pick];
     const voice = voices[this.next[pick]];
     this.next[pick] = (this.next[pick] + 1) % voices.length;
+    voice.playbackRate = pitch;
     voice.currentTime = 0;
-    // A play() that the browser refuses — no gesture yet, or the element is
-    // still loading — rejects a promise, and an unhandled rejection is a red
-    // line in the console for something nobody needs to know about.
+    // A play() the browser refuses — no gesture yet, or the element is still
+    // loading — rejects a promise, and an unhandled rejection is a red line in
+    // the console for something nobody needs to know about.
     void voice.play().catch(() => {});
   }
 
@@ -310,7 +288,7 @@ export class Bumps {
     if (!muted) {
       return;
     }
-    for (const voices of this.clips) {
+    for (const voices of this.voices) {
       for (const voice of voices) {
         voice.pause();
         voice.currentTime = 0;
@@ -322,4 +300,18 @@ export class Bumps {
   stop(): void {
     this.setMuted(true);
   }
+}
+
+/** The five "ow" clips, for hitting a tree or a rock. */
+export function bumpClips(): Clips {
+  return new Clips(
+    [ow1, ow2, ow3, ow4, ow5],
+    SOUND.bumpVolume,
+    SOUND.bumpVoices,
+  );
+}
+
+/** The two chomps, for a fish going down. */
+export function chompClips(): Clips {
+  return new Clips([chomp1, chomp2], SOUND.chompVolume, SOUND.chompVoices);
 }

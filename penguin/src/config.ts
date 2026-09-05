@@ -610,6 +610,34 @@ export const SOUND = {
    * already playing cannot be started again, and two bumps a second apart is
    * an ordinary thing to do on a hill full of trees.
    */
-  bumpVolume: 0.85,
+  /**
+   * Half of what it started at.
+   *
+   * An "ow" at 0.85 is the loudest thing in the game by a long way — the wind
+   * runs at 0.085 flat out — and on a hill this full of trees it is a noise a
+   * child hears a lot. Quiet enough to be funny, rather than loud enough to be
+   * a telling-off.
+   */
+  bumpVolume: 0.45,
   bumpVoices: 2,
+  /**
+   * The chomps: two more of Hannah's, one of them every time a fish goes down.
+   *
+   * Three copies of each rather than two. The fish are laid out in trails of
+   * up to four, and four taken at fifty units a second is four chomps inside a
+   * second — an element already playing cannot be started again, and with two
+   * copies the third fish in a trail would have gone down in silence.
+   */
+  chompVolume: 0.8,
+  chompVoices: 3,
+  /**
+   * How much higher each fish in a run is pitched, and how many of them count.
+   *
+   * The same idea the whale's gulp uses, done with a playback rate instead of
+   * an oscillator: take four fish out of one trail and it runs up a little
+   * scale rather than making the same noise four times. Small, because the
+   * clip speeds up as it rises and a big number turns a voice into a mouse.
+   */
+  chompRise: 0.045,
+  chompRiseMax: 6,
 } as const;
