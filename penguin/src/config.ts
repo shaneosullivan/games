@@ -629,10 +629,17 @@ export const SOUND = {
    * second — an element already playing cannot be started again, and with two
    * copies the third fish in a trail would have gone down in silence.
    */
-  /** The same 0.45 as the "ow". The two are the game's only voices and they
-   *  should sit at the same level, or whichever is louder becomes the one the
-   *  game seems to be about. */
-  chompVolume: 0.45,
+  /**
+   * Lower than the "ow", which is not what it first looked like.
+   *
+   * The two being the game's only voices, matching them at 0.45 seemed right —
+   * but they do not happen the same number of times. There are ninety fish on
+   * the mountain and a handful of trees you actually hit, so the chomp is a
+   * sound you hear over and over and the "ow" is one you hear now and then. A
+   * noise that repeats has to sit under one that does not, or it stops being
+   * a reward and becomes the background.
+   */
+  chompVolume: 0.28,
   chompVoices: 3,
   /**
    * How much higher each fish in a run is pitched, and how many of them count.
