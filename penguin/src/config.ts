@@ -581,17 +581,18 @@ export const SOUND = {
    *  makes noise feel loud is how bright it is, and a wide-open lowpass on
    *  white noise is the brightest thing there is. */
   cutoffMin: 300,
-  cutoffMax: 2300,
+  cutoffMax: 2500,
   /**
    * Volume at a standstill and flat out.
    *
-   * A third of what it was. The wind is the one sound in this game that never
-   * stops, and a continuous noise has to sit well under the things that happen
-   * — the "ow" clips play at 0.85, and at 0.3 the wind was competing with
-   * them for a run's worth of minutes at a time.
+   * Bracketed by ear, in three goes. At 0.3 it drowned the voices. At 0.1 it
+   * had all but gone, and a mountain you slide down in silence is a mountain
+   * with no speed in it — the wind is the only thing telling you how fast you
+   * are travelling. At 0.18 it was loud again. This is between the last two,
+   * and about a quarter of the "ow" and the chomp, which both play at 0.45.
    */
-  levelMin: 0.012,
-  levelMax: 0.1,
+  levelMin: 0.016,
+  levelMax: 0.13,
   /** How fast the wind follows the speed. Lazily: a gust that switched on and
    *  off with every turn would be exhausting. */
   follow: 2.2,
@@ -628,7 +629,10 @@ export const SOUND = {
    * second — an element already playing cannot be started again, and with two
    * copies the third fish in a trail would have gone down in silence.
    */
-  chompVolume: 0.8,
+  /** The same 0.45 as the "ow". The two are the game's only voices and they
+   *  should sit at the same level, or whichever is louder becomes the one the
+   *  game seems to be about. */
+  chompVolume: 0.45,
   chompVoices: 3,
   /**
    * How much higher each fish in a run is pitched, and how many of them count.
