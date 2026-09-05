@@ -401,36 +401,62 @@ export class Penguin {
     belly.translate(0, -0.34, 0.24);
     parts.push(paint(belly, PALETTE.belly));
 
-    // The head, up and forward, and the white of the face under the beak.
-    const head = new THREE.SphereGeometry(1.16, 16, 12);
-    head.scale(1, 0.95, 1);
-    head.translate(0, 1.16, 1.5);
+    // The head.
+    //
+    // Bigger than a real penguin's, on purpose, and that is most of the
+    // cuteness right there: a large head on a small body is the first thing
+    // anyone reads as young, and everything else on this face is the same
+    // trick applied smaller.
+    const head = new THREE.SphereGeometry(1.34, 16, 12);
+    head.scale(1, 0.94, 1);
+    head.translate(0, 1.22, 1.56);
     parts.push(paint(head, PALETTE.back));
 
-    const face = new THREE.SphereGeometry(0.95, 14, 10);
-    face.scale(0.8, 0.85, 0.62);
-    face.translate(0, 0.94, 2.24);
+    // The white of the face, wide enough that the eyes sit on it rather than
+    // beside it. A dark eye on a dark head is a hole; a dark eye on white is
+    // an eye.
+    const face = new THREE.SphereGeometry(1.12, 14, 10);
+    face.scale(0.84, 0.9, 0.62);
+    face.translate(0, 1.02, 2.3);
     parts.push(paint(face, PALETTE.belly));
 
-    const beak = new THREE.ConeGeometry(0.4, 1.05, 8);
-    beak.rotateX(Math.PI / 2);
-    beak.translate(0, 1.02, 3);
+    // A short, stubby beak, low and tipped down.
+    //
+    // It was longer and level, and a long level beak reads as a bird going
+    // about its business. Short, blunt and pointing slightly at the floor is
+    // the difference between a seabird and something a child wants to keep.
+    const beak = new THREE.ConeGeometry(0.4, 0.86, 8);
+    beak.rotateX(Math.PI / 2 + 0.22);
+    beak.translate(0, 0.8, 2.98);
     parts.push(paint(beak, PALETTE.beak));
 
     for (const side of [-1, 1]) {
-      const eye = new THREE.SphereGeometry(0.22, 10, 8);
-      eye.translate(side * 0.44, 1.44, 2.38);
+      // Big, and set low.
+      //
+      // Low is the important half. Eyes high on a head read as an adult and
+      // eyes low on it read as a baby, and it is worth more than the size —
+      // which is also doubled from what it was, because a small eye at this
+      // distance is a full stop.
+      const eye = new THREE.SphereGeometry(0.34, 12, 10);
+      eye.translate(side * 0.46, 1.24, 2.72);
       parts.push(paint(eye, 0x161d26));
-      // The glint. Two of the four things that make a face read as friendly
-      // rather than as a face; the other two are the cheeks and how round the
-      // head is.
-      const glint = new THREE.SphereGeometry(0.08, 8, 6);
-      glint.translate(side * 0.5, 1.53, 2.53);
+
+      // Two catchlights each, a big one up and out and a small one down and
+      // in. One is a shine; two is the oldest trick in cartoon drawing and the
+      // thing that makes an eye look wet and alive rather than painted on.
+      const glint = new THREE.SphereGeometry(0.13, 8, 6);
+      glint.translate(side * 0.58, 1.4, 2.97);
       parts.push(paint(glint, 0xffffff));
 
-      const cheek = new THREE.SphereGeometry(0.26, 10, 8);
-      cheek.scale(1, 0.8, 0.4);
-      cheek.translate(side * 0.72, 1.02, 2.24);
+      const spark = new THREE.SphereGeometry(0.06, 6, 5);
+      spark.translate(side * 0.32, 1.08, 2.99);
+      parts.push(paint(spark, 0xffffff));
+
+      // Cheeks, under the eyes and out to the side, where a full cheek
+      // actually sits.
+      const cheek = new THREE.SphereGeometry(0.36, 10, 8);
+      cheek.scale(1, 0.72, 0.34);
+      cheek.translate(side * 0.82, 0.88, 2.42);
       parts.push(paint(cheek, PALETTE.cheek));
 
       // The feet trail out behind. A penguin on its belly does not run; it
@@ -450,19 +476,21 @@ export class Penguin {
     // white bobble on it is visible from any angle at any distance, and it is
     // the cheapest possible fix for the one thing a child has to be able to
     // see at all times.
-    const brim = new THREE.CylinderGeometry(1.08, 1.12, 0.4, 12);
+    const brim = new THREE.CylinderGeometry(1.26, 1.3, 0.42, 14);
     brim.rotateX(0.18);
-    brim.translate(0, 1.86, 1.44);
+    brim.translate(0, 1.9, 1.5);
     parts.push(paint(brim, PALETTE.snow));
 
-    const hat = new THREE.SphereGeometry(1.02, 12, 8, 0, TAU, 0, Math.PI / 2);
+    const hat = new THREE.SphereGeometry(1.2, 12, 8, 0, TAU, 0, Math.PI / 2);
     hat.scale(1, 0.95, 1);
     hat.rotateX(0.18);
-    hat.translate(0, 1.96, 1.42);
+    hat.translate(0, 2, 1.48);
     parts.push(paint(hat, PALETTE.hat));
 
-    const bobble = new THREE.SphereGeometry(0.4, 10, 8);
-    bobble.translate(0, 2.9, 1.28);
+    // Clear of the top of the dome. At 3.02 it was inside it: the hat's own
+    // crown reaches 3.14, so the bobble was a pom-pom nobody could see.
+    const bobble = new THREE.SphereGeometry(0.44, 10, 8);
+    bobble.translate(0, 3.38, 1.24);
     parts.push(paint(bobble, PALETTE.snow));
 
     const tail = new THREE.ConeGeometry(0.7, 1.3, 6);
