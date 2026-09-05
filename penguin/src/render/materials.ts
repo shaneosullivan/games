@@ -85,7 +85,6 @@ export const PALETTE = {
   back: 0x4a5d80,
   beak: 0xf2a03d,
   foot: 0xe98b2f,
-  cheek: 0xffc9d4,
   fish: 0xa9c4d6,
   fishBelly: 0xe9f2f7,
   flagRed: 0xe2554c,

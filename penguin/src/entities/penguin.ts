@@ -441,23 +441,12 @@ export class Penguin {
       eye.translate(side * 0.46, 1.24, 2.72);
       parts.push(paint(eye, 0x161d26));
 
-      // Two catchlights each, a big one up and out and a small one down and
-      // in. One is a shine; two is the oldest trick in cartoon drawing and the
-      // thing that makes an eye look wet and alive rather than painted on.
-      const glint = new THREE.SphereGeometry(0.13, 8, 6);
+      // One catchlight each, up and out. There were two — the second, small
+      // and low, is the usual cartoon trick for a wet-looking eye — but two
+      // shines and a pink cheek is a doll's face rather than a bird's.
+      const glint = new THREE.SphereGeometry(0.14, 8, 6);
       glint.translate(side * 0.58, 1.4, 2.97);
       parts.push(paint(glint, 0xffffff));
-
-      const spark = new THREE.SphereGeometry(0.06, 6, 5);
-      spark.translate(side * 0.32, 1.08, 2.99);
-      parts.push(paint(spark, 0xffffff));
-
-      // Cheeks, under the eyes and out to the side, where a full cheek
-      // actually sits.
-      const cheek = new THREE.SphereGeometry(0.36, 10, 8);
-      cheek.scale(1, 0.72, 0.34);
-      cheek.translate(side * 0.82, 0.88, 2.42);
-      parts.push(paint(cheek, PALETTE.cheek));
 
       // The feet trail out behind. A penguin on its belly does not run; it
       // steers with its toes, and having them out is most of what says so.
