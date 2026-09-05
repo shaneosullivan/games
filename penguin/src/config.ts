@@ -588,4 +588,19 @@ export const SOUND = {
   follow: 2.2,
   /** The speed the top of the range is measured against. */
   fullSpeed: 55,
+  /**
+   * The bumps: Hannah's own "ow" clips, one of the five picked at random every
+   * time the penguin hits a tree or a rock.
+   *
+   * The one thing in this game that is a recording rather than something the
+   * browser makes on the spot. It is worth the exception — a real voice going
+   * "ow" is funnier than anything an oscillator can do, and the whole point of
+   * hitting a tree here is that it is funny rather than punishing.
+   *
+   * `bumpVoices` is how many copies of each clip are kept. An HTMLAudioElement
+   * already playing cannot be started again, and two bumps a second apart is
+   * an ordinary thing to do on a hill full of trees.
+   */
+  bumpVolume: 0.85,
+  bumpVoices: 2,
 } as const;

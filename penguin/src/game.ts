@@ -3,7 +3,7 @@ import {CAMERA, FINISH, HILL, PROPS, SIM, SLIDE} from "./config";
 import {GameLoop} from "./core/loop";
 import {Joystick} from "./core/input";
 import {Rng} from "./core/rng";
-import {Wind} from "./core/audio";
+import {Bumps, Wind} from "./core/audio";
 import {Stage} from "./render/stage";
 import {PALETTE} from "./render/materials";
 import {Hill} from "./entities/hill";
@@ -53,6 +53,7 @@ export class Game {
   readonly spray: ParticleBurst;
   readonly sparks: ParticleBurst;
   readonly wind: Wind;
+  readonly bumpSounds: Bumps;
   readonly hud: Hud;
   readonly stick: Joystick;
   readonly loop: GameLoop;
@@ -142,6 +143,7 @@ export class Game {
     this.penguin.place(this.hill, this.hill.laneAt(-20), -20);
 
     this.wind = new Wind();
+    this.bumpSounds = new Bumps();
     this.hud = new Hud();
     this.hud.mount(ui);
     this.stick = new Joystick(ui);
@@ -169,7 +171,10 @@ export class Game {
     home.setAttribute("aria-label", "Back to Chofter Games");
     corner.appendChild(home);
     const sound = new SoundButton({
-      onToggle: muted => this.wind.setMuted(muted),
+      onToggle: muted => {
+        this.wind.setMuted(muted);
+        this.bumpSounds.setMuted(muted);
+      },
       className: "ui-interactive",
     });
     corner.appendChild(sound.root);
@@ -179,7 +184,10 @@ export class Game {
     // games are pages rather than tabs: a page that keeps blowing a gale
     // behind the one a child has moved on to is a bug the caterpillar game
     // had once already, and it is worth not having twice.
-    window.addEventListener("pagehide", () => this.wind.stop());
+    window.addEventListener("pagehide", () => {
+      this.wind.stop();
+      this.bumpSounds.stop();
+    });
 
     this.snapCamera();
     this.loop = new GameLoop(this.update, this.render);
@@ -320,7 +328,7 @@ export class Game {
     }
     this.penguin.bump(hit.x, hit.z, hit.radius + 2.2, this.hill);
     this.bumps++;
-    this.wind.thud();
+    this.bumpSounds.play();
     this.puff(26, 11);
   }
 
@@ -335,7 +343,7 @@ export class Game {
   private burstSnowman(o: Obstacle): void {
     this.props.remove(o);
     this.snowmen++;
-    this.wind.thud();
+    this.wind.poof();
     this.penguin.speed *= 0.88;
 
     this.puffAt.set(o.x, this.hill.heightAt(o.x, o.z) + 2.6 * o.scale, o.z);

@@ -1,3 +1,8 @@
+import ow1 from "../assets/ow1.m4a";
+import ow2 from "../assets/ow2.m4a";
+import ow3 from "../assets/ow3.m4a";
+import ow4 from "../assets/ow4.m4a";
+import ow5 from "../assets/ow5.m4a";
 import {SOUND} from "../config";
 
 /**
@@ -116,31 +121,13 @@ export class Wind {
   }
 
   /**
-   * Hitting a tree: a soft thud with no ring to it.
+   * Snow going up: what a snowman sounds like coming apart.
    *
-   * A low sine that drops away in a fifth of a second, under a puff of noise.
-   * Deliberately gentle — nothing in this game punishes a child, and a crash
-   * that sounded like a crash would make a tree something to be afraid of
-   * rather than something to go round.
+   * A puff and nothing else. Hitting a snowman does not hurt — you go straight
+   * through it — so it does not get one of the "ow" clips; see Bumps, which is
+   * for the trees.
    */
-  thud(): void {
-    const ctx = this.ctx;
-    if (!ctx || this.muted) {
-      return;
-    }
-    const now = ctx.currentTime;
-    const osc = ctx.createOscillator();
-    osc.type = "sine";
-    osc.frequency.setValueAtTime(170, now);
-    osc.frequency.exponentialRampToValueAtTime(48, now + 0.22);
-    const g = ctx.createGain();
-    g.gain.setValueAtTime(0.0001, now);
-    g.gain.exponentialRampToValueAtTime(0.22, now + 0.012);
-    g.gain.exponentialRampToValueAtTime(0.0001, now + 0.3);
-    osc.connect(g);
-    g.connect(ctx.destination);
-    osc.start(now);
-    osc.stop(now + 0.32);
+  poof(): void {
     this.puff(0.35, 900, 0.16);
   }
 
@@ -249,5 +236,90 @@ export class Wind {
     this.ctx = null;
     this.gain = null;
     this.filter = null;
+  }
+}
+
+/**
+ * The "ow" clips.
+ *
+ * Five recordings, one picked at random every time the penguin hits a tree or
+ * a rock. Everything else in this game makes its own noise out of oscillators
+ * and filtered noise; these are the one exception, and they earn it — a real
+ * voice going "ow" is funnier than anything an oscillator can do, and the
+ * whole point of hitting a tree in this game is that it is funny rather than
+ * punishing.
+ *
+ * `Audio` elements rather than the WebAudio graph, the same as the caterpillar
+ * game's bites: nothing here has to be mixed, positioned or timed against
+ * anything else, and an element decodes and plays on its own.
+ */
+export class Bumps {
+  private readonly clips: Array<Array<HTMLAudioElement>> = [];
+  /** Which was used last, so the same one never comes round twice running. */
+  private last = -1;
+  /** Which copy of each clip to use next. See SOUND.bumpVoices. */
+  private readonly next: Array<number> = [];
+  private muted = false;
+
+  constructor() {
+    for (const url of [ow1, ow2, ow3, ow4, ow5]) {
+      const voices: Array<HTMLAudioElement> = [];
+      for (let i = 0; i < SOUND.bumpVoices; i++) {
+        const voice = new Audio(url);
+        voice.volume = SOUND.bumpVolume;
+        voice.preload = "auto";
+        voices.push(voice);
+      }
+      this.clips.push(voices);
+      this.next.push(0);
+    }
+  }
+
+  /**
+   * One of them, at random — but never the one that just played.
+   *
+   * Picking from all five every time means the same clip comes up twice in a
+   * row one time in five, and two identical "ow"s a second apart do not sound
+   * random, they sound broken. Choosing among the other four is what actually
+   * feels like chance.
+   */
+  play(): void {
+    if (this.muted || this.clips.length === 0) {
+      return;
+    }
+    let pick = Math.floor(Math.random() * this.clips.length);
+    if (pick === this.last) {
+      pick =
+        (pick + 1 + Math.floor(Math.random() * (this.clips.length - 1))) %
+        this.clips.length;
+    }
+    this.last = pick;
+
+    const voices = this.clips[pick];
+    const voice = voices[this.next[pick]];
+    this.next[pick] = (this.next[pick] + 1) % voices.length;
+    voice.currentTime = 0;
+    // A play() that the browser refuses — no gesture yet, or the element is
+    // still loading — rejects a promise, and an unhandled rejection is a red
+    // line in the console for something nobody needs to know about.
+    void voice.play().catch(() => {});
+  }
+
+  setMuted(muted: boolean): void {
+    this.muted = muted;
+    if (!muted) {
+      return;
+    }
+    for (const voices of this.clips) {
+      for (const voice of voices) {
+        voice.pause();
+        voice.currentTime = 0;
+      }
+    }
+  }
+
+  /** Everything off on the way out, the same as the wind. */
+  stop(): void {
+    this.setMuted(true);
   }
 }
