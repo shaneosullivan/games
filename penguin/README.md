@@ -1,0 +1,65 @@
+# Penguin
+
+A new game.
+
+A touch-native 3D web game. TypeScript + Three.js + Vite, built to one
+self-contained `index.html` and published by the gallery in the repo root.
+
+## Running it
+
+```bash
+npm --prefix penguin run dev
+```
+
+Then open the URL Vite prints. On a tablet on the same Wi-Fi, use this Mac's LAN
+address (`ipconfig getifaddr en0`) with the same port.
+
+For the installed-app feel, **Share → Add to Home Screen** and launch from the
+icon.
+
+## Controls
+
+The starter scene is a red ball on a green field:
+
+- **Finger / mouse** — hold and the ball heads for where you are pointing.
+- **Arrow keys or WASD** — move.
+- **Space** — jump.
+
+Replace all of this with the real game — it exists only so a fresh project runs
+and shows something.
+
+## Commands
+
+```bash
+npm --prefix penguin run dev         # dev server, hot reload
+npm --prefix penguin run typecheck   # tsc --noEmit
+npm --prefix penguin run build       # typechecks, then one dist/index.html
+```
+
+Formatting and linting come from the repo root (`npm run format`, `npm run
+lint`), so this game is covered without any config of its own.
+
+## Publishing
+
+`game.json` carries a `status`. It starts as `"development"`, which lists the
+game in the gallery's **In Development** section — flagged as unfinished. When
+it is ready, change it to `"published"` and it moves to the main list of games.
+
+## Layout
+
+```
+docs/
+  plan-for-app.md  write the initial description of the game here, first
+src/
+  main.ts        the game (the starter scene, for now)
+  assets/        images and models (empty to start)
+index.html       the entry point
+card.png         the gallery's thumbnail — replace the solid colour
+game.json        title, description and status, for the gallery
+```
+
+Start in [docs/plan-for-app.md](docs/plan-for-app.md): write up what the game is
+before you build it.
+
+Everything is generated in code where it can be; see the bee game in the repo
+for how far that goes and the patterns to follow.
