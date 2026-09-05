@@ -577,12 +577,21 @@ export const FINISH = {
 export const SOUND = {
   loopSeconds: 4,
   /** The lowpass at a standstill and flat out. Snow under a belly is a hiss,
-   *  and the hiss is what opens up as you go. */
-  cutoffMin: 320,
-  cutoffMax: 3400,
-  /** Volume at a standstill and flat out. */
-  levelMin: 0.02,
-  levelMax: 0.3,
+   *  and the hiss is what opens up as you go. Not too far open: most of what
+   *  makes noise feel loud is how bright it is, and a wide-open lowpass on
+   *  white noise is the brightest thing there is. */
+  cutoffMin: 300,
+  cutoffMax: 2300,
+  /**
+   * Volume at a standstill and flat out.
+   *
+   * A third of what it was. The wind is the one sound in this game that never
+   * stops, and a continuous noise has to sit well under the things that happen
+   * — the "ow" clips play at 0.85, and at 0.3 the wind was competing with
+   * them for a run's worth of minutes at a time.
+   */
+  levelMin: 0.012,
+  levelMax: 0.1,
   /** How fast the wind follows the speed. Lazily: a gust that switched on and
    *  off with every turn would be exhausting. */
   follow: 2.2,
