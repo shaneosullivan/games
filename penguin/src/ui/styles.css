@@ -1,0 +1,218 @@
+/* Everything on the glass. Sized for an iPad held by a child: big type,
+   generous targets, nothing that needs a hover or a right-click. */
+
+:root {
+  --safe-t: env(safe-area-inset-top, 0px);
+  --safe-b: env(safe-area-inset-bottom, 0px);
+  --safe-l: env(safe-area-inset-left, 0px);
+  --safe-r: env(safe-area-inset-right, 0px);
+  --ink: #1e3346;
+  --panel: rgba(255, 255, 255, 0.84);
+  --stroke: rgba(30, 51, 70, 0.16);
+}
+
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body,
+#app {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: #cfe6f5;
+  font-family:
+    "Nunito",
+    "Avenir Next",
+    "Segoe UI",
+    system-ui,
+    -apple-system,
+    sans-serif;
+  color: var(--ink);
+  /* The game is driven by dragging; never let a drag scroll or zoom the page. */
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+canvas {
+  display: block;
+}
+
+/* The layer the UI lives on. Transparent to taps except where something opts
+   back in, so the stick still works underneath it. */
+.ui {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.ui-interactive {
+  pointer-events: auto;
+}
+
+/* ---------- The readouts ---------- */
+
+.hud {
+  position: absolute;
+  top: calc(var(--safe-t) + 12px);
+  left: calc(var(--safe-l) + 12px);
+  right: calc(var(--safe-r) + 12px);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+}
+
+.hud.hidden {
+  display: none;
+}
+
+.readout {
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: var(--panel);
+  border: 1px solid var(--stroke);
+  backdrop-filter: blur(8px);
+  font-size: 16px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.readout.hidden {
+  display: none;
+}
+
+/* Where the corner buttons sit — top right, the one corner nothing else uses.
+   The sound switch is the shared one and brings its own looks; this only says
+   where the pair of them goes. */
+.corner-buttons {
+  position: absolute;
+  top: calc(var(--safe-t) + 12px);
+  right: calc(var(--safe-r) + 12px);
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+/* The home button, cut to match the shared sound switch beside it: a child
+   should not be able to tell that one of them came from somewhere else. */
+.icon-button {
+  /* Border-box, because the shared sound button next to it is one: an anchor
+     is not, so without this the two discs differ by the two pixels of their
+     border and sit a pixel out of line. */
+  box-sizing: border-box;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: 1px solid var(--stroke);
+  background: var(--panel);
+  color: var(--ink);
+  font-size: 20px;
+  line-height: 1;
+  display: grid;
+  place-items: center;
+  text-decoration: none;
+  backdrop-filter: blur(8px);
+  cursor: pointer;
+}
+
+.icon-button:active {
+  transform: scale(0.93);
+}
+
+/* ---------- Overlays ---------- */
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  padding: 24px;
+  text-align: center;
+  background: rgba(240, 249, 255, 0.82);
+  backdrop-filter: blur(6px);
+  pointer-events: auto;
+  transition: opacity 320ms ease-out;
+}
+
+.overlay.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.overlay h1 {
+  margin: 0;
+  font-size: clamp(30px, 7vw, 62px);
+  line-height: 1.05;
+}
+
+.overlay p {
+  margin: 0;
+  max-width: 22em;
+  font-size: clamp(17px, 2.6vw, 24px);
+  line-height: 1.45;
+}
+
+.big-button {
+  border: none;
+  border-radius: 999px;
+  padding: 18px 46px;
+  font: inherit;
+  font-size: clamp(20px, 3vw, 28px);
+  font-weight: 800;
+  color: #fff;
+  background: #3b8fc9;
+  box-shadow: 0 6px 0 #2c6d9b;
+  cursor: pointer;
+}
+
+.big-button:active {
+  transform: translateY(4px);
+  box-shadow: 0 2px 0 #2c6d9b;
+}
+
+/* ---------- The floating thumbstick ---------- */
+
+.stick {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+  opacity: 0;
+  transition: opacity 130ms ease-out;
+  pointer-events: none;
+}
+
+.stick.active {
+  opacity: 1;
+}
+
+.stick-ring {
+  position: absolute;
+  width: 136px;
+  height: 136px;
+  margin: -68px 0 0 -68px;
+  border-radius: 50%;
+  /* Darker than the other games'. Theirs sit over a wood and a reef; this one
+     sits over snow, and white on white is a control nobody can find. */
+  border: 3px solid rgba(30, 51, 70, 0.42);
+  background: rgba(255, 255, 255, 0.24);
+  backdrop-filter: blur(2px);
+}
+
+.stick-knob {
+  position: absolute;
+  width: 58px;
+  height: 58px;
+  margin: -29px 0 0 -29px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 4px 14px rgba(30, 51, 70, 0.4);
+}
