@@ -344,8 +344,13 @@ export class Wood {
         count: PROPS.stones,
         geo: stoneGeometry(),
         radius: 3.1,
-        top: 99,
-        kind: "solid" as Kind,
+        // Clearable, like everything else on the path. Only the trees stop
+        // you outright now: a hare that can jump ten units and still gets
+        // pulled up short by a rock five high is a hare with a rule nobody
+        // can guess, and being stopped dead is the one thing that hands the
+        // dogs the run.
+        top: 6.8,
+        kind: "low" as Kind,
         across: false,
         spread: 1,
       },
@@ -353,12 +358,17 @@ export class Wood {
         count: PROPS.brambles,
         geo: brambleGeometry(),
         radius: 3.4,
-        top: 99,
-        kind: "solid" as Kind,
+        top: 5.6,
+        kind: "low" as Kind,
         across: false,
         spread: 1.2,
       },
     ];
+
+    // Everything already on the path, so nothing lands on top of anything
+    // else. Shared across the three kinds: a stone tucked against a log is as
+    // unfair as two logs together.
+    const taken: Array<{x: number; z: number}> = [];
 
     for (const k of kinds) {
       const mesh = new THREE.InstancedMesh(k.geo, this.fade.material, k.count);
@@ -370,10 +380,29 @@ export class Wood {
       const pos = new THREE.Vector3();
       const scale = new THREE.Vector3();
 
-      for (let i = 0; i < k.count; i++) {
+      let placed = 0;
+      let tries = 0;
+      while (placed < k.count && tries < k.count * 80) {
+        tries++;
         const z = rng.range(-PROPS.clearStart, -(WOOD.length - PROPS.clearEnd));
         const x = this.pathAt(z) + rng.range(-1, 1) * WOOD.pathHalf * k.spread;
         const s = rng.range(0.85, 1.25);
+
+        let clear = true;
+        for (const t of taken) {
+          const dx = t.x - x;
+          const dz = t.z - z;
+          if (dx * dx + dz * dz < PROPS.spacing * PROPS.spacing) {
+            clear = false;
+            break;
+          }
+        }
+        if (!clear) {
+          continue;
+        }
+        taken.push({x, z});
+        const i = placed;
+        placed++;
 
         pos.set(x, this.heightAt(x, z) - 0.2, z);
         // A log lies across the way you are going, give or take; everything
@@ -391,6 +420,13 @@ export class Wood {
           kind: k.kind,
         });
       }
+      // Anything that never found room is scaled to nothing — an instanced
+      // mesh cannot skip an instance.
+      scale.setScalar(0);
+      for (let i = placed; i < k.count; i++) {
+        m.compose(pos.set(0, 0, 0), q.identity(), scale);
+        mesh.setMatrixAt(i, m);
+      }
       mesh.instanceMatrix.needsUpdate = true;
       this.group.add(mesh);
     }
@@ -400,8 +436,12 @@ export class Wood {
    *  magic the plan asks for, and being tripped by magic is no fun. */
   private plantScenery(rng: Rng): void {
     const kinds = [
-      {count: PROPS.toadstools, geo: toadstoolGeometry(), lit: false},
-      {count: PROPS.glowCaps, geo: glowCapGeometry(), lit: true},
+      {count: PROPS.toadstools, geo: toadstoolGeometry(), lit: false, clump: 1},
+      // Grass grows in patches, not evenly over a wood, and a patch is the
+      // only thing that reads as long grass from a moving camera — scattered
+      // one at a time it is a field of little green spikes.
+      {count: PROPS.grass, geo: grassGeometry(), lit: false, clump: 7},
+      {count: PROPS.glowCaps, geo: glowCapGeometry(), lit: true, clump: 1},
     ];
     for (const k of kinds) {
       const mesh = new THREE.InstancedMesh(
@@ -421,9 +461,16 @@ export class Wood {
       const pos = new THREE.Vector3();
       const scale = new THREE.Vector3();
 
+      let cx = 0;
+      let cz = 0;
       for (let i = 0; i < k.count; i++) {
-        const z = rng.range(10, -WOOD.length + 20);
-        const x = this.pathAt(z) + rng.range(-1, 1) * WOOD.roamHalf * 1.6;
+        if (i % k.clump === 0) {
+          cz = rng.range(10, -WOOD.length + 20);
+          cx = this.pathAt(cz) + rng.range(-1, 1) * WOOD.roamHalf * 1.6;
+        }
+        const spread = k.clump > 1 ? 9 : 0;
+        const z = cz + rng.range(-spread, spread);
+        const x = cx + rng.range(-spread, spread);
         pos.set(x, this.heightAt(x, z) - 0.15, z);
         e.set(0, rng.range(0, TAU), 0);
         q.setFromEuler(e);
@@ -570,6 +617,43 @@ function toadstoolGeometry(): THREE.BufferGeometry {
     parts.push(paint(spot, 0xffffff));
   }
 
+  return mergeGeometries(parts, false);
+}
+
+/**
+ * A tuft of long grass.
+ *
+ * Scenery, and deliberately nothing else: it is in the list that never gets
+ * remembered as an obstacle, so a hare goes straight through it without so
+ * much as slowing down. That is the whole point of it — a wood wants somewhere
+ * that looks like it ought to cost you something and doesn't.
+ *
+ * Blades rather than a blob: five thin cones leaning different ways, which
+ * from a chase camera reads as grass where a green lump reads as a bush.
+ */
+function grassGeometry(): THREE.BufferGeometry {
+  const parts: Array<THREE.BufferGeometry> = [];
+  // Lighter than the wood behind it, or a tuft is a dark smudge on dark grass.
+  const greens = [
+    PALETTE.leafLight,
+    PALETTE.grass,
+    PALETTE.leaf,
+    PALETTE.leafLight,
+  ];
+  for (let i = 0; i < 7; i++) {
+    const a = (i / 7) * TAU + 0.3;
+    // Thin and tall. Fat and short, they were a handful of green pyramids
+    // stuck in the ground; grass is nearly all length and no width.
+    const height = 5.5 + (i % 3) * 1.8;
+    const blade = new THREE.ConeGeometry(0.2, height, 3);
+    // Leaning out from the middle, and a different way each time, so a tuft
+    // has a shape instead of being a bundle of sticks.
+    blade.rotateX(0.22 + (i % 2) * 0.14);
+    blade.rotateZ(Math.sin(a) * 0.34);
+    blade.rotateY(a);
+    blade.translate(Math.cos(a) * 0.45, height * 0.44, Math.sin(a) * 0.45);
+    parts.push(paint(blade, greens[i % greens.length]));
+  }
   return mergeGeometries(parts, false);
 }
 

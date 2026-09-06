@@ -57,11 +57,19 @@ export class Dogs {
       const ears: Array<THREE.Object3D> = [];
       for (const side of [-1, 1]) {
         const pivot = new THREE.Group();
-        pivot.position.set(side * 0.72, 1.9, 2.35);
-        const flap = new THREE.SphereGeometry(1, 8, 7);
-        flap.scale(0.2, 0.85, 0.5);
-        flap.translate(0, -0.7, 0);
-        const ear = new THREE.Mesh(paint(flap, PALETTE.dog), vertexToon());
+        // Set wide on the head and hung from the top of it, so they swing out
+        // and away rather than lying flat along the skull.
+        pivot.position.set(side * 1.05, 2.05, 2.4);
+        // Long, wide and thin: a proper spaniel flap. They were half this and
+        // the dogs read as three brown potatoes with legs — the ears are the
+        // single thing that says "dog" at fifty units, and the single thing
+        // that keeps them daft rather than frightening.
+        const flap = new THREE.SphereGeometry(1, 9, 8);
+        flap.scale(0.26, 1.5, 0.72);
+        flap.translate(0, -1.35, 0);
+        // A shade darker than the coat, the way a floppy-eared dog nearly
+        // always is.
+        const ear = new THREE.Mesh(paint(flap, 0x6a5240), vertexToon());
         ear.castShadow = true;
         pivot.add(ear);
         body.add(pivot);
@@ -181,6 +189,49 @@ export class Dogs {
 
     this.gap = nearest;
     return caught;
+  }
+
+  /**
+   * They have caught you, and now they are pleased about it.
+   *
+   * A ring round the hare, all facing in, bouncing on the spot. Not a pounce
+   * and nothing on top of it: the plan asks for a wood that is friendly and
+   * not scary, and what a dog does when it catches something it was playing
+   * with is stand there wagging.
+   */
+  surround(dt: number, hare: THREE.Vector3, wood: Wood): void {
+    for (let i = 0; i < this.dogs.length; i++) {
+      const dog = this.dogs[i];
+      dog.prevPosition.copy(dog.position);
+      dog.prevHeading = dog.heading;
+
+      // Evenly round the circle, and offset so none of them stands directly
+      // between the hare and the camera.
+      const a = (i / this.dogs.length) * TAU + 0.6;
+      const wobble = Math.sin(dog.stride * 0.5) * 1.2;
+      const want = {
+        x: hare.x + Math.sin(a) * (DOGS.ring + wobble),
+        z: hare.z + Math.cos(a) * (DOGS.ring + wobble),
+      };
+      const ease = Math.min(1, 4 * dt);
+      dog.position.x += (want.x - dog.position.x) * ease;
+      dog.position.z += (want.z - dog.position.z) * ease;
+      dog.position.y = wood.heightAt(dog.position.x, dog.position.z);
+
+      // Facing in.
+      const target = Math.atan2(
+        hare.x - dog.position.x,
+        hare.z - dog.position.z,
+      );
+      const diff =
+        ((((target - dog.heading) % TAU) + TAU + Math.PI) % TAU) - Math.PI;
+      dog.heading += diff * Math.min(1, 6 * dt);
+
+      // Bouncing rather than running: the stride drives the hop and the ears,
+      // so keeping it turning keeps them alive without going anywhere.
+      dog.stride += dt * 11;
+    }
+    this.gap = 0;
   }
 
   /** Draws them somewhere between the last step and this one. */

@@ -267,6 +267,17 @@ export const DOGS = {
   /** How much they slow for a moment after crashing through a bush, which is
    *  what gives a hare that goes through the thick stuff its reward. */
   snag: 0.55,
+  /**
+   * Being caught.
+   *
+   * They do not pounce on the hare, they surround it: three dogs in a ring,
+   * bouncing and barking, which is what dogs that have caught something they
+   * were only ever playing with actually do. `ring` is how far off they stand
+   * — far enough that nothing is on top of the hare — and `linger` is how long
+   * you watch before the card.
+   */
+  ring: 11,
+  linger: 2.4,
 } as const;
 
 /**
@@ -291,9 +302,22 @@ export const PROPS = {
   logs: 22,
   stones: 45,
   brambles: 50,
-  /** Toadstools and glowing mushrooms — scenery, and the magic the plan asks
-   *  for. Nothing collides with them. */
+  /**
+   * How far apart two things on the path have to be.
+   *
+   * Placed at random and nothing else, they pile up: four logs inside sixty
+   * units of each other turns a path into a fence, and a child who has just
+   * cleared one lands on the next. Twenty-two is a little over one jump's
+   * worth of run-up, so there is always room to see a thing and do something
+   * about it.
+   */
+  spacing: 22,
+  /** Toadstools, long grass and glowing mushrooms — scenery, and the magic the
+   *  plan asks for. Nothing collides with any of them: the grass in particular
+   *  is there to be run straight through, which is why it is in this list and
+   *  not in the one above. */
   toadstools: 260,
+  grass: 800,
   glowCaps: 90,
   /** How near the start nothing is placed, so the first seconds are a run and
    *  not a slalom, and how near the end. */

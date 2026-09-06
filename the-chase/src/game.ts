@@ -66,6 +66,8 @@ export class Game {
   private phase: "running" | "homing" | "safe" | "caught" = "running";
   private safeLeft = 0;
   private burstIn = 0;
+  /** Seconds left of watching the dogs make a fuss about it. */
+  private caughtLeft = 0;
 
   private readonly intro: Overlay;
   private readonly won: Overlay;
@@ -232,6 +234,19 @@ export class Game {
     }
 
     if (this.phase === "caught") {
+      // They have you. They are not doing anything about it except barking.
+      this.caughtLeft -= dt;
+      this.dogs.surround(dt, this.hare.position, this.wood);
+      this.hare.speed = 0;
+      this.home.update(dt);
+      this.leaves.update(dt);
+      // Gap zero, so the wood's own bark timer runs at its fastest and its
+      // loudest: they are standing on top of you.
+      this.woodland.update(dt, 0, 0);
+      if (this.caughtLeft <= 0) {
+        this.running = false;
+        this.lost.show();
+      }
       return;
     }
 
@@ -464,14 +479,28 @@ export class Game {
     });
   }
 
+  /**
+   * Caught: the dogs close in and the card waits.
+   *
+   * The card used to come up the instant they touched you, which threw away
+   * the only moment in the game where you get to see what has been chasing you
+   * — and made being caught feel like a door slamming. Now the shot pulls
+   * round, they make a ring and bark, and then the card.
+   */
   private caught(): void {
     this.phase = "caught";
+    this.caughtLeft = DOGS.linger;
     this.stick.enabled = false;
     this.stick.release();
     this.hud.setVisible(false);
     this.woodland.caught();
-    this.running = false;
-    this.lost.show();
+    // Where the shot stands to watch it: off to one side and above, so all
+    // three of them and the hare are in frame at once.
+    this.watchEye.set(
+      this.hare.position.x + 22,
+      this.hare.position.y + 15,
+      this.hare.position.z + 24,
+    );
   }
 
   private showWon(): void {
@@ -511,11 +540,14 @@ export class Game {
   private followCamera(dt: number): void {
     const p = this.hare.group.position;
 
-    // The ending has its own shot: parked, watching the doorway.
-    if (this.phase === "homing" || this.phase === "safe") {
+    // Both endings have their own shot: parked, watching. One watches the
+    // doorway and the other watches the dogs make a fuss.
+    if (this.phase !== "running") {
       const ease = 1 - Math.exp(-CAMERA.easeEye * 0.6 * dt);
       this.stage.camera.position.lerp(this.watchEye, ease);
-      this.smoothLook.lerp(this.home.mouth, 1 - Math.exp(-3 * dt));
+      const at =
+        this.phase === "caught" ? this.hare.group.position : this.home.mouth;
+      this.smoothLook.lerp(at, 1 - Math.exp(-3 * dt));
       this.stage.camera.lookAt(this.smoothLook);
       return;
     }
