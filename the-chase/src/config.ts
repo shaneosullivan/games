@@ -223,6 +223,14 @@ export const JUMP = {
 export const DOGS = {
   count: 3,
   /**
+   * How big they are drawn, against the hare's own size.
+   *
+   * A third again. The whole model is scaled from the ground up rather than
+   * rebuilt — the group's origin is at its feet, so one number moves the body,
+   * the legs and the ears together and nothing ends up hovering.
+   */
+  scale: 1.35,
+  /**
    * How fast they run.
    *
    * Between the hare's lope and its top speed, and that is the entire design:
@@ -247,8 +255,9 @@ export const DOGS = {
   /** How far behind they start. */
   startGap: 120,
   /** How close one has to get to have caught you. About a body length: they
-   *  have to be on top of you, not near you. */
-  reach: 7,
+   *  have to be on top of you, not near you — and a bigger dog reaches you
+   *  from a little further off, which is what `scale` costs. */
+  reach: 9,
   /** How far apart they fan out, and how fast they weave. Wider as they close,
    *  so they come into the shot from the sides rather than from behind the
    *  camera where nobody can see them. */
@@ -276,7 +285,7 @@ export const DOGS = {
    * — far enough that nothing is on top of the hare — and `linger` is how long
    * you watch before the card.
    */
-  ring: 11,
+  ring: 14,
   linger: 2.4,
 } as const;
 

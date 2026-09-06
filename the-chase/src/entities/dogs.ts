@@ -97,6 +97,9 @@ export class Dogs {
       }
 
       object.add(body);
+      // Scaled at the outer group, whose origin is on the ground: scale the
+      // body instead and the legs come off the floor.
+      object.scale.setScalar(DOGS.scale);
       object.userData.body = body;
       this.group.add(object);
 
