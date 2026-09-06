@@ -1,0 +1,591 @@
+import * as THREE from "three";
+import {mergeGeometries} from "three/examples/jsm/utils/BufferGeometryUtils.js";
+import {FADE, HOME, PROPS, WOOD} from "../config";
+import {Rng} from "../core/rng";
+import {PALETTE, paint, toonRamp, vertexToon} from "../render/materials";
+import {fadeInFront, type NearFade} from "../../../shared/fadeInFront";
+
+const TAU = Math.PI * 2;
+
+/** What a thing in the wood does when you reach it. */
+export type Kind = "solid" | "low";
+
+export interface Obstacle {
+  x: number;
+  z: number;
+  /** How far out it actually stops you, which is less than it looks. */
+  radius: number;
+  /** How high it stands. A "low" one is cleared by jumping over it; a "solid"
+   *  one is a tree, and no hare jumps a tree. */
+  top: number;
+  kind: Kind;
+}
+
+/**
+ * The wood: the ground, the path through it, and everything standing in it.
+ *
+ * The ground is a function — heightAt — and the mesh is sampled off it.
+ * Everything else asks the function rather than the mesh: the hare runs on it,
+ * the dogs run on it, the trees are planted on it and the fireflies drift
+ * above it. A model would have to be raycast a few hundred times a step to
+ * answer the same questions.
+ *
+ * There is nothing invisible holding you in. The path wanders and the wood
+ * thickens either side of it, and past a certain point the trunks are simply
+ * too close together to run through — which is a wall a child never has to be
+ * told about.
+ */
+export class Wood {
+  readonly group = new THREE.Group();
+
+  /** Where the burrow stands. */
+  readonly homeZ = -(WOOD.length - HOME.bankAt);
+
+  /** Everything you can run into, bucketed by how far down the wood it is, so
+   *  a collision check looks at the dozen things nearby instead of all nine
+   *  hundred. */
+  private readonly buckets = new Map<number, Array<Obstacle>>();
+  private static readonly BUCKET = 30;
+
+  private readonly gradient = new THREE.Vector2();
+
+  /**
+   * One material for every solid thing in the wood, so a single dissolve
+   * covers the lot. See setFadeFocus — this is what stops six hundred trees
+   * from hiding the one animal you are steering.
+   */
+  private readonly fade: NearFade<THREE.MeshToonMaterial> = fadeInFront(
+    vertexToon(),
+    {band: FADE.band, cutoff: FADE.cutoff, cacheKey: "chaseWoodFade"},
+  );
+  private readonly fadeAt = new THREE.Vector3();
+
+  constructor(rng: Rng) {
+    this.group.add(this.buildGround());
+    this.plantWood(rng);
+    this.plantPath(rng);
+    this.plantScenery(rng);
+  }
+
+  /**
+   * The middle of the path at this point down the wood.
+   *
+   * Two waves whose lengths do not divide into one another, so the run never
+   * repeats a shape a child could learn by heart — and, more to the point, so
+   * the corners do not arrive on a beat.
+   */
+  pathAt(z: number): number {
+    return (
+      Math.sin(z / WOOD.meanderWave) * WOOD.meander +
+      Math.sin(z / WOOD.meanderWave2 + 1.3) * WOOD.meander2
+    );
+  }
+
+  /** How high the ground is here. Gentle: this is a wood floor, not a hill. */
+  heightAt(x: number, z: number): number {
+    return (
+      Math.sin(z / WOOD.rollAlong) *
+        Math.cos(x / WOOD.rollAcross) *
+        WOOD.rollHeight +
+      Math.sin(z / WOOD.rollAlong2 + 2.1) *
+        Math.cos(x / WOOD.rollAcross2 + 0.7) *
+        WOOD.rollHeight2
+    );
+  }
+
+  /**
+   * Which way the ground falls away here, as a 2D gradient.
+   *
+   * Sampled rather than differentiated, so the shape can change without a
+   * second thing to keep in step with it.
+   */
+  slopeAt(x: number, z: number, out: THREE.Vector2): THREE.Vector2 {
+    const e = 1.5;
+    return out.set(
+      (this.heightAt(x + e, z) - this.heightAt(x - e, z)) / (2 * e),
+      (this.heightAt(x, z + e) - this.heightAt(x, z - e)) / (2 * e),
+    );
+  }
+
+  steepness(x: number, z: number): number {
+    return this.slopeAt(x, z, this.gradient).length();
+  }
+
+  /**
+   * What is in the way, or null.
+   *
+   * `y` is how high off the ground the hare is: a log at five units is not in
+   * the way of anything above five units, which is the whole of what makes
+   * jumping worth doing. Three buckets are checked rather than one, because a
+   * fast step crosses a bucket boundary and a thing sitting exactly on one
+   * would otherwise be a ghost.
+   */
+  hit(x: number, z: number, radius: number, y: number): Obstacle | null {
+    const key = Math.floor(z / Wood.BUCKET);
+    for (let k = key - 1; k <= key + 1; k++) {
+      const list = this.buckets.get(k);
+      if (!list) {
+        continue;
+      }
+      for (const o of list) {
+        if (o.kind === "low" && y > o.top) {
+          continue;
+        }
+        const reach = o.radius + radius;
+        const dx = o.x - x;
+        const dz = o.z - z;
+        if (dx * dx + dz * dz < reach * reach) {
+          return o;
+        }
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Dissolves whatever is between the eye and the hare.
+   *
+   * The focus is pulled a little toward the camera so the animal is never
+   * caught by its own fade — a distance rather than a fraction, because at
+   * twenty units away and again at forty it has to clear the same margin.
+   */
+  setFadeFocus(eye: THREE.Vector3, watching: THREE.Vector3): void {
+    const gap = eye.distanceTo(watching);
+    this.fadeAt
+      .copy(watching)
+      .lerp(eye, gap > 0.01 ? Math.min(0.9, FADE.margin / gap) : 0);
+    this.fade.setFocus(eye, this.fadeAt, FADE.radius);
+  }
+
+  private remember(o: Obstacle): void {
+    const key = Math.floor(o.z / Wood.BUCKET);
+    const list = this.buckets.get(key);
+    if (list) {
+      list.push(o);
+    } else {
+      this.buckets.set(key, [o]);
+    }
+  }
+
+  /**
+   * The floor.
+   *
+   * Smooth-shaded, with the colour going deeper where the ground dips. A wood
+   * floor lit through a canopy is mottled, and the mottling is what stops a
+   * few hundred square metres of one green from reading as a carpet.
+   */
+  private buildGround(): THREE.Mesh {
+    const zTop = 50;
+    const zBottom = -WOOD.length;
+    const along = Math.ceil((zTop - zBottom) / WOOD.cell);
+    const across = Math.ceil((WOOD.halfWidth * 2) / WOOD.cell);
+
+    const geo = new THREE.PlaneGeometry(
+      WOOD.halfWidth * 2,
+      zTop - zBottom,
+      across,
+      along,
+    );
+    geo.rotateX(-Math.PI / 2);
+    geo.translate(0, 0, (zTop + zBottom) / 2);
+
+    const pos = geo.attributes.position;
+    const colour = new Float32Array(pos.count * 3);
+    const grass = new THREE.Color(PALETTE.grass).convertSRGBToLinear();
+    const deep = new THREE.Color(PALETTE.grassDeep).convertSRGBToLinear();
+    const earth = new THREE.Color(PALETTE.earth).convertSRGBToLinear();
+    const c = new THREE.Color();
+
+    for (let i = 0; i < pos.count; i++) {
+      const x = pos.getX(i);
+      const z = pos.getZ(i);
+      const h = this.heightAt(x, z);
+      pos.setY(i, h);
+
+      // Deeper green in the hollows, and bare earth down the middle of the
+      // path where a hundred years of hares have worn it through. The worn
+      // strip is the one thing telling a child where to run.
+      c.copy(grass);
+      c.lerp(deep, Math.min(1, Math.max(0, 0.5 - h * 0.22)));
+      const off = Math.abs(x - this.pathAt(z));
+      // Only the middle of the path is worn through, and it does not go all
+      // the way to bare: at full strength over eighty per cent of the path it
+      // was a river of mud running down a green wood.
+      c.lerp(
+        earth,
+        0.75 * Math.min(1, Math.max(0, 1 - off / (WOOD.pathHalf * 0.45))),
+      );
+      colour[i * 3] = c.r;
+      colour[i * 3 + 1] = c.g;
+      colour[i * 3 + 2] = c.b;
+    }
+    geo.setAttribute("color", new THREE.BufferAttribute(colour, 3));
+    geo.computeVertexNormals();
+
+    const mesh = new THREE.Mesh(
+      geo,
+      new THREE.MeshToonMaterial({
+        vertexColors: true,
+        gradientMap: toonRamp(),
+      }),
+    );
+    mesh.receiveShadow = true;
+    return mesh;
+  }
+
+  /**
+   * The trees.
+   *
+   * Thin along the path and thick outside it, thickening further the further
+   * out you go: that gradient is the boundary of the game. Placed by drawing a
+   * spot and throwing it away if it does not pass — rejecting is both shorter
+   * to write and easier to change than any scheme that generates only legal
+   * spots.
+   */
+  private plantWood(rng: Rng): void {
+    const mesh = new THREE.InstancedMesh(
+      treeGeometry(),
+      this.fade.material,
+      PROPS.trees,
+    );
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    // An InstancedMesh is culled against the bounds of its *geometry* — one
+    // tree, at the origin — and not against where its instances are. Leave it
+    // on and the whole wood vanishes the moment the first tree goes off the
+    // back of the screen.
+    mesh.frustumCulled = false;
+
+    const m = new THREE.Matrix4();
+    const q = new THREE.Quaternion();
+    const e = new THREE.Euler();
+    const pos = new THREE.Vector3();
+    const scale = new THREE.Vector3();
+
+    let placed = 0;
+    let tries = 0;
+    while (placed < PROPS.trees && tries < PROPS.trees * 40) {
+      tries++;
+      const z = rng.range(20, -WOOD.length + 20);
+      const centre = this.pathAt(z);
+      const x = centre + rng.range(-1, 1) * WOOD.halfWidth * 0.85;
+      const off = Math.abs(x - centre);
+
+      // The gradient. Nothing on the path itself; a scattering in the roaming
+      // room either side; and out past that, everything.
+      if (off < WOOD.pathHalf) {
+        continue;
+      }
+      const chance =
+        off < WOOD.roamHalf
+          ? 0.12
+          : Math.min(1, 0.35 + (off - WOOD.roamHalf) / 40);
+      if (rng.next() > chance) {
+        continue;
+      }
+      // Not on top of the burrow, or you cannot get home.
+      if (z < this.homeZ + 40 && Math.abs(x) < 60) {
+        continue;
+      }
+
+      pos.set(x, this.heightAt(x, z) - 0.4, z);
+      e.set(0, rng.range(0, TAU), 0);
+      q.setFromEuler(e);
+      const s = rng.range(0.8, 1.45);
+      scale.set(s, rng.range(0.85, 1.25) * s, s);
+      m.compose(pos, q, scale);
+      mesh.setMatrixAt(placed, m);
+      this.remember({
+        x,
+        z,
+        radius: 2.3 * s * PROPS.forgive,
+        top: 99,
+        kind: "solid",
+      });
+      placed++;
+    }
+    // Anything that never found a spot is scaled to nothing — an instanced
+    // mesh cannot skip an instance, and a stack of unplaced trees at the
+    // origin is the alternative.
+    scale.setScalar(0);
+    for (let i = placed; i < PROPS.trees; i++) {
+      m.compose(pos.set(0, 0, 0), q.identity(), scale);
+      mesh.setMatrixAt(i, m);
+    }
+    mesh.instanceMatrix.needsUpdate = true;
+    this.group.add(mesh);
+  }
+
+  /**
+   * What is actually on the path: logs to jump, stones and brambles to go
+   * round.
+   *
+   * Every one of them is placed on the path on purpose. A thing you can run
+   * past without noticing is not an obstacle, and the plan asks for a game
+   * about dodging.
+   */
+  private plantPath(rng: Rng): void {
+    const kinds = [
+      {
+        count: PROPS.logs,
+        geo: logGeometry(),
+        // Six, not nine: a log is a long thing and a circle is a round one,
+        // and the circle has to match what a child can see or they get stopped
+        // by a gap they were sure they had.
+        radius: 6,
+        top: 4.6,
+        kind: "low" as Kind,
+        // Logs lie across the path, so they are turned to face along it and
+        // the whole width of them is in the way.
+        across: true,
+        spread: 0.5,
+      },
+      {
+        count: PROPS.stones,
+        geo: stoneGeometry(),
+        radius: 3.1,
+        top: 99,
+        kind: "solid" as Kind,
+        across: false,
+        spread: 1,
+      },
+      {
+        count: PROPS.brambles,
+        geo: brambleGeometry(),
+        radius: 3.4,
+        top: 99,
+        kind: "solid" as Kind,
+        across: false,
+        spread: 1.2,
+      },
+    ];
+
+    for (const k of kinds) {
+      const mesh = new THREE.InstancedMesh(k.geo, this.fade.material, k.count);
+      mesh.castShadow = true;
+      mesh.frustumCulled = false;
+      const m = new THREE.Matrix4();
+      const q = new THREE.Quaternion();
+      const e = new THREE.Euler();
+      const pos = new THREE.Vector3();
+      const scale = new THREE.Vector3();
+
+      for (let i = 0; i < k.count; i++) {
+        const z = rng.range(-PROPS.clearStart, -(WOOD.length - PROPS.clearEnd));
+        const x = this.pathAt(z) + rng.range(-1, 1) * WOOD.pathHalf * k.spread;
+        const s = rng.range(0.85, 1.25);
+
+        pos.set(x, this.heightAt(x, z) - 0.2, z);
+        // A log lies across the way you are going, give or take; everything
+        // else is turned at random.
+        e.set(0, k.across ? rng.range(-0.35, 0.35) : rng.range(0, TAU), 0);
+        q.setFromEuler(e);
+        scale.set(s, s, s);
+        m.compose(pos, q, scale);
+        mesh.setMatrixAt(i, m);
+        this.remember({
+          x,
+          z,
+          radius: k.radius * s * PROPS.forgive,
+          top: k.top * s,
+          kind: k.kind,
+        });
+      }
+      mesh.instanceMatrix.needsUpdate = true;
+      this.group.add(mesh);
+    }
+  }
+
+  /** Toadstools and glowing caps. Nothing collides with these: they are the
+   *  magic the plan asks for, and being tripped by magic is no fun. */
+  private plantScenery(rng: Rng): void {
+    const kinds = [
+      {count: PROPS.toadstools, geo: toadstoolGeometry(), lit: false},
+      {count: PROPS.glowCaps, geo: glowCapGeometry(), lit: true},
+    ];
+    for (const k of kinds) {
+      const mesh = new THREE.InstancedMesh(
+        k.geo,
+        k.lit
+          ? // Unlit, so a glowing mushroom glows in the shade under a tree
+            // rather than going the same colour as everything else there.
+            new THREE.MeshBasicMaterial({vertexColors: true})
+          : vertexToon(),
+        k.count,
+      );
+      mesh.castShadow = !k.lit;
+      mesh.frustumCulled = false;
+      const m = new THREE.Matrix4();
+      const q = new THREE.Quaternion();
+      const e = new THREE.Euler();
+      const pos = new THREE.Vector3();
+      const scale = new THREE.Vector3();
+
+      for (let i = 0; i < k.count; i++) {
+        const z = rng.range(10, -WOOD.length + 20);
+        const x = this.pathAt(z) + rng.range(-1, 1) * WOOD.roamHalf * 1.6;
+        pos.set(x, this.heightAt(x, z) - 0.15, z);
+        e.set(0, rng.range(0, TAU), 0);
+        q.setFromEuler(e);
+        const s = rng.range(0.7, 1.4);
+        scale.set(s, s, s);
+        m.compose(pos, q, scale);
+        mesh.setMatrixAt(i, m);
+      }
+      mesh.instanceMatrix.needsUpdate = true;
+      this.group.add(mesh);
+    }
+  }
+}
+
+/**
+ * A tree: a trunk and three overlapping crowns.
+ *
+ * Three rather than one, because a single sphere on a stick is a lollipop and
+ * three overlapping ones at different sizes is a tree — the overlap is the
+ * whole of the difference.
+ */
+function treeGeometry(): THREE.BufferGeometry {
+  const parts: Array<THREE.BufferGeometry> = [];
+
+  const trunk = new THREE.CylinderGeometry(1, 1.6, 17, 7);
+  trunk.translate(0, 8.5, 0);
+  parts.push(paint(trunk, PALETTE.bark));
+
+  const crowns = [
+    {x: 0, y: 21, z: 0, r: 7, c: PALETTE.leaf},
+    {x: 3.4, y: 17.6, z: 1.8, r: 5.2, c: PALETTE.leafDeep},
+    {x: -2.9, y: 18.6, z: -2.4, r: 4.7, c: PALETTE.leafLight},
+  ];
+  for (const crown of crowns) {
+    const blob = new THREE.IcosahedronGeometry(crown.r, 1);
+    blob.scale(1, 0.85, 1);
+    blob.translate(crown.x, crown.y, crown.z);
+    parts.push(paint(blob, crown.c));
+  }
+
+  return mergeGeometries(parts, false);
+}
+
+/** A fallen log, lying along +X so it can be turned across the path. */
+function logGeometry(): THREE.BufferGeometry {
+  const parts: Array<THREE.BufferGeometry> = [];
+
+  const trunk = new THREE.CylinderGeometry(2.2, 2.4, 12, 9);
+  trunk.rotateZ(Math.PI / 2);
+  trunk.translate(0, 2.4, 0);
+  parts.push(paint(trunk, PALETTE.bark));
+
+  // The cut ends, a shade lighter and standing a hair proud, so the log has
+  // ends rather than stopping.
+  for (const side of [-1, 1]) {
+    const end = new THREE.CylinderGeometry(2.25, 2.25, 0.5, 9);
+    end.rotateZ(Math.PI / 2);
+    end.translate(side * 6.1, 2.4, 0);
+    parts.push(paint(end, PALETTE.barkDark));
+  }
+
+  // Moss along the top. It also tells you which way up it is at a glance,
+  // which at sixty units a second is the only look you get.
+  const moss = new THREE.CylinderGeometry(
+    2.32,
+    2.32,
+    15,
+    9,
+    1,
+    false,
+    0.9,
+    1.4,
+  );
+  moss.rotateZ(Math.PI / 2);
+  moss.translate(0, 2.4, 0);
+  parts.push(paint(moss, PALETTE.leafDeep));
+
+  return mergeGeometries(parts, false);
+}
+
+/** A rock with a bit of moss on it. */
+function stoneGeometry(): THREE.BufferGeometry {
+  const parts: Array<THREE.BufferGeometry> = [];
+
+  // Taller than it is wide. Flattened, it read from the chase camera as a
+  // paving slab lying on the grass rather than as something to go round.
+  const rock = new THREE.IcosahedronGeometry(3.1, 0);
+  rock.scale(1, 1.3, 1);
+  rock.translate(0, 2.6, 0);
+  parts.push(paint(rock, PALETTE.stone));
+
+  const lump = new THREE.IcosahedronGeometry(1.7, 0);
+  lump.translate(1.9, 1.1, -0.8);
+  parts.push(paint(lump, PALETTE.stoneDark));
+
+  const moss = new THREE.SphereGeometry(2, 8, 5, 0, TAU, 0, Math.PI / 2);
+  moss.scale(1, 0.34, 1);
+  moss.translate(-0.2, 4.4, 0.2);
+  parts.push(paint(moss, PALETTE.leafDeep));
+
+  return mergeGeometries(parts, false);
+}
+
+/** A bramble: a low tangle with berries in it. */
+function brambleGeometry(): THREE.BufferGeometry {
+  const parts: Array<THREE.BufferGeometry> = [];
+
+  // Built upward as well as outward. Flat and wide, it read from the chase
+  // camera as a dark puddle on the grass rather than as something to go round.
+  for (let i = 0; i < 7; i++) {
+    const a = (i / 7) * TAU;
+    const blob = new THREE.IcosahedronGeometry(1.7, 0);
+    blob.scale(1.1, 1, 1.1);
+    blob.translate(Math.cos(a) * 1.5, 1.4 + (i % 3) * 1.1, Math.sin(a) * 1.5);
+    parts.push(paint(blob, i % 2 === 0 ? PALETTE.bramble : PALETTE.leafDeep));
+  }
+  for (let i = 0; i < 8; i++) {
+    const a = (i / 8) * TAU + 0.4;
+    const berry = new THREE.SphereGeometry(0.42, 6, 5);
+    berry.translate(Math.cos(a) * 1.9, 2.4 + (i % 2) * 1.2, Math.sin(a) * 1.9);
+    parts.push(paint(berry, PALETTE.berry));
+  }
+
+  return mergeGeometries(parts, false);
+}
+
+/** A toadstool: a red cap on a pale stalk. */
+function toadstoolGeometry(): THREE.BufferGeometry {
+  const parts: Array<THREE.BufferGeometry> = [];
+
+  const stalk = new THREE.CylinderGeometry(0.24, 0.36, 1.5, 7);
+  stalk.translate(0, 0.75, 0);
+  parts.push(paint(stalk, PALETTE.stalk));
+
+  const cap = new THREE.SphereGeometry(1, 10, 6, 0, TAU, 0, Math.PI / 2);
+  cap.scale(1, 0.7, 1);
+  cap.translate(0, 1.4, 0);
+  parts.push(paint(cap, PALETTE.cap));
+
+  for (let i = 0; i < 3; i++) {
+    const a = (i / 3) * TAU + 0.7;
+    const spot = new THREE.SphereGeometry(0.2, 6, 5);
+    spot.translate(Math.cos(a) * 0.5, 2, Math.sin(a) * 0.5);
+    parts.push(paint(spot, 0xffffff));
+  }
+
+  return mergeGeometries(parts, false);
+}
+
+/** The glowing kind: a pale blue cap that is drawn unlit, so it is brightest
+ *  exactly where the wood is darkest. */
+function glowCapGeometry(): THREE.BufferGeometry {
+  const parts: Array<THREE.BufferGeometry> = [];
+
+  const stalk = new THREE.CylinderGeometry(0.16, 0.26, 1.2, 6);
+  stalk.translate(0, 0.6, 0);
+  parts.push(paint(stalk, 0xdff6ff));
+
+  const cap = new THREE.SphereGeometry(0.75, 9, 6, 0, TAU, 0, Math.PI / 2);
+  cap.scale(1, 0.8, 1);
+  cap.translate(0, 1.1, 0);
+  parts.push(paint(cap, PALETTE.capGlow));
+
+  return mergeGeometries(parts, false);
+}
