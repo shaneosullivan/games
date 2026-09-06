@@ -27,6 +27,8 @@ export class Woodland {
   private level = 0;
   /** Seconds until the next bark. */
   private barkIn = 0;
+  /** The run is over. The wood in the leaves stops; the dogs do not. */
+  private hushed = false;
 
   /** Call from a real gesture — the button that starts the game. */
   start(): void {
@@ -82,16 +84,19 @@ export class Woodland {
    * are doing.
    */
   update(dt: number, speed: number, gap: number): void {
-    const want = Math.min(1, Math.max(0, speed / SOUND.fullSpeed));
-    this.level += (want - this.level) * Math.min(1, SOUND.follow * dt);
-    if (this.gain && this.filter && !this.muted) {
-      this.gain.gain.value =
-        SOUND.levelMin + this.level * (SOUND.levelMax - SOUND.levelMin);
-      // Squared, so most of the brightening happens in the top half of the
-      // speed range, which is where it is actually felt.
-      const bright = this.level * this.level;
-      this.filter.frequency.value =
-        SOUND.cutoffMin + bright * (SOUND.cutoffMax - SOUND.cutoffMin);
+    // Hushed, the rush of leaves goes to nothing — but the barking carries on
+    // below, because the end of a run is exactly when three dogs have most to
+    // say. Silencing the whole thing here was the first go and it took the
+    // dogs with it.
+    if (this.hushed) {
+      this.level = 0;
+      if (this.gain) {
+        this.gain.gain.value = 0;
+      }
+    } else {
+      const want = Math.min(1, Math.max(0, speed / SOUND.fullSpeed));
+      this.level += (want - this.level) * Math.min(1, SOUND.follow * dt);
+      this.bed();
     }
 
     this.barkIn -= dt;
@@ -111,8 +116,37 @@ export class Woodland {
     }
   }
 
+  /** The rush of leaves: volume and brightness both ride on the speed. */
+  private bed(): void {
+    if (this.gain && this.filter && !this.muted) {
+      this.gain.gain.value =
+        SOUND.levelMin + this.level * (SOUND.levelMax - SOUND.levelMin);
+      // Squared, so most of the brightening happens in the top half of the
+      // speed range, which is where it is actually felt.
+      const bright = this.level * this.level;
+      this.filter.frequency.value =
+        SOUND.cutoffMin + bright * (SOUND.cutoffMax - SOUND.cutoffMin);
+    }
+  }
+
   /**
-   * A dog barking: two short yaps, a fifth apart.
+   * Stops the rush of leaves, for the end of a run. `resume` starts it again
+   * when the next one begins.
+   */
+  hush(): void {
+    this.hushed = true;
+    this.level = 0;
+    if (this.gain) {
+      this.gain.gain.value = 0;
+    }
+  }
+
+  resume(): void {
+    this.hushed = false;
+  }
+
+  /**
+   * A dog barking: two woofs, a fifth apart.
    *
    * A bandpassed noise burst with a falling tone under it. Nothing here is
    * meant to be frightening — the plan asks for a wood that is friendly — so
@@ -124,28 +158,46 @@ export class Woodland {
       return;
     }
     for (let i = 0; i < 2; i++) {
-      const at = ctx.currentTime + i * 0.19;
+      const at = ctx.currentTime + i * 0.23;
       const osc = ctx.createOscillator();
       osc.type = "sawtooth";
-      const base = 260 * (i === 0 ? 1 : 0.82) * (0.9 + Math.random() * 0.25);
-      osc.frequency.setValueAtTime(base * 1.8, at);
-      osc.frequency.exponentialRampToValueAtTime(base * 0.7, at + 0.11);
+      // Low, and it drops rather than squeaks.
+      //
+      // It was a yip: two hundred and sixty hertz through a bandpass at nine
+      // hundred, which is all edge and no chest — a very small dog a very long
+      // way off. A hundred and forty through a lowpass at five hundred has a
+      // body to it, and the slower fall and longer tail are what turn a yip
+      // into a woof.
+      const base = 140 * (i === 0 ? 1 : 0.86) * (0.92 + Math.random() * 0.2);
+      osc.frequency.setValueAtTime(base * 1.5, at);
+      osc.frequency.exponentialRampToValueAtTime(base * 0.72, at + 0.17);
 
-      const band = ctx.createBiquadFilter();
-      band.type = "bandpass";
-      band.frequency.value = 900;
-      band.Q.value = 1.1;
+      // A second voice a fifth below, which is most of what makes it sound
+      // like a chest rather than a whistle.
+      const growl = ctx.createOscillator();
+      growl.type = "triangle";
+      growl.frequency.setValueAtTime(base * 0.66, at);
+      growl.frequency.exponentialRampToValueAtTime(base * 0.42, at + 0.19);
+
+      const low = ctx.createBiquadFilter();
+      low.type = "lowpass";
+      low.frequency.setValueAtTime(1100, at);
+      low.frequency.exponentialRampToValueAtTime(360, at + 0.2);
+      low.Q.value = 0.7;
 
       const g = ctx.createGain();
       g.gain.setValueAtTime(0.0001, at);
-      g.gain.exponentialRampToValueAtTime(level, at + 0.012);
-      g.gain.exponentialRampToValueAtTime(0.0001, at + 0.16);
+      g.gain.exponentialRampToValueAtTime(level, at + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, at + 0.26);
 
-      osc.connect(band);
-      band.connect(g);
+      osc.connect(low);
+      growl.connect(low);
+      low.connect(g);
       g.connect(ctx.destination);
       osc.start(at);
-      osc.stop(at + 0.18);
+      osc.stop(at + 0.28);
+      growl.start(at);
+      growl.stop(at + 0.28);
     }
   }
 

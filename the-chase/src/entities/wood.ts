@@ -509,7 +509,12 @@ export class Wood {
           ? // Unlit, so a glowing mushroom glows in the shade under a tree
             // rather than going the same colour as everything else there.
             new THREE.MeshBasicMaterial({vertexColors: true})
-          : vertexToon(),
+          : // On the same dissolving material as everything else. The grass in
+            // particular had to join: it stands nine units tall, there are
+            // eight hundred tufts of it, and it was the one thing left in the
+            // wood that could stand between the camera and the hare and not
+            // get out of the way.
+            this.fade.material,
         k.count,
       );
       mesh.castShadow = !k.lit;

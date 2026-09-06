@@ -33,6 +33,12 @@ None of it is only on the path, either. The same logs, stones and brambles are
 scattered out on the verges either side, so cutting a corner costs you
 something.
 
+How close they are is the gauge down the right-hand side: a tube with a paw in
+the bulb that fills from the bottom as they close, green through amber to red.
+They spend most of a run behind the camera, so without it the only things
+telling you are the barking and the moment they fan wide enough to come into
+shot.
+
 There is no losing except being caught, and being caught is three friendly dogs
 arriving, not a disaster. They make a ring round the hare and bark about it for
 a couple of seconds, and then the run simply starts again — no card, no button,

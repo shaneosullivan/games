@@ -140,7 +140,7 @@ export class Game {
     this.intro = new Overlay(
       ui,
       "The Chase",
-      "You are a hare, and three dogs have seen you. Drag anywhere on the screen to run: hold on to go flat out, and if you let go you drop to a trot and they will catch you up. Tap the left of the screen to jump — you can clear a fallen log easily, but you will have to go round the stones and the brambles. Home is the burrow at the far end of the wood. Get inside it and you are safe.",
+      "You are a hare, and three dogs have seen you. Drag anywhere on the screen to run: hold on to go flat out, and if you let go you drop to a trot and they will catch you up. Tap the left of the screen to jump — you can clear the logs, the stones and the brambles, but not the big boulders or the trees, so go round those. The gauge down the side fills up as the dogs get closer. Home is the burrow at the far end of the wood. Get inside it and you are safe.",
       "Run!",
       () => this.begin(),
     );
@@ -388,6 +388,9 @@ export class Game {
     this.stick.release();
     this.hud.setVisible(false);
     this.home.cheer();
+    // The wood goes quiet. A run that has ended and is still rushing past your
+    // ears is a run that has not ended.
+    this.woodland.hush();
     this.woodland.safe();
     this.burstIn = 0;
     // Where the shot stands for the ending, and it stands still.
@@ -490,6 +493,7 @@ export class Game {
     this.phase = "running";
     this.stick.enabled = true;
     this.hud.setVisible(true);
+    this.woodland.resume();
     this.snapCamera();
   }
 
@@ -507,6 +511,9 @@ export class Game {
     this.stick.enabled = false;
     this.stick.release();
     this.hud.setVisible(false);
+    // The rush stops; the barking does not, since that is the whole of what
+    // you are being shown.
+    this.woodland.hush();
     this.woodland.caught();
     // Where the shot stands to watch it: off to one side and above, so all
     // three of them and the hare are in frame at once.
