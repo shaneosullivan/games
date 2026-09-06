@@ -31,13 +31,17 @@ export class Home {
 
   constructor(rng: Rng, wood: Wood) {
     const z = wood.homeZ;
-    const y = wood.heightAt(0, z);
-    // On the face of the bank, not at its middle: this is the spot the hare
-    // runs at and vanishes into, and it has to be the doorway you can see.
-    this.mouth.set(0, y + HOME.holeHeight * 0.45, z + 12);
+    // On the path, not at x = 0. The path wanders the whole way down the wood
+    // and the burrow was pinned to the middle of the map, so the last stretch
+    // of every run bent away from the one thing you were running at.
+    const cx = wood.pathAt(z);
+    const y = wood.heightAt(cx, z);
+    // The middle of the hole, on the ground. This is the spot the hare runs at
+    // and drops into.
+    this.mouth.set(cx, y, z);
 
-    this.group.add(this.buildBank(wood, z, y));
-    this.buildCrowd(rng, wood, z);
+    this.group.add(this.buildBurrow(cx, z, y));
+    this.buildCrowd(rng, wood, cx, z);
   }
 
   /** They start jumping when the hare gets home. */
@@ -85,12 +89,14 @@ export class Home {
         one.position.x += (dx / left) * step;
         one.position.z += (dz / left) * step;
         one.rotation.y = Math.atan2(dx, dz);
-        one.scale.setScalar(Math.min(1, left / 12));
+        const shrink = Math.min(1, left / 10);
+        one.scale.setScalar(shrink);
         // Still bounding: the same hop the run itself uses, so they are
         // running rather than sliding.
         one.position.y =
           (one.userData.baseY as number) +
-          Math.abs(Math.sin(this.time * 14 + this.bounce[i])) * 1.6;
+          Math.abs(Math.sin(this.time * 14 + this.bounce[i])) * 1.6 -
+          (1 - shrink) * 4;
         continue;
       }
 
@@ -113,72 +119,115 @@ export class Home {
    * a mouth with no bottom to it — there is nothing in there to see, and that
    * is exactly what a burrow looks like from outside.
    */
-  private buildBank(wood: Wood, z: number, y: number): THREE.Mesh {
+  /**
+   * The burrow: a hole in the ground, with a heap of earth behind it.
+   *
+   * It was a bank of grass right across the end of the wood with a doorway cut
+   * in the face of it — a great deal of scenery for one hole, and it walled the
+   * wood off behind. This is what a burrow is: a dark hole in the ground with
+   * the spoil piled behind it and the wood carrying on past.
+   *
+   * Three parts, and the order they stack in is the whole of the trick. The
+   * worn earth lies on the grass; the hole lies on the earth; and a throat
+   * drops out of sight beneath it, so at a low angle you are looking into
+   * something rather than at a black sticker.
+   */
+  private buildBurrow(cx: number, z: number, y: number): THREE.Mesh {
     const parts: Array<THREE.BufferGeometry> = [];
-    const half = 150;
-    // How far the bank's own front surface reaches toward you. Everything to
-    // do with the door is built in front of this line, and that is the whole
-    // lesson of three goes at it: a burrow made of a tube pushed *into* a bank
-    // is a burrow nobody can see. A dome swallows a tube, and a bigger dome
-    // swallows a bigger tube. The door has to stand on the face.
-    const face = 12;
 
-    for (let x = -half; x <= half; x += 11) {
-      const near = Math.max(0, 1 - Math.abs(x) / 70);
-      const h = 15 + near * 12 + Math.sin(x * 0.21) * 2.5;
-      const dome = new THREE.SphereGeometry(11, 9, 6, 0, TAU, 0, Math.PI / 2);
-      dome.scale(1, h / 11, 1.1);
-      dome.translate(
-        x,
-        wood.heightAt(x, z) - 1,
-        z - 3 + Math.sin(x * 0.13) * 2,
-      );
-      parts.push(paint(dome, x % 22 === 0 ? PALETTE.grass : PALETTE.grassDeep));
-    }
-
-    const midY = y + HOME.holeHeight * 0.45;
-
-    // The earth round the door, framing it: a ring standing on the face of the
-    // bank, wider than the hole and lighter than it.
-    const rim = new THREE.RingGeometry(1, 1.55, 26);
-    rim.scale(HOME.holeWidth * 0.5, HOME.holeHeight * 0.5, 1);
-    rim.translate(0, midY, z + face);
-    parts.push(paint(rim, PALETTE.earth));
-
-    // The hole. A flat dark disc on the face, and a tube going back behind it
-    // so it still reads as a hole from off to one side.
-    const hole = new THREE.CircleGeometry(1, 26);
-    hole.scale(HOME.holeWidth * 0.5, HOME.holeHeight * 0.5, 1);
-    hole.translate(0, midY, z + face - 0.1);
-    parts.push(paint(hole, 0x140f0a));
-
-    const tube = new THREE.CylinderGeometry(1, 1, 20, 20, 1, true);
-    tube.rotateX(Math.PI / 2);
-    tube.scale(HOME.holeWidth * 0.5, HOME.holeHeight * 0.5, 1);
-    tube.translate(0, midY, z + face - 10.2);
-    parts.push(paint(tube, 0x1a1310));
-
-    // Bare worn earth on the ground in front of it, where the coming and going
-    // has rubbed the grass off.
-    const worn = new THREE.CircleGeometry(HOME.holeWidth * 0.75, 20);
+    // Bare earth, worn by the coming and going, a little longer than it is
+    // wide because everybody arrives from the same direction.
+    const worn = new THREE.CircleGeometry(HOME.apron, 24);
     worn.rotateX(-Math.PI / 2);
-    worn.scale(1, 1, 1.4);
-    worn.translate(0, y + 0.12, z + face + 10);
+    worn.scale(1, 1, 1.35);
+    worn.translate(cx, y + 0.1, z + 4);
     parts.push(paint(worn, PALETTE.earth));
 
+    // A raised lip of earth round the hole, so it is dug rather than drawn.
+    // A pale ring of thrown-out earth right at the edge, so the black has a
+    // bright edge against it and reads as a hole rather than as a shadow.
+    //
+    // Flat, and that is the point. It was a torus standing proud of the
+    // ground, and a raised ring seen from up the wood sits *over* the hole it
+    // is supposed to be framing — from a hundred units out the burrow was a
+    // pale disc with no hole in it at all. Three flat discs stacked a few
+    // centimetres apart cannot hide one another.
+    const rim = new THREE.RingGeometry(
+      HOME.holeWidth * 0.5,
+      HOME.holeWidth * 0.78,
+      26,
+    );
+    rim.rotateX(-Math.PI / 2);
+    rim.scale(1, 1, 0.9);
+    rim.translate(cx, y + 0.2, z);
+    parts.push(paint(rim, PALETTE.furLight));
+
+    // The hole itself, and the throat under it.
+    const hole = new THREE.CircleGeometry(HOME.holeWidth * 0.5, 24);
+    hole.rotateX(-Math.PI / 2);
+    hole.scale(1, 1, 0.9);
+    hole.translate(cx, y + 0.3, z);
+    parts.push(paint(hole, 0x120d09));
+
+    const throat = new THREE.CylinderGeometry(
+      HOME.holeWidth * 0.5,
+      HOME.holeWidth * 0.28,
+      HOME.holeDepth,
+      22,
+      1,
+      true,
+    );
+    throat.scale(1, 1, 0.85);
+    throat.translate(cx, y + 0.3 - HOME.holeDepth / 2, z);
+    parts.push(paint(throat, 0x1c1510));
+
+    const floor = new THREE.CircleGeometry(HOME.holeWidth * 0.3, 16);
+    floor.rotateX(-Math.PI / 2);
+    floor.translate(cx, y + 0.3 - HOME.holeDepth, z);
+    parts.push(paint(floor, 0x0d0906));
+
+    // The heap behind it: the earth that came out, with grass growing over the
+    // back of it.
+    const heap = new THREE.SphereGeometry(
+      HOME.moundWide,
+      12,
+      8,
+      0,
+      TAU,
+      0,
+      Math.PI / 2,
+    );
+    heap.scale(1.35, HOME.moundHigh / HOME.moundWide, 1);
+    heap.translate(cx, y - 0.4, z - HOME.moundBack);
+    parts.push(paint(heap, PALETTE.earth));
+
+    const turf = new THREE.SphereGeometry(
+      HOME.moundWide * 0.78,
+      10,
+      7,
+      0,
+      TAU,
+      0,
+      Math.PI / 2,
+    );
+    turf.scale(1.35, (HOME.moundHigh * 0.75) / HOME.moundWide, 1);
+    turf.translate(cx, y - 0.2, z - HOME.moundBack - 3);
+    parts.push(paint(turf, PALETTE.grassDeep));
+
     const mesh = new THREE.Mesh(mergeGeometries(parts, false), vertexToon());
-    mesh.castShadow = true;
     mesh.receiveShadow = true;
+    mesh.castShadow = true;
     return mesh;
   }
 
   /** The others, waiting outside. */
-  private buildCrowd(rng: Rng, wood: Wood, z: number): void {
+  private buildCrowd(rng: Rng, wood: Wood, cx: number, z: number): void {
     const geo = littleHare();
     for (let i = 0; i < HOME.crowd; i++) {
       const side = i % 2 === 0 ? -1 : 1;
       const x =
-        side * (HOME.holeWidth * 0.7 + rng.range(0, HOME.crowdSpread)) +
+        cx +
+        side * (HOME.holeWidth * 0.9 + rng.range(0, HOME.crowdSpread)) +
         rng.range(-4, 4);
       const zz = z + rng.range(10, 34);
       const mesh = new THREE.Mesh(geo, vertexToon());

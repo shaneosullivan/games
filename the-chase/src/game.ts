@@ -415,8 +415,10 @@ export class Game {
       // Well back. There is a whole scene to fit in now — the hole, the
       // others filing into it and three wolfhounds running rings round the
       // lot — and at fifty-eight the dogs were cropped off both edges.
-      this.home.mouth.y + 26,
-      this.home.mouth.z + 86,
+      // Higher and nearer than the bank needed: it is a hole in the ground,
+      // so the shot has to look down into it rather than across at it.
+      this.home.mouth.y + 34,
+      this.home.mouth.z + 70,
     );
   }
 
@@ -441,10 +443,12 @@ export class Game {
         HARE.ride;
     }
 
-    // Into the hole: it gets smaller over the last few units and is gone by
-    // the time it reaches the back of the mouth.
-    const shrink = Math.max(0, Math.min(1, left / 16));
+    // Down the hole. It gets smaller over the last few units and sinks as it
+    // goes, because the burrow is a hole in the ground now rather than a door
+    // in a wall — a hare that only shrank would be dissolving on the grass.
+    const shrink = Math.max(0, Math.min(1, left / 14));
     this.hare.group.scale.setScalar(shrink);
+    this.hare.group.position.y -= (1 - shrink) * 4;
     this.woodland.update(dt, this.hare.speed, 999);
 
     if (left <= 0.6) {

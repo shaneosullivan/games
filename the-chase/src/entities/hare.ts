@@ -328,6 +328,27 @@ export class Hare {
       parts.push(paint(glint, 0xffffff));
     }
 
+    // A little top hat, tipped back on the crown between the ears.
+    //
+    // It does the same job the penguin's bobble hat does — most of this game
+    // is spent looking at the back of a brown animal on brown grass, and a
+    // hard dark shape on top of it is visible at any distance and from any
+    // angle. It is also the only joke in the wood.
+    const brim = new THREE.CylinderGeometry(0.8, 0.8, 0.12, 14);
+    brim.rotateX(-0.2);
+    brim.translate(0, 1.5, 2.92);
+    parts.push(paint(brim, PALETTE.hat));
+
+    const crown = new THREE.CylinderGeometry(0.46, 0.5, 1.15, 14);
+    crown.rotateX(-0.2);
+    crown.translate(0, 2.02, 3.03);
+    parts.push(paint(crown, PALETTE.hat));
+
+    const band = new THREE.CylinderGeometry(0.52, 0.54, 0.26, 14);
+    band.rotateX(-0.2);
+    band.translate(0, 1.63, 2.95);
+    parts.push(paint(band, PALETTE.hatBand));
+
     // The scut: a little white ball of a tail.
     const tail = new THREE.SphereGeometry(0.6, 8, 6);
     tail.translate(0, 0.5, -2.5);
@@ -343,7 +364,10 @@ export class Hare {
     // child will look at.
     for (const side of [-1, 1]) {
       const pivot = new THREE.Group();
-      pivot.position.set(side * 0.42, 1.2, 2.5);
+      // Set wide on the head, and that is not decoration: the hat sits on the
+      // crown between them, and at 0.42 apart the ears came up through the
+      // back of it every time the hare slowed down and put them up.
+      pivot.position.set(side * 0.82, 1.16, 2.42);
       const ear = new THREE.SphereGeometry(1, 8, 8);
       ear.scale(0.26, 1.5, 0.42);
       ear.translate(0, 1.35, 0);

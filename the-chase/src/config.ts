@@ -111,11 +111,12 @@ export const WOOD = {
   /**
    * How long the run is.
    *
-   * A hundred and eighty metres of wood, which at a gallop is a run of about
-   * forty seconds. It was eighteen hundred units and over too quickly to
-   * settle into.
+   * The whole ground, not the whole run: the burrow stands HOME.bankAt short
+   * of the far end, so there are three hundred units of wood behind it. Before
+   * that the world simply stopped a few units past the hole and the last shot
+   * of the game was the edge of the map.
    */
-  length: 2600,
+  length: 2900,
   /** Half the width of the ground that gets built. Wider than anywhere you can
    *  reach, so the world never ends in mid-air. */
   halfWidth: 190,
@@ -468,17 +469,37 @@ export const GLOW = {
  * to finish — you have to get there.
  */
 export const HOME = {
-  /** How far short of the end of the ground the bank stands. */
-  bankAt: 60,
-  /** The mouth of the burrow: how wide and how high.
+  /** How far short of the end of the ground the burrow sits. Everything past
+   *  it is wood you never reach and only ever see over the mound. */
+  bankAt: 360,
+  /**
+   * The hole in the ground: how wide across, and how deep the throat goes.
    *
    * Big for a hare — three body-widths across — because it is the thing a
    * child has to aim at while being chased, and a realistic burrow at this
-   * speed would be a keyhole. Not as big as it first was, though: at
-   * twenty-six by eighteen it filled a third of the screen and read as a cave.
+   * speed would be a keyhole.
+   *
+   * It used to be a doorway in the face of a bank across the end of the wood,
+   * which was a lot of scenery for one hole and shut the wood off behind it. A
+   * hole in the ground with a little heap of earth behind it is what a burrow
+   * actually is, and the wood carries on past it.
    */
-  holeWidth: 17,
-  holeHeight: 13,
+  holeWidth: 12,
+  holeDepth: 12,
+  /**
+   * The patch of bare earth round it, which is a separate number on purpose.
+   *
+   * A small hole is harder to see, so what makes it easy to spot is not its
+   * own size but the ring round it: a wide light-earth apron on green grass is
+   * visible the length of the wood, and the black hole in the middle of it is
+   * then unmistakable at any size. Tying the apron to the hole meant shrinking
+   * one shrank the other and the whole thing disappeared.
+   */
+  apron: 21,
+  /** The heap of earth behind it: how big, and how far back it sits. */
+  moundWide: 14,
+  moundHigh: 10,
+  moundBack: 21,
   /** The others waiting: how many and how far either side. */
   crowd: 9,
   crowdSpread: 40,

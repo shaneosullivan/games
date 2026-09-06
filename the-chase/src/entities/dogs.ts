@@ -19,6 +19,8 @@ interface Dog {
    *  crashing through a bramble. */
   side: number;
   snagged: number;
+  /** Standing rather than running. The legs stop; everything else does not. */
+  standing: boolean;
   object: THREE.Group;
   ears: Array<THREE.Object3D>;
   legs: Array<THREE.Object3D>;
@@ -121,6 +123,7 @@ export class Dogs {
         phase: rng.range(0, TAU),
         side,
         snagged: 0,
+        standing: false,
         object,
         ears,
         legs,
@@ -214,6 +217,7 @@ export class Dogs {
       }
 
       dog.stride += dt * 9;
+      dog.standing = false;
     }
 
     this.gap = nearest;
@@ -256,9 +260,12 @@ export class Dogs {
         ((((target - dog.heading) % TAU) + TAU + Math.PI) % TAU) - Math.PI;
       dog.heading += diff * Math.min(1, 6 * dt);
 
-      // Bouncing rather than running: the stride drives the hop and the ears,
-      // so keeping it turning keeps them alive without going anywhere.
-      dog.stride += dt * 11;
+      // Standing, not bouncing. They had you: the chase is over, and three
+      // dogs still pounding their legs on the spot read as a bug rather than
+      // as dogs. The stride goes on turning, slowly, because the render uses
+      // it for the breathing and the ears — but the legs are told to stop.
+      dog.stride += dt * 2.2;
+      dog.standing = true;
     }
     this.gap = 0;
   }
@@ -308,6 +315,7 @@ export class Dogs {
       }
       dog.position.y = wood.heightAt(dog.position.x, dog.position.z);
       dog.stride += dt * 10;
+      dog.standing = false;
     }
   }
 
@@ -321,6 +329,24 @@ export class Dogs {
       dog.object.rotation.y = dog.prevHeading + diff * alpha;
 
       const body = dog.object.userData.body as THREE.Object3D;
+      if (dog.standing) {
+        // Standing over you, getting its breath back. A small quick rise and
+        // fall and nothing else — the legs are still, which is the whole
+        // difference between a dog that has arrived and a dog running on the
+        // spot.
+        body.position.y = 3.3 + Math.sin(dog.stride * 3) * 0.16;
+        body.rotation.x = 0;
+        for (let i = 0; i < dog.ears.length; i++) {
+          const side = i === 0 ? -1 : 1;
+          dog.ears[i].rotation.x = Math.sin(dog.stride * 2.2 + i) * 0.22 - 0.1;
+          dog.ears[i].rotation.z = side * 0.3;
+        }
+        for (const leg of dog.legs) {
+          leg.rotation.x = 0;
+        }
+        continue;
+      }
+
       // The same bound the hare has, a little heavier: a dog at a gallop is
       // rising and falling too, and a dog that slid along flat behind you
       // would look like a cutout.
@@ -445,17 +471,6 @@ function dogGeometry(): THREE.BufferGeometry {
   tongue.scale(0.45, 0.24, 1);
   tongue.translate(0, 1.95, 4.85);
   parts.push(paint(tongue, PALETTE.tongue));
-
-  // A bit of drool off the side of the mouth. Two small drips and nothing
-  // else: a dog that has been running for a hundred and eighty metres with its
-  // mouth open is a dog that is dribbling, and it is funny rather than
-  // horrible so long as there is not much of it.
-  for (const side of [-1, 1]) {
-    const drip = new THREE.SphereGeometry(0.12, 7, 6);
-    drip.scale(0.8, 2.6 - side * 0.7, 0.8);
-    drip.translate(side * 0.3, 1.62 + side * 0.1, 4.55);
-    parts.push(paint(drip, PALETTE.drool));
-  }
 
   for (const side of [-1, 1]) {
     const eye = new THREE.SphereGeometry(0.2, 8, 6);

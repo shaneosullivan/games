@@ -284,7 +284,7 @@ export class Wood {
         continue;
       }
       // Not on top of the burrow, or you cannot get home.
-      if (z < this.homeZ + 40 && Math.abs(x) < 60) {
+      if (z > this.homeZ - 30 && z < this.homeZ + 46 && Math.abs(x) < 52) {
         continue;
       }
 
@@ -445,7 +445,9 @@ export class Wood {
       let tries = 0;
       while (placed < k.count && tries < k.count * 80) {
         tries++;
-        const z = rng.range(-PROPS.clearStart, -(WOOD.length - PROPS.clearEnd));
+        // Down to the burrow, not to the end of the ground: everything past
+        // the hole is scenery nobody runs through.
+        const z = rng.range(-PROPS.clearStart, this.homeZ + PROPS.clearEnd);
         const side = rng.next() < 0.5 ? -1 : 1;
         const x =
           this.pathAt(z) +

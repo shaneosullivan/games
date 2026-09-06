@@ -91,7 +91,9 @@ export const PALETTE = {
   /** Not red. A wolfhound with a scarlet collar on read as a pet in a costume,
    *  and the red was the loudest thing in a wood full of greens and browns. */
   tongue: 0xdf9aa6,
-  drool: 0xeef6f7,
+  /** The hare's hat. */
+  hat: 0x2b2a33,
+  hatBand: 0xf0e6d2,
   /** The magic. */
   cap: 0xe2634f,
   capGlow: 0x9ee8ff,
