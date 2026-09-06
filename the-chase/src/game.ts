@@ -71,7 +71,6 @@ export class Game {
 
   private readonly intro: Overlay;
   private readonly won: Overlay;
-  private readonly lost: Overlay;
 
   /** Seconds since the run began. */
   private time = 0;
@@ -149,14 +148,6 @@ export class Game {
       window.location.reload(),
     );
     this.won.hide();
-    this.lost = new Overlay(
-      ui,
-      "They caught you!",
-      "The dogs only wanted to play, but that is the end of that run. Keep hold of the screen to stay at a gallop, and try not to stop for the brambles.",
-      "Try again",
-      () => window.location.reload(),
-    );
-    this.lost.hide();
 
     const corner = document.createElement("div");
     corner.className = "corner-buttons";
@@ -244,8 +235,7 @@ export class Game {
       // loudest: they are standing on top of you.
       this.woodland.update(dt, 0, 0);
       if (this.caughtLeft <= 0) {
-        this.running = false;
-        this.lost.show();
+        this.restart();
       }
       return;
     }
@@ -477,6 +467,30 @@ export class Game {
       size: 3,
       spherical: 1,
     });
+  }
+
+  /**
+   * Back to the top of the wood, with no card in between.
+   *
+   * Being caught used to end on a panel with a button on it, and a panel is a
+   * stop: the child has read what happened, they know what happened, they
+   * watched it happen. Three dogs make a fuss for a couple of seconds and then
+   * you are running again, which is the only thing anybody wanted.
+   *
+   * The wood is seeded and identical every run, so there is nothing to
+   * rebuild — this is the hare, the dogs and a handful of counters.
+   */
+  private restart(): void {
+    this.hare.place(this.wood, this.wood.pathAt(-20), -20);
+    this.dogs.reset(this.wood, this.hare.position.x, this.hare.position.z);
+    this.bumps = 0;
+    this.time = 0;
+    this.puffIn = 0;
+    this.burstIn = 0;
+    this.phase = "running";
+    this.stick.enabled = true;
+    this.hud.setVisible(true);
+    this.snapCamera();
   }
 
   /**

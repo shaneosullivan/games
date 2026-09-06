@@ -66,7 +66,13 @@ export class Hare {
     this.group.add(this.body);
   }
 
-  /** Drops it on the ground at a spot, facing down the wood. */
+  /**
+   * Drops it on the ground at a spot, facing down the wood.
+   *
+   * Everything is put back, not just the position: this is what a restart uses
+   * after the dogs have had you, and a hare that starts the next run still
+   * carrying the last one's stumble is a hare with a limp nobody asked for.
+   */
   place(wood: Wood, x: number, z: number): void {
     this.position.set(x, wood.heightAt(x, z) + HARE.ride, z);
     this.prevPosition.copy(this.position);
@@ -75,6 +81,13 @@ export class Hare {
     this.speed = HARE.lope;
     this.vy = 0;
     this.grounded = true;
+    this.rest = 0;
+    this.stumble = 0;
+    this.wanted = 0;
+    this.lean = 0;
+    this.prevLean = 0;
+    this.group.scale.setScalar(1);
+    this.group.visible = true;
   }
 
   /** The player has asked for a jump. Remembered for a moment if there is no

@@ -123,6 +123,26 @@ export class Dogs {
   }
 
   /**
+   * Puts them back where they started, for a fresh run.
+   *
+   * The wood does not need rebuilding — it is seeded and identical every time
+   * — so a restart is this, the hare, and a handful of counters.
+   */
+  reset(wood: Wood, x: number, z: number): void {
+    for (let i = 0; i < this.dogs.length; i++) {
+      const dog = this.dogs[i];
+      const dx = x + dog.side * DOGS.spread;
+      const dz = z + DOGS.startGap + i * 6;
+      dog.position.set(dx, wood.heightAt(dx, dz), dz);
+      dog.prevPosition.copy(dog.position);
+      dog.heading = Math.PI;
+      dog.prevHeading = Math.PI;
+      dog.snagged = 0;
+    }
+    this.gap = DOGS.startGap;
+  }
+
+  /**
    * Runs them at the hare.
    *
    * Each one steers for a point beside the hare rather than at it, and how far

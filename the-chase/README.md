@@ -28,7 +28,10 @@ Logs are jumped and everything else is gone round. A jump clears ten units and
 lasts seven tenths of a second; a log stands under five.
 
 There is no losing except being caught, and being caught is three friendly dogs
-arriving, not a disaster.
+arriving, not a disaster. They make a ring round the hare and bark about it for
+a couple of seconds, and then the run simply starts again — no card, no button,
+nothing to read. The wood is seeded and identical every time, so a restart is
+the hare, the dogs and a handful of counters.
 
 ## How it is built
 
