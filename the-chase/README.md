@@ -39,8 +39,9 @@ They spend most of a run behind the camera, so without it the only things
 telling you are the barking and the moment they fan wide enough to come into
 shot.
 
-There is no losing except being caught, and being caught is three friendly dogs
-arriving, not a disaster. They make a ring round the hare and bark about it for
+There is no losing except being caught, and being caught is three Irish
+wolfhounds arriving, not a disaster. They are enormous and lean and grey, with
+a beard and a bit of drool, and nothing on them comes to a point. They make a ring round the hare and bark about it for
 a couple of seconds, and then the run simply starts again — no card, no button,
 nothing to read. The wood is seeded and identical every time, so a restart is
 the hare, the dogs and a handful of counters.
@@ -75,5 +76,13 @@ told about.
 All the art is generated in code: merged primitives with vertex colours,
 toon-shaded, one draw call per assembly. There are no model files and no
 textures.
+
+## The ending
+
+Getting home is a scene rather than a card. The hare runs itself into the
+burrow and shrinks into the dark; the others outside turn and file in after it,
+one behind another; the wolfhounds come pelting up and run rings round the
+hole; and when it is plain that nobody is coming out, they give it up and trot
+off into the wood. A rainbow goes off over the bank the whole time.
 
 See [CLAUDE.md](CLAUDE.md) for the commands and the house style.

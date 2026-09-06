@@ -84,11 +84,14 @@ export const PALETTE = {
   furDark: 0x9d7548,
   nose: 0xd98c9a,
   eye: 0x2a2118,
-  /** The dogs. */
-  dog: 0x7d6350,
-  dogLight: 0xefe3d2,
-  tongue: 0xe0687a,
-  collar: 0xd5533f,
+  /** The dogs: Irish wolfhounds, which are grey and shaggy and enormous. */
+  dog: 0x8d8a83,
+  dogDark: 0x6f6c66,
+  dogLight: 0xc9c4b8,
+  /** Not red. A wolfhound with a scarlet collar on read as a pet in a costume,
+   *  and the red was the loudest thing in a wood full of greens and browns. */
+  tongue: 0xdf9aa6,
+  drool: 0xeef6f7,
   /** The magic. */
   cap: 0xe2634f,
   capGlow: 0x9ee8ff,

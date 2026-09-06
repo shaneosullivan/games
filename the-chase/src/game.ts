@@ -207,6 +207,16 @@ export class Game {
       this.safeLeft -= dt;
       this.rainbow(dt);
       this.home.update(dt);
+      // The others file down the hole and the dogs run rings round it, and
+      // then give it up. This is the only part of the game nobody plays, and
+      // it is the part they will want to watch twice.
+      this.dogs.giveUp(
+        dt,
+        HOME.linger - this.safeLeft,
+        this.home.mouth,
+        this.wood,
+      );
+      this.woodland.update(dt, 0, this.dogs.gap);
       this.leaves.update(dt);
       this.sparks.update(dt);
       if (this.safeLeft <= 0) {
@@ -402,8 +412,11 @@ export class Game {
     // over the top of it, which is the shot the ending is for.
     this.watchEye.set(
       this.home.mouth.x,
-      this.home.mouth.y + 18,
-      this.home.mouth.z + 58,
+      // Well back. There is a whole scene to fit in now — the hole, the
+      // others filing into it and three wolfhounds running rings round the
+      // lot — and at fifty-eight the dogs were cropped off both edges.
+      this.home.mouth.y + 26,
+      this.home.mouth.z + 86,
     );
   }
 
@@ -438,6 +451,8 @@ export class Game {
       this.phase = "safe";
       this.safeLeft = HOME.linger;
       this.hare.group.visible = false;
+      // Everybody else goes in after it.
+      this.home.bolt();
     }
   }
 
@@ -517,10 +532,13 @@ export class Game {
     this.woodland.caught();
     // Where the shot stands to watch it: off to one side and above, so all
     // three of them and the hare are in frame at once.
+    // Well back, because they are enormous. At twenty-two out and fifteen up
+    // a single wolfhound filled half the screen and the hare was somewhere
+    // behind its shoulder.
     this.watchEye.set(
-      this.hare.position.x + 22,
-      this.hare.position.y + 15,
-      this.hare.position.z + 24,
+      this.hare.position.x + 34,
+      this.hare.position.y + 24,
+      this.hare.position.z + 40,
     );
   }
 

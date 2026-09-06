@@ -108,8 +108,14 @@ export const SHADOW = {
  * you in, only a wood that gets too thick to run through.
  */
 export const WOOD = {
-  /** How long the run is. */
-  length: 1800,
+  /**
+   * How long the run is.
+   *
+   * A hundred and eighty metres of wood, which at a gallop is a run of about
+   * forty seconds. It was eighteen hundred units and over too quickly to
+   * settle into.
+   */
+  length: 2600,
   /** Half the width of the ground that gets built. Wider than anywhere you can
    *  reach, so the world never ends in mid-air. */
   halfWidth: 190,
@@ -225,11 +231,13 @@ export const DOGS = {
   /**
    * How big they are drawn, against the hare's own size.
    *
-   * A third again. The whole model is scaled from the ground up rather than
-   * rebuilt — the group's origin is at its feet, so one number moves the body,
-   * the legs and the ears together and nothing ends up hovering.
+   * Getting on for twice, which is about right: an Irish wolfhound stands
+   * taller at the shoulder than any other dog, and against a hare it should
+   * look faintly ridiculous. The whole model is scaled from the ground up
+   * rather than rebuilt — the group's origin is at its feet, so one number
+   * moves the body, the legs and the ears together and nothing hovers.
    */
-  scale: 1.35,
+  scale: 1.7,
   /**
    * How fast they run.
    *
@@ -257,7 +265,7 @@ export const DOGS = {
   /** How close one has to get to have caught you. About a body length: they
    *  have to be on top of you, not near you — and a bigger dog reaches you
    *  from a little further off, which is what `scale` costs. */
-  reach: 9,
+  reach: 11,
   /** How far apart they fan out, and how fast they weave. Wider as they close,
    *  so they come into the shot from the sides rather than from behind the
    *  camera where nobody can see them. */
@@ -285,7 +293,7 @@ export const DOGS = {
    * — far enough that nothing is on top of the hare — and `linger` is how long
    * you watch before the card.
    */
-  ring: 14,
+  ring: 17,
   linger: 2.4,
 } as const;
 
@@ -298,8 +306,10 @@ export const DOGS = {
  */
 export const PROPS = {
   seed: 20260906,
+  /* Every count below is for the whole run and was scaled with WOOD.length
+     when the wood got longer, so the density a child meets is unchanged. */
   /** The wood itself: thick outside the path, thin inside it. */
-  trees: 620,
+  trees: 900,
   /**
    * Things on the path. Logs are jumped, stones and brambles are gone round.
    *
@@ -308,9 +318,9 @@ export const PROPS = {
    * things in five seconds, and a course you cannot get through without being
    * stopped is not a course, it is a wall with gaps.
    */
-  logs: 22,
-  stones: 45,
-  brambles: 50,
+  logs: 32,
+  stones: 65,
+  brambles: 72,
   /**
    * And the same things again out on the verges, either side of the path.
    *
@@ -319,9 +329,9 @@ export const PROPS = {
    * a course you can go round is not a course. Out here they are a reason to
    * come back to the path rather than a wall stopping you leaving it.
    */
-  vergeLogs: 30,
-  vergeStones: 70,
-  vergeBrambles: 80,
+  vergeLogs: 44,
+  vergeStones: 100,
+  vergeBrambles: 116,
   /**
    * Boulders, and trees standing in the way.
    *
@@ -331,8 +341,8 @@ export const PROPS = {
    * A boulder is too big to go over and a tree is a tree, so both have to be
    * gone round, and that is what puts the dodging back.
    */
-  boulders: 34,
-  pathTrees: 26,
+  boulders: 49,
+  pathTrees: 38,
   /**
    * How far apart two things on the path have to be.
    *
@@ -347,9 +357,9 @@ export const PROPS = {
    *  plan asks for. Nothing collides with any of them: the grass in particular
    *  is there to be run straight through, which is why it is in this list and
    *  not in the one above. */
-  toadstools: 260,
-  grass: 800,
-  glowCaps: 90,
+  toadstools: 375,
+  grass: 1150,
+  glowCaps: 130,
   /** How near the start nothing is placed, so the first seconds are a run and
    *  not a slalom, and how near the end. */
   clearStart: 70,
@@ -472,9 +482,26 @@ export const HOME = {
   /** The others waiting: how many and how far either side. */
   crowd: 9,
   crowdSpread: 40,
-  /** How long the camera watches before the card comes up, and the fireworks
-   *  over it: how often one goes off and how far either side. */
-  linger: 2.4,
+  /**
+   * How long the camera watches before the card comes up.
+   *
+   * Long enough for the whole scene: the others turn and bolt for the hole,
+   * the dogs come pelting up and run rings round it, and then they give it up
+   * and trot off into the wood. Two and a half seconds was time for the
+   * fireworks and nothing else.
+   */
+  linger: 6,
+  /** How long the others take to notice, and how fast they run for the hole.
+   *  Staggered, so they go in one after another rather than as a block. */
+  boltAfter: 0.35,
+  boltSpeed: 34,
+  /** How long the dogs spend circling before they give up, and how far out
+   *  they run round it. */
+  circleFor: 3.2,
+  circleAt: 34,
+  /** And how fast they trot away afterwards. */
+  leaveSpeed: 26,
+  /** The fireworks over it: how often one goes off and how far either side. */
   every: 0.2,
   spread: 30,
 } as const;

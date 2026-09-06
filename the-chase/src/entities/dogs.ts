@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import {mergeGeometries} from "three/examples/jsm/utils/BufferGeometryUtils.js";
-import {DOGS} from "../config";
+import {DOGS, HOME} from "../config";
 import {Rng} from "../core/rng";
 import {Wood} from "./wood";
 import {PALETTE, paint, vertexToon} from "../render/materials";
@@ -57,19 +57,17 @@ export class Dogs {
       const ears: Array<THREE.Object3D> = [];
       for (const side of [-1, 1]) {
         const pivot = new THREE.Group();
-        // Set wide on the head and hung from the top of it, so they swing out
-        // and away rather than lying flat along the skull.
-        pivot.position.set(side * 1.05, 2.05, 2.4);
-        // Long, wide and thin: a proper spaniel flap. They were half this and
-        // the dogs read as three brown potatoes with legs — the ears are the
-        // single thing that says "dog" at fifty units, and the single thing
-        // that keeps them daft rather than frightening.
-        const flap = new THREE.SphereGeometry(1, 9, 8);
-        flap.scale(0.26, 1.5, 0.72);
-        flap.translate(0, -1.35, 0);
+        // Small rose ears, folded back against the skull. A wolfhound has
+        // nothing like a spaniel's flap — the ear is half the length and lies
+        // along the head — so the big soft ones had to go, and what keeps
+        // these dogs friendly now is the beard and the eyes instead.
+        pivot.position.set(side * 0.62, 2.85, 3.15);
+        const flap = new THREE.SphereGeometry(1, 8, 7);
+        flap.scale(0.16, 0.42, 0.5);
+        flap.translate(0, -0.3, -0.2);
         // A shade darker than the coat, the way a floppy-eared dog nearly
         // always is.
-        const ear = new THREE.Mesh(paint(flap, 0x6a5240), vertexToon());
+        const ear = new THREE.Mesh(paint(flap, PALETTE.dogDark), vertexToon());
         ear.castShadow = true;
         pivot.add(ear);
         body.add(pivot);
@@ -77,19 +75,27 @@ export class Dogs {
       }
 
       const legs: Array<THREE.Object3D> = [];
+      // Long, and set well apart front and back. The legs are the wolfhound:
+      // it stands a head above every other dog and does it entirely on these.
       const spots = [
-        {x: -0.85, z: 1.7},
-        {x: 0.85, z: 1.7},
-        {x: -0.95, z: -1.4},
-        {x: 0.95, z: -1.4},
+        {x: -0.8, z: 1.9},
+        {x: 0.8, z: 1.9},
+        {x: -0.9, z: -1.7},
+        {x: 0.9, z: -1.7},
       ];
       for (const spot of spots) {
         const pivot = new THREE.Group();
         pivot.position.set(spot.x, 0.1, spot.z);
         const shape = new THREE.SphereGeometry(1, 8, 7);
-        shape.scale(0.34, 1.05, 0.42);
-        shape.translate(0, -0.9, 0);
+        shape.scale(0.3, 1.75, 0.38);
+        shape.translate(0, -1.6, 0);
         const leg = new THREE.Mesh(paint(shape, PALETTE.dog), vertexToon());
+        // A darker foot, so a leg has an end to it.
+        const paw = new THREE.SphereGeometry(1, 7, 6);
+        paw.scale(0.34, 0.22, 0.5);
+        paw.translate(0, -3.2, 0.12);
+        const foot = new THREE.Mesh(paint(paw, PALETTE.dogDark), vertexToon());
+        pivot.add(foot);
         leg.castShadow = true;
         pivot.add(leg);
         body.add(pivot);
@@ -257,6 +263,54 @@ export class Dogs {
     this.gap = 0;
   }
 
+  /**
+   * The hare has gone down the hole and they have not.
+   *
+   * They run rings round the burrow for a few seconds — nose down, still
+   * looking — and then give it up and trot off into the wood. `since` is how
+   * long the ending has been running, which decides which of the two they are
+   * doing.
+   */
+  giveUp(dt: number, since: number, at: THREE.Vector3, wood: Wood): void {
+    const leaving = since > HOME.circleFor;
+    for (let i = 0; i < this.dogs.length; i++) {
+      const dog = this.dogs[i];
+      dog.prevPosition.copy(dog.position);
+      dog.prevHeading = dog.heading;
+
+      let wx: number;
+      let wz: number;
+      if (leaving) {
+        // Away up the wood and out to the side, each on its own line, until
+        // they are gone into the fog.
+        wx = at.x + (i - 1) * 90;
+        wz = at.z + 400;
+      } else {
+        // Round and round. Each one a third of the way apart, all going the
+        // same way, so it reads as circling rather than milling.
+        const a = since * 1.5 + (i / this.dogs.length) * TAU;
+        wx = at.x + Math.sin(a) * HOME.circleAt;
+        wz = at.z + 18 + Math.cos(a) * HOME.circleAt * 0.55;
+      }
+
+      const dx = wx - dog.position.x;
+      const dz = wz - dog.position.z;
+      const d = Math.hypot(dx, dz);
+      if (d > 0.001) {
+        const speed = leaving ? HOME.leaveSpeed : DOGS.speed * 0.8;
+        const step = Math.min(d, speed * dt);
+        dog.position.x += (dx / d) * step;
+        dog.position.z += (dz / d) * step;
+        const target = Math.atan2(dx, dz);
+        const diff =
+          ((((target - dog.heading) % TAU) + TAU + Math.PI) % TAU) - Math.PI;
+        dog.heading += Math.sign(diff) * Math.min(Math.abs(diff), 6 * dt);
+      }
+      dog.position.y = wood.heightAt(dog.position.x, dog.position.z);
+      dog.stride += dt * 10;
+    }
+  }
+
   /** Draws them somewhere between the last step and this one. */
   render(alpha: number): void {
     for (const dog of this.dogs) {
@@ -270,7 +324,9 @@ export class Dogs {
       // The same bound the hare has, a little heavier: a dog at a gallop is
       // rising and falling too, and a dog that slid along flat behind you
       // would look like a cutout.
-      body.position.y = 1.9 + Math.abs(Math.sin(dog.stride)) * 0.9;
+      // Up on the long legs. It was 1.9, which was right for a barrel and
+      // leaves a wolfhound sitting on its own elbows.
+      body.position.y = 3.3 + Math.abs(Math.sin(dog.stride)) * 0.9;
       body.rotation.x = -Math.cos(dog.stride) * 0.14;
 
       // Ears flapping, which is nine tenths of what makes them daft rather
@@ -290,64 +346,133 @@ export class Dogs {
 }
 
 /**
- * One dog: a barrel on legs with a big soft head and its tongue out.
+ * One dog: an Irish wolfhound.
  *
- * Round everywhere. There is not a point on it anywhere — no teeth, no snout
- * to speak of, nothing that comes to an edge — because the plan asks for a
- * wood that is friendly and not scary, and the thing chasing you is the only
- * place that could go wrong.
+ * The tallest dog there is, and shaped nothing like the barrel on legs this
+ * used to be — long in the leg, deep and narrow in the chest, tucked up at the
+ * waist, with a long head and a beard on it. That silhouette is the whole
+ * animal: you can tell a wolfhound from a hundred units away by its legs and
+ * its back line alone.
+ *
+ * Shaggy, which here means lumpy: a dozen irregular blobs along the spine and
+ * down the flanks, because a smooth grey shape at this scale reads as a horse.
+ *
+ * Still not frightening, and that took some doing with a dog this size. No
+ * teeth, no snout coming to a point, soft round eyes, a beard, and the tongue
+ * out — a wolfhound's own reputation is for being the gentlest thing in the
+ * house, and the drawing has to say so before the size does.
  */
 function dogGeometry(): THREE.BufferGeometry {
   const parts: Array<THREE.BufferGeometry> = [];
 
-  const body = new THREE.SphereGeometry(2, 12, 10);
-  body.scale(0.82, 0.8, 1.3);
-  parts.push(paint(body, PALETTE.dog));
+  // The body: long, deep and narrow, higher at the shoulder than the hip.
+  const chest = new THREE.SphereGeometry(2, 12, 10);
+  // Narrow. A wolfhound is a sighthound: deep through the chest and almost
+  // flat from the side, and at 0.62 across it was a barrel with long legs.
+  chest.scale(0.48, 1.05, 1.05);
+  chest.translate(0, 0.1, 1.1);
+  parts.push(paint(chest, PALETTE.dog));
 
-  const chest = new THREE.SphereGeometry(1.5, 10, 8);
-  chest.scale(0.9, 0.85, 1);
-  chest.translate(0, -0.25, 1.5);
-  parts.push(paint(chest, PALETTE.dogLight));
+  const back = new THREE.SphereGeometry(1.9, 12, 10);
+  back.scale(0.46, 0.82, 1.4);
+  back.translate(0, 0.05, -1);
+  parts.push(paint(back, PALETTE.dog));
 
-  const head = new THREE.SphereGeometry(1.35, 12, 10);
-  head.translate(0, 1.1, 2.5);
-  parts.push(paint(head, PALETTE.dog));
+  // The tuck: a hare or a hound is pinched in behind the ribs, and that little
+  // waist is most of what says "runs fast" without anything moving.
+  const waist = new THREE.SphereGeometry(1.35, 10, 8);
+  waist.scale(0.44, 0.66, 0.9);
+  waist.translate(0, -0.15, -0.4);
+  parts.push(paint(waist, PALETTE.dogDark));
 
-  const muzzle = new THREE.SphereGeometry(0.8, 10, 8);
-  muzzle.scale(0.9, 0.75, 1.1);
-  muzzle.translate(0, 0.55, 3.4);
+  const bib = new THREE.SphereGeometry(1.4, 10, 8);
+  bib.scale(0.4, 0.8, 0.7);
+  bib.translate(0, -0.5, 1.9);
+  parts.push(paint(bib, PALETTE.dogLight));
+
+  // A little shag, along the top line only.
+  //
+  // There were a dozen lumps down both flanks and it read as a sheep: a
+  // wolfhound's coat is rough and wiry but it lies close to a body you can
+  // still see the shape of, and the shape is the point. Five along the spine
+  // break the smooth line without burying it.
+  for (let i = 0; i < 5; i++) {
+    const t = i / 4;
+    const lump = new THREE.IcosahedronGeometry(0.42 + (i % 2) * 0.12, 0);
+    lump.scale(0.6, 0.65, 1.1);
+    lump.translate(
+      (i % 2 === 0 ? 1 : -1) * 0.24,
+      0.78 - t * 0.42,
+      1.5 - t * 3.1,
+    );
+    parts.push(paint(lump, i % 2 === 0 ? PALETTE.dogDark : PALETTE.dog));
+  }
+
+  // A long neck, rising.
+  const neck = new THREE.CylinderGeometry(0.62, 0.82, 2.2, 9);
+  neck.rotateX(-0.55);
+  neck.translate(0, 1.35, 2.5);
+  parts.push(paint(neck, PALETTE.dog));
+
+  // The head: long and narrow, and nowhere near as round as it was.
+  const skull = new THREE.SphereGeometry(0.95, 12, 10);
+  skull.scale(0.8, 0.85, 1.05);
+  skull.translate(0, 2.5, 3.35);
+  parts.push(paint(skull, PALETTE.dog));
+
+  const muzzle = new THREE.SphereGeometry(0.62, 10, 8);
+  muzzle.scale(0.72, 0.62, 1.45);
+  muzzle.translate(0, 2.25, 4.35);
   parts.push(paint(muzzle, PALETTE.dogLight));
 
-  const nose = new THREE.SphereGeometry(0.3, 8, 6);
-  nose.translate(0, 0.78, 4.1);
+  // The beard. One shape, and it is the difference between a wolfhound and a
+  // greyhound.
+  const beard = new THREE.SphereGeometry(0.52, 9, 7);
+  beard.scale(0.85, 0.7, 1.1);
+  beard.translate(0, 1.92, 4.5);
+  parts.push(paint(beard, PALETTE.dogLight));
+
+  const brows = new THREE.SphereGeometry(0.42, 8, 6);
+  brows.scale(1.5, 0.5, 0.7);
+  brows.translate(0, 2.95, 3.75);
+  parts.push(paint(brows, PALETTE.dogLight));
+
+  const nose = new THREE.SphereGeometry(0.26, 8, 6);
+  nose.translate(0, 2.32, 5.05);
   parts.push(paint(nose, 0x2f2822));
 
-  // The tongue, hanging out. One shape, and it does more for the mood than
-  // everything else on the animal put together.
-  const tongue = new THREE.SphereGeometry(0.5, 8, 6);
-  tongue.scale(0.5, 0.28, 1.1);
-  tongue.translate(0, 0.16, 3.9);
+  const tongue = new THREE.SphereGeometry(0.42, 8, 6);
+  tongue.scale(0.45, 0.24, 1);
+  tongue.translate(0, 1.95, 4.85);
   parts.push(paint(tongue, PALETTE.tongue));
 
+  // A bit of drool off the side of the mouth. Two small drips and nothing
+  // else: a dog that has been running for a hundred and eighty metres with its
+  // mouth open is a dog that is dribbling, and it is funny rather than
+  // horrible so long as there is not much of it.
   for (const side of [-1, 1]) {
-    const eye = new THREE.SphereGeometry(0.24, 8, 6);
-    eye.translate(side * 0.5, 1.5, 3.5);
+    const drip = new THREE.SphereGeometry(0.12, 7, 6);
+    drip.scale(0.8, 2.6 - side * 0.7, 0.8);
+    drip.translate(side * 0.3, 1.62 + side * 0.1, 4.55);
+    parts.push(paint(drip, PALETTE.drool));
+  }
+
+  for (const side of [-1, 1]) {
+    const eye = new THREE.SphereGeometry(0.2, 8, 6);
+    eye.translate(side * 0.42, 2.72, 3.95);
     parts.push(paint(eye, PALETTE.eye));
-    const glint = new THREE.SphereGeometry(0.09, 6, 5);
-    glint.translate(side * 0.58, 1.62, 3.64);
+    const glint = new THREE.SphereGeometry(0.08, 6, 5);
+    glint.translate(side * 0.49, 2.82, 4.06);
     parts.push(paint(glint, 0xffffff));
   }
 
-  const collar = new THREE.CylinderGeometry(1.2, 1.2, 0.45, 12);
-  collar.rotateX(0.35);
-  collar.translate(0, 0.55, 1.95);
-  parts.push(paint(collar, PALETTE.collar));
-
-  const tail = new THREE.SphereGeometry(0.9, 8, 6);
-  tail.scale(0.35, 0.35, 1.3);
-  tail.rotateX(-0.7);
-  tail.translate(0, 0.9, -2.4);
-  parts.push(paint(tail, PALETTE.dog));
+  // A long tail with a curve in it, carried low.
+  for (let i = 0; i < 4; i++) {
+    const t = i / 3;
+    const seg = new THREE.SphereGeometry(0.42 - t * 0.16, 8, 6);
+    seg.translate(0, 0.5 - t * t * 1.1, -2.6 - t * 1.25);
+    parts.push(paint(seg, i % 2 === 0 ? PALETTE.dog : PALETTE.dogDark));
+  }
 
   return mergeGeometries(parts, false);
 }

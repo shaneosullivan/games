@@ -25,6 +25,9 @@ export class Home {
   private readonly bounce: Array<number> = [];
   private time = 0;
   private cheering = false;
+  /** They have seen the hare coming and are bolting for the hole. See bolt(). */
+  private bolting = false;
+  private boltTime = 0;
 
   constructor(rng: Rng, wood: Wood) {
     const z = wood.homeZ;
@@ -42,10 +45,55 @@ export class Home {
     this.cheering = true;
   }
 
+  /**
+   * And then they bolt.
+   *
+   * A hare arriving with three dogs behind it does not stop for a party at the
+   * door: everybody goes down the hole. They set off a fraction of a second
+   * apart so they file in rather than vanishing all at once, which is the
+   * difference between a scene and a bug.
+   */
+  bolt(): void {
+    this.bolting = true;
+    this.boltTime = 0;
+  }
+
   update(dt: number): void {
     this.time += dt;
+    if (this.bolting) {
+      this.boltTime += dt;
+    }
+
     for (let i = 0; i < this.crowd.length; i++) {
       const one = this.crowd[i];
+      if (!one.visible) {
+        continue;
+      }
+
+      if (this.bolting && this.boltTime > i * HOME.boltAfter) {
+        // Straight at the hole, and gone when it gets there. The shrink is the
+        // whole of the trick — one that simply switched off at the doorway
+        // would have vanished rather than gone in.
+        const dx = this.mouth.x - one.position.x;
+        const dz = this.mouth.z - one.position.z;
+        const left = Math.hypot(dx, dz);
+        if (left < 1.2) {
+          one.visible = false;
+          continue;
+        }
+        const step = Math.min(left, HOME.boltSpeed * dt);
+        one.position.x += (dx / left) * step;
+        one.position.z += (dz / left) * step;
+        one.rotation.y = Math.atan2(dx, dz);
+        one.scale.setScalar(Math.min(1, left / 12));
+        // Still bounding: the same hop the run itself uses, so they are
+        // running rather than sliding.
+        one.position.y =
+          (one.userData.baseY as number) +
+          Math.abs(Math.sin(this.time * 14 + this.bounce[i])) * 1.6;
+        continue;
+      }
+
       // A gentle sway before, and a proper hop after. The difference is what
       // says "that was for you" without a word of text.
       const t = this.time * (this.cheering ? 8 : 1.4) + this.bounce[i];
