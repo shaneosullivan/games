@@ -312,6 +312,28 @@ export const PROPS = {
   stones: 45,
   brambles: 50,
   /**
+   * And the same things again out on the verges, either side of the path.
+   *
+   * The path used to be the only place anything stood, which made the wood
+   * either side of it a free lane: cutting a corner cost nothing at all, and
+   * a course you can go round is not a course. Out here they are a reason to
+   * come back to the path rather than a wall stopping you leaving it.
+   */
+  vergeLogs: 30,
+  vergeStones: 70,
+  vergeBrambles: 80,
+  /**
+   * Boulders, and trees standing in the way.
+   *
+   * These are the two you cannot jump. With the stones and the brambles now
+   * clearable, the run had nothing left in it that made you actually steer —
+   * a hare could hold one line down the whole wood and hit the jump button.
+   * A boulder is too big to go over and a tree is a tree, so both have to be
+   * gone round, and that is what puts the dodging back.
+   */
+  boulders: 34,
+  pathTrees: 26,
+  /**
    * How far apart two things on the path have to be.
    *
    * Placed at random and nothing else, they pile up: four logs inside sixty

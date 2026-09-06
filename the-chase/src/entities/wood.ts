@@ -325,10 +325,43 @@ export class Wood {
    * about dodging.
    */
   private plantPath(rng: Rng): void {
+    // `near` and `far` are how far off the middle of the path a thing may
+    // stand, in path-widths: 0 to 1 is on it, 1 and up is out on the verge.
+    const log = logGeometry();
+    const stone = stoneGeometry();
+    const bramble = brambleGeometry();
     const kinds = [
+      // The two you cannot jump, first.
+      //
+      // Order matters here and it cost a measurement to find out: nothing may
+      // stand within PROPS.spacing of anything else, and the path is only
+      // fifty units wide — so whichever kind is placed last finds the path
+      // already full. Put the trees at the end of the list and two of the
+      // twenty-six found room. These are the ones that make you steer, so
+      // they get first refusal and the clutter fills in around them.
+      {
+        count: PROPS.boulders,
+        geo: boulderGeometry(),
+        radius: 5.2,
+        top: 99,
+        kind: "solid" as Kind,
+        across: false,
+        near: 0.4,
+        far: 2.1,
+      },
+      {
+        count: PROPS.pathTrees,
+        geo: pathTreeGeometry(),
+        radius: 2.3,
+        top: 99,
+        kind: "solid" as Kind,
+        across: false,
+        near: 0,
+        far: 0.9,
+      },
       {
         count: PROPS.logs,
-        geo: logGeometry(),
+        geo: log,
         // Six, not nine: a log is a long thing and a circle is a round one,
         // and the circle has to match what a child can see or they get stopped
         // by a gap they were sure they had.
@@ -338,37 +371,65 @@ export class Wood {
         // Logs lie across the path, so they are turned to face along it and
         // the whole width of them is in the way.
         across: true,
-        spread: 0.5,
+        near: 0,
+        far: 0.5,
       },
       {
         count: PROPS.stones,
-        geo: stoneGeometry(),
+        geo: stone,
         radius: 3.1,
-        // Clearable, like everything else on the path. Only the trees stop
-        // you outright now: a hare that can jump ten units and still gets
-        // pulled up short by a rock five high is a hare with a rule nobody
-        // can guess, and being stopped dead is the one thing that hands the
-        // dogs the run.
+        // Clearable, like everything else on the path. Only the boulders and
+        // the trees stop you outright: a hare that can jump ten units and
+        // still gets pulled up short by a rock five high is a hare with a rule
+        // nobody can guess.
         top: 6.8,
         kind: "low" as Kind,
         across: false,
-        spread: 1,
+        near: 0,
+        far: 1,
       },
       {
         count: PROPS.brambles,
-        geo: brambleGeometry(),
+        geo: bramble,
         radius: 3.4,
         top: 5.6,
         kind: "low" as Kind,
         across: false,
-        spread: 1.2,
+        near: 0,
+        far: 1.2,
+      },
+      // Then what is on the path, and the same three again out on the verges.
+      {
+        count: PROPS.vergeLogs,
+        geo: log,
+        radius: 6,
+        top: 4.6,
+        kind: "low" as Kind,
+        across: false,
+        near: 1,
+        far: 2.3,
+      },
+      {
+        count: PROPS.vergeStones,
+        geo: stone,
+        radius: 3.1,
+        top: 6.8,
+        kind: "low" as Kind,
+        across: false,
+        near: 1,
+        far: 2.3,
+      },
+      {
+        count: PROPS.vergeBrambles,
+        geo: bramble,
+        radius: 3.4,
+        top: 5.6,
+        kind: "low" as Kind,
+        across: false,
+        near: 1,
+        far: 2.3,
       },
     ];
-
-    // Everything already on the path, so nothing lands on top of anything
-    // else. Shared across the three kinds: a stone tucked against a log is as
-    // unfair as two logs together.
-    const taken: Array<{x: number; z: number}> = [];
 
     for (const k of kinds) {
       const mesh = new THREE.InstancedMesh(k.geo, this.fade.material, k.count);
@@ -385,22 +446,20 @@ export class Wood {
       while (placed < k.count && tries < k.count * 80) {
         tries++;
         const z = rng.range(-PROPS.clearStart, -(WOOD.length - PROPS.clearEnd));
-        const x = this.pathAt(z) + rng.range(-1, 1) * WOOD.pathHalf * k.spread;
+        const side = rng.next() < 0.5 ? -1 : 1;
+        const x =
+          this.pathAt(z) +
+          side * rng.range(WOOD.pathHalf * k.near, WOOD.pathHalf * k.far);
         const s = rng.range(0.85, 1.25);
 
-        let clear = true;
-        for (const t of taken) {
-          const dx = t.x - x;
-          const dz = t.z - z;
-          if (dx * dx + dz * dz < PROPS.spacing * PROPS.spacing) {
-            clear = false;
-            break;
-          }
-        }
-        if (!clear) {
+        // Nothing lands on top of anything else — including the wood's own
+        // trees, which are already in the buckets by the time this runs.
+        // Asking the collision list rather than keeping a second one of our
+        // own means a boulder cannot end up inside a trunk, which is what
+        // happened when the two were tracked separately.
+        if (this.hit(x, z, PROPS.spacing, 0)) {
           continue;
         }
-        taken.push({x, z});
         const i = placed;
         placed++;
 
@@ -514,6 +573,36 @@ function treeGeometry(): THREE.BufferGeometry {
   return mergeGeometries(parts, false);
 }
 
+/**
+ * A tree standing on the path: the same tree on a much longer trunk.
+ *
+ * The shot rides seventeen units above the hare, and an ordinary tree's crown
+ * starts at fifteen — so running under one put a wall of leaves across the top
+ * third of the screen exactly where the next obstacle was. Up here the camera
+ * goes under the branches and what you can see is what is coming.
+ */
+function pathTreeGeometry(): THREE.BufferGeometry {
+  const parts: Array<THREE.BufferGeometry> = [];
+
+  const trunk = new THREE.CylinderGeometry(1.1, 1.8, 28, 8);
+  trunk.translate(0, 14, 0);
+  parts.push(paint(trunk, PALETTE.bark));
+
+  const crowns = [
+    {x: 0, y: 33, z: 0, r: 8, c: PALETTE.leaf},
+    {x: 4, y: 29, z: 2.2, r: 6, c: PALETTE.leafDeep},
+    {x: -3.4, y: 30, z: -2.8, r: 5.4, c: PALETTE.leafLight},
+  ];
+  for (const crown of crowns) {
+    const blob = new THREE.IcosahedronGeometry(crown.r, 1);
+    blob.scale(1, 0.85, 1);
+    blob.translate(crown.x, crown.y, crown.z);
+    parts.push(paint(blob, crown.c));
+  }
+
+  return mergeGeometries(parts, false);
+}
+
 /** A fallen log, lying along +X so it can be turned across the path. */
 function logGeometry(): THREE.BufferGeometry {
   const parts: Array<THREE.BufferGeometry> = [];
@@ -570,6 +659,41 @@ function stoneGeometry(): THREE.BufferGeometry {
   moss.scale(1, 0.34, 1);
   moss.translate(-0.2, 4.4, 0.2);
   parts.push(paint(moss, PALETTE.leafDeep));
+
+  return mergeGeometries(parts, false);
+}
+
+/**
+ * A boulder: too big to jump, and it has to look it.
+ *
+ * Half as tall again as a hare can clear, with a smaller one leaning on it and
+ * moss down one side. The moss matters more than it sounds — it is the only
+ * thing telling a child at a glance that this is the grey lump they have to go
+ * round rather than the grey lump they can hop.
+ */
+function boulderGeometry(): THREE.BufferGeometry {
+  const parts: Array<THREE.BufferGeometry> = [];
+
+  const rock = new THREE.IcosahedronGeometry(5.4, 0);
+  rock.scale(1, 1.15, 0.95);
+  rock.rotateY(0.7);
+  rock.translate(0, 4.6, 0);
+  parts.push(paint(rock, PALETTE.stone));
+
+  const lump = new THREE.IcosahedronGeometry(3, 0);
+  lump.rotateY(2.1);
+  lump.translate(3.6, 2.2, -1.2);
+  parts.push(paint(lump, PALETTE.stoneDark));
+
+  const cap = new THREE.SphereGeometry(3.6, 9, 6, 0, TAU, 0, Math.PI / 2);
+  cap.scale(1, 0.3, 1);
+  cap.translate(-0.3, 8.6, 0.3);
+  parts.push(paint(cap, PALETTE.leafDeep));
+
+  const skirt = new THREE.SphereGeometry(2, 8, 5, 0, TAU, 0, Math.PI / 2);
+  skirt.scale(1.3, 0.35, 1.1);
+  skirt.translate(-3.4, 1.2, 1.4);
+  parts.push(paint(skirt, PALETTE.leafDeep));
 
   return mergeGeometries(parts, false);
 }

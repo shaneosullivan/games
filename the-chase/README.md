@@ -24,8 +24,14 @@ which is between the two — so holding on pulls away, letting go hands it back,
 and a bramble you failed to dodge costs about fifteen units of the hundred and
 twenty you start with.
 
-Logs are jumped and everything else is gone round. A jump clears ten units and
-lasts seven tenths of a second; a log stands under five.
+Almost everything is jumped: the logs, the stones and the brambles all stand
+under nine units and a jump clears ten, lasting seven tenths of a second. Only
+two things have to be gone round — the boulders and the trees standing on the
+path — and those are what make you steer.
+
+None of it is only on the path, either. The same logs, stones and brambles are
+scattered out on the verges either side, so cutting a corner costs you
+something.
 
 There is no losing except being caught, and being caught is three friendly dogs
 arriving, not a disaster. They make a ring round the hare and bark about it for
