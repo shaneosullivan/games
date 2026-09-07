@@ -58,7 +58,6 @@ export class Hare {
   private prevStride = 0;
 
   private readonly body = new THREE.Group();
-  private readonly ears: Array<THREE.Object3D> = [];
   private readonly legs: Array<THREE.Object3D> = [];
 
   constructor() {
@@ -224,22 +223,6 @@ export class Hare {
     }
     this.lean += (wantLean - this.lean) * Math.min(1, HARE.leanRate * dt);
 
-    // The ears go back at speed and up when it is loping, which is the one
-    // thing that shows the throttle without a dial on the screen.
-    const rush = Math.min(
-      1,
-      (this.speed - HARE.lope) / (HARE.topSpeed - HARE.lope),
-    );
-    const flick = Math.sin(this.stride * 0.5) * 0.08;
-    for (let i = 0; i < this.ears.length; i++) {
-      const side = i === 0 ? -1 : 1;
-      // Back, but not flat back. Laid right along the spine the ears vanish
-      // into the outline and the animal becomes a brown lump seen from behind,
-      // which is the view a player has for the whole run.
-      this.ears[i].rotation.x = -0.15 + rush * 0.85 + flick;
-      this.ears[i].rotation.z = side * (0.18 + rush * 0.2);
-    }
-
     // Front legs and back legs, half a phase apart, tucked in the air.
     const air = this.grounded ? 1 : 0.35;
     for (let i = 0; i < this.legs.length; i++) {
@@ -328,6 +311,49 @@ export class Hare {
       parts.push(paint(glint, 0xffffff));
     }
 
+    // The ears.
+    //
+    // Fixed, and part of the merge: they do not move at all any more. They
+    // used to lay back as the hare sped up, which looked well enough on paper
+    // and meant the animal a child was watching changed shape depending on how
+    // hard they were pressing.
+    //
+    // They also crossed. Both `rotation.z` signs were the wrong way round, so
+    // each ear leaned toward the other one and they made an X over the top of
+    // the head — the one shape a hare's ears never make. A hare wears them in
+    // a V, near vertical, splayed a little outward, and that is what this is.
+    for (const side of [-1, 1]) {
+      const lean = -side * 0.19;
+
+      const ear = new THREE.SphereGeometry(1, 8, 8);
+      ear.scale(0.26, 1.5, 0.42);
+      ear.translate(0, 1.35, 0);
+      ear.rotateX(-0.07);
+      ear.rotateZ(lean);
+      ear.translate(side * 0.82, 1.16, 2.42);
+      parts.push(paint(ear, PALETTE.fur));
+
+      // The rust-coloured inside, a little shorter and set forward so it reads
+      // as the inside of a cup rather than a stripe painted on.
+      const inner = new THREE.SphereGeometry(1, 8, 8);
+      inner.scale(0.15, 1.22, 0.24);
+      inner.translate(0, 1.32, 0.17);
+      inner.rotateX(-0.07);
+      inner.rotateZ(lean);
+      inner.translate(side * 0.82, 1.16, 2.42);
+      parts.push(paint(inner, PALETTE.earInner));
+
+      // And the dark tip. A hare's ears are black-brown at the top and it is
+      // the first thing you can pick out of long grass.
+      const tip = new THREE.SphereGeometry(1, 8, 7);
+      tip.scale(0.27, 0.3, 0.43);
+      tip.translate(0, 2.55, 0);
+      tip.rotateX(-0.07);
+      tip.rotateZ(lean);
+      tip.translate(side * 0.82, 1.16, 2.42);
+      parts.push(paint(tip, PALETTE.earRim));
+    }
+
     // A little top hat, tipped back on the crown between the ears.
     //
     // It does the same job the penguin's bobble hat does — most of this game
@@ -358,32 +384,6 @@ export class Hare {
     const mesh = new THREE.Mesh(merged, vertexToon());
     mesh.castShadow = true;
     this.body.add(mesh);
-
-    // The ears, on their own pivots at the back of the head so they swing from
-    // the root. They are the longest thing on the animal and they are what a
-    // child will look at.
-    for (const side of [-1, 1]) {
-      const pivot = new THREE.Group();
-      // Set wide on the head, and that is not decoration: the hat sits on the
-      // crown between them, and at 0.42 apart the ears came up through the
-      // back of it every time the hare slowed down and put them up.
-      pivot.position.set(side * 0.82, 1.16, 2.42);
-      const ear = new THREE.SphereGeometry(1, 8, 8);
-      ear.scale(0.26, 1.5, 0.42);
-      ear.translate(0, 1.35, 0);
-      const inner = new THREE.SphereGeometry(1, 8, 8);
-      inner.scale(0.15, 1.25, 0.24);
-      inner.translate(0, 1.35, 0.16);
-      const mergedEar = mergeGeometries(
-        [paint(ear, PALETTE.fur), paint(inner, PALETTE.nose)],
-        false,
-      );
-      const mesh2 = new THREE.Mesh(mergedEar, vertexToon());
-      mesh2.castShadow = true;
-      pivot.add(mesh2);
-      this.body.add(pivot);
-      this.ears.push(pivot);
-    }
 
     // Four legs. The back pair are the big ones — that is where a hare keeps
     // its engine — and they hang from further back.

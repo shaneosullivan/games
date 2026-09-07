@@ -80,6 +80,11 @@ export const PALETTE = {
   berry: 0x8b3f7a,
   /** The hare. */
   fur: 0xc79a63,
+  /** The inside of an ear: a warm rust, and a grey-brown along the rim. Both
+   *  off the photograph rather than invented — a hare's ear is the one part of
+   *  it that is not the colour of the rest. */
+  earInner: 0xc07a4a,
+  earRim: 0x7a6552,
   furLight: 0xe8cfa6,
   furDark: 0x9d7548,
   nose: 0xd98c9a,

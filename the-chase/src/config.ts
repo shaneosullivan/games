@@ -341,8 +341,12 @@ export const PROPS = {
    * a hare could hold one line down the whole wood and hit the jump button.
    * A boulder is too big to go over and a tree is a tree, so both have to be
    * gone round, and that is what puts the dodging back.
+   *
+   * Not many boulders, though. They are the biggest thing on the path and at
+   * forty-nine of them the wood read as a quarry; the trees do most of this
+   * work and the boulders are the exception you meet now and then.
    */
-  boulders: 49,
+  boulders: 22,
   pathTrees: 38,
   /**
    * How far apart two things on the path have to be.
@@ -539,9 +543,17 @@ export const SOUND = {
   /** The wind in the leaves: the lowpass and the volume at a standstill and
    *  flat out. Running fast through a wood is mostly the sound of leaves. */
   cutoffMin: 340,
-  cutoffMax: 2400,
-  levelMin: 0.014,
-  levelMax: 0.12,
+  cutoffMax: 1700,
+  /**
+   * The rush of leaves: quiet.
+   *
+   * It is the one sound in this game that never stops, and a continuous noise
+   * has to sit well under the things that actually happen — the barking, and
+   * whatever a child is doing in the room. The same lesson the penguin's wind
+   * taught, applied first time here.
+   */
+  levelMin: 0.008,
+  levelMax: 0.055,
   follow: 2.4,
   /** The speed the top of that range is measured against. */
   fullSpeed: 62,
