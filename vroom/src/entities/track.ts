@@ -91,7 +91,13 @@ export class Track {
   ): {index: number; t: number; offset: number} {
     let best = hint;
     let bestDist = Infinity;
-    for (let k = -window; k <= window; k++) {
+    // Half the ring either way already covers every sample, so a caller asking
+    // for "everywhere" gets one scan of nine hundred rather than the two
+    // hundred thousand wrapping iterations it literally asked for. The scenery
+    // makes this call for every tree it plants, and uncapped it was a full
+    // second of a child waiting to start a race.
+    const span = Math.min(window, Math.ceil(TRACK.segments / 2));
+    for (let k = -span; k <= span; k++) {
       const i =
         (((hint + k) % TRACK.segments) + TRACK.segments) % TRACK.segments;
       const p = this.points[i];
