@@ -166,6 +166,33 @@ export class Wood {
     this.fade.setFocus(eye, this.fadeAt, FADE.radius);
   }
 
+  /**
+   * Is there anything at all within `gap` of here?
+   *
+   * Distance only, with no interest in what the thing is or how tall it
+   * stands. That is the whole difference between this and `hit`, and the
+   * reason both exist: one is asked while the wood is being laid out and the
+   * other while the hare is running through it.
+   */
+  private crowded(x: number, z: number, gap: number): boolean {
+    const key = Math.floor(z / Wood.BUCKET);
+    for (let k = key - 1; k <= key + 1; k++) {
+      const list = this.buckets.get(k);
+      if (!list) {
+        continue;
+      }
+      for (const o of list) {
+        const reach = o.radius + gap;
+        const dx = o.x - x;
+        const dz = o.z - z;
+        if (dx * dx + dz * dz < reach * reach) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
   private remember(o: Obstacle): void {
     const key = Math.floor(o.z / Wood.BUCKET);
     const list = this.buckets.get(key);
@@ -520,10 +547,13 @@ export class Wood {
 
         // Nothing lands on top of anything else — including the wood's own
         // trees, which are already in the buckets by the time this runs.
-        // Asking the collision list rather than keeping a second one of our
-        // own means a boulder cannot end up inside a trunk, which is what
-        // happened when the two were tracked separately.
-        if (this.hit(x, z, PROPS.spacing, 0)) {
+        //
+        // `crowded` and not `hit`: hit answers "would the hare be stopped
+        // here", which takes the height band into account, and a hollow log's
+        // band starts above the ground. So asking hit at y = 0 said no hollow
+        // log was ever in the way of anything, and things were planted a unit
+        // and a half from one — inside it, in fact.
+        if (this.crowded(x, z, PROPS.spacing)) {
           continue;
         }
         const i = placed;
@@ -532,7 +562,20 @@ export class Wood {
         pos.set(x, this.heightAt(x, z) - 0.2, z);
         // A log lies across the way you are going, give or take; everything
         // else is turned at random.
-        e.set(0, k.across ? rng.range(-0.35, 0.35) : rng.range(0, TAU), 0);
+        //
+        // A hollow one is the exception: you run through it, so its bore has
+        // to follow the path rather than sit at whatever angle came out of the
+        // generator. The path bends by up to a fifth of a radian and the
+        // random yaw was another third on top of that, so a tunnel could face
+        // thirty degrees away from the way you were travelling.
+        const lie =
+          k.kind === "hollow"
+            ? Math.atan((this.pathAt(z - 1) - this.pathAt(z + 1)) / -2) +
+              rng.range(-0.06, 0.06)
+            : k.across
+              ? rng.range(-0.35, 0.35)
+              : rng.range(0, TAU);
+        e.set(0, lie, 0);
         q.setFromEuler(e);
         scale.set(s, s, s);
         m.compose(pos, q, scale);
