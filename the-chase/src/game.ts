@@ -216,7 +216,7 @@ export class Game {
         this.home.mouth,
         this.wood,
       );
-      this.woodland.update(dt, 0, this.dogs.gap);
+      this.woodland.update(dt, this.dogs.gap);
       this.leaves.update(dt);
       this.sparks.update(dt);
       if (this.safeLeft <= 0) {
@@ -243,7 +243,7 @@ export class Game {
       this.leaves.update(dt);
       // Gap zero, so the wood's own bark timer runs at its fastest and its
       // loudest: they are standing on top of you.
-      this.woodland.update(dt, 0, 0);
+      this.woodland.update(dt, 0);
       if (this.caughtLeft <= 0) {
         this.restart();
       }
@@ -277,7 +277,7 @@ export class Game {
       return;
     }
 
-    this.woodland.update(dt, this.hare.speed, this.dogs.gap);
+    this.woodland.update(dt, this.dogs.gap);
     this.home.update(dt);
     this.leaves.update(dt);
     this.sparks.update(dt);
@@ -335,7 +335,7 @@ export class Game {
     }
     this.hare.bump(hit.x, hit.z, hit.radius + 2, this.wood);
     this.bumps++;
-    this.woodland.thud();
+    this.woodland.squeak();
     this.puff(22, 12);
   }
 
@@ -398,9 +398,6 @@ export class Game {
     this.stick.release();
     this.hud.setVisible(false);
     this.home.cheer();
-    // The wood goes quiet. A run that has ended and is still rushing past your
-    // ears is a run that has not ended.
-    this.woodland.hush();
     this.woodland.safe();
     this.burstIn = 0;
     // Where the shot stands for the ending, and it stands still.
@@ -449,7 +446,7 @@ export class Game {
     const shrink = Math.max(0, Math.min(1, left / 14));
     this.hare.group.scale.setScalar(shrink);
     this.hare.group.position.y -= (1 - shrink) * 4;
-    this.woodland.update(dt, this.hare.speed, 999);
+    this.woodland.update(dt, 999);
 
     if (left <= 0.6) {
       this.phase = "safe";
@@ -512,7 +509,6 @@ export class Game {
     this.phase = "running";
     this.stick.enabled = true;
     this.hud.setVisible(true);
-    this.woodland.resume();
     this.snapCamera();
   }
 
@@ -530,9 +526,6 @@ export class Game {
     this.stick.enabled = false;
     this.stick.release();
     this.hud.setVisible(false);
-    // The rush stops; the barking does not, since that is the whole of what
-    // you are being shown.
-    this.woodland.hush();
     this.woodland.caught();
     // Where the shot stands to watch it: off to one side and above, so all
     // three of them and the hare are in frame at once.

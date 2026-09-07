@@ -17,18 +17,29 @@ import {SOUND} from "../config";
  * not start an audio context before a gesture, and asking it to only produces
  * a warning in the console.
  */
+/**
+ * The sounds of the chase.
+ *
+ * Made rather than loaded, the same as the other games here: this one ships as
+ * a single self-contained html file, and a minute of woodland as an mp3 would
+ * be most of it.
+ *
+ * There is no background at all. A rush of leaves used to run under the whole
+ * game with its volume and brightness riding on the hare's speed, and it went:
+ * the only continuous sound in a game gets listened past inside a minute, and
+ * after that it is just something a child's parent can hear from the next
+ * room. Everything left in here *means* something — a bark, a bump, a squeak,
+ * and the four notes that say you are home.
+ *
+ * Nothing is created until the player has touched the screen. A browser will
+ * not start an audio context before a gesture, and asking it to only produces
+ * a warning in the console.
+ */
 export class Woodland {
   private ctx: AudioContext | null = null;
-  private gain: GainNode | null = null;
-  private filter: BiquadFilterNode | null = null;
-  private source: AudioBufferSourceNode | null = null;
   private muted = false;
-  /** Follows the speed, lazily, so the rush rises rather than switches. */
-  private level = 0;
   /** Seconds until the next bark. */
   private barkIn = 0;
-  /** The run is over. The wood in the leaves stops; the dogs do not. */
-  private hushed = false;
 
   /** Call from a real gesture — the button that starts the game. */
   start(): void {
@@ -38,111 +49,33 @@ export class Woodland {
     const Ctor =
       window.AudioContext ??
       (window as {webkitAudioContext?: typeof AudioContext}).webkitAudioContext;
-    if (!Ctor) {
-      return;
+    if (Ctor) {
+      this.ctx = new Ctor();
     }
-    const ctx = new Ctor();
-    this.ctx = ctx;
-
-    const frames = Math.floor(ctx.sampleRate * SOUND.loopSeconds);
-    const buffer = ctx.createBuffer(1, frames, ctx.sampleRate);
-    const data = buffer.getChannelData(0);
-    for (let i = 0; i < frames; i++) {
-      data[i] = Math.random() * 2 - 1;
-    }
-    // The seam. A loop point in noise is a click, and a click every four
-    // seconds is the only thing anybody would hear.
-    const blend = Math.floor(ctx.sampleRate * 0.06);
-    for (let i = 0; i < blend; i++) {
-      const t = i / blend;
-      data[i] = data[i] * t + data[frames - blend + i] * (1 - t);
-    }
-
-    this.filter = ctx.createBiquadFilter();
-    this.filter.type = "lowpass";
-    this.filter.frequency.value = SOUND.cutoffMin;
-    this.filter.Q.value = 0.6;
-
-    this.gain = ctx.createGain();
-    this.gain.gain.value = SOUND.levelMin;
-
-    this.source = ctx.createBufferSource();
-    this.source.buffer = buffer;
-    this.source.loop = true;
-    this.source.connect(this.filter);
-    this.filter.connect(this.gain);
-    this.gain.connect(ctx.destination);
-    this.source.start();
   }
 
   /**
-   * `speed` in units a second, `gap` how far off the nearest dog is.
+   * `gap` is how far off the nearest dog is.
    *
    * The barking is here rather than in the game because it is a *reading* of
    * the gap, not an event: the dogs spend most of the run behind the camera,
    * so how loud and how often they bark is the main way a child knows how they
    * are doing.
    */
-  update(dt: number, speed: number, gap: number): void {
-    // Hushed, the rush of leaves goes to nothing — but the barking carries on
-    // below, because the end of a run is exactly when three dogs have most to
-    // say. Silencing the whole thing here was the first go and it took the
-    // dogs with it.
-    if (this.hushed) {
-      this.level = 0;
-      if (this.gain) {
-        this.gain.gain.value = 0;
-      }
-    } else {
-      const want = Math.min(1, Math.max(0, speed / SOUND.fullSpeed));
-      this.level += (want - this.level) * Math.min(1, SOUND.follow * dt);
-      this.bed();
-    }
-
+  update(dt: number, gap: number): void {
     this.barkIn -= dt;
-    if (this.barkIn <= 0) {
-      const near = Math.min(
-        1,
-        Math.max(
-          0,
-          1 - (gap - SOUND.barkFrom) / (SOUND.barkTo - SOUND.barkFrom),
-        ),
-      );
-      // Closer dogs bark more often as well as louder, so the run gets busier
-      // as it gets worse.
-      this.barkIn =
-        SOUND.barkEvery * (1.4 - near * 0.9) * (0.7 + Math.random() * 0.6);
-      this.bark(SOUND.barkFar + (SOUND.barkNear - SOUND.barkFar) * near);
+    if (this.barkIn > 0) {
+      return;
     }
-  }
-
-  /** The rush of leaves: volume and brightness both ride on the speed. */
-  private bed(): void {
-    if (this.gain && this.filter && !this.muted) {
-      this.gain.gain.value =
-        SOUND.levelMin + this.level * (SOUND.levelMax - SOUND.levelMin);
-      // Squared, so most of the brightening happens in the top half of the
-      // speed range, which is where it is actually felt.
-      const bright = this.level * this.level;
-      this.filter.frequency.value =
-        SOUND.cutoffMin + bright * (SOUND.cutoffMax - SOUND.cutoffMin);
-    }
-  }
-
-  /**
-   * Stops the rush of leaves, for the end of a run. `resume` starts it again
-   * when the next one begins.
-   */
-  hush(): void {
-    this.hushed = true;
-    this.level = 0;
-    if (this.gain) {
-      this.gain.gain.value = 0;
-    }
-  }
-
-  resume(): void {
-    this.hushed = false;
+    const near = Math.min(
+      1,
+      Math.max(0, 1 - (gap - SOUND.barkFrom) / (SOUND.barkTo - SOUND.barkFrom)),
+    );
+    // Closer dogs bark more often as well as louder, so the run gets busier as
+    // it gets worse.
+    this.barkIn =
+      SOUND.barkEvery * (1.4 - near * 0.9) * (0.7 + Math.random() * 0.6);
+    this.bark(SOUND.barkFar + (SOUND.barkNear - SOUND.barkFar) * near);
   }
 
   /**
@@ -201,26 +134,45 @@ export class Woodland {
     }
   }
 
-  /** Running into something: a soft thump and a rustle, no crash. */
-  thud(): void {
+  /**
+   * Running into something: a squeak.
+   *
+   * A short rising-then-falling note with a rustle of leaves under it. It was
+   * a low thump, which is what a thing weighing a ton sounds like hitting
+   * something; a hare weighs three kilograms and the noise it makes is a
+   * squeak. It is also the funniest thing in the game, which is the right way
+   * for a small animal to bump into a log.
+   *
+   * Pitched a little differently every time, or fifteen bumps in a run is the
+   * same noise fifteen times.
+   */
+  squeak(): void {
     const ctx = this.ctx;
     if (!ctx || this.muted) {
       return;
     }
     const now = ctx.currentTime;
+    const wobble = 1 + (Math.random() - 0.5) * 2 * SOUND.squeakWobble;
+    const base = 820 * wobble;
+
     const osc = ctx.createOscillator();
-    osc.type = "sine";
-    osc.frequency.setValueAtTime(150, now);
-    osc.frequency.exponentialRampToValueAtTime(52, now + 0.2);
+    osc.type = "triangle";
+    osc.frequency.setValueAtTime(base, now);
+    osc.frequency.exponentialRampToValueAtTime(base * 1.75, now + 0.06);
+    osc.frequency.exponentialRampToValueAtTime(base * 0.8, now + 0.19);
+
     const g = ctx.createGain();
     g.gain.setValueAtTime(0.0001, now);
-    g.gain.exponentialRampToValueAtTime(0.16, now + 0.012);
-    g.gain.exponentialRampToValueAtTime(0.0001, now + 0.28);
+    g.gain.exponentialRampToValueAtTime(SOUND.squeak, now + 0.015);
+    g.gain.exponentialRampToValueAtTime(0.0001, now + 0.22);
+
     osc.connect(g);
     g.connect(ctx.destination);
     osc.start(now);
-    osc.stop(now + 0.3);
-    this.rustle(0.3, 1500, 0.11);
+    osc.stop(now + 0.24);
+
+    // And the bush it went into.
+    this.rustle(0.26, 1600, 0.08);
   }
 
   /** Feet leaving the ground, and feet landing in leaves. */
@@ -311,9 +263,6 @@ export class Woodland {
 
   setMuted(muted: boolean): void {
     this.muted = muted;
-    if (this.gain) {
-      this.gain.gain.value = muted ? 0 : SOUND.levelMin;
-    }
   }
 
   /**
@@ -324,11 +273,7 @@ export class Woodland {
    * caterpillar game had once already.
    */
   stop(): void {
-    this.source?.stop();
-    this.source = null;
     void this.ctx?.close();
     this.ctx = null;
-    this.gain = null;
-    this.filter = null;
   }
 }

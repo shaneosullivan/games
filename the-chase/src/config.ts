@@ -539,24 +539,15 @@ export const HOME = {
  * most of it.
  */
 export const SOUND = {
-  loopSeconds: 4,
-  /** The wind in the leaves: the lowpass and the volume at a standstill and
-   *  flat out. Running fast through a wood is mostly the sound of leaves. */
-  cutoffMin: 340,
-  cutoffMax: 1700,
   /**
-   * The rush of leaves: quiet.
+   * No bed.
    *
-   * It is the one sound in this game that never stops, and a continuous noise
-   * has to sit well under the things that actually happen — the barking, and
-   * whatever a child is doing in the room. The same lesson the penguin's wind
-   * taught, applied first time here.
+   * There was a rush of leaves under the whole run, its volume and brightness
+   * riding on the hare's speed. It went, and the game is better for it: the
+   * only continuous sound in a game gets listened past within a minute and
+   * then it is just something a child's parent can hear from the next room.
+   * What is left all *means* something — a bark, a bump, a squeak.
    */
-  levelMin: 0.008,
-  levelMax: 0.055,
-  follow: 2.4,
-  /** The speed the top of that range is measured against. */
-  fullSpeed: 62,
   /** The barking: how often, and how much louder it gets as they close. The
    *  dogs are behind the camera most of the time, so this is the main way you
    *  know how they are doing. */
@@ -566,4 +557,8 @@ export const SOUND = {
   /** The gap at which the barking is at its loudest and its quietest. */
   barkFrom: 20,
   barkTo: 170,
+  /** The squeak when the hare runs into something: how loud, and how far the
+   *  pitch wanders from one bump to the next so it is never the same twice. */
+  squeak: 0.2,
+  squeakWobble: 0.18,
 } as const;

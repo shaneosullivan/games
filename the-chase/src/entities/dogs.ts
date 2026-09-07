@@ -89,13 +89,15 @@ export class Dogs {
         const pivot = new THREE.Group();
         pivot.position.set(spot.x, 0.1, spot.z);
         const shape = new THREE.SphereGeometry(1, 8, 7);
-        shape.scale(0.3, 1.75, 0.38);
-        shape.translate(0, -1.6, 0);
+        // Thin. A wolfhound's leg is bone and tendon and the width of a
+        // broom handle; anything thicker turns the dog into furniture.
+        shape.scale(0.23, 1.85, 0.3);
+        shape.translate(0, -1.7, 0);
         const leg = new THREE.Mesh(paint(shape, PALETTE.dog), vertexToon());
         // A darker foot, so a leg has an end to it.
         const paw = new THREE.SphereGeometry(1, 7, 6);
-        paw.scale(0.34, 0.22, 0.5);
-        paw.translate(0, -3.2, 0.12);
+        paw.scale(0.27, 0.2, 0.44);
+        paw.translate(0, -3.4, 0.12);
         const foot = new THREE.Mesh(paint(paw, PALETTE.dogDark), vertexToon());
         pivot.add(foot);
         leg.castShadow = true;
@@ -280,6 +282,7 @@ export class Dogs {
    */
   giveUp(dt: number, since: number, at: THREE.Vector3, wood: Wood): void {
     const leaving = since > HOME.circleFor;
+    let nearest = Infinity;
     for (let i = 0; i < this.dogs.length; i++) {
       const dog = this.dogs[i];
       dog.prevPosition.copy(dog.position);
@@ -316,7 +319,14 @@ export class Dogs {
       dog.position.y = wood.heightAt(dog.position.x, dog.position.z);
       dog.stride += dt * 10;
       dog.standing = false;
+      nearest = Math.min(
+        nearest,
+        Math.hypot(dog.position.x - at.x, dog.position.z - at.z),
+      );
     }
+    // Kept up to date so the barking follows them: loud while they are round
+    // the hole and fading as they give it up and go.
+    this.gap = nearest;
   }
 
   /** Draws them somewhere between the last step and this one. */
@@ -334,7 +344,7 @@ export class Dogs {
         // fall and nothing else — the legs are still, which is the whole
         // difference between a dog that has arrived and a dog running on the
         // spot.
-        body.position.y = 3.3 + Math.sin(dog.stride * 3) * 0.16;
+        body.position.y = 3.5 + Math.sin(dog.stride * 3) * 0.16;
         body.rotation.x = 0;
         for (let i = 0; i < dog.ears.length; i++) {
           const side = i === 0 ? -1 : 1;
@@ -352,7 +362,7 @@ export class Dogs {
       // would look like a cutout.
       // Up on the long legs. It was 1.9, which was right for a barrel and
       // leaves a wolfhound sitting on its own elbows.
-      body.position.y = 3.3 + Math.abs(Math.sin(dog.stride)) * 0.9;
+      body.position.y = 3.5 + Math.abs(Math.sin(dog.stride)) * 0.9;
       body.rotation.x = -Math.cos(dog.stride) * 0.14;
 
       // Ears flapping, which is nine tenths of what makes them daft rather
@@ -392,28 +402,37 @@ function dogGeometry(): THREE.BufferGeometry {
   const parts: Array<THREE.BufferGeometry> = [];
 
   // The body: long, deep and narrow, higher at the shoulder than the hip.
-  const chest = new THREE.SphereGeometry(2, 12, 10);
-  // Narrow. A wolfhound is a sighthound: deep through the chest and almost
-  // flat from the side, and at 0.62 across it was a barrel with long legs.
-  chest.scale(0.48, 1.05, 1.05);
-  chest.translate(0, 0.1, 1.1);
+  // The outline, and it is four shapes rather than one tube.
+  //
+  // A sighthound is deep and narrow at the front, cut away underneath behind
+  // the ribs, and carries its width only over the haunch. Getting that wrong
+  // is what made these dogs fat: a chest, a waist, a back and a rump all
+  // overlapping at much the same depth merge into one sausage, and no amount
+  // of narrowing a sausage makes it athletic. What does it is the gap — the
+  // underline has to climb steeply from the brisket to the loin, and there has
+  // to be daylight under the back half of the dog.
+  const chest = new THREE.SphereGeometry(1, 12, 10);
+  chest.scale(0.82, 2.05, 1.85);
+  chest.translate(0, 0.35, 1.2);
   parts.push(paint(chest, PALETTE.dog));
 
-  const back = new THREE.SphereGeometry(1.9, 12, 10);
-  back.scale(0.46, 0.82, 1.4);
-  back.translate(0, 0.05, -1);
-  parts.push(paint(back, PALETTE.dog));
+  // The loin: half the depth of the chest and riding a long way higher.
+  const loin = new THREE.SphereGeometry(1, 10, 9);
+  loin.scale(0.6, 0.85, 1.6);
+  loin.translate(0, 0.95, -0.55);
+  parts.push(paint(loin, PALETTE.dog));
 
-  // The tuck: a hare or a hound is pinched in behind the ribs, and that little
-  // waist is most of what says "runs fast" without anything moving.
-  const waist = new THREE.SphereGeometry(1.35, 10, 8);
-  waist.scale(0.44, 0.66, 0.9);
-  waist.translate(0, -0.15, -0.4);
-  parts.push(paint(waist, PALETTE.dogDark));
+  // The haunch, which is the one place a wolfhound is wide — and it is muscle,
+  // so it sits high and well back.
+  const haunch = new THREE.SphereGeometry(1, 10, 9);
+  haunch.scale(0.88, 1.35, 1.25);
+  haunch.translate(0, 0.55, -2.05);
+  parts.push(paint(haunch, PALETTE.dog));
 
-  const bib = new THREE.SphereGeometry(1.4, 10, 8);
-  bib.scale(0.4, 0.8, 0.7);
-  bib.translate(0, -0.5, 1.9);
+  // The pale brisket, low at the front where the chest is deepest.
+  const bib = new THREE.SphereGeometry(1, 10, 8);
+  bib.scale(0.62, 1.1, 1.2);
+  bib.translate(0, -0.45, 1.6);
   parts.push(paint(bib, PALETTE.dogLight));
 
   // A little shag, along the top line only.
@@ -422,15 +441,11 @@ function dogGeometry(): THREE.BufferGeometry {
   // wolfhound's coat is rough and wiry but it lies close to a body you can
   // still see the shape of, and the shape is the point. Five along the spine
   // break the smooth line without burying it.
-  for (let i = 0; i < 5; i++) {
-    const t = i / 4;
-    const lump = new THREE.IcosahedronGeometry(0.42 + (i % 2) * 0.12, 0);
-    lump.scale(0.6, 0.65, 1.1);
-    lump.translate(
-      (i % 2 === 0 ? 1 : -1) * 0.24,
-      0.78 - t * 0.42,
-      1.5 - t * 3.1,
-    );
+  for (let i = 0; i < 3; i++) {
+    const t = i / 2;
+    const lump = new THREE.IcosahedronGeometry(0.34, 0);
+    lump.scale(0.55, 0.5, 1.2);
+    lump.translate((i % 2 === 0 ? 1 : -1) * 0.16, 1.5 - t * 0.35, 1 - t * 2.4);
     parts.push(paint(lump, i % 2 === 0 ? PALETTE.dogDark : PALETTE.dog));
   }
 
