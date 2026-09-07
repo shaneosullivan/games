@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import {CAR, RIVALS} from "../config";
-import {Car} from "./car";
+import {Car, Drive} from "./car";
 import {Patches} from "./patches";
 import {Track, wrap} from "./track";
 
@@ -32,8 +32,11 @@ export class Rivals {
   private readonly aim = new THREE.Vector3();
   private readonly want = new THREE.Vector2();
   private readonly here = new THREE.Vector3();
+  /** Held rather than made each step: three cars, sixty steps a second. */
+  private readonly drive: Drive;
 
   constructor(track: Track) {
+    this.drive = {kind: "aim", aim: this.want};
     for (let i = 0; i < RIVALS.count; i++) {
       const car = new Car(RIVALS.colours[i % RIVALS.colours.length]);
       // Left, right, left: a grid, not a queue.
@@ -77,7 +80,7 @@ export class Rivals {
         // Full throttle unless they are already past where they should be.
         this.want.multiplyScalar(Math.min(1, d / 30) / d);
       }
-      car.update(dt, this.want, track, patches);
+      car.update(dt, this.drive, track, patches);
       car.keepIn(track);
     }
   }

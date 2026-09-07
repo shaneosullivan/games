@@ -32,6 +32,14 @@ The shot looks straight down and never turns, so the way you push the stick is
 the way on the screen the car goes. That is the one reason this game needs no
 camera-relative arithmetic anywhere in it.
 
+**A keyboard is a different control, not a squarer stick.** Arrow keys and WASD
+steer left and right _of the car's own nose_, with up and down as the pedals —
+hold left and the car keeps turning left, whatever it ends up pointing at, and
+down brakes and then reverses. Fed through the stick's own scheme, a keyboard
+gave four fixed compass directions, which is not driving. `Drive` in
+`entities/car.ts` is the union of the two, and the car reads whichever is in
+use; a finger on the glass always wins.
+
 The grass will slow you down and the wall at the edge of it will not let you
 past. One lap.
 

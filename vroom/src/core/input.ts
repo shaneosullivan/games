@@ -15,8 +15,14 @@ const DEADZONE = 0.08;
  * swinging camera; this one is the direction, full stop.
  *
  * Tracks a single pointerId, so a second finger on the glass can't steal the
- * stick out from under the first. WASD and the arrow keys work too, purely so
- * the game can be driven on a laptop while it is being built.
+ * stick out from under the first.
+ *
+ * WASD and the arrow keys work too, and they are **not** the same control. A
+ * thumb on glass points at where the car should go; a hand on a keyboard has
+ * one key for left and one for right, and expects them to mean left and right
+ * *of the car* — which is a steering wheel, not a direction. So the keys give
+ * a steer and a throttle instead of a vector, and the car reads whichever of
+ * the two is being used.
  */
 export class Joystick {
   /** -1..1 in screen axes. y is positive downward, i.e. "pull back". */
@@ -25,8 +31,18 @@ export class Joystick {
   /** 0..1. How hard the stick is over, which is the throttle. */
   magnitude = 0;
 
+  /** Car-relative, for a keyboard: left and right of the nose, and forward or
+   *  back. Both -1..1, and only meaningful while `onKeys` is true. */
+  steer = 0;
+  throttle = 0;
+
   /** The chequered flag takes the controls away, so the finish plays out. */
   enabled = true;
+
+  /** Is the keyboard driving? A finger on the glass always wins. */
+  get onKeys(): boolean {
+    return this.pointerId === null && this.keys.size > 0;
+  }
 
   private pointerId: number | null = null;
   private baseX = 0;
@@ -136,6 +152,7 @@ export class Joystick {
     this.root.classList.remove("active");
     this.setKnob(0, 0);
     this.x = this.y = this.magnitude = 0;
+    this.steer = this.throttle = 0;
   };
 
   private onKey = (e: KeyboardEvent): void => {
@@ -167,19 +184,16 @@ export class Joystick {
     if (this.pointerId !== null) {
       return;
     }
-    const kx =
+    // Left and right of the car's own nose, forward on the throttle and back
+    // on the brake. Nothing here is in screen axes, which is the whole point.
+    this.steer =
       (this.keys.has("d") || this.keys.has("arrowright") ? 1 : 0) -
       (this.keys.has("a") || this.keys.has("arrowleft") ? 1 : 0);
-    const ky =
-      (this.keys.has("s") || this.keys.has("arrowdown") ? 1 : 0) -
-      (this.keys.has("w") || this.keys.has("arrowup") ? 1 : 0);
-    const mag = Math.hypot(kx, ky);
-    if (mag === 0) {
-      this.x = this.y = this.magnitude = 0;
-    } else {
-      this.x = kx / mag;
-      this.y = ky / mag;
-      this.magnitude = 1;
-    }
+    this.throttle =
+      (this.keys.has("w") || this.keys.has("arrowup") ? 1 : 0) -
+      (this.keys.has("s") || this.keys.has("arrowdown") ? 1 : 0);
+    // The stick's own reading goes to nothing, so nobody downstream can pick
+    // up a vector left over from the last key that was pressed.
+    this.x = this.y = this.magnitude = 0;
   };
 }

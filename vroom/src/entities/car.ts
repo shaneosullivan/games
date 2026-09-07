@@ -7,6 +7,23 @@ import {Track} from "./track";
 
 const TAU = Math.PI * 2;
 
+/**
+ * The two ways a car is driven, and they are genuinely different things.
+ *
+ * `aim` is the thumbstick: a direction on the screen and how hard it is over.
+ * The car turns towards it, so pushing back on the stick turns the car round —
+ * which is what a thumb expects and needs no reading of instructions.
+ *
+ * `wheel` is a keyboard: left and right of the car's own nose, and a pedal.
+ * Holding left keeps turning left for as long as it is held, whatever the car
+ * ends up pointing at, and back is a brake rather than a request to face the
+ * other way. Feeding a keyboard through `aim` gave four fixed compass
+ * directions, which is not driving.
+ */
+export type Drive =
+  | {kind: "aim"; aim: THREE.Vector2}
+  | {kind: "wheel"; steer: number; throttle: number};
+
 function shortestAngle(from: number, to: number): number {
   return ((((to - from) % TAU) + TAU + Math.PI) % TAU) - Math.PI;
 }
@@ -105,17 +122,11 @@ export class Car {
   /**
    * One step.
    *
-   * `want` is the direction the stick is asking for and how hard it is over —
-   * which is both the tiller and the throttle. Returns how far off the middle
-   * of the track it now is, since the caller wants that for the surface and
-   * the barriers anyway.
+   * `drive` is either the stick or the keys; see `Drive`. Returns how far off
+   * the middle of the track it now is, since the caller wants that for the
+   * surface and the barriers anyway.
    */
-  update(
-    dt: number,
-    want: THREE.Vector2,
-    track: Track,
-    patches?: Patches,
-  ): number {
+  update(dt: number, drive: Drive, track: Track, patches?: Patches): number {
     this.prevPosition.copy(this.position);
     this.prevHeading = this.heading;
 
@@ -133,23 +144,49 @@ export class Car {
     }
     const flying = this.air > 0;
 
-    const push = Math.min(1, want.length());
-    if (push > 1e-4) {
-      // Turn toward the stick — but less and less of the turn survives as the
-      // speed comes up. A car that cornered as hard at a hundred as at a walk
-      // would have no corners in it.
-      const target = Math.atan2(want.x, want.y);
-      const ease = Math.min(1, this.speed / CAR.top);
-      let rate = CAR.turn * (1 - ease * (1 - CAR.turnAtSpeed));
-      if (flying) {
-        rate *= ITEM.ramp.steer;
+    // How fast the nose can come round. Less and less of the turn survives as
+    // the speed comes up — a car that cornered as hard at a hundred as at a
+    // walk would have no corners in it — and in mid-air there is barely any.
+    const ease = Math.min(1, this.speed / CAR.top);
+    let rate = CAR.turn * (1 - ease * (1 - CAR.turnAtSpeed));
+    if (flying) {
+      rate *= ITEM.ramp.steer;
+    }
+
+    let push: number;
+    /** Asking to slow down, however this car is being driven. */
+    let backwards: boolean;
+    /** The stick's direction, kept so the brake test can be made below —
+     *  after the nose has been turned, since it is asked against the nose. */
+    let aim: THREE.Vector2 | null = null;
+
+    if (drive.kind === "wheel") {
+      push = Math.min(1, Math.abs(drive.throttle));
+      backwards = drive.throttle < 0;
+      // Steering is not throttle here: a coasting car still turns, so this is
+      // outside the `push` test that the stick's version lives inside.
+      this.heading += drive.steer * rate * dt;
+    } else {
+      aim = drive.aim;
+      push = Math.min(1, aim.length());
+      backwards = false;
+      if (push > 1e-4) {
+        const target = Math.atan2(aim.x, aim.y);
+        const diff = shortestAngle(this.heading, target);
+        this.heading += Math.sign(diff) * Math.min(Math.abs(diff), rate * dt);
       }
-      const diff = shortestAngle(this.heading, target);
-      this.heading += Math.sign(diff) * Math.min(Math.abs(diff), rate * dt);
     }
 
     this.dir.set(Math.sin(this.heading), Math.cos(this.heading));
     this.side.set(this.dir.y, -this.dir.x);
+
+    if (aim && push > 1e-4) {
+      // Pushing against the way you are already going is the brake. There is
+      // no separate brake button and there does not need to be one — asking to
+      // go the other way is asking to slow down, which is what a child does
+      // without being told.
+      backwards = (this.dir.x * aim.x + this.dir.y * aim.y) / push < -0.2;
+    }
 
     // The two halves of the velocity: the way the nose points, and sideways.
     let along = this.velocity.dot(this.dir);
@@ -159,13 +196,12 @@ export class Car {
       // Nothing to push against up here: whatever the car had going into the
       // ramp is what it lands with.
     } else if (push > 1e-4) {
-      // Pushing against the way you are already going is the brake. There is
-      // no separate brake button and there does not need to be one — asking to
-      // go the other way is asking to slow down, which is what a child does
-      // without being told.
-      const facing = (this.dir.x * want.x + this.dir.y * want.y) / (push || 1);
-      if (facing < -0.2 && along > 0) {
-        along -= CAR.brake * push * dt;
+      if (backwards) {
+        // Brake while it is still rolling forward, and reverse once it is not.
+        // The stick never reaches the second case — pushing back on it turns
+        // the car round instead — but a keyboard's down arrow should back out
+        // of a wall rather than sit there.
+        along -= (along > 0 ? CAR.brake : CAR.accel) * push * dt;
       } else {
         along += CAR.accel * push * dt;
       }

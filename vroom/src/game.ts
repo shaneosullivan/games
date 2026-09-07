@@ -8,7 +8,7 @@ import {Rng} from "./core/rng";
 import {Engine} from "./core/audio";
 import {Stage} from "./render/stage";
 import {Track, wrap} from "./entities/track";
-import {Car} from "./entities/car";
+import {Car, Drive} from "./entities/car";
 import {Rivals} from "./entities/rivals";
 import {Skids} from "./entities/skids";
 import {Scenery} from "./entities/scenery";
@@ -63,6 +63,9 @@ export class Game {
   private knocks = 0;
 
   private readonly want = new THREE.Vector2();
+  /** The two controls, held rather than made every step. */
+  private readonly aimDrive: Drive = {kind: "aim", aim: this.want};
+  private readonly keyDrive = {kind: "wheel" as const, steer: 0, throttle: 0};
   private readonly wheels = [new THREE.Vector2(), new THREE.Vector2()];
   private readonly eye = new THREE.Vector3();
   private readonly wantEye = new THREE.Vector3();
@@ -111,7 +114,7 @@ export class Game {
     this.intro = new Overlay(
       ui,
       spec.name,
-      "You are the red car, and you are starting at the back. Drag anywhere on the screen to drive: push the way you want to go, and push harder to go faster. Pull back against yourself to brake. Take a corner too fast and the back end will step out and leave black marks all over the road — that is the whole fun of it, and it is quicker than it looks if you can catch it. The grass will slow you down and the red and white wall will not let you past. One lap.",
+      "You are the red car, and you are starting at the back. Drag anywhere on the screen to drive: push the way you want to go, and push harder to go faster. Pull back against yourself to brake. On a computer the arrow keys steer left and right, and up and down are the pedals. Take a corner too fast and the back end will step out and leave black marks all over the road — that is the whole fun of it, and it is quicker than it looks if you can catch it. The grass will slow you down and the wall at the edge will not let you past. One lap.",
       "Lights out",
       () => this.begin(),
     );
@@ -184,12 +187,7 @@ export class Game {
     }
     this.time += dt;
 
-    // The stick, straight through. This is the one game in the repo that needs
-    // no camera-relative arithmetic: the shot looks down and never turns, so
-    // screen right is world +X and screen down is world +Z, full stop.
-    this.want.set(this.stick.x, this.stick.y);
-
-    this.car.update(dt, this.want, this.track, this.patches);
+    this.car.update(dt, this.controls(), this.track, this.patches);
     if (this.car.keepIn(this.track)) {
       this.knocks++;
       this.engine.bump();
@@ -202,6 +200,27 @@ export class Game {
     this.engine.update(dt, this.car.speed, this.car.slip, CAR.top);
     this.hud.update(Math.min(1, this.progress), this.place());
   };
+
+  /**
+   * Whichever control is actually being used.
+   *
+   * The stick goes straight through, and this is the one game in the repo that
+   * needs no camera-relative arithmetic to do it: the shot looks down and never
+   * turns, so screen right is world +X and screen down is world +Z, full stop.
+   *
+   * A keyboard is a different control and not a squarer stick — left and right
+   * of the car's own nose — so it is handed over as one. A finger on the glass
+   * always wins.
+   */
+  private controls(): Drive {
+    if (this.stick.onKeys) {
+      this.keyDrive.steer = this.stick.steer;
+      this.keyDrive.throttle = this.stick.throttle;
+      return this.keyDrive;
+    }
+    this.want.set(this.stick.x, this.stick.y);
+    return this.aimDrive;
+  }
 
   /**
    * Where the player is in the race.
