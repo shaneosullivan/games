@@ -59,14 +59,18 @@ export class Dogs {
       const ears: Array<THREE.Object3D> = [];
       for (const side of [-1, 1]) {
         const pivot = new THREE.Group();
-        // Small rose ears, folded back against the skull. A wolfhound has
-        // nothing like a spaniel's flap — the ear is half the length and lies
-        // along the head — so the big soft ones had to go, and what keeps
-        // these dogs friendly now is the beard and the eyes instead.
-        pivot.position.set(side * 0.62, 2.85, 3.15);
+        // Small rose ears, folded flat against the skull.
+        //
+        // Small is the word that matters. At 0.5 deep and 0.42 tall the ear
+        // was a rounded slab the size of the dog's cheek, and seen from the
+        // side — which is how you see them when they are running past you —
+        // it read as a big dark circle stuck on the back of the head. A
+        // wolfhound's ear is a little folded flap that barely breaks the
+        // outline of the skull, and this is that.
+        pivot.position.set(side * 0.52, 2.92, 3.05);
         const flap = new THREE.SphereGeometry(1, 8, 7);
-        flap.scale(0.16, 0.42, 0.5);
-        flap.translate(0, -0.3, -0.2);
+        flap.scale(0.11, 0.26, 0.3);
+        flap.translate(0, -0.16, -0.12);
         // A shade darker than the coat, the way a floppy-eared dog nearly
         // always is.
         const ear = new THREE.Mesh(paint(flap, PALETTE.dogDark), vertexToon());
@@ -435,19 +439,13 @@ function dogGeometry(): THREE.BufferGeometry {
   bib.translate(0, -0.45, 1.6);
   parts.push(paint(bib, PALETTE.dogLight));
 
-  // A little shag, along the top line only.
+  // No shag at all in the end.
   //
-  // There were a dozen lumps down both flanks and it read as a sheep: a
-  // wolfhound's coat is rough and wiry but it lies close to a body you can
-  // still see the shape of, and the shape is the point. Five along the spine
-  // break the smooth line without burying it.
-  for (let i = 0; i < 3; i++) {
-    const t = i / 2;
-    const lump = new THREE.IcosahedronGeometry(0.34, 0);
-    lump.scale(0.55, 0.5, 1.2);
-    lump.translate((i % 2 === 0 ? 1 : -1) * 0.16, 1.5 - t * 0.35, 1 - t * 2.4);
-    parts.push(paint(lump, i % 2 === 0 ? PALETTE.dogDark : PALETTE.dog));
-  }
+  // It went from twelve lumps to five to three, and the last three were still
+  // wrong: they are painted a shade darker than the coat and they sit on the
+  // spine, so the one over the shoulder read as a big dark circle stuck behind
+  // the dog's head. A wolfhound's coat is rough but it is all one colour, and
+  // the outline is doing this work now anyway.
 
   // A long neck, rising.
   const neck = new THREE.CylinderGeometry(0.62, 0.82, 2.2, 9);

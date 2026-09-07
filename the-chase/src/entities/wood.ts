@@ -8,16 +8,25 @@ import {fadeInFront, type NearFade} from "../../../shared/fadeInFront";
 const TAU = Math.PI * 2;
 
 /** What a thing in the wood does when you reach it. */
-export type Kind = "solid" | "low";
+export type Kind = "solid" | "low" | "hollow";
 
 export interface Obstacle {
   x: number;
   z: number;
   /** How far out it actually stops you, which is less than it looks. */
   radius: number;
-  /** How high it stands. A "low" one is cleared by jumping over it; a "solid"
-   *  one is a tree, and no hare jumps a tree. */
+  /**
+   * The band of heights you cannot be in.
+   *
+   * `top` is the height you clear it at and `bore` the height you pass under
+   * it at, so between the two is what actually stops you. A log is (0, 4.6):
+   * nothing goes under, a jump goes over. A tree is (0, 99). A hollow log is
+   * (3.9, 6.6) — you run straight through the middle of it, and jumping is
+   * what catches you out, which makes it the one obstacle in this wood that
+   * punishes the button instead of rewarding it.
+   */
   top: number;
+  bore: number;
   kind: Kind;
 }
 
@@ -128,7 +137,7 @@ export class Wood {
         continue;
       }
       for (const o of list) {
-        if (o.kind === "low" && y > o.top) {
+        if (y > o.top || y < o.bore) {
           continue;
         }
         const reach = o.radius + radius;
@@ -300,6 +309,7 @@ export class Wood {
         z,
         radius: 2.3 * s * PROPS.forgive,
         top: 99,
+        bore: 0,
         kind: "solid",
       });
       placed++;
@@ -344,6 +354,7 @@ export class Wood {
         geo: boulderGeometry(),
         radius: 5.2,
         top: 99,
+        bore: 0,
         kind: "solid" as Kind,
         across: false,
         near: 0.4,
@@ -354,10 +365,49 @@ export class Wood {
         geo: pathTreeGeometry(),
         radius: 2.3,
         top: 99,
+        bore: 0,
         kind: "solid" as Kind,
         across: false,
         near: 0,
         far: 0.9,
+      },
+      // The two interesting logs, and they go near the front of the queue for
+      // the same reason the boulders do: nothing may stand within
+      // PROPS.spacing of anything else, both of these sit in the narrow strip
+      // down the middle of the path, and whatever is placed last finds that
+      // strip full. Left at the end of the list, not one of the twelve hollow
+      // logs found room.
+      //
+      // A big fallen tree with its branches still on it: longer and taller
+      // than the ordinary log, so it is a jump you have to mean.
+      {
+        count: PROPS.longLogs,
+        geo: longLogGeometry(),
+        radius: 8.5,
+        top: 6.4,
+        bore: 0,
+        kind: "low" as Kind,
+        across: true,
+        near: 0,
+        far: 0.45,
+      },
+      // And a hollow one, which you go *through*. See Obstacle.top.
+      {
+        count: PROPS.hollowLogs,
+        geo: hollowLogGeometry(),
+        radius: 7,
+        // No top: it is far too big to jump, and that is the point of it. The
+        // tunnel is the only way past, so this is the one thing in the wood
+        // where pressing the jump button is the wrong answer — at 6.6 it could
+        // be cleared as well as gone through, which made it decoration.
+        top: 99,
+        bore: 4.6,
+        kind: "hollow" as Kind,
+        // Not "across": this one is already built pointing down the path, and
+        // the small random yaw an across-log gets is exactly what it wants.
+        across: true,
+        near: 0,
+        far: 0.5,
       },
       {
         count: PROPS.logs,
@@ -367,6 +417,7 @@ export class Wood {
         // by a gap they were sure they had.
         radius: 6,
         top: 4.6,
+        bore: 0,
         kind: "low" as Kind,
         // Logs lie across the path, so they are turned to face along it and
         // the whole width of them is in the way.
@@ -383,6 +434,7 @@ export class Wood {
         // still gets pulled up short by a rock five high is a hare with a rule
         // nobody can guess.
         top: 6.8,
+        bore: 0,
         kind: "low" as Kind,
         across: false,
         near: 0,
@@ -393,6 +445,7 @@ export class Wood {
         geo: bramble,
         radius: 3.4,
         top: 5.6,
+        bore: 0,
         kind: "low" as Kind,
         across: false,
         near: 0,
@@ -404,6 +457,7 @@ export class Wood {
         geo: log,
         radius: 6,
         top: 4.6,
+        bore: 0,
         kind: "low" as Kind,
         across: false,
         near: 1,
@@ -414,6 +468,7 @@ export class Wood {
         geo: stone,
         radius: 3.1,
         top: 6.8,
+        bore: 0,
         kind: "low" as Kind,
         across: false,
         near: 1,
@@ -424,6 +479,7 @@ export class Wood {
         geo: bramble,
         radius: 3.4,
         top: 5.6,
+        bore: 0,
         kind: "low" as Kind,
         across: false,
         near: 1,
@@ -478,6 +534,7 @@ export class Wood {
           z,
           radius: k.radius * s * PROPS.forgive,
           top: k.top * s,
+          bore: k.bore * s,
           kind: k.kind,
         });
       }
@@ -643,6 +700,110 @@ function logGeometry(): THREE.BufferGeometry {
   moss.rotateZ(Math.PI / 2);
   moss.translate(0, 2.4, 0);
   parts.push(paint(moss, PALETTE.leafDeep));
+
+  return mergeGeometries(parts, false);
+}
+
+/**
+ * A big fallen tree, with the stumps of its branches still on it.
+ *
+ * Longer and thicker than the ordinary log, and the branches are the point:
+ * they stick out past the trunk, so what you have to clear is visibly wider
+ * than the log itself and you cannot sneak round the end of it.
+ */
+function longLogGeometry(): THREE.BufferGeometry {
+  const parts: Array<THREE.BufferGeometry> = [];
+
+  const trunk = new THREE.CylinderGeometry(2.7, 3, 19, 10);
+  trunk.rotateZ(Math.PI / 2);
+  trunk.translate(0, 3, 0);
+  parts.push(paint(trunk, PALETTE.bark));
+
+  for (const side of [-1, 1]) {
+    const end = new THREE.CylinderGeometry(2.75, 2.75, 0.5, 10);
+    end.rotateZ(Math.PI / 2);
+    end.translate(side * 9.6, 3, 0);
+    parts.push(paint(end, PALETTE.barkDark));
+  }
+
+  const stubs = [
+    {x: -5, tilt: 0.9, turn: 0.5, len: 6},
+    {x: 2, tilt: 1.1, turn: -0.7, len: 5},
+    {x: 8, tilt: 0.7, turn: 0.2, len: 7},
+  ];
+  for (const stub of stubs) {
+    const branch = new THREE.CylinderGeometry(0.55, 0.9, stub.len, 6);
+    branch.translate(0, stub.len / 2, 0);
+    branch.rotateX(stub.turn);
+    branch.rotateZ(stub.tilt);
+    branch.translate(stub.x, 3.4, 0);
+    parts.push(paint(branch, PALETTE.bark));
+  }
+
+  const moss = new THREE.CylinderGeometry(
+    2.85,
+    2.85,
+    17,
+    10,
+    1,
+    false,
+    0.9,
+    1.4,
+  );
+  moss.rotateZ(Math.PI / 2);
+  moss.translate(0, 3, 0);
+  parts.push(paint(moss, PALETTE.leafDeep));
+
+  return mergeGeometries(parts, false);
+}
+
+/**
+ * A hollow log: a tunnel you run through.
+ *
+ * Built as a ring of staves rather than a tube with a hole bored through it.
+ * There is no cutting one solid out of another here, and painting the inside
+ * of an open cylinder does not work either — the inside of an open cylinder is
+ * its own back faces, and back faces are not drawn. Eleven solid staves in a
+ * circle are hollow for real, from any angle, with nothing to get wrong.
+ */
+function hollowLogGeometry(): THREE.BufferGeometry {
+  const parts: Array<THREE.BufferGeometry> = [];
+  // Big. The tunnel is the only way past it, so it has to look like something
+  // no hare could ever hop over — and the bore has to sit on the ground, or
+  // the hare would have to jump up into it.
+  const ring = 3.4;
+  const staves = 13;
+
+  for (let i = 0; i < staves; i++) {
+    const a = (i / staves) * TAU;
+    const stave = new THREE.CylinderGeometry(0.85, 0.85, 15, 6);
+    // Along Z, not X.
+    //
+    // Every other log in this wood lies across the path, because you jump over
+    // those. This one you run *through*, so its bore has to point the way you
+    // are going — built along X it was a tunnel at ninety degrees to the
+    // direction of travel, which the collision test was perfectly happy with
+    // and which made no sense whatever to look at.
+    stave.rotateX(Math.PI / 2);
+    stave.translate(Math.sin(a) * ring, ring + Math.cos(a) * ring, 0);
+    // Moss along the top, bare bark underneath. The dark underside is what
+    // makes the mouth of the tunnel read as a mouth from up the path.
+    const lit = Math.cos(a) > 0.35;
+    parts.push(
+      paint(
+        stave,
+        lit ? PALETTE.leafDeep : i % 2 ? PALETTE.bark : PALETTE.barkDark,
+      ),
+    );
+  }
+
+  // A rim at each end, so the tunnel has a mouth rather than just stopping.
+  // A torus is already in the XY plane, which is square on to the bore.
+  for (const side of [-1, 1]) {
+    const rim = new THREE.TorusGeometry(ring, 0.55, 6, staves * 2);
+    rim.translate(0, ring, side * 7.5);
+    parts.push(paint(rim, PALETTE.barkDark));
+  }
 
   return mergeGeometries(parts, false);
 }

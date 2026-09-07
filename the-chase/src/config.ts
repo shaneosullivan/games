@@ -320,6 +320,12 @@ export const PROPS = {
    * stopped is not a course, it is a wall with gaps.
    */
   logs: 32,
+  /** Big fallen trees with their branches still on them, and hollow ones you
+   *  run through instead of over. Both are on the path and nowhere else —
+   *  they are the two most interesting things in the wood and hiding them out
+   *  in the verges would be a waste of them. */
+  longLogs: 14,
+  hollowLogs: 12,
   stones: 65,
   brambles: 72,
   /**
@@ -516,6 +522,17 @@ export const HOME = {
    * fireworks and nothing else.
    */
   linger: 6,
+  /**
+   * The leap in.
+   *
+   * The hare does not run into the burrow, it jumps into it — which is both
+   * what a hare does and a far better last thing to watch than an animal
+   * walking downstairs. `leapFrom` is how far out it takes off and
+   * `leapHeight` how high the arc goes; the arc is solved rather than
+   * simulated, so it lands in the hole every time from any run-in speed.
+   */
+  leapFrom: 26,
+  leapHeight: 9,
   /** How long the others take to notice, and how fast they run for the hole.
    *  Staggered, so they go in one after another rather than as a block. */
   boltAfter: 0.35,

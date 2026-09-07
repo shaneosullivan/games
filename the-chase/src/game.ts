@@ -435,17 +435,41 @@ export class Game {
       this.hare.heading += Math.sign(diff) * Math.min(Math.abs(diff), 5 * dt);
       const step = Math.min(left, this.hare.speed * dt);
       this.hare.position.addScaledVector(this.want, step);
-      this.hare.position.y =
-        this.wood.heightAt(this.hare.position.x, this.hare.position.z) +
-        HARE.ride;
     }
 
-    // Down the hole. It gets smaller over the last few units and sinks as it
-    // goes, because the burrow is a hole in the ground now rather than a door
-    // in a wall — a hare that only shrank would be dissolving on the grass.
-    const shrink = Math.max(0, Math.min(1, left / 14));
+    const ground = this.wood.heightAt(
+      this.hare.position.x,
+      this.hare.position.z,
+    );
+
+    // The leap.
+    //
+    // Solved rather than simulated: `t` is how far through the jump it is, and
+    // the arc is the parabola that is zero at both ends. That way it takes off
+    // at HOME.leapFrom and comes down in the hole whatever speed it arrived
+    // at — where a launch velocity and gravity would land it short from a slow
+    // run-in and over the top from a fast one.
+    const t = 1 - Math.min(1, left / HOME.leapFrom);
+    const arc = 4 * HOME.leapHeight * t * (1 - t);
+    // And down the hole over the last stretch of it. Both the arc and the drop
+    // go into `position`, not into `group.position`: render lerps the group
+    // from prevPosition to position every frame, so anything written straight
+    // to the group is overwritten before it is ever drawn — which is why the
+    // old version never actually sank into the hole.
+    const shrink = Math.max(0, Math.min(1, left / 7));
+    this.hare.position.y = ground + HARE.ride + arc - (1 - shrink) * 5;
     this.hare.group.scale.setScalar(shrink);
-    this.hare.group.position.y -= (1 - shrink) * 4;
+
+    // Nose up on the way and down on the way in. The hare's own render reads
+    // its pitch off vy while it is off the ground, so this hands it the slope
+    // of the arc — the derivative of that parabola, in units a second.
+    this.hare.grounded = t <= 0 || t >= 1;
+    this.hare.vy =
+      t > 0 && t < 1
+        ? ((4 * HOME.leapHeight * (1 - 2 * t)) / HOME.leapFrom) *
+          this.hare.speed
+        : 0;
+
     this.woodland.update(dt, 999);
 
     if (left <= 0.6) {
