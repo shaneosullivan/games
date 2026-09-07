@@ -19,7 +19,7 @@ function shortestAngle(from: number, to: number): number {
  * velocity into the part going the way the nose points and the part going
  * sideways; the engine works on the first, and grip eats the second. Turn the
  * nose faster than grip can drag the velocity round after it and the car is
- * sliding — which is what a skid is, and what the game is named after.
+ * sliding — which is what a skid is, and the whole point of the game.
  *
  * Used for the player and for the rivals alike; what differs is who is holding
  * the stick.

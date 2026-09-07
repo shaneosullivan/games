@@ -9,11 +9,16 @@ import {isSpec, TrackSpec} from "./spec";
  * rubbish in it is a shrug — a game that will not start because a saved track
  * is malformed would be much worse than one that quietly has fewer tracks.
  */
-const KEY = "skid-marks.tracks.v1";
+const KEY = "vroom.tracks.v1";
+/* What the key was called when the game was. A track drawn before the game was
+   renamed is still somebody's track, so the old key is read once and moved
+   over rather than left behind. */
+const OLD_KEY = "skid-marks.tracks.v1";
 
 export function loadTracks(): Array<TrackSpec> {
   try {
-    const raw = window.localStorage.getItem(KEY);
+    const raw =
+      window.localStorage.getItem(KEY) ?? window.localStorage.getItem(OLD_KEY);
     if (!raw) {
       return [];
     }

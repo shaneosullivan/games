@@ -1,4 +1,4 @@
-# Skid Marks
+# Vroom
 
 A top-down arcade racer, and a track builder to go with it. Drive one lap of a
 circuit against three rivals, hold the car sideways through the corners and
@@ -11,7 +11,7 @@ published by the gallery in the repo root.
 ## Running it
 
 ```bash
-npm --prefix skid-marks run dev
+npm --prefix vroom run dev
 ```
 
 Then open the URL Vite prints. On a tablet on the same Wi-Fi, use this Mac's LAN
@@ -81,9 +81,9 @@ Worth knowing before changing anything:
 ## Commands
 
 ```bash
-npm --prefix skid-marks run dev         # dev server, hot reload
-npm --prefix skid-marks run typecheck   # tsc --noEmit
-npm --prefix skid-marks run build       # typechecks, then one dist/index.html
+npm --prefix vroom run dev         # dev server, hot reload
+npm --prefix vroom run typecheck   # tsc --noEmit
+npm --prefix vroom run build       # typechecks, then one dist/index.html
 ```
 
 Formatting and linting come from the repo root (`npm run format`, `npm run

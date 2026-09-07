@@ -32,7 +32,7 @@ export class Menu {
     const head = document.createElement("header");
     head.className = "menu-head";
     const title = document.createElement("h1");
-    title.textContent = "Skid Marks";
+    title.textContent = "Vroom";
     const blurb = document.createElement("p");
     blurb.textContent = "Pick a track, or draw one of your own.";
     head.append(title, blurb);

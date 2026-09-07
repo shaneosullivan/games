@@ -1,7 +1,7 @@
-# Plan for Skid Marks
+# Plan for Vroom
 
 > **Write the initial description of the app here.** This file is the starting
-> point for Skid Marks — before any code, set down what you want it to be. Replace
+> point for Vroom — before any code, set down what you want it to be. Replace
 > everything below the line with your own words; it's only prompts to get you
 > going.
 

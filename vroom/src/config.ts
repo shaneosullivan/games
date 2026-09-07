@@ -1,5 +1,5 @@
 /**
- * Every tunable number in Skid Marks, grouped by system.
+ * Every tunable number in Vroom, grouped by system.
  *
  * The house rule in this repo: no magic numbers at the call site, and where a
  * number was arrived at rather than guessed, the arithmetic that produced it
@@ -186,7 +186,7 @@ export const TRACK = {
  * An arcade drift model, which is the whole game: the car has a heading and a
  * velocity, and they are not the same thing. Grip pulls the velocity round
  * toward the heading, and when you ask for more than the grip can give, the
- * car slides — and leaves the marks the game is named after.
+ * car slides — and leaves black marks all over the road.
  */
 export const CAR = {
   /** Sixteen units long and seven wide: four metres by one and three quarters,
@@ -227,13 +227,13 @@ export const CAR = {
    * sideways 16.6, and a hard yank of the stick at speed reaches the thirties.
    * Eighteen sits between the two, so a clean lap marks only the tightest
    * corners and throwing the car about blacks the road — which is the game.
-   * Twenty-six was above everything driving normally ever produced, and the
-   * game named after the marks made none.
+   * Twenty-six was above everything driving normally ever produced, so the
+   * marks never appeared at all.
    */
   skidAt: 18,
 } as const;
 
-/** The marks themselves, which the game is named after. */
+/** The marks the road is left covered in. */
 export const SKID = {
   /** How many are kept. The oldest is overwritten, so the trail is always the
    *  last few seconds of driving — and a lap of a thousand metres of unbroken

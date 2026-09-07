@@ -17,7 +17,7 @@ import {Overlay} from "./ui/overlays";
 import {SoundButton} from "../../shared/soundButton";
 
 /**
- * Skid Marks.
+ * Vroom.
  *
  * A car, a circuit and one lap. The plan asks for the Amiga game by name and
  * points at pictures of it, so this is what those pictures are: straight down

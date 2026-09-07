@@ -79,11 +79,11 @@
       "port": 5173
     },
     {
-      "name": "skid-marks",
+      "name": "vroom",
       "runtimeExecutable": "npm",
       "runtimeArgs": [
         "--prefix",
-        "skid-marks",
+        "vroom",
         "run",
         "dev"
       ],

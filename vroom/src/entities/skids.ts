@@ -3,7 +3,7 @@ import {Palette, SKID} from "../config";
 import {LAYER, order} from "../render/sprites";
 
 /**
- * The marks the game is named after.
+ * The marks the road is left covered in.
  *
  * A fixed pool of little dark rectangles laid on the road under the back
  * wheels whenever the car is going sideways faster than CAR.skidAt. The oldest

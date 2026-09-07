@@ -1,4 +1,4 @@
-# Working on Skid Marks
+# Working on Vroom
 
 A self-contained 3D web game in this repo of games. TypeScript + Three.js +
 Vite, built to one `index.html` that the gallery in the repo root publishes.
@@ -8,9 +8,9 @@ the wider patterns.
 ## Commands
 
 ```bash
-npm --prefix skid-marks run dev         # dev server, hot reload
-npm --prefix skid-marks run typecheck   # tsc --noEmit
-npm --prefix skid-marks run build       # typechecks, then one self-contained dist/index.html
+npm --prefix vroom run dev         # dev server, hot reload
+npm --prefix vroom run typecheck   # tsc --noEmit
+npm --prefix vroom run build       # typechecks, then one self-contained dist/index.html
 ```
 
 Formatting and linting are the repo's, run from the root:
@@ -23,7 +23,7 @@ npm run lint                         # eslint .
 **Run `npm run format` before every commit**, not as a follow-up — an
 unformatted commit makes the next format a diff about nothing.
 
-Always typecheck before calling a change done; `npm --prefix skid-marks run build`
+Always typecheck before calling a change done; `npm --prefix vroom run build`
 does it for you.
 
 **Before pushing, build the whole repo** — `npm run format && npm run lint &&
