@@ -77,6 +77,17 @@
         "dev"
       ],
       "port": 5173
+    },
+    {
+      "name": "skid-marks",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "--prefix",
+        "skid-marks",
+        "run",
+        "dev"
+      ],
+      "port": 5173
     }
   ]
 }

@@ -1,0 +1,225 @@
+/* Everything on the glass. Sized for an iPad held by a child: big type,
+   generous targets, nothing that needs a hover or a right-click. */
+
+:root {
+  --safe-t: env(safe-area-inset-top, 0px);
+  --safe-b: env(safe-area-inset-bottom, 0px);
+  --safe-l: env(safe-area-inset-left, 0px);
+  --safe-r: env(safe-area-inset-right, 0px);
+  --ink: #1d2430;
+  --panel: rgba(255, 255, 255, 0.84);
+  --stroke: rgba(29, 36, 48, 0.16);
+}
+
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body,
+#app {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: #4f9a44;
+  font-family:
+    "Nunito",
+    "Avenir Next",
+    "Segoe UI",
+    system-ui,
+    -apple-system,
+    sans-serif;
+  color: var(--ink);
+  /* The game is driven by dragging; never let a drag scroll or zoom the page. */
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+canvas {
+  display: block;
+}
+
+/* The layer the UI lives on. Transparent to taps except where something opts
+   back in, so the stick still works underneath it. */
+.ui {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.ui-interactive {
+  pointer-events: auto;
+}
+
+/* ---------- The readouts ---------- */
+
+.hud {
+  position: absolute;
+  top: calc(var(--safe-t) + 12px);
+  left: calc(var(--safe-l) + 12px);
+  right: calc(var(--safe-r) + 12px);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+}
+
+.hud.hidden {
+  display: none;
+}
+
+.readout {
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: var(--panel);
+  border: 1px solid var(--stroke);
+  backdrop-filter: blur(8px);
+  font-size: 16px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.readout.hidden {
+  display: none;
+}
+
+/* Out in front. The only thing on the glass that changes colour, so it is the
+   only thing that catches the eye at a hundred kilometres an hour. */
+.readout.leading {
+  background: rgba(242, 193, 74, 0.95);
+  color: #2a2205;
+  border-color: rgba(255, 255, 255, 0.4);
+}
+
+/* ---------- The corner buttons ---------- */
+
+.corner-buttons {
+  position: absolute;
+  top: calc(var(--safe-t) + 12px);
+  right: calc(var(--safe-r) + 12px);
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+/* Cut to match the shared sound switch beside it, box-sizing included: the
+   anchor is not border-box by default, and without this the two discs differ
+   by the two pixels of the border and sit a pixel out of line. */
+.icon-button {
+  box-sizing: border-box;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: 1px solid var(--stroke);
+  background: var(--panel);
+  color: var(--ink);
+  font-size: 20px;
+  line-height: 1;
+  display: grid;
+  place-items: center;
+  text-decoration: none;
+  backdrop-filter: blur(8px);
+  cursor: pointer;
+}
+
+.icon-button:active {
+  transform: scale(0.93);
+}
+
+/* ---------- The two full-screen cards ---------- */
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  padding: 24px;
+  text-align: center;
+  /* Pale, not dark: the card is read before the race and after it, and a dark
+     sheet over a bright green field is a jolt in a game for a child. */
+  background: rgba(247, 248, 244, 0.86);
+  backdrop-filter: blur(6px);
+  pointer-events: auto;
+  transition: opacity 320ms ease-out;
+}
+
+.overlay.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.overlay h1 {
+  margin: 0;
+  font-size: clamp(30px, 7vw, 62px);
+  line-height: 1.05;
+}
+
+.overlay p {
+  margin: 0;
+  max-width: 22em;
+  font-size: clamp(17px, 2.6vw, 24px);
+  line-height: 1.45;
+}
+
+.big-button {
+  border: none;
+  border-radius: 999px;
+  padding: 18px 46px;
+  font: inherit;
+  font-size: clamp(20px, 3vw, 28px);
+  font-weight: 800;
+  color: #fff;
+  background: #d6473c;
+  box-shadow: 0 6px 0 #a3332a;
+  cursor: pointer;
+}
+
+.big-button:active {
+  transform: translateY(4px);
+  box-shadow: 0 2px 0 #a3332a;
+}
+
+/* ---------- The floating thumbstick ---------- */
+
+.stick {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+  opacity: 0;
+  transition: opacity 130ms ease-out;
+  pointer-events: none;
+}
+
+.stick.active {
+  opacity: 1;
+}
+
+.stick-ring {
+  position: absolute;
+  width: 136px;
+  height: 136px;
+  margin: -68px 0 0 -68px;
+  border-radius: 50%;
+  /* Dark rather than white. It sits over grass and tarmac, and a pale ring on
+     either of those is a control nobody can find. */
+  border: 3px solid rgba(20, 24, 32, 0.5);
+  background: rgba(255, 255, 255, 0.24);
+  backdrop-filter: blur(2px);
+}
+
+.stick-knob {
+  position: absolute;
+  width: 58px;
+  height: 58px;
+  margin: -29px 0 0 -29px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 4px 14px rgba(20, 24, 32, 0.45);
+}
