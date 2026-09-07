@@ -319,12 +319,21 @@ export const PROPS = {
    * things in five seconds, and a course you cannot get through without being
    * stopped is not a course, it is a wall with gaps.
    */
-  logs: 32,
+  /**
+   * The logs, and the total is the point.
+   *
+   * There were seventy-six log-shaped things in the wood — thirty-two on the
+   * path and forty-four out on the verges — and adding the long ones and the
+   * hollow ones on top of that took it to a hundred and two, which turned
+   * stretches of the run into a timber yard. The plain logs give up their
+   * places instead, so it is still seventy-six.
+   */
+  logs: 22,
   /** Big fallen trees with their branches still on them, and hollow ones you
    *  run through instead of over. Both are on the path and nowhere else —
    *  they are the two most interesting things in the wood and hiding them out
    *  in the verges would be a waste of them. */
-  longLogs: 14,
+  longLogs: 12,
   hollowLogs: 12,
   stones: 65,
   brambles: 72,
@@ -336,7 +345,7 @@ export const PROPS = {
    * a course you can go round is not a course. Out here they are a reason to
    * come back to the path rather than a wall stopping you leaving it.
    */
-  vergeLogs: 44,
+  vergeLogs: 30,
   vergeStones: 100,
   vergeBrambles: 116,
   /**
@@ -574,8 +583,20 @@ export const SOUND = {
   /** The gap at which the barking is at its loudest and its quietest. */
   barkFrom: 20,
   barkTo: 170,
-  /** The squeak when the hare runs into something: how loud, and how far the
-   *  pitch wanders from one bump to the next so it is never the same twice. */
-  squeak: 0.2,
-  squeakWobble: 0.18,
+  /**
+   * The squeak when the hare runs into something: Hannah's own, three of them,
+   * one picked at random.
+   *
+   * The only recorded sound in this game, and it earns the exception the same
+   * way the penguin's does — a real voice squeaking is funnier than anything
+   * an oscillator can manage, and running into a log is meant to be funny.
+   *
+   * `voices` is how many copies of each are kept. An element already playing
+   * cannot be started again; two is plenty here because BUMP.rest means you
+   * cannot be stopped twice inside half a second.
+   */
+  squeak: 0.5,
+  squeakVoices: 2,
+  /** And the leaves it goes into, under the squeak. */
+  rustle: 0.08,
 } as const;

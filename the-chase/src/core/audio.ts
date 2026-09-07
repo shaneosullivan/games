@@ -1,3 +1,6 @@
+import squeak1 from "../assets/haresqueak1.m4a";
+import squeak2 from "../assets/haresqueak2.m4a";
+import squeak3 from "../assets/haresqueak3.m4a";
 import {SOUND} from "../config";
 
 /**
@@ -135,44 +138,14 @@ export class Woodland {
   }
 
   /**
-   * Running into something: a squeak.
+   * The bush it went into.
    *
-   * A short rising-then-falling note with a rustle of leaves under it. It was
-   * a low thump, which is what a thing weighing a ton sounds like hitting
-   * something; a hare weighs three kilograms and the noise it makes is a
-   * squeak. It is also the funniest thing in the game, which is the right way
-   * for a small animal to bump into a log.
-   *
-   * Pitched a little differently every time, or fifteen bumps in a run is the
-   * same noise fifteen times.
+   * Only the leaves now: the squeak itself is a recording, played by the game
+   * alongside this. It was an oscillator, which was a fair impression of a
+   * small animal and no match at all for a real one.
    */
-  squeak(): void {
-    const ctx = this.ctx;
-    if (!ctx || this.muted) {
-      return;
-    }
-    const now = ctx.currentTime;
-    const wobble = 1 + (Math.random() - 0.5) * 2 * SOUND.squeakWobble;
-    const base = 820 * wobble;
-
-    const osc = ctx.createOscillator();
-    osc.type = "triangle";
-    osc.frequency.setValueAtTime(base, now);
-    osc.frequency.exponentialRampToValueAtTime(base * 1.75, now + 0.06);
-    osc.frequency.exponentialRampToValueAtTime(base * 0.8, now + 0.19);
-
-    const g = ctx.createGain();
-    g.gain.setValueAtTime(0.0001, now);
-    g.gain.exponentialRampToValueAtTime(SOUND.squeak, now + 0.015);
-    g.gain.exponentialRampToValueAtTime(0.0001, now + 0.22);
-
-    osc.connect(g);
-    g.connect(ctx.destination);
-    osc.start(now);
-    osc.stop(now + 0.24);
-
-    // And the bush it went into.
-    this.rustle(0.26, 1600, 0.08);
+  leaves(): void {
+    this.rustle(0.26, 1600, SOUND.rustle);
   }
 
   /** Feet leaving the ground, and feet landing in leaves. */
@@ -275,5 +248,84 @@ export class Woodland {
   stop(): void {
     void this.ctx?.close();
     this.ctx = null;
+  }
+}
+
+/**
+ * The squeaks.
+ *
+ * Three recordings, one picked at random every time the hare runs into
+ * something. `Audio` elements rather than the WebAudio graph, the same as the
+ * caterpillar game's bites and the penguin's: nothing here has to be mixed,
+ * positioned or timed against anything else, and an element decodes and plays
+ * on its own.
+ */
+export class Squeaks {
+  private readonly voices: Array<Array<HTMLAudioElement>> = [];
+  /** Which was used last, so the same one never comes round twice running. */
+  private last = -1;
+  /** Which copy of each clip to use next. See SOUND.squeakVoices. */
+  private readonly next: Array<number> = [];
+  private muted = false;
+
+  constructor() {
+    for (const url of [squeak1, squeak2, squeak3]) {
+      const voices: Array<HTMLAudioElement> = [];
+      for (let i = 0; i < SOUND.squeakVoices; i++) {
+        const voice = new Audio(url);
+        voice.volume = SOUND.squeak;
+        voice.preload = "auto";
+        voices.push(voice);
+      }
+      this.voices.push(voices);
+      this.next.push(0);
+    }
+  }
+
+  /**
+   * One of them, at random — but never the one that just played.
+   *
+   * Picking freely from three means the same clip comes up twice in a row one
+   * time in three, and two identical squeaks a second apart do not sound
+   * random, they sound broken.
+   */
+  play(): void {
+    if (this.muted || this.voices.length === 0) {
+      return;
+    }
+    let pick = Math.floor(Math.random() * this.voices.length);
+    if (pick === this.last && this.voices.length > 1) {
+      pick =
+        (pick + 1 + Math.floor(Math.random() * (this.voices.length - 1))) %
+        this.voices.length;
+    }
+    this.last = pick;
+
+    const voices = this.voices[pick];
+    const voice = voices[this.next[pick]];
+    this.next[pick] = (this.next[pick] + 1) % voices.length;
+    voice.currentTime = 0;
+    // A play() the browser refuses — no gesture yet, or the element is still
+    // loading — rejects a promise, and an unhandled rejection is a red line in
+    // the console for something nobody needs to know about.
+    void voice.play().catch(() => {});
+  }
+
+  setMuted(muted: boolean): void {
+    this.muted = muted;
+    if (!muted) {
+      return;
+    }
+    for (const voices of this.voices) {
+      for (const voice of voices) {
+        voice.pause();
+        voice.currentTime = 0;
+      }
+    }
+  }
+
+  /** Everything off on the way out, the same as the wood. */
+  stop(): void {
+    this.setMuted(true);
   }
 }

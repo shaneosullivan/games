@@ -3,7 +3,7 @@ import {CAMERA, DOGS, HARE, HOME, PROPS, SIM, WOOD} from "./config";
 import {GameLoop} from "./core/loop";
 import {Joystick} from "./core/input";
 import {Rng} from "./core/rng";
-import {Woodland} from "./core/audio";
+import {Squeaks, Woodland} from "./core/audio";
 import {Stage} from "./render/stage";
 import {RAINBOW} from "./render/materials";
 import {Wood} from "./entities/wood";
@@ -48,6 +48,7 @@ export class Game {
   readonly leaves: ParticleBurst;
   readonly sparks: ParticleBurst;
   readonly woodland: Woodland;
+  readonly squeaks: Squeaks;
   readonly hud: Hud;
   readonly stick: Joystick;
   readonly loop: GameLoop;
@@ -131,6 +132,7 @@ export class Game {
     this.stage.scene.add(this.glow.flies);
 
     this.woodland = new Woodland();
+    this.squeaks = new Squeaks();
     this.hud = new Hud();
     this.hud.mount(ui);
     this.stick = new Joystick(ui);
@@ -159,7 +161,10 @@ export class Game {
     homeLink.setAttribute("aria-label", "Back to Chofter Games");
     corner.appendChild(homeLink);
     const sound = new SoundButton({
-      onToggle: muted => this.woodland.setMuted(muted),
+      onToggle: muted => {
+        this.woodland.setMuted(muted);
+        this.squeaks.setMuted(muted);
+      },
       className: "ui-interactive",
     });
     corner.appendChild(sound.root);
@@ -169,7 +174,10 @@ export class Game {
     // games are pages rather than tabs: a page that keeps barking behind the
     // one a child has moved on to is a bug the caterpillar game had once
     // already, and it is worth not having twice.
-    window.addEventListener("pagehide", () => this.woodland.stop());
+    window.addEventListener("pagehide", () => {
+      this.woodland.stop();
+      this.squeaks.stop();
+    });
 
     this.snapCamera();
     this.loop = new GameLoop(this.update, this.render);
@@ -335,7 +343,8 @@ export class Game {
     }
     this.hare.bump(hit.x, hit.z, hit.radius + 2, this.wood);
     this.bumps++;
-    this.woodland.squeak();
+    this.squeaks.play();
+    this.woodland.leaves();
     this.puff(22, 12);
   }
 
