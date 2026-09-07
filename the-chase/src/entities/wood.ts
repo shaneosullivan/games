@@ -352,10 +352,18 @@ export class Wood {
       {
         count: PROPS.boulders,
         geo: boulderGeometry(),
-        radius: 5.2,
-        top: 99,
+        radius: 4.2,
+        // Jumpable, like everything else on the path except the trees.
+        //
+        // Seven units, and the boulder was shrunk to match rather than the
+        // number fudged: a hare's jump peaks between ten and twelve above the
+        // grass, and at its old size the biggest boulders stood ten and a half
+        // — clearing them would have come down to which end of the scale range
+        // the generator happened to roll, which is the worst kind of unfair
+        // because it looks like the same obstacle every time.
+        top: 7,
         bore: 0,
-        kind: "solid" as Kind,
+        kind: "low" as Kind,
         across: false,
         near: 0.4,
         far: 2.1,
@@ -832,35 +840,35 @@ function stoneGeometry(): THREE.BufferGeometry {
 }
 
 /**
- * A boulder: too big to jump, and it has to look it.
+ * A boulder: the big grey one, as against the small grey one.
  *
- * Half as tall again as a hare can clear, with a smaller one leaning on it and
- * moss down one side. The moss matters more than it sounds — it is the only
- * thing telling a child at a glance that this is the grey lump they have to go
- * round rather than the grey lump they can hop.
+ * It used to be too big to jump and had to look it. It is jumpable now, so it
+ * has come down to seven units — still half again the height of the stones,
+ * with a smaller rock leaning on it and moss down one side, but honestly
+ * inside a hare's jump rather than a coin toss against it.
  */
 function boulderGeometry(): THREE.BufferGeometry {
   const parts: Array<THREE.BufferGeometry> = [];
 
-  const rock = new THREE.IcosahedronGeometry(5.4, 0);
-  rock.scale(1, 1.15, 0.95);
+  const rock = new THREE.IcosahedronGeometry(3.6, 0);
+  rock.scale(1, 1.1, 0.95);
   rock.rotateY(0.7);
-  rock.translate(0, 4.6, 0);
+  rock.translate(0, 3, 0);
   parts.push(paint(rock, PALETTE.stone));
 
-  const lump = new THREE.IcosahedronGeometry(3, 0);
+  const lump = new THREE.IcosahedronGeometry(2.1, 0);
   lump.rotateY(2.1);
-  lump.translate(3.6, 2.2, -1.2);
+  lump.translate(2.5, 1.5, -0.9);
   parts.push(paint(lump, PALETTE.stoneDark));
 
-  const cap = new THREE.SphereGeometry(3.6, 9, 6, 0, TAU, 0, Math.PI / 2);
+  const cap = new THREE.SphereGeometry(2.5, 9, 6, 0, TAU, 0, Math.PI / 2);
   cap.scale(1, 0.3, 1);
-  cap.translate(-0.3, 8.6, 0.3);
+  cap.translate(-0.2, 5.9, 0.2);
   parts.push(paint(cap, PALETTE.leafDeep));
 
-  const skirt = new THREE.SphereGeometry(2, 8, 5, 0, TAU, 0, Math.PI / 2);
+  const skirt = new THREE.SphereGeometry(1.5, 8, 5, 0, TAU, 0, Math.PI / 2);
   skirt.scale(1.3, 0.35, 1.1);
-  skirt.translate(-3.4, 1.2, 1.4);
+  skirt.translate(-2.4, 0.9, 1);
   parts.push(paint(skirt, PALETTE.leafDeep));
 
   return mergeGeometries(parts, false);
