@@ -186,9 +186,15 @@ export class Joystick {
     }
     // Left and right of the car's own nose, forward on the throttle and back
     // on the brake. Nothing here is in screen axes, which is the whole point.
+    //
+    // Left is the *positive* steer, which looks backwards and is not. The
+    // heading turns from +Z toward +X, and the camera puts +Z down the screen
+    // and +X to the right — so a rising heading swings the nose from six
+    // o'clock to three o'clock, which is anticlockwise on the glass and a left
+    // turn from the driver's seat.
     this.steer =
-      (this.keys.has("d") || this.keys.has("arrowright") ? 1 : 0) -
-      (this.keys.has("a") || this.keys.has("arrowleft") ? 1 : 0);
+      (this.keys.has("a") || this.keys.has("arrowleft") ? 1 : 0) -
+      (this.keys.has("d") || this.keys.has("arrowright") ? 1 : 0);
     this.throttle =
       (this.keys.has("w") || this.keys.has("arrowup") ? 1 : 0) -
       (this.keys.has("s") || this.keys.has("arrowdown") ? 1 : 0);

@@ -91,6 +91,13 @@ export class Rivals {
     }
   }
 
+  /** Lifts whichever of them are up on a flyover. */
+  setAbove(isAbove: (index: number) => boolean): void {
+    for (const car of this.cars) {
+      car.setAbove(isAbove(car.hint));
+    }
+  }
+
   /** How far each of them has come, in laps, for working out the order. */
   progress(i: number): number {
     return this.travelled[i];

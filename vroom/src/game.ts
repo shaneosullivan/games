@@ -1,7 +1,17 @@
 import * as THREE from "three";
-import {CAMERA, CAR, PLAYER, RIVALS, SCENERY, SKID, TRACK} from "./config";
+import {
+  BUMP,
+  CAMERA,
+  CAR,
+  PLAYER,
+  RIVALS,
+  SCENERY,
+  SKID,
+  TRACK,
+} from "./config";
 import {TrackSpec} from "./track/spec";
 import {Patches} from "./entities/patches";
+import {Bridges} from "./entities/bridges";
 import {GameLoop} from "./core/loop";
 import {Joystick} from "./core/input";
 import {Rng} from "./core/rng";
@@ -38,6 +48,7 @@ export class Game {
   readonly rivals: Rivals;
   readonly skids: Skids;
   readonly patches: Patches;
+  readonly bridges: Bridges;
   readonly engine: Engine;
   readonly hud: Hud;
   readonly stick: Joystick;
@@ -59,6 +70,8 @@ export class Game {
   /** Seconds since the flag dropped, and until the next mark is laid. */
   private time = 0;
   private skidIn = 0;
+  /** How long until another car-to-car bump is allowed to be heard. */
+  private nudgeIn = 0;
   /** How many times the barriers have been hit, for the finish card. */
   private knocks = 0;
 
@@ -95,6 +108,7 @@ export class Game {
     this.rivals = new Rivals(this.track);
     this.skids = new Skids(palette);
     this.patches = new Patches(this.track, spec.items);
+    this.bridges = new Bridges(this.track, palette);
 
     this.stage.scene.add(this.track.group);
     this.stage.scene.add(new Scenery(rng, this.track, palette).group);
@@ -102,6 +116,9 @@ export class Game {
     this.stage.scene.add(this.skids.mesh);
     this.stage.scene.add(this.rivals.group);
     this.stage.scene.add(this.car.group);
+    // Last, and drawn over everything: where the circuit runs over itself, the
+    // later part of the lap is on top of the earlier one.
+    this.stage.scene.add(this.bridges.group);
 
     this.gridUp();
 
@@ -188,11 +205,25 @@ export class Game {
     this.time += dt;
 
     this.car.update(dt, this.controls(), this.track, this.patches);
+    this.rivals.update(dt, this.track, this.patches);
+
+    // Cars off each other before cars off the wall: a shove is what can put
+    // you into the barrier, and it should be corrected in the same step rather
+    // than leaving the car a frame inside it.
+    this.nudgeIn -= dt;
+    if (this.jostle() && this.nudgeIn <= 0) {
+      this.nudgeIn = BUMP.quiet;
+      this.engine.bump();
+    }
     if (this.car.keepIn(this.track)) {
       this.knocks++;
       this.engine.bump();
     }
-    this.rivals.update(dt, this.track, this.patches);
+
+    // Who is over a flyover and who is under one, before anything is drawn.
+    this.car.setAbove(this.bridges.above(this.car.hint));
+    this.rivals.setAbove(i => this.bridges.above(i));
+    this.bridges.update(dt, this.car.hint);
 
     this.layRubber(dt);
     this.skids.update(dt);
@@ -237,6 +268,61 @@ export class Game {
       }
     }
     return ahead + 1;
+  }
+
+  /**
+   * Cars bouncing off each other.
+   *
+   * Equal discs, shoved apart and given back half of the speed they closed at.
+   * That is the whole model, deliberately: this wants to be a nudge that
+   * unsettles a car, not a crash that ends anybody's race. Some of the closing
+   * speed is thrown away as well, so four cars arriving at a hairpin together
+   * settle instead of pinging about.
+   *
+   * Returns whether the player was one of the two, which is what decides
+   * whether a child hears anything.
+   */
+  private jostle(): boolean {
+    const cars = [this.car, ...this.rivals.cars];
+    let hitPlayer = false;
+    for (let i = 0; i < cars.length; i++) {
+      for (let j = i + 1; j < cars.length; j++) {
+        const a = cars[i];
+        const b = cars[j];
+        const dx = b.position.x - a.position.x;
+        const dz = b.position.z - a.position.z;
+        const d = Math.hypot(dx, dz);
+        if (d >= BUMP.radius * 2 || d < 1e-4) {
+          continue;
+        }
+        const nx = dx / d;
+        const nz = dz / d;
+        const overlap = BUMP.radius * 2 - d;
+        // Half each. Neither car is more important than the other, and a car
+        // that never gave ground would be a wall with wheels.
+        a.position.x -= nx * overlap * 0.5;
+        a.position.z -= nz * overlap * 0.5;
+        b.position.x += nx * overlap * 0.5;
+        b.position.z += nz * overlap * 0.5;
+
+        const closing =
+          (b.velocity.x - a.velocity.x) * nx +
+          (b.velocity.y - a.velocity.y) * nz;
+        if (closing < 0) {
+          const kick = -closing * BUMP.bounce;
+          a.velocity.x -= nx * kick;
+          a.velocity.y -= nz * kick;
+          b.velocity.x += nx * kick;
+          b.velocity.y += nz * kick;
+          a.velocity.multiplyScalar(BUMP.keep);
+          b.velocity.multiplyScalar(BUMP.keep);
+          if (i === 0) {
+            hitPlayer = true;
+          }
+        }
+      }
+    }
+    return hitPlayer;
   }
 
   /**

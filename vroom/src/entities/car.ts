@@ -70,6 +70,10 @@ export class Car {
    */
   air = 0;
 
+  /** How long the ramp's extra speed lingers. The ceiling is lifted while this
+   *  runs and eased back as it empties. */
+  private boost = 0;
+
   private readonly dir = new THREE.Vector2();
   private readonly side = new THREE.Vector2();
   private readonly sprite: THREE.Mesh;
@@ -112,6 +116,7 @@ export class Car {
     this.hint = hint;
     this.lap = lap;
     this.air = 0;
+    this.boost = 0;
   }
 
   /** How fast it is going, whichever way it happens to be pointing. */
@@ -141,7 +146,13 @@ export class Car {
       this.air = Math.max(0, this.air - dt);
     } else if (on === "ramp" && this.speed >= ITEM.ramp.minSpeed) {
       this.air = ITEM.ramp.airtime;
+      this.boost = ITEM.ramp.carry;
+      // Straight onto the velocity, before it is split into along and across:
+      // the shove is in the direction the car was actually travelling, which
+      // on a ramp taken sideways is not where the nose is pointing.
+      this.velocity.multiplyScalar(ITEM.ramp.boost);
     }
+    this.boost = Math.max(0, this.boost - dt);
     const flying = this.air > 0;
 
     // How fast the nose can come round. Less and less of the turn survives as
@@ -229,7 +240,11 @@ export class Car {
     }
     across *= Math.exp(-grip * dt);
 
-    along = Math.max(-top * 0.35, Math.min(top, along));
+    // The ceiling, lifted by whatever is left of a ramp's boost and easing
+    // back to the ordinary top speed as that runs out.
+    const ceiling =
+      top * (1 + (ITEM.ramp.boost - 1) * (this.boost / ITEM.ramp.carry));
+    along = Math.max(-ceiling * 0.35, Math.min(ceiling, along));
 
     this.velocity.set(
       this.dir.x * along + this.side.x * across,
@@ -273,6 +288,19 @@ export class Car {
     }
     this.velocity.multiplyScalar(0.86);
     return true;
+  }
+
+  /**
+   * Lifts the car above the flyover decks, or drops it back under them.
+   *
+   * A deck is drawn over every car, because a car on the road underneath a
+   * bridge should not show through it. The car actually driving over the
+   * bridge is the exception, and this is it.
+   */
+  setAbove(above: boolean): void {
+    const lift = above ? 20 : 0;
+    this.sprite.renderOrder = order(LAYER.car) + lift;
+    this.shadow.renderOrder = order(LAYER.shadow) + lift;
   }
 
   /** Where the back wheels are, for laying rubber. */

@@ -41,7 +41,8 @@ gave four fixed compass directions, which is not driving. `Drive` in
 use; a finger on the glass always wins.
 
 The grass will slow you down and the wall at the edge of it will not let you
-past. One lap.
+past. Cars bounce off each other, ramps throw you into the air and give you a
+shove with it, oil takes your grip away and mud takes your speed. One lap.
 
 ## Building a track
 
@@ -73,6 +74,13 @@ Worth knowing before changing anything:
   renders everything at about a third of its brightness. The tell, when this was
   wrong, was that the grass looked right and nothing else did — the grass is the
   scene background, which the renderer writes out untouched.
+- **Where the circuit runs over itself, the later part of the lap is on top.**
+  `Bridges` rebuilds that stretch of road complete — ground, run-off, barrier,
+  kerbs — and draws it over everything including the cars, so the road below is
+  properly hidden; a car up on a deck is lifted above it by `Car.setAbove`, and
+  the deck fades to a ghost while the player is underneath. Watch out for the
+  crossing finder: pairs are stored smallest-index-first, so a crossing that
+  straddles the start of the lap turns up twice, once mirrored.
 - **A track is data**, in `src/track/spec.ts`. The circuit the game ships with
   and one drawn by a child are the same kind of thing, and the game reads both
   the same way. Everything on a track is stored _against the circuit_ — how far

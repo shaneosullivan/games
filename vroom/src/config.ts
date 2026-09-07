@@ -359,7 +359,81 @@ export const ITEM = {
      *  committed to, and being able to fly a corner would make the ramps a
      *  short cut rather than a risk. */
     steer: 0.15,
+    /**
+     * The shove a ramp gives, and how long the car is allowed to keep it.
+     *
+     * Applied to the velocity at take-off, so the boost is immediate and in
+     * whatever direction the car was actually travelling. The speed ceiling is
+     * lifted by the same amount and eased back down over `carry` seconds —
+     * without that the clamp would take the boost away in the same step it was
+     * given, and landing would snap the car back to walking pace at exactly
+     * the moment it should feel fastest.
+     */
+    boost: 1.35,
+    carry: 2.5,
   },
+} as const;
+
+/**
+ * Cars hitting each other.
+ *
+ * A race with four cars that pass through one another is not a race. They are
+ * treated as equal discs and simply shoved apart, which is the whole model —
+ * anything more careful would be modelling a crash, and this game wants a
+ * nudge and a bit of a slide, not a shunt.
+ */
+export const BUMP = {
+  /** How close two cars get before they touch, centre to centre. A little
+   *  under half a car length, so they can run side by side down a straight
+   *  without shoving each other the whole way. */
+  radius: 7.4,
+  /** How much of the closing speed comes back as a bounce. Half: enough to
+   *  feel like a hit and not enough to fling a child off the road. */
+  bounce: 0.5,
+  /**
+   * And how much speed survives each step of contact, so a pile-up settles.
+   *
+   * Applied every step the two are touching rather than once per impact, which
+   * is right — leaning on a car ahead should cost you — but it compounds, and
+   * it has to be gentle for that reason. At 0.88 a shunt lasting ten steps
+   * kept a quarter of the speed and stopped the player dead.
+   */
+  keep: 0.97,
+  /** How long between bump noises. Ten frames of contact is one bump, not ten
+   *  — without this a shunt is a machine gun. */
+  quiet: 0.25,
+} as const;
+
+/**
+ * Flyovers.
+ *
+ * A circuit that runs over itself has to say which of the two roads is on top,
+ * and the answer is always the later part of the lap. Otherwise a child
+ * driving into a crossing has no way of knowing whether they are about to go
+ * over or under, and half the corner is drawn on top of the other half.
+ */
+export const BRIDGE = {
+  /**
+   * How far the deck reaches either side of the crossing, in world units
+   * along the road.
+   *
+   * It has to cover everything the road underneath draws — its tarmac, kerbs,
+   * run-off and barrier — which reaches out to the barrier's far edge. A
+   * little more than that, so the deck ends over the grass and not on the
+   * kerb it is hiding.
+   */
+  reach: 120,
+  /**
+   * What the deck fades to while the player is underneath it.
+   *
+   * Not to nothing. Fading the deck away entirely would leave the car
+   * apparently driving through the middle of a road that is not there, and a
+   * ghost of it says "you are under this" much better than a hole does.
+   */
+  under: 0.3,
+  /** How fast it fades, per second. Quick enough to be out of the way before
+   *  the car is, slow enough not to blink. */
+  fade: 6,
 } as const;
 
 /**

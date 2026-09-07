@@ -5,6 +5,25 @@ import {TrackSpec} from "../track/spec";
 import {flatVertex, LAYER, order, paint} from "../render/sprites";
 
 /**
+ * One place the circuit runs over itself: the earlier stretch and the later
+ * one. `low`/`high` are the middle of each, and the `From`/`To` pair is how
+ * far the tangle actually reaches — unwrapped, so `To` can be past the end of
+ * the ring and the arithmetic still works.
+ */
+export interface Crossing {
+  low: number;
+  lowFrom: number;
+  lowTo: number;
+  high: number;
+  highFrom: number;
+  highTo: number;
+}
+
+/** How wide a kerb is. Shared, because a flyover deck has to cover the road
+ *  underneath it right out to the far edge of its kerb. */
+export const KERB = 5;
+
+/**
  * The circuit.
  *
  * One curve through the hand-placed corners, and everything else is measured
@@ -135,12 +154,14 @@ export class Track {
    * a kerb is (half, half + 5) and so on. One geometry, one draw call, for a
    * kilometre of road.
    */
-  private ribbon(
+  ribbon(
     from: number,
     to: number,
     colour: number,
     height: number,
     stripe?: {other: number; every: number},
+    /** Part of the circuit rather than all of it, for a flyover deck. */
+    span?: {start: number; count: number},
   ): THREE.Mesh {
     const verts: Array<number> = [];
     const colours: Array<number> = [];
@@ -148,8 +169,11 @@ export class Track {
     const a = new THREE.Color(colour);
     const b = new THREE.Color(stripe?.other ?? colour);
 
-    for (let i = 0; i < TRACK.segments; i++) {
-      const j = (i + 1) % TRACK.segments;
+    const start = span ? span.start : 0;
+    const count = span ? span.count : TRACK.segments;
+    for (let k = 0; k < count; k++) {
+      const i = wrapIndex(start + k);
+      const j = wrapIndex(i + 1);
       const p0 = this.points[i];
       const p1 = this.points[j];
       const s0 = this.sides[i];
@@ -185,7 +209,7 @@ export class Track {
 
   /** Red and white, both sides, the way every circuit in the world does it. */
   private kerbs(): THREE.Mesh {
-    const w = 5;
+    const w = KERB;
     const stripe = {other: this.palette.kerbB, every: 6};
     return mergeMeshes([
       this.ribbon(
@@ -259,6 +283,126 @@ export class Track {
     return mesh;
   }
 
+  /**
+   * Where the circuit runs over itself.
+   *
+   * Two samples far apart along the lap but close together on the ground are a
+   * crossing. "Far apart along the lap" is the whole test: every sample is
+   * near its neighbours, and without that guard the answer would be the entire
+   * track.
+   *
+   * What comes back is not a pair of points but a pair of *stretches*, and
+   * that matters. A crossing at a right angle is a handful of touching
+   * samples; two roads meeting at a shallow angle run alongside each other for
+   * a couple of hundred units first, and a bridge built to a fixed length
+   * would sit in the middle of that leaving both ends tangled. So each
+   * crossing carries the full extent of the ground it covers, and the deck is
+   * built to fit it.
+   *
+   * A plain scan of every pair, once, when the track is built. Nine hundred
+   * samples is four hundred thousand distance checks; anything cleverer would
+   * be more code than the thing it replaced.
+   */
+  crossings(): Array<Crossing> {
+    // Close enough that the two roads and their kerbs share ground.
+    const near = (TRACK.half + KERB) * 2;
+    const near2 = near * near;
+    // Far enough apart along the lap that this is a crossing and not simply
+    // the road being next to itself.
+    const apart = Math.max(30, Math.round(TRACK.segments * 0.05));
+
+    const hits: Array<{low: number; high: number; d: number}> = [];
+    for (let i = 0; i < TRACK.segments; i++) {
+      for (let j = i + apart; j < TRACK.segments; j++) {
+        if (TRACK.segments - (j - i) < apart) {
+          continue;
+        }
+        const a = this.points[i];
+        const b = this.points[j];
+        const d = (a.x - b.x) ** 2 + (a.z - b.z) ** 2;
+        if (d <= near2) {
+          hits.push({low: i, high: j, d});
+        }
+      }
+    }
+
+    // Closest pair first, so each cluster is seeded at the middle of its
+    // crossing and grown outward from there. Growing from whichever pair
+    // happened to be found first split single crossings into three.
+    hits.sort((a, b) => a.d - b.d);
+    const taken: Array<boolean> = new Array(hits.length).fill(false);
+    const found: Array<Crossing> = [];
+
+    for (let k = 0; k < hits.length; k++) {
+      if (taken[k]) {
+        continue;
+      }
+      const seed = hits[k];
+      taken[k] = true;
+      let lowMin = 0;
+      let lowMax = 0;
+      let highMin = 0;
+      let highMax = 0;
+
+      // Single linkage: keep sweeping until a sweep adds nothing. A pair
+      // belongs if it is near anything already in the cluster, which is what
+      // lets a long shallow crossing come out as one thing.
+      //
+      // Both ways round, and that is not a nicety. A pair is stored with the
+      // smaller index first, so a crossing that straddles the start of the lap
+      // is found twice — once as (1, 325) and again as its mirror (324, 899) —
+      // and comparing only low-to-low would call those two different bridges
+      // and stack two decks on the same piece of road.
+      const fits = (a: number, b: number): boolean =>
+        a >= lowMin - apart &&
+        a <= lowMax + apart &&
+        b >= highMin - apart &&
+        b <= highMax + apart;
+
+      let grew = true;
+      while (grew) {
+        grew = false;
+        for (let m = 0; m < hits.length; m++) {
+          if (taken[m]) {
+            continue;
+          }
+          const straight: [number, number] = [
+            ringGap(seed.low, hits[m].low),
+            ringGap(seed.high, hits[m].high),
+          ];
+          const mirrored: [number, number] = [
+            ringGap(seed.low, hits[m].high),
+            ringGap(seed.high, hits[m].low),
+          ];
+          const use = fits(...straight)
+            ? straight
+            : fits(...mirrored)
+              ? mirrored
+              : null;
+          if (!use) {
+            continue;
+          }
+          taken[m] = true;
+          grew = true;
+          lowMin = Math.min(lowMin, use[0]);
+          lowMax = Math.max(lowMax, use[0]);
+          highMin = Math.min(highMin, use[1]);
+          highMax = Math.max(highMax, use[1]);
+        }
+      }
+
+      found.push({
+        low: seed.low,
+        lowFrom: seed.low + lowMin,
+        lowTo: seed.low + lowMax,
+        high: seed.high,
+        highFrom: seed.high + highMin,
+        highTo: seed.high + highMax,
+      });
+    }
+    return found;
+  }
+
   /** Where the grid sits: a fraction of a lap back from the line. */
   gridAt(slot: number, offset: number, out: THREE.Vector3): number {
     const t = wrap(this.startAt - 0.006 - slot * 0.006);
@@ -267,6 +411,18 @@ export class Track {
     out.addScaledVector(this.tmp, offset);
     return t;
   }
+}
+
+/** How far apart two sample indices are, the short way round. */
+export function ringGap(a: number, b: number): number {
+  const d = ((b - a) % TRACK.segments) + TRACK.segments;
+  const w = d % TRACK.segments;
+  return w > TRACK.segments / 2 ? w - TRACK.segments : w;
+}
+
+/** A sample index, wrapped into the ring. */
+export function wrapIndex(i: number): number {
+  return ((i % TRACK.segments) + TRACK.segments) % TRACK.segments;
 }
 
 /** 0..1, wrapping, so a lap can be counted past the end of the curve. */
