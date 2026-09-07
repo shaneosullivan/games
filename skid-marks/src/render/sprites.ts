@@ -12,7 +12,18 @@ import * as THREE from "three";
  * drawn over what.
  */
 
-/** How high off the ground each kind of thing sits. Bigger is nearer the eye. */
+/**
+ * How high off the ground each kind of thing sits. Bigger is nearer the eye.
+ *
+ * The heights alone do not decide what is drawn over what, and it is worth
+ * being clear about why: nothing in this game writes to the depth buffer, so
+ * every one of these flat things passes the depth test and the *order* they
+ * are drawn in is the whole of the stacking. Left to three's own sort that
+ * order is near enough right by accident and wrong where it matters — the
+ * car's shadow came out on top of the car in mid-air. So every mesh states
+ * its place with `order()` below, and the heights are kept only to stop
+ * coplanar faces fighting.
+ */
 export const LAYER = {
   grass: 0,
   sand: 0.1,
@@ -24,6 +35,11 @@ export const LAYER = {
   shadow: 0.9,
   car: 1,
 } as const;
+
+/** A LAYER as a renderOrder: what is drawn over what, said out loud. */
+export function order(height: number): number {
+  return Math.round(height * 100);
+}
 
 /**
  * Unlit flat colour. Every material in the game is one of these.

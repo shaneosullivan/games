@@ -1,5 +1,7 @@
 import * as THREE from "three";
 import {CAMERA, CAR, PLAYER, RIVALS, SCENERY, SKID, TRACK} from "./config";
+import {TrackSpec} from "./track/spec";
+import {Patches} from "./entities/patches";
 import {GameLoop} from "./core/loop";
 import {Joystick} from "./core/input";
 import {Rng} from "./core/rng";
@@ -35,6 +37,7 @@ export class Game {
   readonly car: Car;
   readonly rivals: Rivals;
   readonly skids: Skids;
+  readonly patches: Patches;
   readonly engine: Engine;
   readonly hud: Hud;
   readonly stick: Joystick;
@@ -65,20 +68,34 @@ export class Game {
   private readonly wantEye = new THREE.Vector3();
   private readonly here = new THREE.Vector3();
 
-  constructor(host: HTMLElement, ui: HTMLElement) {
+  constructor(
+    host: HTMLElement,
+    ui: HTMLElement,
+    spec: TrackSpec,
+    /** Back to the track list. The gallery's own home button is beside it and
+     *  goes somewhere else entirely, so both are needed. */
+    private readonly onExit: () => void,
+    /** Another go on the same circuit. The shell throws this Game away and
+     *  builds a fresh one, which is much less to get wrong than unwinding a
+     *  finished race in place. */
+    private readonly onAgain: () => void,
+  ) {
     // Seeded, so the trees and the crowd are in the same places every time. A
     // driver who learns a corner by the tree beside it should find that tree
     // there tomorrow.
     const rng = new Rng(SCENERY.seed);
 
-    this.stage = new Stage(host);
-    this.track = new Track();
+    this.track = new Track(spec);
+    const palette = this.track.palette;
+    this.stage = new Stage(host, palette);
     this.car = new Car(PLAYER.colour);
     this.rivals = new Rivals(this.track);
-    this.skids = new Skids();
+    this.skids = new Skids(palette);
+    this.patches = new Patches(this.track, spec.items);
 
     this.stage.scene.add(this.track.group);
-    this.stage.scene.add(new Scenery(rng, this.track).group);
+    this.stage.scene.add(new Scenery(rng, this.track, palette).group);
+    this.stage.scene.add(this.patches.group);
     this.stage.scene.add(this.skids.mesh);
     this.stage.scene.add(this.rivals.group);
     this.stage.scene.add(this.car.group);
@@ -93,13 +110,13 @@ export class Game {
 
     this.intro = new Overlay(
       ui,
-      "Skid Marks",
+      spec.name,
       "You are the red car, and you are starting at the back. Drag anywhere on the screen to drive: push the way you want to go, and push harder to go faster. Pull back against yourself to brake. Take a corner too fast and the back end will step out and leave black marks all over the road — that is the whole fun of it, and it is quicker than it looks if you can catch it. The grass will slow you down and the red and white wall will not let you past. One lap.",
       "Lights out",
       () => this.begin(),
     );
     this.done = new Overlay(ui, "Chequered flag!", "", "Race again", () =>
-      window.location.reload(),
+      this.onAgain(),
     );
     this.done.hide();
 
@@ -112,6 +129,14 @@ export class Game {
     home.title = "Chofter Games";
     home.setAttribute("aria-label", "Back to Chofter Games");
     corner.appendChild(home);
+    const tracks = document.createElement("button");
+    tracks.className = "icon-button ui-interactive";
+    tracks.type = "button";
+    tracks.textContent = "🏁";
+    tracks.title = "Choose a track";
+    tracks.setAttribute("aria-label", "Choose a track");
+    tracks.addEventListener("click", () => this.onExit());
+    corner.appendChild(tracks);
     const sound = new SoundButton({
       onToggle: muted => this.engine.setMuted(muted),
       className: "ui-interactive",
@@ -164,12 +189,12 @@ export class Game {
     // screen right is world +X and screen down is world +Z, full stop.
     this.want.set(this.stick.x, this.stick.y);
 
-    this.car.update(dt, this.want, this.track);
+    this.car.update(dt, this.want, this.track, this.patches);
     if (this.car.keepIn(this.track)) {
       this.knocks++;
       this.engine.bump();
     }
-    this.rivals.update(dt, this.track);
+    this.rivals.update(dt, this.track, this.patches);
 
     this.layRubber(dt);
     this.skids.update(dt);
@@ -245,8 +270,8 @@ export class Game {
 
     const crossed =
       step > 0 &&
-      wrap(this.lastT - TRACK.startAt) > 0.5 &&
-      wrap(found.t - TRACK.startAt) < 0.5;
+      wrap(this.lastT - this.track.startAt) > 0.5 &&
+      wrap(found.t - this.track.startAt) < 0.5;
     this.lastT = found.t;
 
     if (crossed && this.progress > 0.5) {
@@ -303,6 +328,15 @@ export class Game {
     this.stage.camera.position.lerp(this.wantEye, ease);
     // Looking straight down, always. There is nothing to aim: the camera's
     // rotation is fixed and only its position moves.
+  }
+
+  /** Everything off, for a screen that is going away. */
+  dispose(): void {
+    this.running = false;
+    this.loop.stop();
+    this.engine.stop();
+    this.stick.enabled = false;
+    this.stage.dispose();
   }
 
   /** Puts the camera over the car straight away, so the first frame is not a

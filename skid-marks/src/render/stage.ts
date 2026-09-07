@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import {CAMERA, WORLD} from "../config";
+import {CAMERA, Palette} from "../config";
 
 /**
  * The renderer, the scene and the camera.
@@ -20,7 +20,7 @@ export class Stage {
   readonly scene = new THREE.Scene();
   readonly camera: THREE.OrthographicCamera;
 
-  constructor(host: HTMLElement) {
+  constructor(host: HTMLElement, palette: Palette) {
     this.renderer = new THREE.WebGLRenderer({antialias: true});
     // Capped at 2: a modern iPad reports 3, which triples the pixels drawn for
     // a difference nobody can see on flat colour.
@@ -28,7 +28,10 @@ export class Stage {
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     host.appendChild(this.renderer.domElement);
 
-    this.scene.background = new THREE.Color(WORLD.grass);
+    // The ground is the background rather than a mesh: the world has no edge,
+    // and a floor big enough to never run out from under the camera would be a
+    // county-sized quad drawn behind every frame for nothing.
+    this.scene.background = new THREE.Color(palette.ground);
 
     // The frustum is set in resize(), which knows the aspect. Near and far are
     // generous because everything lives within a few units of y = 0 and there
@@ -66,5 +69,14 @@ export class Stage {
 
   render(): void {
     this.renderer.render(this.scene, this.camera);
+  }
+
+  /** Gives the canvas and its GL context back. A child can start half a dozen
+   *  races and open the builder between each of them, and a browser will only
+   *  hand out so many contexts before it starts silently dropping the oldest. */
+  dispose(): void {
+    window.removeEventListener("resize", this.resize);
+    this.renderer.dispose();
+    this.renderer.domElement.remove();
   }
 }

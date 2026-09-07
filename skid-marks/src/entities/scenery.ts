@@ -1,8 +1,8 @@
 import * as THREE from "three";
 import {mergeGeometries} from "three/examples/jsm/utils/BufferGeometryUtils.js";
-import {SCENERY} from "../config";
+import {Palette, SCENERY} from "../config";
 import {Rng} from "../core/rng";
-import {flatVertex, LAYER, paint, tile} from "../render/sprites";
+import {flatVertex, LAYER, order, paint, tile} from "../render/sprites";
 import {Track} from "./track";
 
 const TAU = Math.PI * 2;
@@ -20,7 +20,7 @@ const TAU = Math.PI * 2;
 export class Scenery {
   readonly group = new THREE.Group();
 
-  constructor(rng: Rng, track: Track) {
+  constructor(rng: Rng, track: Track, palette: Palette) {
     const trees: Array<THREE.BufferGeometry> = [];
     const tyres: Array<THREE.BufferGeometry> = [];
     const crowd: Array<THREE.BufferGeometry> = [];
@@ -64,12 +64,14 @@ export class Scenery {
       crown.rotateX(-Math.PI / 2);
       crown.rotateY(rng.range(0, TAU));
       crown.translate(at.x, LAYER.scenery, at.z);
-      trees.push(paint(crown, rng.next() < 0.5 ? 0x2f6b34 : 0x3b7d3c));
+      trees.push(
+        paint(crown, rng.next() < 0.5 ? palette.treeA : palette.treeB),
+      );
 
       const trunk = new THREE.CircleGeometry(r * 0.22, 6);
       trunk.rotateX(-Math.PI / 2);
       trunk.translate(at.x, LAYER.scenery + 0.01, at.z);
-      trees.push(paint(trunk, 0x4a3524));
+      trees.push(paint(trunk, palette.trunk));
     }
 
     for (let i = 0; i < SCENERY.tyres; i++) {
@@ -79,12 +81,12 @@ export class Scenery {
       const stack = new THREE.CircleGeometry(rng.range(3, 4.5), 8);
       stack.rotateX(-Math.PI / 2);
       stack.translate(at.x, LAYER.scenery, at.z);
-      tyres.push(paint(stack, 0x1f1f23));
+      tyres.push(paint(stack, palette.tyre));
     }
 
     // The crowd: little coloured dots in clumps, the way a crowd actually
     // stands. Scattered one at a time they read as confetti.
-    const shirts = [0xe0b13c, 0x3f7fd6, 0xd6473c, 0xf2efe6, 0x49b45a];
+    const shirts = palette.crowd;
     let cx = 0;
     let cz = 0;
     for (let i = 0; i < SCENERY.crowd; i++) {
@@ -106,6 +108,7 @@ export class Scenery {
 
     for (const parts of [trees, tyres, crowd]) {
       const mesh = new THREE.Mesh(mergeGeometries(parts, false), flatVertex());
+      mesh.renderOrder = order(LAYER.scenery);
       mesh.frustumCulled = false;
       this.group.add(mesh);
     }

@@ -1,6 +1,6 @@
 import * as THREE from "three";
-import {SKID, WORLD} from "../config";
-import {LAYER} from "../render/sprites";
+import {Palette, SKID} from "../config";
+import {LAYER, order} from "../render/sprites";
 
 /**
  * The marks the game is named after.
@@ -29,10 +29,11 @@ export class Skids {
   private readonly scale = new THREE.Vector3();
   private readonly colour = new THREE.Color();
   /** What a spent mark fades to: the road it is lying on. */
-  private readonly gone = new THREE.Color(WORLD.tarmac);
+  private readonly gone: THREE.Color;
   private static readonly fresh = new THREE.Color(0x000000);
 
-  constructor() {
+  constructor(palette: Palette) {
+    this.gone = new THREE.Color(palette.tarmac);
     const geo = new THREE.PlaneGeometry(1, 1);
     geo.rotateX(-Math.PI / 2);
     // White, and the darkness comes from the per-instance colour instead. A
@@ -46,6 +47,7 @@ export class Skids {
       depthWrite: false,
     });
     this.mesh = new THREE.InstancedMesh(geo, mat, SKID.max);
+    this.mesh.renderOrder = order(LAYER.skid);
     this.mesh.frustumCulled = false;
     this.mesh.instanceColor = new THREE.InstancedBufferAttribute(
       new Float32Array(SKID.max * 3),

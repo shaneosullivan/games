@@ -26,19 +26,80 @@ export const SIM = {
  * scenery either side. So there is no perspective and no lighting anywhere in
  * this game — an orthographic camera looking down and unlit materials, which
  * between them are exactly what a 2D game made of sprites is.
+ *
+ * Every colour lives in ENVIRONMENTS below rather than in one global palette,
+ * because a track carries its world with it.
  */
-export const WORLD = {
-  grass: 0x4f9a44,
-  grassDark: 0x458938,
-  /* A grey with a little blue in it, the way the Amiga game's road reads
-     against its grass. */
-  tarmac: 0x6b6d76,
-  tarmacDark: 0x5c5e66,
-  kerbRed: 0xd6473c,
-  kerbWhite: 0xf2efe6,
-  sand: 0xd8c48b,
-  line: 0xf2efe6,
+
+/**
+ * The three worlds a track can be set in.
+ *
+ * The plan for the track builder asks for green hills, a desert and a
+ * futuristic city with lots of neon, so a palette is a whole environment:
+ * every colour in the game comes out of one of these, and nothing anywhere
+ * else reaches for a colour of its own. Swapping the palette swaps the world.
+ *
+ * `ground` is the scene background rather than a mesh — the world is
+ * unbounded and there is nothing to be gained by drawing a floor the size of a
+ * county — so it is the one colour that reaches the screen untouched.
+ */
+export const ENVIRONMENTS = {
+  hills: {
+    name: "Green hills",
+    ground: 0x4f9a44,
+    tarmac: 0x6b6d76,
+    tarmacDark: 0x5c5e66,
+    /** The two colours of the kerb, alternating. */
+    kerbA: 0xd6473c,
+    kerbB: 0xf2efe6,
+    /** The run-off band inside the barrier. */
+    sand: 0xd8c48b,
+    line: 0xf2efe6,
+    /** The scenery: two shades of the tall thing, its stem, and a stack. */
+    treeA: 0x2f6b34,
+    treeB: 0x3b7d3c,
+    trunk: 0x4a3524,
+    tyre: 0x1f1f23,
+    crowd: [0xe0b13c, 0x3f7fd6, 0xd6473c, 0xf2efe6, 0x49b45a],
+  },
+  desert: {
+    name: "Desert",
+    ground: 0xd9b072,
+    tarmac: 0x8a8577,
+    tarmacDark: 0x767162,
+    kerbA: 0xc9502f,
+    kerbB: 0xf6efdd,
+    sand: 0xe6cd9c,
+    line: 0xf6efdd,
+    /* Cactus green and a paler scrub, on sand rather than grass. */
+    treeA: 0x4c7a3f,
+    treeB: 0x7f9153,
+    trunk: 0x6b5334,
+    tyre: 0x2a2622,
+    crowd: [0xe8d16a, 0xd0663c, 0xf6efdd, 0x8fb07a, 0xb44a3a],
+  },
+  neon: {
+    name: "Neon city",
+    /* Near-black, because everything else in this palette is a light. A neon
+       city that is not dark is just a bright city. */
+    ground: 0x141024,
+    tarmac: 0x2b2740,
+    tarmacDark: 0x211d33,
+    kerbA: 0xff2d95,
+    kerbB: 0x2de2ff,
+    sand: 0x3a2f5c,
+    line: 0xf4eaff,
+    treeA: 0x7b3cff,
+    treeB: 0x2de2ff,
+    trunk: 0xff2d95,
+    tyre: 0x0d0a18,
+    crowd: [0xff2d95, 0x2de2ff, 0xfaff5c, 0x7b3cff, 0xf4eaff],
+  },
 } as const;
+
+export type Environment = keyof typeof ENVIRONMENTS;
+
+export type Palette = (typeof ENVIRONMENTS)[Environment];
 
 export const CAMERA = {
   /**
@@ -250,4 +311,75 @@ export const SOUND = {
   /** The tyres, which come in only when the car is actually sliding. */
   skidLevel: 0.14,
   skidCutoff: 2600,
+} as const;
+
+/**
+ * The things a child can drop on a track.
+ *
+ * All three are a circle of paint on the road with a rule attached, and the
+ * rules are deliberately the three different ways a racing game can interfere
+ * with a car: one takes your grip away, one takes your speed away, and one
+ * takes the road away from under you for a second.
+ */
+export const ITEM = {
+  /** How big each patch is, and how far apart two of them must be dropped. */
+  radius: 26,
+  minGap: 34,
+  oil: {
+    colour: 0x1a1a20,
+    /* A ring round it, because the slick itself is nearly black and the neon
+       city's road is nearly black too — on that track the patch simply was not
+       there. Every patch is drawn on a rim so it reads on any tarmac. */
+    rim: 0x8d7bd6,
+    /** What is left of the car's grip on oil. Six per cent: the back end goes
+     *  and stays gone, which is the joke, and it is survivable because a spin
+     *  on a wide track costs a second and not the race. */
+    grip: 0.06,
+  },
+  mud: {
+    colour: 0x6b4a2c,
+    rim: 0xb08b56,
+    /** Top speed and drag on mud. Slow, but it never stops you dead — a child
+     *  stuck still in a puddle has nothing to do about it. */
+    top: 0.45,
+    drag: 34,
+  },
+  ramp: {
+    colour: 0xe8b23c,
+    stripe: 0x2b2b31,
+    /** How long the car is in the air, and how much bigger it looks at the top
+     *  of the arc. Seen from straight above there is no other way to say
+     *  "off the ground": the sprite grows and its shadow stays put. */
+    airtime: 1,
+    lift: 0.55,
+    /** How slow you can be and still take off. Roll onto it and nothing
+     *  happens, which is the right lesson. */
+    minSpeed: 40,
+    /** What is left of the steering in mid-air. Almost nothing: a jump is
+     *  committed to, and being able to fly a corner would make the ramps a
+     *  short cut rather than a risk. */
+    steer: 0.15,
+  },
+} as const;
+
+/**
+ * The track builder.
+ *
+ * The drawing surface is a fixed square of the world, so a track drawn on a
+ * phone and one drawn on an iPad come out the same size — the canvas stretches
+ * and the world does not.
+ */
+export const EDITOR = {
+  /** Half the width of the world the canvas shows, in game units. */
+  reach: 760,
+  /** How far the finger must travel before another point is kept, and how many
+   *  points the finished loop is reduced to. Raw touch points are far too
+   *  many and far too jittery to be corners. */
+  sampleEvery: 26,
+  corners: 26,
+  /** The smallest loop worth racing, as a fraction of the drawing area, and
+   *  the fewest corners. Below either, the drawing is a scribble and is
+   *  rejected with a word rather than saved as an unplayable track. */
+  minSpan: 0.22,
+  minCorners: 6,
 } as const;

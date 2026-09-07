@@ -1,7 +1,8 @@
 import * as THREE from "three";
 import {mergeGeometries} from "three/examples/jsm/utils/BufferGeometryUtils.js";
-import {CAR} from "../config";
-import {flatVertex, LAYER, tile} from "../render/sprites";
+import {CAR, ITEM} from "../config";
+import {flatVertex, LAYER, order, tile} from "../render/sprites";
+import {Patches} from "./patches";
 import {Track} from "./track";
 
 const TAU = Math.PI * 2;
@@ -42,11 +43,40 @@ export class Car {
   /** How far round the lap, counted so it can pass 1 rather than wrapping. */
   lap = 0;
 
+  /**
+   * How long is left in the air after a ramp.
+   *
+   * Seen from straight above there is no such thing as height, so a jump is
+   * told entirely by the sprite growing and its shadow staying where it is.
+   * While this is running the car keeps whatever it was doing: no grip, no
+   * throttle, almost no steering. A jump is committed to.
+   */
+  air = 0;
+
   private readonly dir = new THREE.Vector2();
   private readonly side = new THREE.Vector2();
+  private readonly sprite: THREE.Mesh;
+  private readonly shadow: THREE.Mesh;
 
   constructor(colour: number) {
-    this.group.add(new THREE.Mesh(carSprite(colour), flatVertex()));
+    this.sprite = new THREE.Mesh(carSprite(colour), flatVertex());
+    // Under the car and only ever seen in mid-air. It stays the size the car
+    // was on the ground, which is what makes the car look as though it has
+    // left it rather than merely got bigger.
+    this.shadow = new THREE.Mesh(
+      tile(CAR.width * 1.05, CAR.length * 1.05, 0x000000),
+      flatVertex(),
+    );
+    this.shadow.position.y = LAYER.shadow - LAYER.car;
+    this.shadow.visible = false;
+    this.shadow.renderOrder = order(LAYER.shadow);
+    this.sprite.renderOrder = order(LAYER.car);
+    this.group.add(this.shadow, this.sprite);
+  }
+
+  /** Off the ground, and how far through the jump. */
+  get airborne(): boolean {
+    return this.air > 0;
   }
 
   place(
@@ -64,6 +94,7 @@ export class Car {
     this.slip = 0;
     this.hint = hint;
     this.lap = lap;
+    this.air = 0;
   }
 
   /** How fast it is going, whichever way it happens to be pointing. */
@@ -79,13 +110,28 @@ export class Car {
    * of the track it now is, since the caller wants that for the surface and
    * the barriers anyway.
    */
-  update(dt: number, want: THREE.Vector2, track: Track): number {
+  update(
+    dt: number,
+    want: THREE.Vector2,
+    track: Track,
+    patches?: Patches,
+  ): number {
     this.prevPosition.copy(this.position);
     this.prevHeading = this.heading;
 
     const found = track.nearest(this.position.x, this.position.z, this.hint);
     this.hint = found.index;
     const tarmac = track.onTarmac(found.offset);
+
+    // What is under the wheels. Checked before the jump timer is spent, so a
+    // ramp taken at walking pace does nothing and one taken at speed launches.
+    const on = patches ? patches.at(this.position.x, this.position.z) : null;
+    if (this.air > 0) {
+      this.air = Math.max(0, this.air - dt);
+    } else if (on === "ramp" && this.speed >= ITEM.ramp.minSpeed) {
+      this.air = ITEM.ramp.airtime;
+    }
+    const flying = this.air > 0;
 
     const push = Math.min(1, want.length());
     if (push > 1e-4) {
@@ -94,7 +140,10 @@ export class Car {
       // would have no corners in it.
       const target = Math.atan2(want.x, want.y);
       const ease = Math.min(1, this.speed / CAR.top);
-      const rate = CAR.turn * (1 - ease * (1 - CAR.turnAtSpeed));
+      let rate = CAR.turn * (1 - ease * (1 - CAR.turnAtSpeed));
+      if (flying) {
+        rate *= ITEM.ramp.steer;
+      }
       const diff = shortestAngle(this.heading, target);
       this.heading += Math.sign(diff) * Math.min(Math.abs(diff), rate * dt);
     }
@@ -106,7 +155,10 @@ export class Car {
     let along = this.velocity.dot(this.dir);
     let across = this.velocity.dot(this.side);
 
-    if (push > 1e-4) {
+    if (flying) {
+      // Nothing to push against up here: whatever the car had going into the
+      // ramp is what it lands with.
+    } else if (push > 1e-4) {
       // Pushing against the way you are already going is the brake. There is
       // no separate brake button and there does not need to be one — asking to
       // go the other way is asking to slow down, which is what a child does
@@ -123,17 +175,33 @@ export class Car {
 
     // Grip. Frame-rate independent decay rather than a fixed subtraction, so
     // the slide behaves the same on a 60Hz laptop and a 120Hz iPad.
-    const grip = CAR.grip * (tarmac ? 1 : CAR.grassGrip);
+    let grip = CAR.grip * (tarmac ? 1 : CAR.grassGrip);
+    let top = CAR.top * (tarmac ? 1 : CAR.grassTop);
+    if (on === "oil" && !flying) {
+      // Almost no grip at all, which is what oil is for: the back end goes and
+      // it stays gone until the car is off the slick.
+      grip *= ITEM.oil.grip;
+    }
+    if (on === "mud" && !flying) {
+      top *= ITEM.mud.top;
+      along -= Math.sign(along) * Math.min(Math.abs(along), ITEM.mud.drag * dt);
+    }
+    if (flying) {
+      // In the air the velocity is simply carried: no grip to pull it round,
+      // and no surface to take it away.
+      grip = 0;
+    }
     across *= Math.exp(-grip * dt);
 
-    const top = CAR.top * (tarmac ? 1 : CAR.grassTop);
     along = Math.max(-top * 0.35, Math.min(top, along));
 
     this.velocity.set(
       this.dir.x * along + this.side.x * across,
       this.dir.y * along + this.side.y * across,
     );
-    this.slip = Math.abs(across);
+    // No rubber in mid-air, which is both true and the only thing stopping a
+    // jump from painting a stripe across the grass it flew over.
+    this.slip = flying ? 0 : Math.abs(across);
 
     this.position.x += this.velocity.x * dt;
     this.position.z += this.velocity.y * dt;
@@ -188,6 +256,14 @@ export class Car {
     this.group.position.lerpVectors(this.prevPosition, this.position, alpha);
     this.group.rotation.y =
       this.prevHeading + shortestAngle(this.prevHeading, this.heading) * alpha;
+
+    // The jump, drawn. A half-sine so the car swells off the ramp and settles
+    // back onto its shadow rather than snapping between two sizes.
+    const through = this.air > 0 ? 1 - this.air / ITEM.ramp.airtime : 0;
+    const lift =
+      this.air > 0 ? Math.sin(Math.PI * through) * ITEM.ramp.lift : 0;
+    this.sprite.scale.setScalar(1 + lift);
+    this.shadow.visible = this.air > 0;
   }
 }
 

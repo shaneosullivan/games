@@ -1,6 +1,7 @@
 import * as THREE from "three";
-import {CAR, RIVALS, TRACK} from "../config";
+import {CAR, RIVALS} from "../config";
 import {Car} from "./car";
+import {Patches} from "./patches";
 import {Track, wrap} from "./track";
 
 /**
@@ -37,7 +38,7 @@ export class Rivals {
       const car = new Car(RIVALS.colours[i % RIVALS.colours.length]);
       // Left, right, left: a grid, not a queue.
       const off = (i % 2 === 0 ? 1 : -1) * RIVALS.offset;
-      const t = wrap(TRACK.startAt - 0.006 - i * RIVALS.gridGap);
+      const t = wrap(track.startAt - 0.006 - i * RIVALS.gridGap);
       track.pointAt(t, this.here);
       track.sideAt(t, this.aim);
       const x = this.here.x + this.aim.x * off;
@@ -55,7 +56,7 @@ export class Rivals {
     }
   }
 
-  update(dt: number, track: Track): void {
+  update(dt: number, track: Track, patches?: Patches): void {
     for (let i = 0; i < this.cars.length; i++) {
       const car = this.cars[i];
       // Walk their point along the circuit at their own pace, and aim the car
@@ -76,7 +77,7 @@ export class Rivals {
         // Full throttle unless they are already past where they should be.
         this.want.multiplyScalar(Math.min(1, d / 30) / d);
       }
-      car.update(dt, this.want, track);
+      car.update(dt, this.want, track, patches);
       car.keepIn(track);
     }
   }

@@ -1,7 +1,8 @@
 import * as THREE from "three";
 import {mergeGeometries} from "three/examples/jsm/utils/BufferGeometryUtils.js";
-import {TRACK, WORLD} from "../config";
-import {flatVertex, LAYER, paint} from "../render/sprites";
+import {ENVIRONMENTS, Palette, TRACK} from "../config";
+import {TrackSpec} from "../track/spec";
+import {flatVertex, LAYER, order, paint} from "../render/sprites";
 
 /**
  * The circuit.
@@ -17,6 +18,10 @@ export class Track {
   readonly curve: THREE.CatmullRomCurve3;
   /** How long a lap is, in units. */
   readonly length: number;
+  /** Where the line is, as a fraction round the lap. It comes off the spec
+   *  now: on a drawn track it is wherever the child dropped it. */
+  readonly startAt: number;
+  readonly palette: Palette;
 
   /** The sampled centre line, and the sideways direction at each sample. Both
    *  are what `nearest` searches and what the ribbons are built from. */
@@ -25,9 +30,11 @@ export class Track {
 
   private readonly tmp = new THREE.Vector3();
 
-  constructor() {
+  constructor(spec: TrackSpec) {
+    this.palette = ENVIRONMENTS[spec.environment];
+    this.startAt = wrap(spec.startAt);
     this.curve = new THREE.CatmullRomCurve3(
-      TRACK.shape.map(p => new THREE.Vector3(p.x, 0, p.z)),
+      spec.shape.map(p => new THREE.Vector3(p.x, 0, p.z)),
       true,
       "catmullrom",
       0.5,
@@ -44,7 +51,7 @@ export class Track {
     }
 
     this.group.add(
-      this.ribbon(-TRACK.half, TRACK.half, WORLD.tarmac, LAYER.tarmac),
+      this.ribbon(-TRACK.half, TRACK.half, this.palette.tarmac, LAYER.tarmac),
     );
     this.group.add(this.kerbs());
     this.group.add(this.barriers());
@@ -163,6 +170,7 @@ export class Track {
     geo.setAttribute("position", new THREE.Float32BufferAttribute(verts, 3));
     geo.setAttribute("color", new THREE.Float32BufferAttribute(colours, 3));
     const mesh = new THREE.Mesh(geo, flatVertex());
+    mesh.renderOrder = order(height);
     // The ribbon wraps the whole circuit, so it is on screen whatever the
     // camera is looking at and there is nothing for culling to save.
     mesh.frustumCulled = false;
@@ -172,19 +180,19 @@ export class Track {
   /** Red and white, both sides, the way every circuit in the world does it. */
   private kerbs(): THREE.Mesh {
     const w = 5;
-    const stripe = {other: WORLD.kerbWhite, every: 6};
+    const stripe = {other: this.palette.kerbB, every: 6};
     return mergeMeshes([
       this.ribbon(
         TRACK.half,
         TRACK.half + w,
-        WORLD.kerbRed,
+        this.palette.kerbA,
         LAYER.kerb,
         stripe,
       ),
       this.ribbon(
         -TRACK.half - w,
         -TRACK.half,
-        WORLD.kerbRed,
+        this.palette.kerbA,
         LAYER.kerb,
         stripe,
       ),
@@ -200,22 +208,22 @@ export class Track {
    */
   private barriers(): THREE.Mesh {
     const limit = Track.limit;
-    const stripe = {other: WORLD.kerbWhite, every: 3};
+    const stripe = {other: this.palette.kerbB, every: 3};
     return mergeMeshes([
-      this.ribbon(limit - 10, limit, WORLD.sand, LAYER.sand),
-      this.ribbon(limit, limit + 7, WORLD.kerbRed, LAYER.kerb, stripe),
-      this.ribbon(-limit, -limit + 10, WORLD.sand, LAYER.sand),
-      this.ribbon(-limit - 7, -limit, WORLD.kerbRed, LAYER.kerb, stripe),
+      this.ribbon(limit - 10, limit, this.palette.sand, LAYER.sand),
+      this.ribbon(limit, limit + 7, this.palette.kerbA, LAYER.kerb, stripe),
+      this.ribbon(-limit, -limit + 10, this.palette.sand, LAYER.sand),
+      this.ribbon(-limit - 7, -limit, this.palette.kerbA, LAYER.kerb, stripe),
     ]);
   }
 
   /** The chequered line you start on and finish on. */
   private startLine(): THREE.Mesh {
     const parts: Array<THREE.BufferGeometry> = [];
-    const i = Math.floor(TRACK.startAt * TRACK.segments);
+    const i = Math.floor(this.startAt * TRACK.segments);
     const p = this.points[i];
     const s = this.sides[i];
-    const d = this.curve.getTangentAt(TRACK.startAt);
+    const d = this.curve.getTangentAt(this.startAt);
     const squares = 14;
     const size = (TRACK.half * 2) / squares;
 
@@ -232,18 +240,22 @@ export class Track {
           p.z + s.z * off + d.z * along,
         );
         parts.push(
-          paint(geo, (k + row) % 2 === 0 ? WORLD.line : WORLD.tarmacDark),
+          paint(
+            geo,
+            (k + row) % 2 === 0 ? this.palette.line : this.palette.tarmacDark,
+          ),
         );
       }
     }
     const mesh = new THREE.Mesh(mergeGeometries(parts, false), flatVertex());
+    mesh.renderOrder = order(LAYER.paint);
     mesh.frustumCulled = false;
     return mesh;
   }
 
   /** Where the grid sits: a fraction of a lap back from the line. */
   gridAt(slot: number, offset: number, out: THREE.Vector3): number {
-    const t = wrap(TRACK.startAt - 0.006 - slot * 0.006);
+    const t = wrap(this.startAt - 0.006 - slot * 0.006);
     this.pointAt(t, out);
     this.sideAt(t, this.tmp);
     out.addScaledVector(this.tmp, offset);
@@ -263,6 +275,9 @@ function mergeMeshes(meshes: Array<THREE.Mesh>): THREE.Mesh {
     false,
   );
   const mesh = new THREE.Mesh(merged, flatVertex());
+  // The topmost of what went in: a merged pile is drawn in one go, so it can
+  // only have one place in the order, and the highest is the one that matters.
+  mesh.renderOrder = Math.max(...meshes.map(m => m.renderOrder));
   mesh.frustumCulled = false;
   return mesh;
 }
