@@ -278,11 +278,23 @@ function littleHare(): THREE.BufferGeometry {
     eye.translate(side * 0.68, 3.55, 0.55);
     parts.push(paint(eye, PALETTE.eye));
 
-    const ear = new THREE.SphereGeometry(1, 8, 7);
-    ear.scale(0.16, 0.95, 0.28);
-    ear.rotateZ(side * 0.16);
-    ear.translate(side * 0.3, 4.7, 0.05);
+    // Rounder, and splayed outward rather than inward.
+    //
+    // They had the same crossed-over bug the player's did — a positive
+    // rotation about Z leans an upright ear toward -X, so `side * 0.16` tipped
+    // both of them toward each other. And they were thin: half again as wide
+    // reads as a bunny where a sliver reads as a stick.
+    const ear = new THREE.SphereGeometry(1, 9, 8);
+    ear.scale(0.24, 0.92, 0.34);
+    ear.rotateZ(-side * 0.2);
+    ear.translate(side * 0.42, 4.6, 0.02);
     parts.push(paint(ear, PALETTE.fur));
+
+    const earInner = new THREE.SphereGeometry(1, 8, 7);
+    earInner.scale(0.13, 0.72, 0.2);
+    earInner.rotateZ(-side * 0.2);
+    earInner.translate(side * 0.42, 4.55, 0.16);
+    parts.push(paint(earInner, PALETTE.earInner));
 
     const foot = new THREE.SphereGeometry(0.5, 8, 6);
     foot.scale(0.8, 0.4, 1.3);

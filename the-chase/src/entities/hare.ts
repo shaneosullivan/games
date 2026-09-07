@@ -345,9 +345,13 @@ export class Hare {
 
       // And the dark tip. A hare's ears are black-brown at the top and it is
       // the first thing you can pick out of long grass.
-      const tip = new THREE.SphereGeometry(1, 8, 7);
-      tip.scale(0.27, 0.3, 0.43);
-      tip.translate(0, 2.55, 0);
+      //
+      // Narrow enough to sit inside the ear's own taper. At 0.27 across it was
+      // nearly twice the width of the ellipsoid at that height, so instead of
+      // a rounded top the ear finished in a bulge with a corner on it.
+      const tip = new THREE.SphereGeometry(1, 9, 8);
+      tip.scale(0.17, 0.36, 0.29);
+      tip.translate(0, 2.48, 0);
       tip.rotateX(-0.07);
       tip.rotateZ(lean);
       tip.translate(side * 0.82, 1.16, 2.42);
