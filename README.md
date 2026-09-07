@@ -108,6 +108,10 @@ A running copy checks for new builds once a minute and offers a reload when the
 site has been deployed over the top of it. That's in
 [site/README.md](site/README.md#telling-a-running-app-its-out-of-date).
 
+## Licence
+
+MIT — see [LICENSE](LICENSE).
+
 ## Working on this with Claude Code
 
 [CLAUDE.md](CLAUDE.md) is the orientation doc: layout, conventions, how to

@@ -4,6 +4,7 @@
   "version": "0.1.0",
   "type": "module",
   "description": "Little web games, and the static gallery that publishes them.",
+  "license": "MIT",
   "scripts": {
     "build": "node site/build.mjs",
     "new-game": "node scripts/new-game.mjs",
