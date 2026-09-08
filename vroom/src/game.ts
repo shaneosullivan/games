@@ -103,6 +103,8 @@ export class Game {
    *  there are sixty frames a second of them. */
   private readonly onMap: Array<{x: number; z: number}> = [];
   private shownBeat = -1;
+  /** How long since the flag, for the shot coming back down in front. */
+  private finishing = -1;
   /** How many times round this race is. */
   private laps = 1;
 
@@ -630,6 +632,9 @@ export class Game {
     this.map.setVisible(false);
     this.engine.flag();
     this.engine.setMuted(true);
+    // The shot comes back down in front of the car, the way it left at the
+    // start. The card waits for it — see `endFilm`.
+    this.finishing = 0;
 
     const place = this.place();
     const clean = this.knocks === 0;
@@ -639,18 +644,39 @@ export class Game {
     if (place < RIVALS.count + 1) {
       this.stands.cheer(this.car.position, this.track.palette);
     }
-    this.done.setTitle(place === 1 ? "You won!" : "Chequered flag!");
+
     const round = this.laps === 1 ? "" : ` over ${this.laps} laps`;
+    this.done.setTitle(place === 1 ? "You won!" : "Chequered flag!");
     this.done.setBody(
       `${ordinal(place)} of ${RIVALS.count + 1}${round}, in ${this.time.toFixed(1)} seconds.` +
         (clean
           ? " And you never once touched the wall."
           : ` You hit the wall ${this.knocks === 1 ? "once" : `${this.knocks} times`} — the long way round the outside is usually the quick way.`),
     );
-    this.done.show();
+  }
+
+  /**
+   * The shot after the flag: the start, run backwards.
+   *
+   * It comes back down in front of the car and looks at it, and the card is
+   * held until it has arrived — otherwise the confetti goes off behind a
+   * full-screen panel and the moment the whole race was building towards is
+   * spent looking at a button.
+   */
+  private endFilm(dt: number): void {
+    if (this.finishing < 0) {
+      return;
+    }
+    this.finishing += dt;
+    this.shot = Math.max(0, 1 - this.finishing / START.endsFor);
+    if (this.finishing >= START.cardAfter) {
+      this.finishing = -1;
+      this.done.show();
+    }
   }
 
   render = (alpha: number, dt: number): void => {
+    this.endFilm(dt);
     // Every frame is evidence about the machine. Only while actually racing:
     // a card on the screen or a countdown is not what the race will feel like.
     if (this.running) {

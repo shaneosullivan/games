@@ -251,12 +251,21 @@ export const STAND = {
   jumpHeight: 3.4,
   jumpRate: 7,
   /** The confetti over the line when the flag falls. */
-  confetti: 260,
-  confettiSpeed: 34,
-  confettiLift: 46,
-  confettiFall: 42,
-  confettiLasts: 3.4,
-  confettiSize: 22,
+  /**
+   * The confetti over the line.
+   *
+   * Small and plentiful. It was set while the only camera that ever saw it was
+   * a hundred and fifty units up, where a piece twenty units across looks like
+   * a piece of paper; the finish now comes down in front of the car, where the
+   * same piece is bigger than the car. Paper is paper: about a foot across,
+   * and a lot of it.
+   */
+  confetti: 460,
+  confettiSpeed: 30,
+  confettiLift: 44,
+  confettiFall: 38,
+  confettiLasts: 4,
+  confettiSize: 2.4,
 } as const;
 
 /**
@@ -432,6 +441,16 @@ export const START = {
   pullsFor: 1.3,
   /** How long "Go!" stays up after the flag. */
   goFor: 0.7,
+  /**
+   * The finish, which is the start run backwards.
+   *
+   * The shot comes back down in front of the car and looks at it, and the card
+   * waits until it has — otherwise the confetti goes off behind a full-screen
+   * panel and the one moment the race was building towards is spent looking at
+   * a button.
+   */
+  endsFor: 1.5,
+  cardAfter: 2.6,
 } as const;
 
 /**
