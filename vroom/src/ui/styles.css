@@ -382,6 +382,40 @@ canvas {
   border-top: 1px solid var(--stroke);
 }
 
+/* How hard a track is. Three colours a child can read across the room, and the
+   word as well as the colour — a badge that only differs by hue is a badge
+   half the people looking at it cannot use. */
+.rating {
+  align-self: flex-start;
+  margin-top: 4px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.rating[data-rating="easy"] {
+  background: #d9f0d1;
+  color: #2c5c22;
+}
+
+.rating[data-rating="medium"] {
+  background: #fdeecb;
+  color: #7a5410;
+}
+
+.rating[data-rating="hard"] {
+  background: #fbd8d4;
+  color: #8c2b21;
+}
+
+/* Nothing to say yet: an empty badge must not leave a coloured pill behind. */
+.rating:empty {
+  display: none;
+}
+
 /* ---------- The builder ---------- */
 
 .editor-bar {
@@ -443,6 +477,57 @@ canvas {
   font-size: 15px;
   font-weight: 700;
   text-align: center;
+}
+
+/* Laps and the rating, side by side under the tools. */
+.settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px 0;
+}
+
+.stepper {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid var(--stroke);
+  border-radius: 999px;
+  padding: 3px;
+  background: #fff;
+}
+
+.step {
+  width: 34px;
+  height: 34px;
+  border: none;
+  border-radius: 50%;
+  background: #f0f1ed;
+  color: var(--ink);
+  font: inherit;
+  font-size: 20px;
+  font-weight: 800;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.step:active {
+  transform: scale(0.92);
+}
+
+.stepper-value {
+  min-width: 68px;
+  text-align: center;
+  font-size: 15px;
+}
+
+/* In the builder it sits on its own rather than under a track's name. */
+.settings-row .rating {
+  align-self: center;
+  margin-top: 0;
+  font-size: 13px;
+  padding: 6px 14px;
 }
 
 .tool-row,

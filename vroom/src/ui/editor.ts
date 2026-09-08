@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import {EDITOR, ENVIRONMENTS, ITEM, TRACK} from "../config";
+import {EDITOR, ENVIRONMENTS, ITEM, RACE, TRACK} from "../config";
 import type {Environment} from "../config";
 import {
   ItemKind,
@@ -9,6 +9,7 @@ import {
   TrackItem,
   TrackSpec,
 } from "../track/spec";
+import {rate, RATING_NAMES} from "../track/rating";
 import {showJson} from "./modal";
 
 /** What the finger is doing on the canvas. */
@@ -60,11 +61,14 @@ export class Editor {
   private readonly ctx: CanvasRenderingContext2D;
   private readonly nameField = document.createElement("input");
   private readonly says = document.createElement("p");
+  private readonly lapsField = document.createElement("strong");
+  private readonly ratingChip = document.createElement("span");
 
   private readonly id: string;
   private shape: Array<{x: number; z: number}> = [];
   private items: Array<TrackItem> = [];
   private startAt = 0;
+  private laps = 1;
   private environment: Environment = "hills";
 
   /** The smoothed circuit, and the points every hit test is run against. */
@@ -89,6 +93,7 @@ export class Editor {
       this.shape = existing.shape.map(p => ({...p}));
       this.items = existing.items.map(i => ({...i}));
       this.startAt = existing.startAt;
+      this.laps = existing.laps;
       this.environment = existing.environment;
     }
 
@@ -137,6 +142,7 @@ export class Editor {
       this.curve = null;
       this.tool = null;
       this.paint();
+      this.showRating();
       this.tell("Draw a loop with your finger.");
       this.markTools();
     });
@@ -173,6 +179,35 @@ export class Editor {
       b.addEventListener("pointerdown", event => this.startDrag(event, t.tool));
       tools.appendChild(b);
     }
+
+    const settings = document.createElement("div");
+    settings.className = "settings-row";
+
+    // A stepper rather than ten buttons. Ten of anything is a row a child has
+    // to scroll, and the number they want is almost always one away from the
+    // one showing.
+    const lapsBox = document.createElement("div");
+    lapsBox.className = "stepper";
+    const fewer = document.createElement("button");
+    fewer.type = "button";
+    fewer.className = "step";
+    fewer.textContent = "−";
+    fewer.setAttribute("aria-label", "Fewer laps");
+    const more = document.createElement("button");
+    more.type = "button";
+    more.className = "step";
+    more.textContent = "+";
+    more.setAttribute("aria-label", "More laps");
+    fewer.addEventListener("click", () => this.setLaps(this.laps - 1));
+    more.addEventListener("click", () => this.setLaps(this.laps + 1));
+    this.lapsField.className = "stepper-value";
+    lapsBox.append(fewer, this.lapsField, more);
+
+    // What the track is worth, updating as it is drawn. A child adding a
+    // hairpin and watching this tip over to Hard is the whole reason it is on
+    // this screen and not only on the list.
+    this.ratingChip.className = "rating";
+    settings.append(lapsBox, this.ratingChip);
 
     const envs = document.createElement("div");
     envs.className = "env-row";
@@ -217,7 +252,7 @@ export class Editor {
     });
     foot.append(test, send, save);
 
-    this.root.append(bar, stage, tools, envs, foot);
+    this.root.append(bar, stage, tools, settings, envs, foot);
 
     this.canvas.addEventListener("pointerdown", this.onDown);
     this.canvas.addEventListener("pointermove", this.onMove);
@@ -225,6 +260,7 @@ export class Editor {
     this.canvas.addEventListener("pointercancel", this.onUp);
 
     this.markEnvs();
+    this.setLaps(this.laps);
     this.tell("Draw a loop with your finger.");
   }
 
@@ -258,6 +294,32 @@ export class Editor {
 
   private tell(text: string): void {
     this.says.textContent = text;
+  }
+
+  private setLaps(laps: number): void {
+    this.laps = Math.max(1, Math.min(RACE.maxLaps, laps));
+    this.lapsField.textContent =
+      this.laps === 1 ? "1 lap" : `${this.laps} laps`;
+    this.showRating();
+  }
+
+  /**
+   * The rating, from the track as it stands.
+   *
+   * Blank until there is a track to rate: a rating on an empty field would be
+   * a number about nothing, and "Easy" is exactly the wrong first impression
+   * to give a child who has not drawn anything yet.
+   */
+  private showRating(): void {
+    const spec = this.compose();
+    if (!spec) {
+      this.ratingChip.textContent = "";
+      this.ratingChip.dataset.rating = "";
+      return;
+    }
+    const r = rate(spec);
+    this.ratingChip.textContent = RATING_NAMES[r];
+    this.ratingChip.dataset.rating = r;
   }
 
   // ---------- drawing the loop ----------
@@ -313,6 +375,7 @@ export class Editor {
     this.items = [];
     this.startAt = 0;
     this.rebuild();
+    this.showRating();
     this.tell("Now drag the start line and anything else onto the track.");
     this.markTools();
   };
@@ -384,6 +447,7 @@ export class Editor {
       if (near >= 0) {
         this.items.splice(near, 1);
         this.tell("Gone.");
+        this.showRating();
       } else {
         this.tell("Nothing there to rub out.");
       }
@@ -411,6 +475,7 @@ export class Editor {
     }
 
     this.items.push({kind: tool, t: found.t, across});
+    this.showRating();
     this.tell(`${ITEM_NAMES[tool]} down. Put on as many as you like.`);
     this.paint();
   }
@@ -585,18 +650,23 @@ export class Editor {
 
   // ---------- out ----------
 
-  /** The drawing as a track, or nothing and a word about why. */
-  private finish(): TrackSpec | null {
+  /**
+   * The drawing as a track, or nothing if there is not one yet.
+   *
+   * Says nothing either way. The rating asks this several times a minute while
+   * a track is being built, and a version that complained would keep wiping
+   * out whatever the last message was trying to tell the child.
+   */
+  private compose(): TrackSpec | null {
     if (!this.curve || this.shape.length < EDITOR.minCorners) {
-      this.tell("Draw a loop first.");
       return null;
     }
-    const name = this.nameField.value.trim() || "My Track";
     return {
       version: SPEC_VERSION,
       id: this.id,
-      name,
+      name: this.nameField.value.trim() || "My Track",
       environment: this.environment,
+      laps: this.laps,
       shape: this.shape.map(p => ({
         x: Math.round(p.x),
         z: Math.round(p.z),
@@ -608,6 +678,15 @@ export class Editor {
         across: Math.round(i.across),
       })),
     };
+  }
+
+  /** The same, for a button that needs one — and a word if there is none. */
+  private finish(): TrackSpec | null {
+    const spec = this.compose();
+    if (!spec) {
+      this.tell("Draw a loop first.");
+    }
+    return spec;
   }
 }
 

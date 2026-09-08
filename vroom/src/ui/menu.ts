@@ -1,6 +1,7 @@
 import {ENVIRONMENTS} from "../config";
 import {deleteTrack, loadTracks} from "../track/store";
 import {BUILT_IN, TrackSpec} from "../track/spec";
+import {rate, RATING_NAMES} from "../track/rating";
 
 /**
  * The track list: what you see when the game opens.
@@ -88,6 +89,7 @@ export class Menu {
     name.textContent = spec.name;
     const sub = document.createElement("span");
     const bits: Array<string> = [palette.name];
+    bits.push(spec.laps === 1 ? "1 lap" : `${spec.laps} laps`);
     if (spec.items.length > 0) {
       bits.push(
         `${spec.items.length} ${spec.items.length === 1 ? "thing" : "things"} on it`,
@@ -95,6 +97,15 @@ export class Menu {
     }
     sub.textContent = bits.join(" · ");
     words.append(name, sub);
+
+    // Worked out from the track, not claimed by whoever drew it — which is the
+    // only way a rating means anything to the next person to pick it.
+    const rating = rate(spec);
+    const badge = document.createElement("span");
+    badge.className = "rating";
+    badge.dataset.rating = rating;
+    badge.textContent = RATING_NAMES[rating];
+    words.appendChild(badge);
 
     const play = document.createElement("button");
     play.type = "button";

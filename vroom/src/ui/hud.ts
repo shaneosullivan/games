@@ -12,8 +12,12 @@ export class Hud {
   private readonly root: HTMLDivElement;
   private readonly bar: ProgressBar;
   private readonly place: HTMLDivElement;
+  private readonly lap: HTMLDivElement;
 
   private shown = -1;
+  private shownLap = -1;
+  /** How many times round. One lap needs no counter at all. */
+  private laps = 1;
 
   constructor() {
     this.root = document.createElement("div");
@@ -27,6 +31,10 @@ export class Hud {
     });
     this.root.appendChild(this.bar.root);
 
+    this.lap = document.createElement("div");
+    this.lap.className = "readout hidden";
+    this.root.appendChild(this.lap);
+
     this.place = document.createElement("div");
     this.place.className = "readout";
     this.root.appendChild(this.place);
@@ -36,9 +44,33 @@ export class Hud {
     this.root.classList.toggle("hidden", !visible);
   }
 
-  /** `lap` is 0..1 round the circuit; `place` is 1 for first. */
-  update(lap: number, place: number): void {
-    this.bar.set(lap);
+  /** How many laps this race is. A one-lap race says nothing about laps —
+   *  there is nothing to count, and a "1 / 1" is only clutter. */
+  setLaps(laps: number): void {
+    this.laps = laps;
+    this.lap.classList.toggle("hidden", laps <= 1);
+  }
+
+  /**
+   * `done` is 0..1 through the *whole race* rather than round the lap: on a
+   * five-lap race the bar fills once, over five laps, because what a child
+   * wants to know is how much is left of the thing they are doing.
+   */
+  update(done: number, place: number): void {
+    this.bar.set(done);
+    if (this.laps > 1) {
+      // Clamped at both ends. The grid sits a few metres *behind* the line, so
+      // for the first second of every race the progress is slightly negative
+      // and the readout said "Lap 0".
+      const on = Math.max(
+        1,
+        Math.min(this.laps, Math.floor(done * this.laps) + 1),
+      );
+      if (on !== this.shownLap) {
+        this.shownLap = on;
+        this.lap.textContent = `Lap ${on} / ${this.laps}`;
+      }
+    }
     if (place !== this.shown) {
       this.shown = place;
       this.place.textContent = `🏁 ${ordinal(place)}`;

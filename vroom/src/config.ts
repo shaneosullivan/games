@@ -405,6 +405,82 @@ export const BUMP = {
 } as const;
 
 /**
+ * The race itself.
+ */
+export const RACE = {
+  /** The most laps a drawn track may ask for. */
+  maxLaps: 10,
+} as const;
+
+/**
+ * How a track is rated: easy, medium or hard.
+ *
+ * Worked out from the track rather than asked of whoever drew it. A child who
+ * has just built something is the worst possible judge of how hard it is —
+ * they have not driven it — and the whole use of a rating is telling somebody
+ * else what they are in for.
+ *
+ * The score adds up the three things that actually make a lap difficult, and
+ * the thresholds below were read off real tracks rather than guessed: the
+ * circuit the game ships with scores 22, a lazy oval scores 4, and a scribble
+ * with oil all over it scores past 70.
+ */
+export const RATING = {
+  /**
+   * What the corners are worth.
+   *
+   * Multiplied by how far the track's slowest corners fall short of flat out —
+   * nought on a circuit that can be driven all the way round without lifting,
+   * and towards one on a track that is all hairpins. Set so that turning is
+   * most of the score and the hazards are the trimming.
+   */
+  perSlowing: 60,
+  perOil: 7,
+  perMud: 4,
+  perRamp: 2,
+  perCrossing: 4,
+  perExtraLap: 1.5,
+  /**
+   * Where the bands fall.
+   *
+   * Read off real tracks rather than picked: the circuit the game ships with
+   * scores 2, a lazy oval scores nothing at all, a figure of eight with a
+   * flyover scores 12, the same circuit with two oil slicks and a mud patch on
+   * it scores 20, and a scribble of hairpins scores 39.
+   */
+  medium: 10,
+  hard: 28,
+} as const;
+
+/**
+ * The tyre stacks on the verge.
+ *
+ * Real things on the grass to hit, rather than more scenery beyond the wall
+ * that nothing ever touches. They go on the outside of corners, which is both
+ * where a real circuit puts them and where a car that has run wide actually
+ * ends up.
+ */
+export const TYRES = {
+  /** How many clusters, and how many stacks in each. Twelve stacks around a
+   *  lap: enough to meet some, few enough that the verge is still a place you
+   *  can use when you get a corner wrong. */
+  clusters: 4,
+  perCluster: 3,
+  /** How far apart the stacks in a cluster sit, along the road. */
+  spacing: 26,
+  /** How big one is, and how far off the centre line they sit — clear of the
+   *  kerb, and short of the barrier. */
+  radius: 8,
+  from: 47,
+  to: 60,
+  /** How hard the car comes off one, and how much speed it keeps. Springier
+   *  than the wall, which is meant to be a mistake; a tyre stack is meant to
+   *  be a bit of fun. */
+  bounce: 0.65,
+  keep: 0.9,
+} as const;
+
+/**
  * Flyovers.
  *
  * A circuit that runs over itself has to say which of the two roads is on top,

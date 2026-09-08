@@ -41,8 +41,9 @@ gave four fixed compass directions, which is not driving. `Drive` in
 use; a finger on the glass always wins.
 
 The grass will slow you down and the wall at the edge of it will not let you
-past. Cars bounce off each other, ramps throw you into the air and give you a
-shove with it, oil takes your grip away and mud takes your speed. One lap.
+past, and there are tyre stacks on the outside of some corners to bounce off.
+Cars bounce off each other too, ramps throw you into the air and give you a
+shove with it, oil takes your grip away and mud takes your speed.
 
 ## Building a track
 
@@ -51,6 +52,13 @@ a finger; then drag the start line, ramps, oil and mud onto the road, pick one
 of the three worlds, and save it. Saved tracks live in this browser and appear
 under **Custom tracks** on the front screen, where they can be raced, edited or
 thrown away.
+
+A track can be one to ten laps, and carries a difficulty — Easy, Medium or
+Hard — that is **worked out from the track rather than claimed by whoever drew
+it**. A child who has just built something is the worst possible judge of how
+hard it is: they have not driven it. `track/rating.ts` reads how slow the
+track's slowest corners make you, what has been dropped on it, and how many
+times round you go.
 
 **Export** shows the track as JSON with a button to copy it. That is the whole
 sharing story for now — the intention is a server one day, with short codes for

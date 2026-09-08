@@ -1,4 +1,4 @@
-import {ENVIRONMENTS, TRACK} from "../config";
+import {ENVIRONMENTS, RACE, TRACK} from "../config";
 import type {Environment} from "../config";
 
 export type {Environment};
@@ -42,6 +42,8 @@ export interface TrackSpec {
   id: string;
   name: string;
   environment: Environment;
+  /** How many times round. One to RACE.maxLaps. */
+  laps: number;
   /** The corners, in world units. Smoothed into a closed curve. */
   shape: Array<{x: number; z: number}>;
   /** Where the start line sits, as a fraction round the lap. */
@@ -55,10 +57,21 @@ export const BUILT_IN: TrackSpec = {
   id: "built-in",
   name: "Sunday Hills",
   environment: "hills",
+  laps: 1,
   shape: TRACK.shape.map(p => ({x: p.x, z: p.z})),
   startAt: TRACK.startAt,
   items: [],
 };
+
+/** One to ten, whole. Ten is the limit because a child racing an eleventh lap
+ *  of their own track has stopped playing and started commuting. */
+export function clampLaps(laps: unknown): number {
+  const n = Math.round(Number(laps));
+  if (!Number.isFinite(n)) {
+    return 1;
+  }
+  return Math.max(1, Math.min(RACE.maxLaps, n));
+}
 
 export function newId(): string {
   return `t${Date.now().toString(36)}${Math.floor(Math.random() * 1e6).toString(36)}`;
@@ -94,6 +107,9 @@ export function isSpec(value: unknown): value is TrackSpec {
   if (!Number.isFinite(s.startAt)) {
     return false;
   }
+  // Laps arrived after the first tracks were saved, so a spec without them is
+  // not broken — it is a one-lap race, which is what it was when it was made.
+  s.laps = clampLaps(s.laps);
   if (!Array.isArray(s.items)) {
     return false;
   }

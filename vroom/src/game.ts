@@ -12,6 +12,7 @@ import {
 import {TrackSpec} from "./track/spec";
 import {Patches} from "./entities/patches";
 import {Bridges} from "./entities/bridges";
+import {Tyres} from "./entities/tyres";
 import {GameLoop} from "./core/loop";
 import {Joystick} from "./core/input";
 import {Rng} from "./core/rng";
@@ -49,6 +50,7 @@ export class Game {
   readonly skids: Skids;
   readonly patches: Patches;
   readonly bridges: Bridges;
+  readonly tyres: Tyres;
   readonly engine: Engine;
   readonly hud: Hud;
   readonly stick: Joystick;
@@ -63,6 +65,8 @@ export class Game {
   private lastT = 0;
   /** Over the line. */
   private finished = false;
+  /** How many times round this race is. */
+  private readonly laps: number;
 
   private readonly intro: Overlay;
   private readonly done: Overlay;
@@ -101,6 +105,7 @@ export class Game {
     // there tomorrow.
     const rng = new Rng(SCENERY.seed);
 
+    this.laps = spec.laps;
     this.track = new Track(spec);
     const palette = this.track.palette;
     this.stage = new Stage(host, palette);
@@ -109,9 +114,11 @@ export class Game {
     this.skids = new Skids(palette);
     this.patches = new Patches(this.track, spec.items);
     this.bridges = new Bridges(this.track, palette);
+    this.tyres = new Tyres(rng, this.track, palette);
 
     this.stage.scene.add(this.track.group);
     this.stage.scene.add(new Scenery(rng, this.track, palette).group);
+    this.stage.scene.add(this.tyres.group);
     this.stage.scene.add(this.patches.group);
     this.stage.scene.add(this.skids.mesh);
     this.stage.scene.add(this.rivals.group);
@@ -124,6 +131,7 @@ export class Game {
 
     this.engine = new Engine();
     this.hud = new Hud();
+    this.hud.setLaps(this.laps);
     this.hud.mount(ui);
     this.stick = new Joystick(ui);
     this.stick.enabled = false;
@@ -210,8 +218,18 @@ export class Game {
     // Cars off each other before cars off the wall: a shove is what can put
     // you into the barrier, and it should be corrected in the same step rather
     // than leaving the car a frame inside it.
+    // Cars off each other and everybody off the tyre stacks. Same cooldown for
+    // both: what a child hears is "I hit something", and hitting two things at
+    // once is still one noise.
+    let knocked = this.jostle();
+    if (this.tyres.bounce(this.car)) {
+      knocked = true;
+    }
+    for (const rival of this.rivals.cars) {
+      this.tyres.bounce(rival);
+    }
     this.nudgeIn -= dt;
-    if (this.jostle() && this.nudgeIn <= 0) {
+    if (knocked && this.nudgeIn <= 0) {
       this.nudgeIn = BUMP.quiet;
       this.engine.bump();
     }
@@ -229,7 +247,10 @@ export class Game {
     this.skids.update(dt);
     this.lapCount();
     this.engine.update(dt, this.car.speed, this.car.slip, CAR.top);
-    this.hud.update(Math.min(1, this.progress), this.place());
+    this.hud.update(
+      Math.max(0, Math.min(1, this.progress / this.laps)),
+      this.place(),
+    );
   };
 
   /**
@@ -379,7 +400,10 @@ export class Game {
       wrap(found.t - this.track.startAt) < 0.5;
     this.lastT = found.t;
 
-    if (crossed && this.progress > 0.5) {
+    // Past the line with most of a lap behind you. The half-lap guard is what
+    // stops the grid — which sits a few metres behind the line — from counting
+    // as a crossing in the first second of every race.
+    if (crossed && this.progress > this.laps - 0.5) {
       this.flag();
     }
   }
@@ -396,8 +420,9 @@ export class Game {
     const place = this.place();
     const clean = this.knocks === 0;
     this.done.setTitle(place === 1 ? "You won!" : "Chequered flag!");
+    const round = this.laps === 1 ? "" : ` over ${this.laps} laps`;
     this.done.setBody(
-      `${ordinal(place)} of ${RIVALS.count + 1}, in ${this.time.toFixed(1)} seconds.` +
+      `${ordinal(place)} of ${RIVALS.count + 1}${round}, in ${this.time.toFixed(1)} seconds.` +
         (clean
           ? " And you never once touched the wall."
           : ` You hit the wall ${this.knocks === 1 ? "once" : `${this.knocks} times`} — the long way round the outside is usually the quick way.`),
