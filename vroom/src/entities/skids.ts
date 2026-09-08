@@ -20,8 +20,14 @@ export class Skids {
   readonly mesh: THREE.InstancedMesh;
 
   private cursor = 0;
+  private readonly size: number;
   /** How much life each mark has left. Zero means the slot is free. */
   private readonly life: Float32Array;
+  /** How long that mark's full life is, since they are no longer all the
+   *  same: rubber goes in seconds, a trail of oil takes ten. */
+  private readonly span: Float32Array;
+  /** What colour each one started, so it can fade from its own. */
+  private readonly base: Float32Array;
   private readonly m = new THREE.Matrix4();
   private readonly q = new THREE.Quaternion();
   private readonly e = new THREE.Euler();
@@ -30,9 +36,10 @@ export class Skids {
   private readonly colour = new THREE.Color();
   /** What a spent mark fades to: the road it is lying on. */
   private readonly gone: THREE.Color;
-  private static readonly fresh = new THREE.Color(0x000000);
+  private static readonly fresh = new THREE.Color();
 
-  constructor(palette: Palette) {
+  constructor(palette: Palette, size: number = SKID.max) {
+    this.size = size;
     this.gone = new THREE.Color(palette.tarmac);
     const geo = new THREE.PlaneGeometry(1, 1);
     geo.rotateX(-Math.PI / 2);
@@ -46,19 +53,21 @@ export class Skids {
       opacity: SKID.darkness,
       depthWrite: false,
     });
-    this.mesh = new THREE.InstancedMesh(geo, mat, SKID.max);
+    this.mesh = new THREE.InstancedMesh(geo, mat, this.size);
     this.mesh.renderOrder = order(LAYER.skid);
     this.mesh.frustumCulled = false;
     this.mesh.instanceColor = new THREE.InstancedBufferAttribute(
-      new Float32Array(SKID.max * 3),
+      new Float32Array(this.size * 3),
       3,
     );
-    this.life = new Float32Array(SKID.max);
+    this.life = new Float32Array(size);
+    this.span = new Float32Array(size);
+    this.base = new Float32Array(size * 3);
 
     // Every slot starts empty, which for an instanced mesh means scaled to
     // nothing: it cannot skip an instance.
     this.scale.setScalar(0);
-    for (let i = 0; i < SKID.max; i++) {
+    for (let i = 0; i < this.size; i++) {
       this.m.compose(this.pos.set(0, 0, 0), this.q.identity(), this.scale);
       this.mesh.setMatrixAt(i, this.m);
     }
@@ -66,15 +75,28 @@ export class Skids {
   }
 
   /** Lays one mark at a point, lying along the way the tyre is travelling. */
-  lay(x: number, z: number, heading: number, length: number): void {
+  lay(
+    x: number,
+    z: number,
+    heading: number,
+    length: number,
+    width: number = SKID.width,
+    colour: number = 0x000000,
+    life: number = SKID.life,
+  ): void {
     const i = this.cursor;
-    this.cursor = (this.cursor + 1) % SKID.max;
-    this.life[i] = SKID.life;
+    this.cursor = (this.cursor + 1) % this.size;
+    this.life[i] = life;
+    this.span[i] = life;
+    this.colour.set(colour);
+    this.base[i * 3] = this.colour.r;
+    this.base[i * 3 + 1] = this.colour.g;
+    this.base[i * 3 + 2] = this.colour.b;
 
     this.pos.set(x, LAYER.skid, z);
     this.e.set(0, heading, 0);
     this.q.setFromEuler(this.e);
-    this.scale.set(SKID.width, 1, Math.max(SKID.width, length));
+    this.scale.set(width, 1, Math.max(width, length));
     this.m.compose(this.pos, this.q, this.scale);
     this.mesh.setMatrixAt(i, this.m);
     this.mesh.instanceMatrix.needsUpdate = true;
@@ -91,12 +113,12 @@ export class Skids {
    */
   update(dt: number): void {
     let touched = false;
-    for (let i = 0; i < SKID.max; i++) {
+    for (let i = 0; i < this.size; i++) {
       if (this.life[i] <= 0) {
         continue;
       }
       this.life[i] -= dt;
-      this.fade(i, Math.max(0, this.life[i] / SKID.life));
+      this.fade(i, Math.max(0, this.life[i] / this.span[i]));
       touched = true;
       if (this.life[i] <= 0) {
         this.scale.setScalar(0);
@@ -113,7 +135,7 @@ export class Skids {
   /** Wipes the lot, for a fresh lap. */
   clear(): void {
     this.scale.setScalar(0);
-    for (let i = 0; i < SKID.max; i++) {
+    for (let i = 0; i < this.size; i++) {
       this.life[i] = 0;
       this.m.compose(this.pos.set(0, 0, 0), this.q.identity(), this.scale);
       this.mesh.setMatrixAt(i, this.m);
@@ -123,9 +145,15 @@ export class Skids {
   }
 
   private fade(i: number, amount: number): void {
-    // Fresh is black; spent is the tarmac's own colour, so the last frame of a
-    // mark's life is indistinguishable from the road under it. Fading towards
-    // white instead would leave a pale ghost on grey tarmac.
+    // Fresh is whatever it was laid in; spent is the tarmac's own colour, so
+    // the last frame of a mark's life is indistinguishable from the road under
+    // it. Fading towards white instead would leave a pale ghost on grey
+    // tarmac, whatever colour it started.
+    Skids.fresh.setRGB(
+      this.base[i * 3],
+      this.base[i * 3 + 1],
+      this.base[i * 3 + 2],
+    );
     this.colour.copy(this.gone).lerp(Skids.fresh, amount);
     this.mesh.setColorAt(i, this.colour);
   }

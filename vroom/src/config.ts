@@ -61,6 +61,8 @@ export const ENVIRONMENTS = {
     trunk: 0x4a3524,
     tyre: 0x1f1f23,
     crowd: [0xe0b13c, 0x3f7fd6, 0xd6473c, 0xf2efe6, 0x49b45a],
+    /** What grows here. Each environment plants something different. */
+    flora: "broadleaf",
   },
   desert: {
     name: "Desert",
@@ -77,6 +79,7 @@ export const ENVIRONMENTS = {
     trunk: 0x6b5334,
     tyre: 0x2a2622,
     crowd: [0xe8d16a, 0xd0663c, 0xf6efdd, 0x8fb07a, 0xb44a3a],
+    flora: "cactus",
   },
   neon: {
     name: "Neon city",
@@ -94,6 +97,7 @@ export const ENVIRONMENTS = {
     trunk: 0xff2d95,
     tyre: 0x0d0a18,
     crowd: [0xff2d95, 0x2de2ff, 0xfaff5c, 0x7b3cff, 0xf4eaff],
+    flora: "palm",
   },
 } as const;
 
@@ -112,11 +116,12 @@ export const CAMERA = {
    * swung round with the car would make the stick mean something different
    * every second.
    *
-   * The angle is atan(up / back) = 49 degrees, which is steep enough to see a
-   * corner coming and shallow enough that the cars have a side to them.
+   * The angle is atan(up / back), and with the two equal that is 45 degrees
+   * exactly — steep enough to see a corner coming, shallow enough that the
+   * cars have a side to them.
    */
   back: 150,
-  up: 172,
+  up: 150,
   /** How wide the lens is. Narrow, because a wide one bends a straight road
    *  into a fan at the edges of the screen. */
   fov: 42,
@@ -162,38 +167,81 @@ export const CAMERA = {
  * These are fractions of full brightness, not three's own units — the stage
  * multiplies by pi on the way in. See the note there.
  */
+/**
+ * The look of the picture itself, after the scene has been drawn.
+ *
+ * Tone mapping and bloom are what separate this from a diagram. The renderer
+ * works in a range far wider than a screen can show, and the tone map is how
+ * that range is fitted onto one — ACES is the film industry's curve and it is
+ * why bright things roll off into colour instead of clipping to white. Bloom
+ * gathers whatever is left above the top of the range and spills it, which is
+ * the halo round a neon tube and the flare off a wing in the sun.
+ */
+export const FILM = {
+  /** How much light reaches the sensor. */
+  exposure: 0.95,
+  /**
+   * How much of the environment the materials gather.
+   *
+   * Turned well down. The generated environment is a bright room, and at 0.9
+   * it was pouring white into every surface from every direction at once —
+   * which is what a washed-out, desaturated picture actually is. Enough to
+   * give metal something to reflect, not enough to be the lighting.
+   */
+  envIntensity: 0.45,
+  /**
+   * Bloom: how strong, how wide, and how bright a thing has to be to bloom.
+   *
+   * The threshold is the number that matters and it has to be well clear of
+   * one. Bloom reads the linear buffer, *before* the tone curve, and a plainly
+   * lit white kerb in sun already sits above 1 there — so at 1.05 the entire
+   * picture glowed and the road came out as fog. Only the emissive things go
+   * past two, which is exactly the neon and the brake lights, which is the
+   * whole point of having it.
+   */
+  bloom: 0.85,
+  bloomRadius: 0.55,
+  bloomThreshold: 2.0,
+  /** Shadow map size. Big enough that a car's own shadow has an edge. */
+  shadow: 2048,
+  /** How far around the car shadows are cast. Everything past this is lit but
+   *  casts nothing, which nobody notices and which keeps the map sharp. */
+  shadowReach: 320,
+} as const;
+
 export const LIGHT = {
   /**
-   * Mostly ambient, and measurably so.
+   * Almost no ambient, now that there is an environment map.
    *
-   * An upright face receives the ambient and whatever the two directionals
-   * give it, so the ambient is the floor on how dark anything in this game can
-   * get. At 0.62 the barrier came out at two-thirds strength and read as
-   * dingy maroon beside the bright flat kerb next to it.
-   *
-   * The three together are set so an upward face lands just under full. Any
-   * higher and it goes past its own colour rather than reaching it: the red
-   * car came back off the screen at 236 where its red is 214, which is not a
-   * brighter car, it is a washed-out one. Measured, tops now sit at about 0.97
-   * and sides between 0.82 and 0.85 — a step you can see, and nowhere near
-   * dingy.
+   * This used to be nearly all of the light, because there was nothing else:
+   * a flat-shaded scene with one directional light needs a high floor or half
+   * of it goes black. A physically based one does not — the environment map
+   * *is* the ambient, and it is a far better one, because it comes from
+   * different directions with different colours in it. Left at the old 0.78
+   * the two together washed the whole picture out: pale grass, pale trees, no
+   * shadows to speak of.
    */
-  ambient: 0.78,
-  sun: 0.16,
+  ambient: 0.05,
+  /** The sun, and it is a real one now: it casts the shadows. Strong, because
+   *  the contrast between lit and shaded is most of what makes a scene look
+   *  like it is somewhere rather than nowhere. */
+  sun: 1.05,
   /** Which way the sun is. Off to one side rather than straight down, or every
    *  vertical face in the game would be the same shade as every other. */
-  from: {x: 0.45, y: 1, z: 0.3},
   /**
-   * A weaker light from roughly the other side.
+   * Which way the sun is.
    *
-   * Without it, every face turned away from the sun gets the ambient and
-   * nothing else — and since the barrier runs in every direction, half of it
-   * was always at the floor. Red came out maroon and white came out grey,
-   * which on a wall a child has been told is "red and white" is the wrong
-   * wall. With the fill no upright face is ever at bare ambient, and the two
-   * together still leave a top face brighter than any side.
+   * Low, and that is the whole point of it. It was nearly straight overhead,
+   * which put every shadow directly underneath the thing casting it — where,
+   * from a camera looking down at forty-five degrees, the thing itself hides
+   * it. A low sun throws a shadow sideways where it can be seen, and a
+   * visible shadow is most of what puts a car on the road rather than above
+   * it.
    */
-  fill: 0.1,
+  from: {x: 0.62, y: 0.72, z: 0.34},
+  /** A weaker light from roughly the other side, so the shadowed side of a
+   *  thing is dark rather than black. */
+  fill: 0.12,
   fillFrom: {x: -0.5, y: 0.35, z: -0.4},
 } as const;
 
@@ -316,6 +364,17 @@ export const CAR = {
    * marks never appeared at all.
    */
   skidAt: 18,
+  /**
+   * How hard a left-to-right difference in grip turns the car.
+   *
+   * Radians a second at full speed for a complete split — every wheel down
+   * one side gripping and none down the other. This is what makes the edge of
+   * an oil slick more dangerous than the middle of it.
+   */
+  spinFromSplit: 2.6,
+  /** How fast the car rights itself once it is back on the ground, after a
+   *  roll. Frame-rate independent, so it is a rate and not a fraction. */
+  rightsItself: 5,
 } as const;
 
 /** The marks the road is left covered in. */
@@ -456,6 +515,22 @@ export const ITEM = {
      */
     boost: 1.35,
     carry: 2.5,
+    /**
+     * How hard a lopsided take-off throws the car over.
+     *
+     * Hitting a ramp square launches the car flat. Catching it with the wheels
+     * down one side only launches that side, and the car rolls — which is what
+     * a real one does and is the whole reason a ramp is worth aiming at
+     * properly. Radians a second of roll per unit of left-to-right imbalance,
+     * at full speed.
+     */
+    roll: 7.5,
+    /** And how much it pitches nose-up off the lip. */
+    pitch: 1.4,
+    /** How fast it goes up. The arc is a real one now — gravity brings it
+     *  back — so this is a speed and not a duration. */
+    launch: 62,
+    gravity: 150,
   },
 } as const;
 
@@ -467,6 +542,26 @@ export const ITEM = {
  * anything more careful would be modelling a crash, and this game wants a
  * nudge and a bit of a slide, not a shunt.
  */
+/**
+ * What a wheel carries out of a patch, and the trail it leaves.
+ *
+ * A car that drives through oil does not stop being oily at the edge of the
+ * slick — it tracks it up the road, and the marks tell everybody behind
+ * exactly where the trouble is. Each wheel carries its own, so clipping a
+ * patch with one side leaves one line and not two.
+ */
+export const TRAIL = {
+  /** How long a wheel goes on laying after it leaves the patch. */
+  carries: 2.2,
+  /** How long a mark stays on the road before it has faded out. */
+  life: 10,
+  /** How often one is laid, and how wide. */
+  every: 0.035,
+  width: 2.2,
+  /** How many marks are kept at once, across every wheel and both kinds. */
+  max: 900,
+} as const;
+
 export const BUMP = {
   /** How close two cars get before they touch, centre to centre. A little
    *  under half a car length, so they can run side by side down a straight
@@ -535,6 +630,53 @@ export const RATING = {
    */
   medium: 10,
   hard: 28,
+} as const;
+
+/**
+ * The neon city's signs.
+ *
+ * These are the reason the city environment exists. A sign is a hoarding with
+ * bent glass on it, and the glass is emissive far above white so the bloom
+ * pass spills a halo round it — which is what a glowing tube looks like
+ * through a camera, and what makes neon read as neon rather than as a bright
+ * line. Each one also carries a real light, so the road under it is its
+ * colour.
+ */
+export const NEON = {
+  /** How many go up around a lap. Enough that there is always one in shot and
+   *  few enough that the lights stay affordable. */
+  count: 30,
+  /**
+   * How far past the barrier they stand.
+   *
+   * Close. They were out at thirty to a hundred and sixty and the nearest one
+   * to the car was a hundred and fifty units away — off the side of the
+   * screen, so a city full of signs had none of them in shot. A sign that
+   * cannot be read from the road is not a sign.
+   */
+  from: 10,
+  to: 85,
+  minHeight: 26,
+  maxHeight: 64,
+  /** How fat the glass is. */
+  tube: 0.9,
+  /**
+   * How hard the tubes are driven.
+   *
+   * Well past one on purpose: everything above the display range is what the
+   * bloom pass gathers into a glow, so this number is really "how big is the
+   * halo" rather than "how bright is the tube".
+   */
+  emissive: 4.2,
+  /** The light each one throws, and how far it carries. */
+  lampPower: 900,
+  lampReach: 190,
+  /** How many are faulty, how fast they stutter, and how far down they drop
+   *  when they do. Not to nothing — a dead tube still catches the streetlight. */
+  brokenChance: 0.35,
+  flickerFrom: 3,
+  flickerTo: 11,
+  dimmed: 0.06,
 } as const;
 
 /**

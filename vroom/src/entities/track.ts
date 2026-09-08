@@ -4,6 +4,7 @@ import {BRIDGE, ENVIRONMENTS, HEIGHT, Palette, TRACK} from "../config";
 import {TrackSpec} from "../track/spec";
 import {fadingVertex, flatVertex, LAYER, order, paint} from "../render/sprites";
 import {NearFade} from "../../../shared/fadeInFront";
+import {Substance} from "../render/materials";
 
 /**
  * One place the circuit runs over itself: the earlier stretch and the later
@@ -18,6 +19,18 @@ export interface Crossing {
   high: number;
   highFrom: number;
   highTo: number;
+}
+
+/** What a flat at each layer is made of. Tarmac gathers a little of the sky;
+ *  a painted line and a grass verge do not. */
+function substanceFor(height: number): Substance {
+  if (height === LAYER.tarmac) {
+    return "road";
+  }
+  if (height === LAYER.kerb || height === LAYER.paint) {
+    return "concrete";
+  }
+  return "verge";
 }
 
 /** How wide a kerb is. Shared, because a flyover deck has to cover the road
@@ -231,12 +244,17 @@ export class Track {
         verts.push(p.x + s.x * off, height, p.z + s.z * off);
       };
       // Two triangles a segment, wound so they face up.
+      //
+      // They did not, for most of this game's life. The sideways vector points
+      // the opposite way to what the winding assumed, so every road triangle
+      // faced the ground — which cost nothing while the material was unlit and
+      // double-sided, and turned the whole road black the moment it was lit.
       push(p0, s0, from);
+      push(p1, s1, to);
       push(p1, s1, from);
-      push(p1, s1, to);
       push(p0, s0, from);
-      push(p1, s1, to);
       push(p0, s0, to);
+      push(p1, s1, to);
 
       const c = stripe && Math.floor(i / stripe.every) % 2 === 1 ? b : a;
       for (let v = 0; v < 6; v++) {
@@ -247,8 +265,23 @@ export class Track {
     const geo = new THREE.BufferGeometry();
     geo.setAttribute("position", new THREE.Float32BufferAttribute(verts, 3));
     geo.setAttribute("color", new THREE.Float32BufferAttribute(colours, 3));
-    const mesh = new THREE.Mesh(geo, flatVertex());
+    // Straight up, stated rather than computed: a ribbon is flat by
+    // construction, and this way the lighting does not depend on the winding
+    // being right anywhere else.
+    const normals = new Float32Array(verts.length);
+    for (let n = 1; n < normals.length; n += 3) {
+      normals[n] = 1;
+    }
+    geo.setAttribute("normal", new THREE.BufferAttribute(normals, 3));
+    geo.setAttribute(
+      "uv",
+      new THREE.BufferAttribute(new Float32Array((verts.length / 3) * 2), 2),
+    );
+    const mesh = new THREE.Mesh(geo, flatVertex(substanceFor(height)));
     mesh.renderOrder = order(height);
+    // The road takes the shadow of whatever is on it, which is most of what
+    // puts a car on a surface rather than above one.
+    mesh.receiveShadow = true;
     // The ribbon wraps the whole circuit, so it is on screen whatever the
     // camera is looking at and there is nothing for culling to save.
     mesh.frustumCulled = false;
@@ -368,6 +401,10 @@ export class Track {
     geo.setAttribute("position", new THREE.Float32BufferAttribute(verts, 3));
     geo.setAttribute("color", new THREE.Float32BufferAttribute(colours, 3));
     geo.setAttribute("normal", new THREE.Float32BufferAttribute(normals, 3));
+    geo.setAttribute(
+      "uv",
+      new THREE.BufferAttribute(new Float32Array((verts.length / 3) * 2), 2),
+    );
     return geo;
   }
   /** The chequered line you start on and finish on. */
@@ -400,7 +437,10 @@ export class Track {
         );
       }
     }
-    const mesh = new THREE.Mesh(mergeGeometries(parts, false), flatVertex());
+    const mesh = new THREE.Mesh(
+      mergeGeometries(parts, false),
+      flatVertex("concrete"),
+    );
     mesh.renderOrder = order(LAYER.paint);
     mesh.frustumCulled = false;
     return mesh;
@@ -559,7 +599,8 @@ function mergeMeshes(meshes: Array<THREE.Mesh>): THREE.Mesh {
     meshes.map(m => m.geometry as THREE.BufferGeometry),
     false,
   );
-  const mesh = new THREE.Mesh(merged, flatVertex());
+  const mesh = new THREE.Mesh(merged, flatVertex("concrete"));
+  mesh.receiveShadow = true;
   // The topmost of what went in: a merged pile is drawn in one go, so it can
   // only have one place in the order, and the highest is the one that matters.
   mesh.renderOrder = Math.max(...meshes.map(m => m.renderOrder));

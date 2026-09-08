@@ -1,16 +1,9 @@
 import * as THREE from "three";
-import {mergeGeometries} from "three/examples/jsm/utils/BufferGeometryUtils.js";
-import {CAR, HEIGHT, ITEM} from "../config";
-import {
-  block,
-  flatVertex,
-  LAYER,
-  order,
-  post,
-  solidVertex,
-  tile,
-} from "../render/sprites";
+import {CAR, ITEM, TRAIL} from "../config";
+import {flatVertex, LAYER, order, tile} from "../render/sprites";
+import {car as carModel} from "../models/car";
 import {Patches} from "./patches";
+import type {ItemKind} from "../track/spec";
 import {Track} from "./track";
 
 const TAU = Math.PI * 2;
@@ -78,17 +71,43 @@ export class Car {
    */
   air = 0;
 
+  /** How high off the ground, and how fast that is changing. A real arc now:
+   *  the ramp throws the car up and gravity brings it back. */
+  height = 0;
+  private climb = 0;
+  /** Which way up it is. Roll comes from a lopsided take-off and pitch from
+   *  the lip of the ramp; both unwind once it is back on the ground. */
+  roll = 0;
+  pitch = 0;
+  private rollRate = 0;
+  private pitchRate = 0;
+
+  /**
+   * What each wheel is still carrying out of a patch, and for how long.
+   *
+   * Per wheel, because that is the point: clip a slick with the left-hand
+   * wheels and one line of oil comes up the road, not two.
+   */
+  readonly carrying: Array<ItemKind | null> = [null, null, null, null];
+  readonly carriedFor = [0, 0, 0, 0];
+
   /** How long the ramp's extra speed lingers. The ceiling is lifted while this
    *  runs and eased back as it empties. */
   private boost = 0;
 
   private readonly dir = new THREE.Vector2();
   private readonly side = new THREE.Vector2();
-  private readonly sprite: THREE.Mesh;
+  private readonly sprite: THREE.Object3D;
+  private readonly wheelAt = [
+    new THREE.Vector2(),
+    new THREE.Vector2(),
+    new THREE.Vector2(),
+    new THREE.Vector2(),
+  ];
   private readonly shadow: THREE.Mesh;
 
   constructor(colour: number) {
-    this.sprite = new THREE.Mesh(carBody(colour), solidVertex());
+    this.sprite = carModel(colour);
     // Under the car and only ever seen in mid-air. It stays the size the car
     // was on the ground, which is what makes the car look as though it has
     // left it rather than merely got bigger.
@@ -125,6 +144,14 @@ export class Car {
     this.lap = lap;
     this.air = 0;
     this.boost = 0;
+    this.height = 0;
+    this.climb = 0;
+    this.roll = 0;
+    this.pitch = 0;
+    this.rollRate = 0;
+    this.pitchRate = 0;
+    this.carrying.fill(null);
+    this.carriedFor.fill(0);
   }
 
   /** How fast it is going, whichever way it happens to be pointing. */
@@ -147,21 +174,69 @@ export class Car {
     this.hint = found.index;
     const tarmac = track.onTarmac(found.offset);
 
-    // What is under the wheels. Checked before the jump timer is spent, so a
-    // ramp taken at walking pace does nothing and one taken at speed launches.
-    const on = patches ? patches.at(this.position.x, this.position.z) : null;
+    // What is under each wheel. Four samples rather than one, because a car is
+    // not a point: half on a slick and half on dry tarmac is the interesting
+    // case, and it was not expressible before.
+    this.corners(this.wheelAt);
+    let leftGrip = 0;
+    let rightGrip = 0;
+    let slowest = 1;
+    let onRamp = 0;
+    let rampLean = 0;
+    for (let i = 0; i < 4; i++) {
+      const w = this.wheelAt[i];
+      const under = patches ? patches.at(w.x, w.y) : null;
+      // One side of the car and the other. Which is which does not matter —
+      // the model is symmetric — only that they are told apart.
+      const nearSide = i % 2 === 0;
+
+      // A wheel goes on carrying what it drove through for a while afterwards.
+      if (under === "oil" || under === "mud") {
+        this.carrying[i] = under;
+        this.carriedFor[i] = TRAIL.carries;
+      } else if (this.carriedFor[i] > 0) {
+        this.carriedFor[i] = Math.max(0, this.carriedFor[i] - dt);
+        if (this.carriedFor[i] === 0) {
+          this.carrying[i] = null;
+        }
+      }
+
+      let grip = 1;
+      if (under === "oil") {
+        grip = ITEM.oil.grip;
+      } else if (under === "mud") {
+        slowest = Math.min(slowest, ITEM.mud.top);
+      }
+      if (under === "ramp") {
+        onRamp++;
+        rampLean += nearSide ? 1 : -1;
+      }
+      if (nearSide) {
+        leftGrip += grip / 2;
+      } else {
+        rightGrip += grip / 2;
+      }
+    }
+
     if (this.air > 0) {
       this.air = Math.max(0, this.air - dt);
-    } else if (on === "ramp" && this.speed >= ITEM.ramp.minSpeed) {
+    } else if (onRamp > 0 && this.speed >= ITEM.ramp.minSpeed) {
       this.air = ITEM.ramp.airtime;
       this.boost = ITEM.ramp.carry;
       // Straight onto the velocity, before it is split into along and across:
       // the shove is in the direction the car was actually travelling, which
       // on a ramp taken sideways is not where the nose is pointing.
       this.velocity.multiplyScalar(ITEM.ramp.boost);
+      // Up, and — if the ramp was caught lopsided — over. One side on the ramp
+      // lifts one side of the car, which is what rolls a real one; hitting it
+      // square lifts both and does not.
+      const push = Math.min(1, this.speed / CAR.top);
+      this.climb = ITEM.ramp.launch * push;
+      this.pitchRate = ITEM.ramp.pitch * push;
+      this.rollRate = (rampLean / 2) * ITEM.ramp.roll * push;
     }
     this.boost = Math.max(0, this.boost - dt);
-    const flying = this.air > 0;
+    const flying = this.air > 0 || this.height > 0;
 
     // How fast the nose can come round. Less and less of the turn survives as
     // the speed comes up — a car that cornered as hard at a hundred as at a
@@ -232,14 +307,26 @@ export class Car {
     // the slide behaves the same on a 60Hz laptop and a 120Hz iPad.
     let grip = CAR.grip * (tarmac ? 1 : CAR.grassGrip);
     let top = CAR.top * (tarmac ? 1 : CAR.grassTop);
-    if (on === "oil" && !flying) {
-      // Almost no grip at all, which is what oil is for: the back end goes and
-      // it stays gone until the car is off the slick.
-      grip *= ITEM.oil.grip;
-    }
-    if (on === "mud" && !flying) {
-      top *= ITEM.mud.top;
-      along -= Math.sign(along) * Math.min(Math.abs(along), ITEM.mud.drag * dt);
+    if (!flying) {
+      // Grip is the average of what the four wheels have; the top speed is set
+      // by the worst of them, because one wheel in mud holds a whole car back.
+      grip *= (leftGrip + rightGrip) / 2;
+      top *= slowest;
+      if (slowest < 1) {
+        along -=
+          Math.sign(along) * Math.min(Math.abs(along), ITEM.mud.drag * dt);
+      }
+
+      // And the part that makes a patch worth avoiding rather than merely
+      // slow: if one side has grip and the other does not, the car turns
+      // towards the side that still bites. Two wheels on oil is not "a bit
+      // less grip", it is a spin — which is why clipping the edge of a slick
+      // is worse than driving over the middle of it.
+      const split = rightGrip - leftGrip;
+      if (Math.abs(split) > 0.01) {
+        this.heading +=
+          split * CAR.spinFromSplit * Math.min(1, this.speed / CAR.top) * dt;
+      }
     }
     if (flying) {
       // In the air the velocity is simply carried: no grip to pull it round,
@@ -261,6 +348,35 @@ export class Car {
     // No rubber in mid-air, which is both true and the only thing stopping a
     // jump from painting a stripe across the grass it flew over.
     this.slip = flying ? 0 : Math.abs(across);
+
+    // The arc. Gravity does this now rather than a timer, so a fast take-off
+    // really does go further and land later than a slow one.
+    if (this.air > 0 || this.height > 0) {
+      this.height += this.climb * dt;
+      this.climb -= ITEM.ramp.gravity * dt;
+      this.roll += this.rollRate * dt;
+      this.pitch += this.pitchRate * dt;
+      if (this.height <= 0) {
+        this.height = 0;
+        this.climb = 0;
+        this.air = 0;
+        this.rollRate = 0;
+        this.pitchRate = 0;
+      }
+    } else if (this.roll !== 0 || this.pitch !== 0) {
+      // Back on the ground it rights itself — towards whichever whole turn it
+      // is nearest, so a car that went all the way over lands the right way up
+      // rather than winding a full revolution backwards.
+      const settle = 1 - Math.exp(-CAR.rightsItself * dt);
+      this.roll += (Math.round(this.roll / TAU) * TAU - this.roll) * settle;
+      this.pitch -= this.pitch * settle;
+      // Once it is upright, say so exactly. A car that has been over three
+      // times is upright at 1080 degrees, and leaving it there would have the
+      // number climbing for the whole race.
+      if (Math.abs(this.roll % TAU) < 0.001) {
+        this.roll = 0;
+      }
+    }
 
     this.position.x += this.velocity.x * dt;
     this.position.z += this.velocity.y * dt;
@@ -311,6 +427,30 @@ export class Car {
     this.shadow.renderOrder = order(LAYER.shadow) + lift;
   }
 
+  /**
+   * Where all four wheels are, in the order front-left, front-right,
+   * rear-left, rear-right.
+   *
+   * The whole of the per-wheel physics reads off this. A car is not a point:
+   * clipping the edge of an oil slick puts two wheels on it and two on dry
+   * tarmac, and those are completely different things to be doing.
+   */
+  corners(out: Array<THREE.Vector2>): void {
+    let k = 0;
+    for (const along of [CAR.length * 0.33, -CAR.length * 0.31]) {
+      for (const side of [-1, 1]) {
+        out[k++].set(
+          this.position.x +
+            this.dir.x * along +
+            this.side.x * side * HALF_TRACK,
+          this.position.z +
+            this.dir.y * along +
+            this.side.y * side * HALF_TRACK,
+        );
+      }
+    }
+  }
+
   /** Where the back wheels are, for laying rubber. */
   wheels(gauge: number, out: Array<THREE.Vector2>): void {
     const back = -CAR.length * 0.3;
@@ -329,88 +469,21 @@ export class Car {
     this.group.rotation.y =
       this.prevHeading + shortestAngle(this.prevHeading, this.heading) * alpha;
 
-    // The jump, drawn. A half-sine so the car swells off the ramp and settles
-    // back onto its shadow rather than snapping between two sizes.
-    const through = this.air > 0 ? 1 - this.air / ITEM.ramp.airtime : 0;
-    const lift =
-      this.air > 0 ? Math.sin(Math.PI * through) * ITEM.ramp.lift : 0;
-    this.sprite.scale.setScalar(1 + lift);
-    this.shadow.visible = this.air > 0;
+    // The jump, drawn — and it is drawn by actually being off the ground now
+    // rather than by growing. A perspective camera does the rest: a car that
+    // is genuinely eight units up looks eight units up.
+    this.group.position.y = LAYER.car + this.height;
+    this.sprite.rotation.set(this.pitch, 0, this.roll);
+    // The shadow stays on the ground and shrinks with height, which is most of
+    // what says how far up the car is.
+    this.shadow.visible = this.height > 0.2;
+    this.shadow.position.y = LAYER.shadow - LAYER.car - this.height;
+    const shrink = 1 / (1 + this.height * 0.03);
+    this.shadow.scale.set(shrink, 1, shrink);
   }
 }
 
 const tmp3 = new THREE.Vector3();
 
-/**
- * The car itself: a body, a cockpit, four wheels and a wing.
- *
- * It was a set of flat tiles when the camera looked straight down, which was
- * right then and is not now — from a diagonal a flat car is a sticker on the
- * road. So everything here has a top and sides, and the sides carry a darker
- * shade of the body colour so the shape reads even where the light does not
- * reach it.
- *
- * Still bold and simple. At this distance a car is forty pixels long, and
- * anything finer than a cockpit and a stripe is a smudge.
- *
- * Pointing +Z, so the group's Y rotation is the heading and nothing has to be
- * offset by a right angle anywhere else in the game.
- */
-function carBody(colour: number): THREE.BufferGeometry {
-  const L = CAR.length;
-  const W = CAR.width;
-  const H = HEIGHT.car;
-  const parts: Array<THREE.BufferGeometry> = [];
-
-  // Wheels first: fat little cylinders lying on their sides, proud of the body
-  // so they are visible from behind as well as above.
-  for (const along of [0.3, -0.28]) {
-    for (const side of [-1, 1]) {
-      const wheel = post(HEIGHT.wheel / 2, W * 0.26, 0, 8, 0x1b1b1f);
-      // A cylinder stands up by default; a wheel does not.
-      wheel.rotateZ(Math.PI / 2);
-      wheel.translate(side * W * 0.5, HEIGHT.wheel / 2, along * L);
-      parts.push(wheel);
-    }
-  }
-
-  const body = block(W, H * 0.62, L, HEIGHT.wheel * 0.32, colour);
-  parts.push(body);
-
-  // A nose that tapers, which is most of what says which way it is facing.
-  const nose = block(W * 0.62, H * 0.42, L * 0.24, HEIGHT.wheel * 0.32, colour);
-  nose.translate(0, 0, L * 0.5);
-  parts.push(nose);
-
-  const stripe = block(
-    W * 0.18,
-    H * 0.06,
-    L * 0.66,
-    HEIGHT.wheel * 0.32 + H * 0.62,
-    0xf2efe6,
-  );
-  stripe.translate(0, 0, L * 0.06);
-  parts.push(stripe);
-
-  const cockpit = block(
-    W * 0.56,
-    HEIGHT.cockpit,
-    L * 0.3,
-    HEIGHT.wheel * 0.32 + H * 0.62,
-    0x24252b,
-  );
-  cockpit.translate(0, 0, -L * 0.02);
-  parts.push(cockpit);
-
-  // A wing across the tail: the one shape that stops it reading as a brick.
-  const wing = block(W * 1.15, H * 0.12, L * 0.1, H * 0.72, 0x24252b);
-  wing.translate(0, 0, -L * 0.48);
-  parts.push(wing);
-  for (const side of [-1, 1]) {
-    const stay = block(W * 0.08, H * 0.4, L * 0.08, H * 0.34, 0x24252b);
-    stay.translate(side * W * 0.4, 0, -L * 0.48);
-    parts.push(stay);
-  }
-
-  return mergeGeometries(parts, false);
-}
+/** Half the track width of the car — how far a wheel sits from its middle. */
+const HALF_TRACK = CAR.width * 0.56;

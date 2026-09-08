@@ -3,6 +3,7 @@ import {Game} from "./game";
 import {lockZoom} from "./core/lockZoom";
 import {Editor} from "./ui/editor";
 import {Menu} from "./ui/menu";
+import {ModelViewer, MODELS_HASH} from "./ui/models";
 import {BUILT_IN, TrackSpec} from "./track/spec";
 import {saveTrack} from "./track/store";
 
@@ -29,23 +30,46 @@ if (!app) {
  */
 let game: Game | null = null;
 let editor: Editor | null = null;
+let models: ModelViewer | null = null;
 
 function clear(): void {
   game?.dispose();
   game = null;
   editor?.dispose();
   editor = null;
+  models?.dispose();
+  models = null;
   app!.replaceChildren();
 }
 
 function showMenu(): void {
   clear();
+  if (window.location.hash.startsWith(MODELS_HASH)) {
+    window.history.replaceState(null, "", window.location.pathname);
+  }
   const menu = new Menu({
     onPlay: showRace,
     onBuild: () => showEditor(),
     onEdit: spec => showEditor(spec),
+    onModels: showModels,
   });
   app!.appendChild(menu.root);
+}
+
+/**
+ * The model viewer, and the reason it puts itself in the URL.
+ *
+ * It exists to be looked at while a model is being changed, and changing a
+ * model reloads the page — so without the hash every edit would land back on
+ * the track list and the tool would be useless for the one job it has.
+ */
+function showModels(hash = ""): void {
+  clear();
+  models = new ModelViewer(showMenu);
+  app!.appendChild(models.root);
+  if (hash) {
+    models.restore(hash);
+  }
 }
 
 function showEditor(existing?: TrackSpec): void {
@@ -80,9 +104,13 @@ function showRace(spec: TrackSpec): void {
   window.game = game;
 }
 
-// Straight into the list rather than into a race. There is more than one track
-// now, and one of them might be the child's own.
-showMenu();
+// Straight into the list rather than into a race — unless the URL says the
+// model viewer was open, in which case a reload goes back to it.
+if (import.meta.env.DEV && window.location.hash.startsWith(MODELS_HASH)) {
+  showModels(window.location.hash);
+} else {
+  showMenu();
+}
 
 // The live game, for driving it from the console while it is built. See
 // CLAUDE.md — there is no test suite, and this is how a change is checked.

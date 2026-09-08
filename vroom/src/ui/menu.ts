@@ -15,6 +15,8 @@ export interface MenuHandlers {
   onPlay: (spec: TrackSpec) => void;
   onBuild: () => void;
   onEdit: (spec: TrackSpec) => void;
+  /** The model viewer. Development builds only. */
+  onModels: () => void;
 }
 
 export class Menu {
@@ -64,6 +66,17 @@ export class Menu {
 
     const foot = document.createElement("div");
     foot.className = "menu-foot";
+
+    // Development only. It is a tool for building the game, not part of it,
+    // and Vite strips the whole branch out of a production build.
+    if (import.meta.env.DEV) {
+      const models = document.createElement("button");
+      models.type = "button";
+      models.className = "chip";
+      models.textContent = "🧊 Models";
+      models.addEventListener("click", () => this.handlers.onModels());
+      foot.appendChild(models);
+    }
     const home = document.createElement("a");
     home.className = "chip";
     home.href = "../../";

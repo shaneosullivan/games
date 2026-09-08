@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import {fadeInFront, NearFade} from "../../../shared/fadeInFront";
+import {material, Substance} from "./materials";
 
 /**
  * The two kinds of thing in the scene, and how each is drawn.
@@ -14,17 +15,12 @@ import {fadeInFront, NearFade} from "../../../shared/fadeInFront";
  * barrier walls. They do write depth, so they occlude each other properly, and
  * they are all drawn after the flats.
  *
- * The solids are lit. The flats are **not**, and that is a decision rather
- * than an oversight: every flat faces straight up, so shading one can only
- * ever return its own colour — and getting there depends on the triangle
- * winding, which for the ribbons built by hand along the circuit is backwards.
- * Lit, the whole road came out at the ambient level and looked like wet slate.
- * Unlit, a flat is its own colour by construction and there is nothing to get
- * wrong.
- *
- * The light is set so an upward-facing solid face receives slightly more than
- * it can show, which is what keeps the two kinds sitting at the same
- * brightness where they meet.
+ * Both are lit, and both are physically based. The flats were unlit for a
+ * while, because the ribbons built by hand along the circuit were wound
+ * face-down and lighting them turned the road black. They are wound the right
+ * way now and carry their own upward normals, so tarmac gathers the sky the
+ * way tarmac does — which is most of what stops a road looking like a stripe
+ * of paint.
  */
 
 /**
@@ -88,6 +84,20 @@ export function paint(
   colour: number,
 ): THREE.BufferGeometry {
   const geo = source.index ? source.toNonIndexed() : source;
+  // Everything that might be merged has to carry the same set of attributes,
+  // and three's own primitives do not agree: ConvexGeometry has no uv at all,
+  // so a hull merged with a box is refused. Filling in the missing ones here
+  // is one line and saves the caller ever thinking about it.
+  if (!geo.attributes.normal) {
+    geo.computeVertexNormals();
+  }
+  if (!geo.attributes.uv) {
+    const count = geo.attributes.position.count;
+    geo.setAttribute(
+      "uv",
+      new THREE.BufferAttribute(new Float32Array(count * 2), 2),
+    );
+  }
   /* No convertSRGBToLinear here. three converts a hex into the linear working
      space the moment the Color is constructed, and a vertex colour attribute
      is read as already-linear — converting again renders every piece of
@@ -108,12 +118,10 @@ export function paint(
 
 /** A flat, vertex-coloured: one draw call for a whole merged assembly. See
  *  `flat` for why both sides are drawn. */
-export function flatVertex(): THREE.MeshBasicMaterial {
-  return new THREE.MeshBasicMaterial({
-    vertexColors: true,
-    depthWrite: false,
-    side: THREE.DoubleSide,
-  });
+export function flatVertex(
+  substance: Substance = "verge",
+): THREE.MeshStandardMaterial {
+  return material(substance, {doubleSided: true, decal: true});
 }
 
 /**

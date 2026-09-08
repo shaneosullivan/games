@@ -1,41 +1,32 @@
 import * as THREE from "three";
 import {mergeGeometries} from "three/examples/jsm/utils/BufferGeometryUtils.js";
-import {HEIGHT, Palette, SCENERY} from "../config";
+import {NEON, Palette, SCENERY} from "../config";
 import {Rng} from "../core/rng";
-import {
-  fadingVertex,
-  flatVertex,
-  LAYER,
-  order,
-  paint,
-  post,
-  tile,
-} from "../render/sprites";
-import {NearFade} from "../../../shared/fadeInFront";
+import {instance, neonSign, plant} from "../models";
+import type {NeonSign} from "../models/neon";
+import {flatVertex, LAYER, order, tile} from "../render/sprites";
 import {Track} from "./track";
 
-const TAU = Math.PI * 2;
+const UP = new THREE.Vector3(0, 1, 0);
 
 /**
- * Everything outside the barrier: trees, tyre stacks and the crowd.
+ * Everything outside the barrier: the planting, the crowd, and — in the city —
+ * the signs.
  *
- * None of it is ever touched — the wall is at the edge of the grass and all of
- * this is beyond it — so there is no collision, no update and no state. It is
- * here to give the circuit somewhere to be, which the pictures in the plan do
- * with trees and spectators and which a bare green field does not do at all.
+ * None of it is ever touched, so there is no collision and no state. It is
+ * here to give the circuit somewhere to be, which a bare field does not do.
  *
- * Three merged geometries, three draw calls, for the whole world.
+ * The planting is **instanced**: one copy of the geometry and a matrix per
+ * tree. That is what allows the trees to be real models with a trunk and three
+ * clumps of leaves rather than a disc — four hundred of those drawn one at a
+ * time would be four hundred draw calls, and instanced they are two.
  */
 export class Scenery {
   readonly group = new THREE.Group();
-  /** The trees and stacks dissolve when they stand in front of the car. */
-  readonly fades: Array<NearFade> = [];
+  /** The signs that flicker. Empty everywhere but the city. */
+  readonly signs: Array<NeonSign> = [];
 
   constructor(rng: Rng, track: Track, palette: Palette) {
-    const trees: Array<THREE.BufferGeometry> = [];
-    const tyres: Array<THREE.BufferGeometry> = [];
-    const crowd: Array<THREE.BufferGeometry> = [];
-
     const p = new THREE.Vector3();
     const s = new THREE.Vector3();
     const limit = Track.limit + 12;
@@ -50,58 +41,54 @@ export class Scenery {
      * the back straight. So the spot is checked against the whole circuit and
      * thrown away if it is too near any of it.
      */
-    const place = (out: THREE.Vector3, band: number): boolean => {
+    const place = (out: THREE.Vector3, band: number, from = 6): boolean => {
       const t = rng.next();
       track.pointAt(t, p);
       track.sideAt(t, s);
       const side = rng.next() < 0.5 ? -1 : 1;
-      const off = side * (limit + rng.range(6, band));
+      const off = side * (limit + rng.range(from, band));
       out.set(p.x + s.x * off, 0, p.z + s.z * off);
       const near = track.nearest(out.x, out.z, 0, 100000);
       return Math.abs(near.offset) > limit;
     };
 
     const at = new THREE.Vector3();
-
+    const spots: Array<{x: number; z: number; turn: number; scale: number}> =
+      [];
     for (let i = 0; i < SCENERY.trees; i++) {
       if (!place(at, SCENERY.band)) {
         continue;
       }
-      // A trunk with a crown on it. Short ones: seen from a low diagonal, a
-      // tree the height of a real one is a green wall across whatever corner
-      // happens to be behind it.
-      const r = rng.range(7, 13);
-      const height = rng.range(HEIGHT.crown * 0.7, HEIGHT.crown);
-      const trunk = post(r * 0.2, HEIGHT.trunk, 0, 6, palette.trunk);
-      trunk.translate(at.x, 0, at.z);
-      trees.push(trunk);
-
-      const crown = new THREE.SphereGeometry(r, 7, 5);
-      crown.scale(1, 0.8, 1);
-      crown.rotateY(rng.range(0, TAU));
-      crown.translate(at.x, HEIGHT.trunk + height * 0.3, at.z);
-      trees.push(
-        paint(crown, rng.next() < 0.5 ? palette.treeA : palette.treeB),
-      );
+      spots.push({
+        x: at.x,
+        z: at.z,
+        turn: rng.range(0, Math.PI * 2),
+        scale: rng.range(0.75, 1.35),
+      });
     }
 
-    for (let i = 0; i < SCENERY.tyres; i++) {
-      if (!place(at, 30)) {
-        continue;
-      }
-      const stack = post(
-        rng.range(3, 4.5),
-        HEIGHT.tyreStack * 0.7,
-        0,
-        8,
-        palette.tyre,
-      );
-      stack.translate(at.x, 0, at.z);
-      tyres.push(stack);
+    // One plant, drawn everywhere. Its own randomness is spent once, on the
+    // shape of the archetype; the variety on screen comes from the turn and
+    // the scale of each instance.
+    const m = new THREE.Matrix4();
+    const q = new THREE.Quaternion();
+    const pos = new THREE.Vector3();
+    const size = new THREE.Vector3();
+    for (const mesh of instance(plant(palette, rng), spots.length)) {
+      spots.forEach((spot, i) => {
+        q.setFromAxisAngle(UP, spot.turn);
+        m.compose(pos.set(spot.x, 0, spot.z), q, size.setScalar(spot.scale));
+        mesh.setMatrixAt(i, m);
+      });
+      mesh.instanceMatrix.needsUpdate = true;
+      this.group.add(mesh);
     }
 
     // The crowd: little coloured dots in clumps, the way a crowd actually
-    // stands. Scattered one at a time they read as confetti.
+    // stands. Scattered one at a time they read as confetti. Still flat, and
+    // still the right call — a stand full of modelled people is a thousand
+    // draw calls for something nobody looks at.
+    const crowd: Array<THREE.BufferGeometry> = [];
     const shirts = palette.crowd;
     let cx = 0;
     let cz = 0;
@@ -121,19 +108,36 @@ export class Scenery {
       );
       crowd.push(dot);
     }
-
-    // The trees and the stacks stand up; the crowd is dots on the ground.
-    for (const [i, parts] of [trees, tyres].entries()) {
-      const {material, fade} = fadingVertex(`scenery${i}`);
-      const mesh = new THREE.Mesh(mergeGeometries(parts, false), material);
-      mesh.renderOrder = order(LAYER.car);
-      mesh.frustumCulled = false;
-      this.group.add(mesh);
-      this.fades.push(fade);
+    if (crowd.length > 0) {
+      const dots = new THREE.Mesh(mergeGeometries(crowd, false), flatVertex());
+      dots.renderOrder = order(LAYER.scenery);
+      dots.frustumCulled = false;
+      this.group.add(dots);
     }
-    const dots = new THREE.Mesh(mergeGeometries(crowd, false), flatVertex());
-    dots.renderOrder = order(LAYER.scenery);
-    dots.frustumCulled = false;
-    this.group.add(dots);
+
+    // And the city. Signs are not instanced: each one has its own light, its
+    // own fault and its own tubes, and there are few enough of them that a
+    // draw call each is the right price for that.
+    if (palette.flora === "palm") {
+      for (let i = 0; i < NEON.count; i++) {
+        if (!place(at, NEON.to, NEON.from)) {
+          continue;
+        }
+        const sign = neonSign(palette, rng);
+        sign.group.position.set(at.x, 0, at.z);
+        // Turned to face roughly back at the road, which is where anybody
+        // reading a sign is.
+        sign.group.rotation.y = Math.atan2(-at.x, -at.z) + rng.range(-0.6, 0.6);
+        this.group.add(sign.group);
+        this.signs.push(sign);
+      }
+    }
+  }
+
+  /** Ticked so the faulty signs stutter. */
+  update(time: number): void {
+    for (const sign of this.signs) {
+      sign.update(time);
+    }
   }
 }

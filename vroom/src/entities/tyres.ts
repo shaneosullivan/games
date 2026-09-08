@@ -1,9 +1,7 @@
 import * as THREE from "three";
-import {mergeGeometries} from "three/examples/jsm/utils/BufferGeometryUtils.js";
-import {CAR, HEIGHT, Palette, TYRES} from "../config";
+import {CAR, Palette, TYRES} from "../config";
 import {Rng} from "../core/rng";
-import {fadingVertex, LAYER, order, post} from "../render/sprites";
-import {NearFade} from "../../../shared/fadeInFront";
+import {instance, tyreStack} from "../models";
 import {Car} from "./car";
 import {Track} from "./track";
 
@@ -21,9 +19,6 @@ import {Track} from "./track";
  */
 export class Tyres {
   readonly group = new THREE.Group();
-  /** Dissolves when a stack stands between the camera and the car — which on
-   *  the outside of a corner it regularly does. */
-  readonly fade: NearFade;
 
   private readonly xs: Array<number> = [];
   private readonly zs: Array<number> = [];
@@ -33,7 +28,9 @@ export class Tyres {
   private readonly ahead = new THREE.Vector3();
 
   constructor(rng: Rng, track: Track, palette: Palette) {
-    const parts: Array<THREE.BufferGeometry> = [];
+    // Placed first, then handed to the instancer: it has to know how many
+    // there are before it can make room for them.
+    const spots: Array<{x: number; z: number; turn: number}> = [];
 
     for (let c = 0; c < TYRES.clusters; c++) {
       // Spread the clusters round the lap rather than scattering them, so no
@@ -51,16 +48,23 @@ export class Tyres {
         const z = this.p.z + this.s.z * off * side;
         this.xs.push(x);
         this.zs.push(z);
-        parts.push(...stack(x, z, palette));
+        spots.push({x, z, turn: rng.range(0, Math.PI * 2)});
       }
     }
 
-    const {material, fade} = fadingVertex("tyres");
-    this.fade = fade;
-    const mesh = new THREE.Mesh(mergeGeometries(parts, false), material);
-    mesh.renderOrder = order(LAYER.car);
-    mesh.frustumCulled = false;
-    this.group.add(mesh);
+    const m = new THREE.Matrix4();
+    const q = new THREE.Quaternion();
+    const pos = new THREE.Vector3();
+    const one = new THREE.Vector3(1, 1, 1);
+    for (const mesh of instance(tyreStack(palette), spots.length)) {
+      spots.forEach((spot, i) => {
+        q.setFromAxisAngle(UP, spot.turn);
+        m.compose(pos.set(spot.x, 0, spot.z), q, one);
+        mesh.setMatrixAt(i, m);
+      });
+      mesh.instanceMatrix.needsUpdate = true;
+      this.group.add(mesh);
+    }
   }
 
   /**
@@ -120,27 +124,5 @@ export class Tyres {
  *  by a circle has to be. */
 const CAR_HALF = (CAR.width + CAR.length) / 4;
 
-/**
- * One stack: a squat black cylinder with a bright cap.
- *
- * The cap is not decoration. On the neon city's near-black ground a black
- * stack is a hole, and this is the one piece of scenery in the game a child is
- * expected to see coming.
- */
-function stack(
-  x: number,
-  z: number,
-  palette: Palette,
-): Array<THREE.BufferGeometry> {
-  const body = post(TYRES.radius, HEIGHT.tyreStack, 0, 12, palette.tyre);
-  body.translate(x, 0, z);
-  const cap = post(
-    TYRES.radius * 0.55,
-    HEIGHT.tyreStack * 0.16,
-    HEIGHT.tyreStack,
-    10,
-    palette.kerbA,
-  );
-  cap.translate(x, 0, z);
-  return [body, cap];
-}
+/** Straight up, for turning a stack about its own axis. */
+const UP = new THREE.Vector3(0, 1, 0);

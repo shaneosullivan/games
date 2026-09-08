@@ -2,6 +2,8 @@ import * as THREE from "three";
 import {
   BUMP,
   CAMERA,
+  ITEM,
+  TRAIL,
   CAR,
   PLAYER,
   RIVALS,
@@ -49,9 +51,13 @@ export class Game {
   readonly car: Car;
   readonly rivals: Rivals;
   readonly skids: Skids;
+  /** Oil and mud tracked out of a patch, in their own pool: they last ten
+   *  seconds where rubber lasts seven, and they are not black. */
+  readonly trails: Skids;
   readonly patches: Patches;
   readonly bridges: Bridges;
   readonly tyres: Tyres;
+  private readonly scenery: Scenery;
   /** Everything that dissolves when it stands between the camera and the car. */
   private readonly fades: Array<NearFade>;
   readonly engine: Engine;
@@ -77,6 +83,7 @@ export class Game {
   /** Seconds since the flag dropped, and until the next mark is laid. */
   private time = 0;
   private skidIn = 0;
+  private trailIn = 0;
   /** How long until another car-to-car bump is allowed to be heard. */
   private nudgeIn = 0;
   /** How many times the barriers have been hit, for the finish card. */
@@ -87,6 +94,12 @@ export class Game {
   private readonly aimDrive: Drive = {kind: "aim", aim: this.want};
   private readonly keyDrive = {kind: "wheel" as const, steer: 0, throttle: 0};
   private readonly wheels = [new THREE.Vector2(), new THREE.Vector2()];
+  private readonly corners = [
+    new THREE.Vector2(),
+    new THREE.Vector2(),
+    new THREE.Vector2(),
+    new THREE.Vector2(),
+  ];
   private readonly eye = new THREE.Vector3();
   private readonly wantEye = new THREE.Vector3();
   private readonly here = new THREE.Vector3();
@@ -115,17 +128,19 @@ export class Game {
     this.car = new Car(PLAYER.colour);
     this.rivals = new Rivals(this.track);
     this.skids = new Skids(palette);
+    this.trails = new Skids(palette, TRAIL.max);
     this.patches = new Patches(this.track, spec.items);
     this.bridges = new Bridges(this.track, palette);
     this.tyres = new Tyres(rng, this.track, palette);
 
     this.stage.scene.add(this.track.group);
-    const scenery = new Scenery(rng, this.track, palette);
-    this.fades = [...scenery.fades, this.tyres.fade, ...this.track.fades];
-    this.stage.scene.add(scenery.group);
+    this.scenery = new Scenery(rng, this.track, palette);
+    this.fades = [...this.track.fades];
+    this.stage.scene.add(this.scenery.group);
     this.stage.scene.add(this.tyres.group);
     this.stage.scene.add(this.patches.group);
     this.stage.scene.add(this.skids.mesh);
+    this.stage.scene.add(this.trails.mesh);
     this.stage.scene.add(this.rivals.group);
     this.stage.scene.add(this.car.group);
     // Last, and drawn over everything: where the circuit runs over itself, the
@@ -247,9 +262,13 @@ export class Game {
     this.car.setAbove(this.bridges.above(this.car.hint));
     this.rivals.setAbove(i => this.bridges.above(i));
     this.bridges.update(dt, this.car.hint);
+    // The city's faulty signs, which stutter on their own clock.
+    this.scenery.update(this.time);
 
     this.layRubber(dt);
+    this.layTrails(dt);
     this.skids.update(dt);
+    this.trails.update(dt);
     this.lapCount();
     this.engine.update(dt, this.car.speed, this.car.slip, CAR.top);
     this.hud.update(
@@ -372,6 +391,49 @@ export class Game {
     this.car.wheels(SKID.gauge, this.wheels);
     for (const w of this.wheels) {
       this.skids.lay(w.x, w.y, travel, length);
+    }
+  }
+
+  /**
+   * The mess a car tracks out of a patch.
+   *
+   * Per wheel, which is the whole point of it: clip the edge of a slick and
+   * one line of oil comes up the road, not two, and anybody behind can see
+   * exactly which line to avoid. It fades over ten seconds, so a lap later the
+   * road is clean again.
+   *
+   * Every car does this, not only the player's. A rival that spins through the
+   * mud should leave the same evidence.
+   */
+  private layTrails(dt: number): void {
+    this.trailIn -= dt;
+    if (this.trailIn > 0) {
+      return;
+    }
+    this.trailIn = TRAIL.every;
+    for (const car of [this.car, ...this.rivals.cars]) {
+      if (car.height > 0.2) {
+        continue;
+      }
+      car.corners(this.corners);
+      for (let i = 0; i < 4; i++) {
+        const kind = car.carrying[i];
+        if (!kind) {
+          continue;
+        }
+        // Thinner as it runs out, the way a tyre stops carrying.
+        const left = car.carriedFor[i] / TRAIL.carries;
+        const w = this.corners[i];
+        this.trails.lay(
+          w.x,
+          w.y,
+          car.heading,
+          Math.max(TRAIL.width, car.speed * TRAIL.every * 2.2),
+          TRAIL.width * (0.4 + left * 0.6),
+          ITEM[kind].colour,
+          TRAIL.life,
+        );
+      }
     }
   }
 

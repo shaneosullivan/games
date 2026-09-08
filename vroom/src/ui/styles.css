@@ -654,3 +654,113 @@ canvas {
   gap: 8px;
   justify-content: flex-end;
 }
+
+/* ---------- The model viewer (development only) ---------- */
+
+.screen.models {
+  background: #191b20;
+  color: #eef0f4;
+}
+
+/* One canvas behind the whole grid. Every card is drawn into its own rectangle
+   of it with the scissor test, so thirty models cost one WebGL context. */
+.models-canvas {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.screen.models .editor-bar {
+  position: relative;
+  z-index: 2;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(25, 27, 32, 0.9);
+  backdrop-filter: blur(8px);
+}
+
+.models-title {
+  flex: 1;
+  font-size: 17px;
+}
+
+.models-envs {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+}
+
+.screen.models .chip {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.16);
+  color: #eef0f4;
+  font-size: 14px;
+  padding: 8px 14px;
+}
+
+.screen.models .chip.strong {
+  background: #d6473c;
+  border-color: #d6473c;
+}
+
+.models-grid {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  /* Rows are a stated height, and the content is packed to the top.
+     Left to themselves the rows came out about half the height the card asked
+     for, while the view inside still measured its full 210 — so the renderer
+     drew each model into a rectangle hanging out of the bottom of its card. */
+  grid-auto-rows: 272px;
+  align-content: start;
+  gap: 14px;
+  padding: 14px calc(var(--safe-r) + 14px) calc(var(--safe-b) + 20px)
+    calc(var(--safe-l) + 14px);
+}
+
+.model-card {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 16px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+/* Maximised: the same card, over everything. Nothing is rebuilt — the renderer
+   simply finds a much larger rectangle where the card used to be. */
+.model-card.full {
+  position: fixed;
+  inset: 0;
+  z-index: 3;
+  border-radius: 0;
+  background: #191b20;
+}
+
+.model-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
+  font-weight: 800;
+  font-size: 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Transparent on purpose: the shared canvas shows through here. */
+.model-view {
+  flex: 1;
+  min-height: 0;
+  touch-action: none;
+  cursor: grab;
+}
+
+.model-view:active {
+  cursor: grabbing;
+}

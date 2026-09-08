@@ -81,16 +81,11 @@ Worth knowing before changing anything:
   top of the car in mid-air). _Solids_ have tops and sides — cars, tyre stacks,
   trees, the barrier walls. They are lit and they do write depth, so a car
   really does pass behind a tyre stack.
-- **Flats are unlit on purpose.** Every one faces straight up, so shading it
-  can only return its own colour — and getting there depends on the triangle
-  winding, which for the ribbons built by hand along the circuit is backwards.
-  Lit, the whole road came out at the ambient level and looked like wet slate.
-- **Light intensities in `config.ts` are fractions of full brightness**, and
-  the stage multiplies them by π on the way in. Three's lights are in physical
-  units: the Lambert response divides by π, so an intensity of 1 lands at about
-  a third of the material's colour. The three lights together are set so an
-  upward face reaches just under full — any higher and it goes _past_ its own
-  colour rather than reaching it.
+- **The road ribbons are wound face-down** — the sideways vector points the
+  opposite way to what the winding assumed. It cost nothing while they were
+  unlit and double-sided, and turned the whole road black the moment they were
+  lit. They are wound the right way now _and_ carry stated upward normals, so
+  neither alone has to be relied on.
 - **Anything that can stand between the camera and the car dissolves**, using
   the shared near-fade shader. A full lap of the built-in circuit was measured
   frame by frame: the car's own pixels are on screen in every one of them.
