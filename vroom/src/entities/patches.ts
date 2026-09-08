@@ -58,6 +58,35 @@ export class Patches {
     }
   }
 
+  /**
+   * Which ramp is under this point, or -1.
+   *
+   * The car needs more than the kind for a ramp: it takes off level with the
+   * middle of one, so it has to know where the middle is.
+   */
+  rampAt(x: number, z: number): number {
+    const r2 = ITEM.radius * ITEM.radius;
+    for (let i = 0; i < this.xs.length; i++) {
+      if (this.kinds[i] !== "ramp") {
+        continue;
+      }
+      const dx = this.xs[i] - x;
+      const dz = this.zs[i] - z;
+      if (dx * dx + dz * dz <= r2) {
+        return i;
+      }
+    }
+    return -1;
+  }
+
+  centreX(i: number): number {
+    return this.xs[i];
+  }
+
+  centreZ(i: number): number {
+    return this.zs[i];
+  }
+
   /** What, if anything, is under this point. */
   at(x: number, z: number): ItemKind | null {
     const r2 = ITEM.radius * ITEM.radius;

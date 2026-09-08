@@ -80,10 +80,12 @@ export class Car {
   roll = 0;
   pitch = 0;
   private rollRate = 0;
-  /** Which of the four wheels have touched the ramp during this crossing of
-   *  it, and whether it is still on one. */
-  private readonly rampTouch = [false, false, false, false];
-  private onRamp = false;
+  /** Whether it has already taken off from the ramp it is currently on, so a
+   *  long ramp cannot launch the same car twice. */
+  private launched = false;
+  /** Which front wheels were on the ramp last frame, so a car that brushes the
+   *  very edge and never draws level with the middle still gets a jump. */
+  private readonly lastFront = [false, false];
   /** How long is left of the jolt as the nose comes down. */
   private landing = 0;
 
@@ -130,16 +132,16 @@ export class Car {
   /**
    * Leaving the ramp.
    *
-   * Whether the car rolls is decided by which wheels touched the ramp over the
-   * *whole* crossing, not by which were on it at any one moment — and that is
-   * the whole fix. Deciding it on first contact meant deciding it in the frame
-   * the front wheels arrived, when a car even slightly out of square has one
-   * of them down and the other not, so almost every jump came out as a half
-   * roll. Judged over the crossing, a car that went up the middle has all four
-   * marked and goes straight, and one that clipped the edge has two down one
-   * side and goes over.
+   * Whether it rolls is decided by the two front wheels at the moment the
+   * front axle draws level with the middle of the ramp. Deciding it on first
+   * contact was wrong — that is the frame the front wheels arrive, when a car
+   * even slightly out of square has one down and the other not, so nearly
+   * every jump came out as a half roll — and deciding it at the far lip was
+   * wrong the other way, because by then the car had left the ramp behind.
+   * The middle is where a ramp throws you, and the back wheels have nothing to
+   * add: they go wherever the front ones went.
    */
-  private launch(): void {
+  private launch(nearFront: boolean, farFront: boolean): void {
     const push = Math.min(1, this.speed / CAR.top);
     this.air = ITEM.ramp.airtime;
     this.boost = ITEM.ramp.carry;
@@ -149,13 +151,9 @@ export class Car {
     this.velocity.multiplyScalar(ITEM.ramp.boost);
     this.climb = ITEM.ramp.launch * push;
 
-    const near = this.rampTouch[0] || this.rampTouch[2];
-    const far = this.rampTouch[1] || this.rampTouch[3];
-    const all = this.rampTouch.every(Boolean);
-    let lean = 0;
-    if (!all) {
-      lean = near && !far ? 1 : far && !near ? -1 : 0;
-    }
+    // Both front wheels on it is a jump; one is a roll towards whichever side
+    // was left hanging.
+    const lean = nearFront === farFront ? 0 : nearFront ? 1 : -1;
     this.rollRate = lean * ITEM.ramp.roll * push;
   }
 
@@ -187,8 +185,9 @@ export class Car {
     this.pitch = 0;
     this.rollRate = 0;
     this.landing = 0;
-    this.onRamp = false;
-    this.rampTouch.fill(false);
+    this.launched = false;
+    this.lastFront[0] = false;
+    this.lastFront[1] = false;
     this.carrying.fill(null);
     this.carriedFor.fill(0);
   }
@@ -220,7 +219,7 @@ export class Car {
     let leftGrip = 0;
     let rightGrip = 0;
     let slowest = 1;
-    let onRamp = 0;
+    const frontOn = [false, false];
     for (let i = 0; i < 4; i++) {
       const w = this.wheelAt[i];
       const under = patches ? patches.at(w.x, w.y) : null;
@@ -245,9 +244,11 @@ export class Car {
       } else if (under === "mud") {
         slowest = Math.min(slowest, ITEM.mud.top);
       }
-      if (under === "ramp") {
-        onRamp++;
-        this.rampTouch[i] = true;
+      if (under === "ramp" && i < 2) {
+        // Front wheels only. The back two follow wherever the front two went,
+        // so they have nothing to add — and waiting for them is what made the
+        // car take off long after it had left the ramp.
+        frontOn[i] = true;
       }
       if (nearSide) {
         leftGrip += grip / 2;
@@ -258,20 +259,50 @@ export class Car {
 
     if (this.air > 0) {
       this.air = Math.max(0, this.air - dt);
-    } else if (onRamp > 0) {
-      // On it, not off it. The car is still on the ground here — it takes off
-      // at the far lip, which is where a car really leaves a ramp.
-      if (!this.onRamp) {
-        this.rampTouch.fill(false);
-        this.rampTouch[0] = false;
+    } else if (frontOn[0] || frontOn[1]) {
+      // Level with the middle of the ramp, not off the far end of it.
+      //
+      // Waiting for the car to run out of ramp meant it took off well past the
+      // thing that launched it. The middle is where a ramp actually throws you
+      // and it is where the decision is made: whichever front wheels are on it
+      // at that moment decide whether this is a jump or a roll.
+      const which = patches
+        ? patches.rampAt(
+            (this.wheelAt[0].x + this.wheelAt[1].x) / 2,
+            (this.wheelAt[0].y + this.wheelAt[1].y) / 2,
+          )
+        : -1;
+      if (which >= 0 && !this.launched) {
+        const ax = (this.wheelAt[0].x + this.wheelAt[1].x) / 2;
+        const az = (this.wheelAt[0].y + this.wheelAt[1].y) / 2;
+        // How far past the middle the front axle is, measured the way the car
+        // is going. It crosses zero at the closest approach — which is the
+        // middle for a car going over the top, and the nearest point to it for
+        // one clipping the edge.
+        const along =
+          (ax - patches!.centreX(which)) * this.dir.x +
+          (az - patches!.centreZ(which)) * this.dir.y;
+        if (along >= 0 && this.speed >= ITEM.ramp.minSpeed) {
+          this.launched = true;
+          this.launch(frontOn[0], frontOn[1]);
+        }
       }
-      this.onRamp = true;
-    } else if (this.onRamp) {
-      // And now it has run out of ramp.
-      this.onRamp = false;
-      if (this.speed >= ITEM.ramp.minSpeed) {
-        this.launch();
+      this.lastFront[0] = frontOn[0];
+      this.lastFront[1] = frontOn[1];
+    } else {
+      // Off the ramp. A car that brushed the very edge can leave without ever
+      // drawing level with the middle — it still went over something, so it
+      // still gets thrown, on whatever it was touching last.
+      if (
+        (this.lastFront[0] || this.lastFront[1]) &&
+        !this.launched &&
+        this.speed >= ITEM.ramp.minSpeed
+      ) {
+        this.launch(this.lastFront[0], this.lastFront[1]);
       }
+      this.lastFront[0] = false;
+      this.lastFront[1] = false;
+      this.launched = false;
     }
     this.boost = Math.max(0, this.boost - dt);
     const flying = this.air > 0 || this.height > 0;
