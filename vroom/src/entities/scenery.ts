@@ -1,8 +1,17 @@
 import * as THREE from "three";
 import {mergeGeometries} from "three/examples/jsm/utils/BufferGeometryUtils.js";
-import {Palette, SCENERY} from "../config";
+import {HEIGHT, Palette, SCENERY} from "../config";
 import {Rng} from "../core/rng";
-import {flatVertex, LAYER, order, paint, tile} from "../render/sprites";
+import {
+  fadingVertex,
+  flatVertex,
+  LAYER,
+  order,
+  paint,
+  post,
+  tile,
+} from "../render/sprites";
+import {NearFade} from "../../../shared/fadeInFront";
 import {Track} from "./track";
 
 const TAU = Math.PI * 2;
@@ -19,6 +28,8 @@ const TAU = Math.PI * 2;
  */
 export class Scenery {
   readonly group = new THREE.Group();
+  /** The trees and stacks dissolve when they stand in front of the car. */
+  readonly fades: Array<NearFade> = [];
 
   constructor(rng: Rng, track: Track, palette: Palette) {
     const trees: Array<THREE.BufferGeometry> = [];
@@ -56,32 +67,37 @@ export class Scenery {
       if (!place(at, SCENERY.band)) {
         continue;
       }
-      // A tree from above is a blob of leaves with a dot of trunk showing in
-      // the middle of it. That is genuinely all you can see of one from up
-      // here, and drawing more would be drawing something nobody is looking at.
+      // A trunk with a crown on it. Short ones: seen from a low diagonal, a
+      // tree the height of a real one is a green wall across whatever corner
+      // happens to be behind it.
       const r = rng.range(7, 13);
-      const crown = new THREE.CircleGeometry(r, 7);
-      crown.rotateX(-Math.PI / 2);
+      const height = rng.range(HEIGHT.crown * 0.7, HEIGHT.crown);
+      const trunk = post(r * 0.2, HEIGHT.trunk, 0, 6, palette.trunk);
+      trunk.translate(at.x, 0, at.z);
+      trees.push(trunk);
+
+      const crown = new THREE.SphereGeometry(r, 7, 5);
+      crown.scale(1, 0.8, 1);
       crown.rotateY(rng.range(0, TAU));
-      crown.translate(at.x, LAYER.scenery, at.z);
+      crown.translate(at.x, HEIGHT.trunk + height * 0.3, at.z);
       trees.push(
         paint(crown, rng.next() < 0.5 ? palette.treeA : palette.treeB),
       );
-
-      const trunk = new THREE.CircleGeometry(r * 0.22, 6);
-      trunk.rotateX(-Math.PI / 2);
-      trunk.translate(at.x, LAYER.scenery + 0.01, at.z);
-      trees.push(paint(trunk, palette.trunk));
     }
 
     for (let i = 0; i < SCENERY.tyres; i++) {
       if (!place(at, 30)) {
         continue;
       }
-      const stack = new THREE.CircleGeometry(rng.range(3, 4.5), 8);
-      stack.rotateX(-Math.PI / 2);
-      stack.translate(at.x, LAYER.scenery, at.z);
-      tyres.push(paint(stack, palette.tyre));
+      const stack = post(
+        rng.range(3, 4.5),
+        HEIGHT.tyreStack * 0.7,
+        0,
+        8,
+        palette.tyre,
+      );
+      stack.translate(at.x, 0, at.z);
+      tyres.push(stack);
     }
 
     // The crowd: little coloured dots in clumps, the way a crowd actually
@@ -106,11 +122,18 @@ export class Scenery {
       crowd.push(dot);
     }
 
-    for (const parts of [trees, tyres, crowd]) {
-      const mesh = new THREE.Mesh(mergeGeometries(parts, false), flatVertex());
-      mesh.renderOrder = order(LAYER.scenery);
+    // The trees and the stacks stand up; the crowd is dots on the ground.
+    for (const [i, parts] of [trees, tyres].entries()) {
+      const {material, fade} = fadingVertex(`scenery${i}`);
+      const mesh = new THREE.Mesh(mergeGeometries(parts, false), material);
+      mesh.renderOrder = order(LAYER.car);
       mesh.frustumCulled = false;
       this.group.add(mesh);
+      this.fades.push(fade);
     }
+    const dots = new THREE.Mesh(mergeGeometries(crowd, false), flatVertex());
+    dots.renderOrder = order(LAYER.scenery);
+    dots.frustumCulled = false;
+    this.group.add(dots);
   }
 }

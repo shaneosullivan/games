@@ -42,19 +42,16 @@ export class Bridges {
   }> = [];
 
   constructor(track: Track, palette: Palette) {
-    const crossings = track.crossings();
+    const crossings = track.tangles;
     if (crossings.length === 0) {
       return;
     }
 
-    // The margin either side of the tangle, in samples. A drawn track can be
-    // any length, so this is measured off the circuit rather than assumed.
-    const perSample = track.length / TRACK.segments;
-    const margin = Math.max(4, Math.round(BRIDGE.reach / perSample));
-
     for (const crossing of crossings) {
-      const highPad = halfWidth(crossing.highFrom, crossing.highTo, margin);
-      const lowPad = halfWidth(crossing.lowFrom, crossing.lowTo, margin);
+      // The circuit works these out, because the same stretches decide where
+      // the barrier stops being built.
+      const highPad = track.deckHalfWidth(crossing.highFrom, crossing.highTo);
+      const lowPad = track.deckHalfWidth(crossing.lowFrom, crossing.lowTo);
       const span = {
         start: wrapIndex(crossing.high - highPad),
         count: highPad * 2,
@@ -106,12 +103,6 @@ export class Bridges {
 /** A colour at a bit over half strength, for the shadowed side of a thing. */
 function darken(colour: number): number {
   return new THREE.Color(colour).multiplyScalar(0.55).getHex();
-}
-
-/** Half the span a stretch needs, with its margin, as a whole number of
- *  samples either side of its middle. */
-function halfWidth(from: number, to: number, margin: number): number {
-  return Math.max(4, Math.ceil((to - from) / 2) + margin);
 }
 
 /**
@@ -197,6 +188,13 @@ function deck(
   const material = flatVertex();
   // One opacity for the whole deck, so it fades as a single thing.
   material.depthWrite = false;
+  // And no depth *test* either, which matters now that the cars and the
+  // barrier walls are solid and write depth. The deck is a flat lying on the
+  // ground; a car on the road beneath it is nearer the camera than it is, so
+  // tested against depth the deck would lose and the car would show through
+  // the bridge it is supposed to be under. Drawn last and untested, it simply
+  // paints over everything — which is the whole idea of it.
+  material.depthTest = false;
   const mesh = new THREE.Mesh(merged, material);
   mesh.frustumCulled = false;
   return mesh;

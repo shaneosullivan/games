@@ -1,8 +1,9 @@
 import * as THREE from "three";
 import {mergeGeometries} from "three/examples/jsm/utils/BufferGeometryUtils.js";
-import {ENVIRONMENTS, Palette, TRACK} from "../config";
+import {BRIDGE, ENVIRONMENTS, HEIGHT, Palette, TRACK} from "../config";
 import {TrackSpec} from "../track/spec";
-import {flatVertex, LAYER, order, paint} from "../render/sprites";
+import {fadingVertex, flatVertex, LAYER, order, paint} from "../render/sprites";
+import {NearFade} from "../../../shared/fadeInFront";
 
 /**
  * One place the circuit runs over itself: the earlier stretch and the later
@@ -41,6 +42,18 @@ export class Track {
    *  now: on a drawn track it is wherever the child dropped it. */
   readonly startAt: number;
   readonly palette: Palette;
+  /** The barrier walls dissolve when they stand in front of the car. */
+  readonly fades: Array<NearFade> = [];
+  /**
+   * Where the circuit runs over itself.
+   *
+   * Found once, here, because two things need it and the scan is four hundred
+   * thousand distance checks: the flyover decks are built from it, and the
+   * barrier stops being built where it passes underneath one.
+   */
+  readonly tangles: Array<Crossing>;
+  /** How far past the tangle a deck reaches, in samples on this circuit. */
+  readonly deckMargin: number;
 
   /** The sampled centre line, and the sideways direction at each sample. Both
    *  are what `nearest` searches and what the ribbons are built from. */
@@ -69,11 +82,18 @@ export class Track {
       this.sides.push(new THREE.Vector3(-d.z, 0, d.x).normalize());
     }
 
+    this.tangles = this.crossings();
+    this.deckMargin = Math.max(
+      4,
+      Math.round(BRIDGE.reach / (this.length / TRACK.segments)),
+    );
+
     this.group.add(
       this.ribbon(-TRACK.half, TRACK.half, this.palette.tarmac, LAYER.tarmac),
     );
     this.group.add(this.kerbs());
     this.group.add(this.barriers());
+    this.group.add(this.walls());
     this.group.add(this.startLine());
   }
 
@@ -135,6 +155,34 @@ export class Track {
     const s = this.sides[best];
     const offset = (x - p.x) * s.x + (z - p.z) * s.z;
     return {index: best, t: best / TRACK.segments, offset};
+  }
+
+  /**
+   * How wide the deck over this crossing is, in samples either side.
+   *
+   * Shared with the bridges rather than worked out twice: what the deck covers
+   * and what the wall leaves out have to be the same stretch, or the wall
+   * reappears in the gap.
+   */
+  deckHalfWidth(from: number, to: number): number {
+    return Math.max(4, Math.ceil((to - from) / 2) + this.deckMargin);
+  }
+
+  /**
+   * Is this sample of the circuit running underneath a flyover?
+   *
+   * The barrier is not built here. It used to be, and from a diagonal it
+   * showed: a deck is flat on the ground and a wall is twelve units tall, so
+   * the wall under the bridge stuck up through it and read as a red and white
+   * band laid across the road. A road that passes under a bridge does not
+   * bring its fence through with it.
+   */
+  underBridge(index: number): boolean {
+    return this.tangles.some(
+      c =>
+        Math.abs(ringGap(c.low, index)) <=
+        this.deckHalfWidth(c.lowFrom, c.lowTo),
+    );
   }
 
   /** Is this far off the middle still on the tarmac? */
@@ -230,23 +278,98 @@ export class Track {
   }
 
   /**
-   * The wall at the edge of the grass.
+   * The run-off at the edge of the grass: a band of sand, and nothing else.
    *
-   * The plan says you can go on the grass "but no farther", so there has to be
-   * something there saying so. A band of sand first — the run-off — and then
-   * the barrier itself, which is what the car is actually stopped by.
+   * The wall itself used to be another flat ribbon here, painted on the
+   * ground. That was fine looking straight down and is not now — see
+   * `walls()`, which stands it up.
    */
   private barriers(): THREE.Mesh {
     const limit = Track.limit;
-    const stripe = {other: this.palette.kerbB, every: 3};
     return mergeMeshes([
       this.ribbon(limit - 10, limit, this.palette.sand, LAYER.sand),
-      this.ribbon(limit, limit + 7, this.palette.kerbA, LAYER.kerb, stripe),
       this.ribbon(-limit, -limit + 10, this.palette.sand, LAYER.sand),
-      this.ribbon(-limit - 7, -limit, this.palette.kerbA, LAYER.kerb, stripe),
     ]);
   }
 
+  /**
+   * The barrier, standing up.
+   *
+   * The plan says you can go on the grass "but no farther", so there has to be
+   * something there saying so — and from a diagonal it has to be something you
+   * can see over the top of rather than a stripe you drive across. It stands
+   * exactly on the limit the car is stopped at, so what a child sees and what
+   * the car hits are the same line.
+   *
+   * It dissolves when it comes between the camera and the car. The near side
+   * of the track is between the two on every left-hand corner, and a wall you
+   * cannot see past is a car you cannot see.
+   */
+  private walls(): THREE.Mesh {
+    const limit = Track.limit;
+    const stripe = {other: this.palette.kerbB, every: 3};
+    const parts = [
+      this.wallStrip(limit, this.palette.kerbA, stripe),
+      this.wallStrip(-limit, this.palette.kerbA, stripe),
+    ];
+    const {material, fade} = fadingVertex("walls");
+    this.fades.push(fade);
+    const mesh = new THREE.Mesh(mergeGeometries(parts, false), material);
+    mesh.renderOrder = order(LAYER.car);
+    mesh.frustumCulled = false;
+    return mesh;
+  }
+
+  /** One upright band along the circuit, facing the road. */
+  private wallStrip(
+    offset: number,
+    colour: number,
+    stripe: {other: number; every: number},
+  ): THREE.BufferGeometry {
+    const verts: Array<number> = [];
+    const colours: Array<number> = [];
+    const normals: Array<number> = [];
+    const a = new THREE.Color(colour);
+    const b = new THREE.Color(stripe.other);
+    // Inward, so the face a driver sees is the lit one.
+    const facing = offset > 0 ? -1 : 1;
+
+    for (let i = 0; i < TRACK.segments; i++) {
+      const j = (i + 1) % TRACK.segments;
+      const p0 = this.points[i];
+      const p1 = this.points[j];
+      const s0 = this.sides[i];
+      const s1 = this.sides[j];
+      if (this.underBridge(i)) {
+        continue;
+      }
+      const x0 = p0.x + s0.x * offset;
+      const z0 = p0.z + s0.z * offset;
+      const x1 = p1.x + s1.x * offset;
+      const z1 = p1.z + s1.z * offset;
+      const h = HEIGHT.wall;
+
+      verts.push(x0, 0, z0, x1, 0, z1, x1, h, z1);
+      verts.push(x0, 0, z0, x1, h, z1, x0, h, z0);
+
+      const c = Math.floor(i / stripe.every) % 2 === 1 ? b : a;
+      for (let v = 0; v < 6; v++) {
+        colours.push(c.r, c.g, c.b);
+      }
+      for (let v = 0; v < 3; v++) {
+        normals.push(s0.x * facing, 0, s0.z * facing);
+      }
+      for (let v = 0; v < 3; v++) {
+        normals.push(s1.x * facing, 0, s1.z * facing);
+      }
+    }
+
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute("position", new THREE.Float32BufferAttribute(verts, 3));
+    geo.setAttribute("color", new THREE.Float32BufferAttribute(colours, 3));
+    geo.setAttribute("normal", new THREE.Float32BufferAttribute(normals, 3));
+    return geo;
+  }
   /** The chequered line you start on and finish on. */
   private startLine(): THREE.Mesh {
     const parts: Array<THREE.BufferGeometry> = [];
@@ -303,7 +426,7 @@ export class Track {
    * samples is four hundred thousand distance checks; anything cleverer would
    * be more code than the thing it replaced.
    */
-  crossings(): Array<Crossing> {
+  private crossings(): Array<Crossing> {
     // Close enough that the two roads and their kerbs share ground.
     const near = (TRACK.half + KERB) * 2;
     const near2 = near * near;

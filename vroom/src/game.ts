@@ -13,6 +13,7 @@ import {TrackSpec} from "./track/spec";
 import {Patches} from "./entities/patches";
 import {Bridges} from "./entities/bridges";
 import {Tyres} from "./entities/tyres";
+import {NearFade} from "../../shared/fadeInFront";
 import {GameLoop} from "./core/loop";
 import {Joystick} from "./core/input";
 import {Rng} from "./core/rng";
@@ -51,6 +52,8 @@ export class Game {
   readonly patches: Patches;
   readonly bridges: Bridges;
   readonly tyres: Tyres;
+  /** Everything that dissolves when it stands between the camera and the car. */
+  private readonly fades: Array<NearFade>;
   readonly engine: Engine;
   readonly hud: Hud;
   readonly stick: Joystick;
@@ -117,7 +120,9 @@ export class Game {
     this.tyres = new Tyres(rng, this.track, palette);
 
     this.stage.scene.add(this.track.group);
-    this.stage.scene.add(new Scenery(rng, this.track, palette).group);
+    const scenery = new Scenery(rng, this.track, palette);
+    this.fades = [...scenery.fades, this.tyres.fade, ...this.track.fades];
+    this.stage.scene.add(scenery.group);
     this.stage.scene.add(this.tyres.group);
     this.stage.scene.add(this.patches.group);
     this.stage.scene.add(this.skids.mesh);
@@ -438,26 +443,37 @@ export class Game {
   };
 
   /**
-   * The shot: straight down, never turning, leading the car a little.
+   * The shot: a fixed diagonal, never turning, leading the car a little.
    *
    * The lead is along the car's own heading and not its velocity. Leading on
    * the velocity sounds more correct and is much worse — this is a game about
    * going sideways, and it would swing the entire picture every time the back
    * end stepped out, at exactly the moment a child needs to see where they are
    * going.
+   *
+   * What the camera watches is eased; where it *sits* is a fixed offset from
+   * that. The offset never changes and the camera never turns, which is what
+   * keeps "push the way you want to go" true from one end of a race to the
+   * other.
    */
   private followCamera(dt: number): void {
     const p = this.car.group.position;
     const lead = CAMERA.lead * Math.min(1, this.car.speed / CAR.top);
     this.wantEye.set(
       p.x + Math.sin(this.car.group.rotation.y) * lead,
-      this.stage.camera.position.y,
+      0,
       p.z + Math.cos(this.car.group.rotation.y) * lead,
     );
     const ease = 1 - Math.exp(-CAMERA.ease * dt);
-    this.stage.camera.position.lerp(this.wantEye, ease);
-    // Looking straight down, always. There is nothing to aim: the camera's
-    // rotation is fixed and only its position moves.
+    this.eye.lerp(this.wantEye, ease);
+    this.stage.watch(this.eye.x, this.eye.z);
+
+    // Anything standing between the camera and the car gets out of the way.
+    // From a diagonal there is always something that can: a tree on the inside
+    // of a corner, a tyre stack on the outside of one.
+    for (const fade of this.fades) {
+      fade.setFocus(this.stage.camera.position, p, CAMERA.clear);
+    }
   }
 
   /** Everything off, for a screen that is going away. */
@@ -475,7 +491,8 @@ export class Game {
     this.car.render(1);
     this.rivals.render(1);
     const p = this.car.group.position;
-    this.stage.camera.position.set(p.x, this.stage.camera.position.y, p.z);
+    this.eye.set(p.x, 0, p.z);
+    this.stage.watch(p.x, p.z);
     this.hud.update(0, RIVALS.count + 1);
   }
 }

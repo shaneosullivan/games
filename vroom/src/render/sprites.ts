@@ -1,15 +1,30 @@
 import * as THREE from "three";
+import {fadeInFront, NearFade} from "../../../shared/fadeInFront";
 
 /**
- * Flat things, seen from above.
+ * The two kinds of thing in the scene, and how each is drawn.
  *
- * Everything in this game is a plane lying in the XZ plane with an unlit
- * material on it. There is no shading anywhere: the plan asks for the Amiga
- * game, and that game is flat colour and sprites.
+ * **Flats** lie in the XZ plane and are the ground and everything painted on
+ * it: the road, its kerbs, the start line, the patches, the skid marks. They
+ * do not write to the depth buffer, and what is drawn over what is decided
+ * entirely by `order()` below — the LAYER heights exist only to stop coplanar
+ * faces fighting.
  *
- * The height offsets are the layering. Nothing here is ever seen edge-on, so a
- * tenth of a unit is as good as a thousand — it is only ever deciding what is
- * drawn over what.
+ * **Solids** have a top and sides: the cars, the tyre stacks, the trees, the
+ * barrier walls. They do write depth, so they occlude each other properly, and
+ * they are all drawn after the flats.
+ *
+ * The solids are lit. The flats are **not**, and that is a decision rather
+ * than an oversight: every flat faces straight up, so shading one can only
+ * ever return its own colour — and getting there depends on the triangle
+ * winding, which for the ribbons built by hand along the circuit is backwards.
+ * Lit, the whole road came out at the ambient level and looked like wet slate.
+ * Unlit, a flat is its own colour by construction and there is nothing to get
+ * wrong.
+ *
+ * The light is set so an upward-facing solid face receives slightly more than
+ * it can show, which is what keeps the two kinds sitting at the same
+ * brightness where they meet.
  */
 
 /**
@@ -42,16 +57,16 @@ export function order(height: number): number {
 }
 
 /**
- * Unlit flat colour. Every material in the game is one of these.
+ * A flat, in one colour.
  *
- * Double-sided, and that is not a detail. Everything here is a flat thing
- * lying face-up, and half of it is built by hand as triangle strips along the
- * circuit — get the winding backwards on one of those and it is simply not
- * drawn, with nothing in the console to say so. The first build of this game
- * had no road in it for exactly that reason. Nothing is ever seen edge-on, so
- * there is nothing to lose by drawing both faces.
+ * Double-sided, and that is not a detail. Everything here lies face-up, and
+ * half of it is built by hand as triangle strips along the circuit — get the
+ * winding backwards on one of those and it is simply not drawn, with nothing
+ * in the console to say so. The first build of this game had no road in it for
+ * exactly that reason. A flat is never seen edge-on, so there is nothing to
+ * lose by drawing both faces.
  */
-export function flat(colour: number, opacity = 1): THREE.MeshBasicMaterial {
+export function flat(colour: number, opacity = 1): THREE.Material {
   return new THREE.MeshBasicMaterial({
     color: colour,
     transparent: opacity < 1,
@@ -91,7 +106,7 @@ export function paint(
   return geo;
 }
 
-/** Unlit, vertex-coloured: one draw call for a whole merged assembly. See
+/** A flat, vertex-coloured: one draw call for a whole merged assembly. See
  *  `flat` for why both sides are drawn. */
 export function flatVertex(): THREE.MeshBasicMaterial {
   return new THREE.MeshBasicMaterial({
@@ -99,6 +114,71 @@ export function flatVertex(): THREE.MeshBasicMaterial {
     depthWrite: false,
     side: THREE.DoubleSide,
   });
+}
+
+/**
+ * A solid, vertex-coloured: something with a top and sides.
+ *
+ * Writes depth, unlike everything flat, because two solids can genuinely be in
+ * front of one another and no amount of draw order will sort that out — a car
+ * passing behind a tyre stack has to actually go behind it. Single-sided:
+ * these are closed shapes and the inside of one is never seen.
+ */
+export function solidVertex(): THREE.MeshLambertMaterial {
+  return new THREE.MeshLambertMaterial({vertexColors: true});
+}
+
+/**
+ * A solid that dissolves when it stands between the camera and the car.
+ *
+ * Needed the moment the shot went diagonal. Looking straight down, nothing
+ * could ever be in the way; from a diagonal, a tree or a tyre stack on the
+ * near side of the road is directly in front of the thing the child is
+ * steering, and a player who cannot see their car is stuck.
+ *
+ * The shader is the shared one — it is a cone, an instance matrix and a
+ * discard that all have to be right together, and a second copy is a second
+ * thing to get wrong.
+ */
+export function fadingVertex(cacheKey: string): {
+  material: THREE.MeshLambertMaterial;
+  fade: NearFade<THREE.MeshLambertMaterial>;
+} {
+  const material = new THREE.MeshLambertMaterial({vertexColors: true});
+  const fade = fadeInFront(material, {band: 26, cutoff: 0.28, cacheKey});
+  return {material, fade};
+}
+
+/**
+ * A box standing on the ground, in one colour, centred on the origin in X and
+ * Z and sitting on y = base.
+ *
+ * The workhorse for everything with height, the way `tile` is for everything
+ * without it.
+ */
+export function block(
+  width: number,
+  height: number,
+  depth: number,
+  base: number,
+  colour: number,
+): THREE.BufferGeometry {
+  const geo = new THREE.BoxGeometry(width, height, depth);
+  geo.translate(0, base + height / 2, 0);
+  return paint(geo, colour);
+}
+
+/** A round thing standing on the ground: a tyre stack, a tree trunk. */
+export function post(
+  radius: number,
+  height: number,
+  base: number,
+  sides: number,
+  colour: number,
+): THREE.BufferGeometry {
+  const geo = new THREE.CylinderGeometry(radius, radius, height, sides);
+  geo.translate(0, base + height / 2, 0);
+  return paint(geo, colour);
 }
 
 /**

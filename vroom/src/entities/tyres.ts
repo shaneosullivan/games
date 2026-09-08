@@ -1,8 +1,9 @@
 import * as THREE from "three";
 import {mergeGeometries} from "three/examples/jsm/utils/BufferGeometryUtils.js";
-import {CAR, Palette, TYRES} from "../config";
+import {CAR, HEIGHT, Palette, TYRES} from "../config";
 import {Rng} from "../core/rng";
-import {flatVertex, LAYER, order, paint} from "../render/sprites";
+import {fadingVertex, LAYER, order, post} from "../render/sprites";
+import {NearFade} from "../../../shared/fadeInFront";
 import {Car} from "./car";
 import {Track} from "./track";
 
@@ -20,6 +21,9 @@ import {Track} from "./track";
  */
 export class Tyres {
   readonly group = new THREE.Group();
+  /** Dissolves when a stack stands between the camera and the car — which on
+   *  the outside of a corner it regularly does. */
+  readonly fade: NearFade;
 
   private readonly xs: Array<number> = [];
   private readonly zs: Array<number> = [];
@@ -51,8 +55,10 @@ export class Tyres {
       }
     }
 
-    const mesh = new THREE.Mesh(mergeGeometries(parts, false), flatVertex());
-    mesh.renderOrder = order(LAYER.scenery);
+    const {material, fade} = fadingVertex("tyres");
+    this.fade = fade;
+    const mesh = new THREE.Mesh(mergeGeometries(parts, false), material);
+    mesh.renderOrder = order(LAYER.car);
     mesh.frustumCulled = false;
     this.group.add(mesh);
   }
@@ -114,21 +120,27 @@ export class Tyres {
  *  by a circle has to be. */
 const CAR_HALF = (CAR.width + CAR.length) / 4;
 
-/** One stack, from straight above: a black tyre with its hole in the middle. */
+/**
+ * One stack: a squat black cylinder with a bright cap.
+ *
+ * The cap is not decoration. On the neon city's near-black ground a black
+ * stack is a hole, and this is the one piece of scenery in the game a child is
+ * expected to see coming.
+ */
 function stack(
   x: number,
   z: number,
   palette: Palette,
 ): Array<THREE.BufferGeometry> {
-  const outer = new THREE.CircleGeometry(TYRES.radius, 12);
-  outer.rotateX(-Math.PI / 2);
-  outer.translate(x, LAYER.scenery, z);
-
-  // A bright middle, so a stack reads as a thing to avoid rather than a hole
-  // in the grass — and reads it on the neon city's dark ground too.
-  const hole = new THREE.CircleGeometry(TYRES.radius * 0.42, 10);
-  hole.rotateX(-Math.PI / 2);
-  hole.translate(x, LAYER.scenery + 0.01, z);
-
-  return [paint(outer, palette.tyre), paint(hole, palette.kerbA)];
+  const body = post(TYRES.radius, HEIGHT.tyreStack, 0, 12, palette.tyre);
+  body.translate(x, 0, z);
+  const cap = post(
+    TYRES.radius * 0.55,
+    HEIGHT.tyreStack * 0.16,
+    HEIGHT.tyreStack,
+    10,
+    palette.kerbA,
+  );
+  cap.translate(x, 0, z);
+  return [body, cap];
 }

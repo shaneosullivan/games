@@ -68,15 +68,32 @@ swapping tracks about, and until then this is how a track leaves the device.
 
 Worth knowing before changing anything:
 
-- **The camera is orthographic and looks straight down**, and there are no
-  lights in the scene at all. Every material is an unlit `MeshBasicMaterial`.
-  That single decision is what makes this a 2D game made of sprites, which is
-  what the plan asks for.
-- **Nothing writes to the depth buffer**, so what is drawn over what is decided
-  purely by draw order. Every mesh states its place with `order(LAYER.x)`;
-  leaving it to three's own sort is near enough right by accident and wrong
-  where it matters — the car's shadow came out on top of the car in mid-air.
-  The `LAYER` heights are kept only to stop coplanar faces fighting.
+- **The camera is a perspective one at a fixed diagonal**, behind and above the
+  car, tipped down about fifty degrees. It follows the car and it **never
+  turns**, and that is load-bearing rather than lazy: the controls are "push
+  the way you want to go", which only means anything while the picture holds
+  still. Screen-up is world −Z at every moment of the game.
+- **There are two kinds of thing, and they are drawn differently.** _Flats_
+  lie in the XZ plane — the road, kerbs, start line, patches, skid marks. They
+  are unlit and do not write depth, and what is drawn over what is decided
+  entirely by `order(LAYER.x)`; leaving it to three's own sort is near enough
+  right by accident and wrong where it matters (the car's shadow came out on
+  top of the car in mid-air). _Solids_ have tops and sides — cars, tyre stacks,
+  trees, the barrier walls. They are lit and they do write depth, so a car
+  really does pass behind a tyre stack.
+- **Flats are unlit on purpose.** Every one faces straight up, so shading it
+  can only return its own colour — and getting there depends on the triangle
+  winding, which for the ribbons built by hand along the circuit is backwards.
+  Lit, the whole road came out at the ambient level and looked like wet slate.
+- **Light intensities in `config.ts` are fractions of full brightness**, and
+  the stage multiplies them by π on the way in. Three's lights are in physical
+  units: the Lambert response divides by π, so an intensity of 1 lands at about
+  a third of the material's colour. The three lights together are set so an
+  upward face reaches just under full — any higher and it goes _past_ its own
+  colour rather than reaching it.
+- **Anything that can stand between the camera and the car dissolves**, using
+  the shared near-fade shader. A full lap of the built-in circuit was measured
+  frame by frame: the car's own pixels are on screen in every one of them.
 - **Colours are constructed, not converted.** `new THREE.Color(hex)` already
   lands in the linear working space, so a `convertSRGBToLinear()` on top of it
   renders everything at about a third of its brightness. The tell, when this was

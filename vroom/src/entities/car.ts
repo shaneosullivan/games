@@ -1,7 +1,15 @@
 import * as THREE from "three";
 import {mergeGeometries} from "three/examples/jsm/utils/BufferGeometryUtils.js";
-import {CAR, ITEM} from "../config";
-import {flatVertex, LAYER, order, tile} from "../render/sprites";
+import {CAR, HEIGHT, ITEM} from "../config";
+import {
+  block,
+  flatVertex,
+  LAYER,
+  order,
+  post,
+  solidVertex,
+  tile,
+} from "../render/sprites";
 import {Patches} from "./patches";
 import {Track} from "./track";
 
@@ -80,7 +88,7 @@ export class Car {
   private readonly shadow: THREE.Mesh;
 
   constructor(colour: number) {
-    this.sprite = new THREE.Mesh(carSprite(colour), flatVertex());
+    this.sprite = new THREE.Mesh(carBody(colour), solidVertex());
     // Under the car and only ever seen in mid-air. It stays the size the car
     // was on the ground, which is what makes the car look as though it has
     // left it rather than merely got bigger.
@@ -334,51 +342,75 @@ export class Car {
 const tmp3 = new THREE.Vector3();
 
 /**
- * The sprite: a car seen from directly above.
+ * The car itself: a body, a cockpit, four wheels and a wing.
  *
- * Bold and simple on purpose. At the camera's height a car is about twenty
- * pixels long, which is exactly what it was on an Amiga — so it is a body, a
- * dark cockpit, four black tyres and a light stripe up the nose, and anything
- * finer than that would be a smudge.
+ * It was a set of flat tiles when the camera looked straight down, which was
+ * right then and is not now — from a diagonal a flat car is a sticker on the
+ * road. So everything here has a top and sides, and the sides carry a darker
+ * shade of the body colour so the shape reads even where the light does not
+ * reach it.
+ *
+ * Still bold and simple. At this distance a car is forty pixels long, and
+ * anything finer than a cockpit and a stripe is a smudge.
  *
  * Pointing +Z, so the group's Y rotation is the heading and nothing has to be
  * offset by a right angle anywhere else in the game.
  */
-function carSprite(colour: number): THREE.BufferGeometry {
+function carBody(colour: number): THREE.BufferGeometry {
   const L = CAR.length;
   const W = CAR.width;
+  const H = HEIGHT.car;
   const parts: Array<THREE.BufferGeometry> = [];
 
-  // The tyres first, so the body is drawn over their inner edges.
+  // Wheels first: fat little cylinders lying on their sides, proud of the body
+  // so they are visible from behind as well as above.
   for (const along of [0.3, -0.28]) {
     for (const side of [-1, 1]) {
-      const tyre = tile(W * 0.26, L * 0.22, 0x1b1b1f);
-      tyre.translate(side * W * 0.52, 0, along * L);
-      parts.push(tyre);
+      const wheel = post(HEIGHT.wheel / 2, W * 0.26, 0, 8, 0x1b1b1f);
+      // A cylinder stands up by default; a wheel does not.
+      wheel.rotateZ(Math.PI / 2);
+      wheel.translate(side * W * 0.5, HEIGHT.wheel / 2, along * L);
+      parts.push(wheel);
     }
   }
 
-  const body = tile(W, L, colour);
+  const body = block(W, H * 0.62, L, HEIGHT.wheel * 0.32, colour);
   parts.push(body);
 
   // A nose that tapers, which is most of what says which way it is facing.
-  const nose = tile(W * 0.62, L * 0.22, colour);
+  const nose = block(W * 0.62, H * 0.42, L * 0.24, HEIGHT.wheel * 0.32, colour);
   nose.translate(0, 0, L * 0.5);
   parts.push(nose);
 
-  const stripe = tile(W * 0.18, L * 0.66, 0xf2efe6);
-  stripe.translate(0, 0.02, L * 0.06);
+  const stripe = block(
+    W * 0.18,
+    H * 0.06,
+    L * 0.66,
+    HEIGHT.wheel * 0.32 + H * 0.62,
+    0xf2efe6,
+  );
+  stripe.translate(0, 0, L * 0.06);
   parts.push(stripe);
 
-  const cockpit = tile(W * 0.56, L * 0.3, 0x24252b);
-  cockpit.translate(0, 0.03, -L * 0.02);
+  const cockpit = block(
+    W * 0.56,
+    HEIGHT.cockpit,
+    L * 0.3,
+    HEIGHT.wheel * 0.32 + H * 0.62,
+    0x24252b,
+  );
+  cockpit.translate(0, 0, -L * 0.02);
   parts.push(cockpit);
 
   // A wing across the tail: the one shape that stops it reading as a brick.
-  const wing = tile(W * 1.15, L * 0.1, 0x24252b);
-  wing.translate(0, 0.02, -L * 0.48);
+  const wing = block(W * 1.15, H * 0.12, L * 0.1, H * 0.72, 0x24252b);
+  wing.translate(0, 0, -L * 0.48);
   parts.push(wing);
+  for (const side of [-1, 1]) {
+    const stay = block(W * 0.08, H * 0.4, L * 0.08, H * 0.34, 0x24252b);
+    stay.translate(side * W * 0.4, 0, -L * 0.48);
+    parts.push(stay);
+  }
 
-  const merged = mergeGeometries(parts, false);
-  return merged;
+  return mergeGeometries(parts, false);
 }

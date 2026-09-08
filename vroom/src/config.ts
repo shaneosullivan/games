@@ -103,15 +103,23 @@ export type Palette = (typeof ENVIRONMENTS)[Environment];
 
 export const CAMERA = {
   /**
-   * How much of the world is on screen, measured across the short side.
+   * The shot: behind the car, above it, looking down at a diagonal.
    *
-   * Two hundred and eighty units is seventy metres: about three and a half
-   * road-widths, which puts the car on screen at roughly the size the Amiga
-   * game draws it. Six hundred was two and a half seconds of road ahead and
-   * looked right on paper, but a four-metre car inside a hundred and fifty
-   * metres of view is eleven pixels on an iPad — a speck, not a sprite.
+   * `back` and `up` are a fixed offset in world axes — not behind the *car*,
+   * behind it on the *screen*. The camera's heading never changes, and that is
+   * load-bearing rather than lazy: the controls are "push the way you want to
+   * go", which only means anything while the picture holds still. A shot that
+   * swung round with the car would make the stick mean something different
+   * every second.
+   *
+   * The angle is atan(up / back) = 49 degrees, which is steep enough to see a
+   * corner coming and shallow enough that the cars have a side to them.
    */
-  view: 280,
+  back: 150,
+  up: 172,
+  /** How wide the lens is. Narrow, because a wide one bends a straight road
+   *  into a fan at the edges of the screen. */
+  fov: 42,
   /** How fast the shot chases the car, per second. Frame-rate independent
    *  easing, so this is a rate and not a fraction. */
   ease: 6,
@@ -123,6 +131,83 @@ export const CAMERA = {
    * a game about sideways slides.
    */
   lead: 52,
+  /**
+   * How much room the near-fade clears around the car.
+   *
+   * Anything standing between the eye and a disc this wide about the car
+   * dissolves. Wide enough to clear the whole car and a little around it, and
+   * no wider — a generous radius takes out half the trees on the inside of
+   * every corner.
+   */
+  clear: 16,
+  /** Where the fog starts and ends. It hides the far edge of a world that has
+   *  no edge, and gives the road somewhere to go. */
+  fogFrom: 420,
+  fogTo: 1150,
+} as const;
+
+/**
+ * The light.
+ *
+ * There was none at all until the view went diagonal: a camera looking
+ * straight down at flat colour has nothing to shade. Now that things have
+ * sides, the sides have to be darker than the tops or the whole scene reads as
+ * a pattern on the floor again.
+ *
+ * Ambient does most of it, on purpose. The ground and the road are flat and
+ * face straight up, so they take the full amount and look exactly as they did
+ * before; only the upright faces lose anything, which is precisely where the
+ * shape wants to show.
+ *
+ * These are fractions of full brightness, not three's own units — the stage
+ * multiplies by pi on the way in. See the note there.
+ */
+export const LIGHT = {
+  /**
+   * Mostly ambient, and measurably so.
+   *
+   * An upright face receives the ambient and whatever the two directionals
+   * give it, so the ambient is the floor on how dark anything in this game can
+   * get. At 0.62 the barrier came out at two-thirds strength and read as
+   * dingy maroon beside the bright flat kerb next to it.
+   *
+   * The three together are set so an upward face lands just under full. Any
+   * higher and it goes past its own colour rather than reaching it: the red
+   * car came back off the screen at 236 where its red is 214, which is not a
+   * brighter car, it is a washed-out one. Measured, tops now sit at about 0.97
+   * and sides between 0.82 and 0.85 — a step you can see, and nowhere near
+   * dingy.
+   */
+  ambient: 0.78,
+  sun: 0.16,
+  /** Which way the sun is. Off to one side rather than straight down, or every
+   *  vertical face in the game would be the same shade as every other. */
+  from: {x: 0.45, y: 1, z: 0.3},
+  /**
+   * A weaker light from roughly the other side.
+   *
+   * Without it, every face turned away from the sun gets the ambient and
+   * nothing else — and since the barrier runs in every direction, half of it
+   * was always at the floor. Red came out maroon and white came out grey,
+   * which on a wall a child has been told is "red and white" is the wrong
+   * wall. With the fill no upright face is ever at bare ambient, and the two
+   * together still leave a top face brighter than any side.
+   */
+  fill: 0.1,
+  fillFrom: {x: -0.5, y: 0.35, z: -0.4},
+} as const;
+
+/** How tall the solid things stand. Nothing is tall: this is a game seen from
+ *  a steep angle, and a tree the height of a real one is a green wall across
+ *  the corner behind it. */
+export const HEIGHT = {
+  car: 5.5,
+  cockpit: 2.4,
+  wheel: 3,
+  tyreStack: 9,
+  wall: 12,
+  trunk: 9,
+  crown: 16,
 } as const;
 
 /**
