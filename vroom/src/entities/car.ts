@@ -80,7 +80,12 @@ export class Car {
   roll = 0;
   pitch = 0;
   private rollRate = 0;
-  private pitchRate = 0;
+  /** Which of the four wheels have touched the ramp during this crossing of
+   *  it, and whether it is still on one. */
+  private readonly rampTouch = [false, false, false, false];
+  private onRamp = false;
+  /** How long is left of the jolt as the nose comes down. */
+  private landing = 0;
 
   /**
    * What each wheel is still carrying out of a patch, and for how long.
@@ -122,6 +127,38 @@ export class Car {
     this.group.add(this.shadow, this.sprite);
   }
 
+  /**
+   * Leaving the ramp.
+   *
+   * Whether the car rolls is decided by which wheels touched the ramp over the
+   * *whole* crossing, not by which were on it at any one moment — and that is
+   * the whole fix. Deciding it on first contact meant deciding it in the frame
+   * the front wheels arrived, when a car even slightly out of square has one
+   * of them down and the other not, so almost every jump came out as a half
+   * roll. Judged over the crossing, a car that went up the middle has all four
+   * marked and goes straight, and one that clipped the edge has two down one
+   * side and goes over.
+   */
+  private launch(): void {
+    const push = Math.min(1, this.speed / CAR.top);
+    this.air = ITEM.ramp.airtime;
+    this.boost = ITEM.ramp.carry;
+    // Straight onto the velocity, before it is split into along and across:
+    // the shove is in the direction the car was actually travelling, which on
+    // a ramp taken sideways is not where the nose is pointing.
+    this.velocity.multiplyScalar(ITEM.ramp.boost);
+    this.climb = ITEM.ramp.launch * push;
+
+    const near = this.rampTouch[0] || this.rampTouch[2];
+    const far = this.rampTouch[1] || this.rampTouch[3];
+    const all = this.rampTouch.every(Boolean);
+    let lean = 0;
+    if (!all) {
+      lean = near && !far ? 1 : far && !near ? -1 : 0;
+    }
+    this.rollRate = lean * ITEM.ramp.roll * push;
+  }
+
   /** Off the ground, and how far through the jump. */
   get airborne(): boolean {
     return this.air > 0;
@@ -149,7 +186,9 @@ export class Car {
     this.roll = 0;
     this.pitch = 0;
     this.rollRate = 0;
-    this.pitchRate = 0;
+    this.landing = 0;
+    this.onRamp = false;
+    this.rampTouch.fill(false);
     this.carrying.fill(null);
     this.carriedFor.fill(0);
   }
@@ -182,7 +221,6 @@ export class Car {
     let rightGrip = 0;
     let slowest = 1;
     let onRamp = 0;
-    let rampLean = 0;
     for (let i = 0; i < 4; i++) {
       const w = this.wheelAt[i];
       const under = patches ? patches.at(w.x, w.y) : null;
@@ -209,7 +247,7 @@ export class Car {
       }
       if (under === "ramp") {
         onRamp++;
-        rampLean += nearSide ? 1 : -1;
+        this.rampTouch[i] = true;
       }
       if (nearSide) {
         leftGrip += grip / 2;
@@ -220,20 +258,20 @@ export class Car {
 
     if (this.air > 0) {
       this.air = Math.max(0, this.air - dt);
-    } else if (onRamp > 0 && this.speed >= ITEM.ramp.minSpeed) {
-      this.air = ITEM.ramp.airtime;
-      this.boost = ITEM.ramp.carry;
-      // Straight onto the velocity, before it is split into along and across:
-      // the shove is in the direction the car was actually travelling, which
-      // on a ramp taken sideways is not where the nose is pointing.
-      this.velocity.multiplyScalar(ITEM.ramp.boost);
-      // Up, and — if the ramp was caught lopsided — over. One side on the ramp
-      // lifts one side of the car, which is what rolls a real one; hitting it
-      // square lifts both and does not.
-      const push = Math.min(1, this.speed / CAR.top);
-      this.climb = ITEM.ramp.launch * push;
-      this.pitchRate = ITEM.ramp.pitch * push;
-      this.rollRate = (rampLean / 2) * ITEM.ramp.roll * push;
+    } else if (onRamp > 0) {
+      // On it, not off it. The car is still on the ground here — it takes off
+      // at the far lip, which is where a car really leaves a ramp.
+      if (!this.onRamp) {
+        this.rampTouch.fill(false);
+        this.rampTouch[0] = false;
+      }
+      this.onRamp = true;
+    } else if (this.onRamp) {
+      // And now it has run out of ramp.
+      this.onRamp = false;
+      if (this.speed >= ITEM.ramp.minSpeed) {
+        this.launch();
+      }
     }
     this.boost = Math.max(0, this.boost - dt);
     const flying = this.air > 0 || this.height > 0;
@@ -355,15 +393,23 @@ export class Car {
       this.height += this.climb * dt;
       this.climb -= ITEM.ramp.gravity * dt;
       this.roll += this.rollRate * dt;
-      this.pitch += this.pitchRate * dt;
+      // The nose follows the climb: up while it is going up, down while it is
+      // coming down. No timer, and the shape of the jump comes out for free.
+      this.pitch = ITEM.ramp.pitch * (this.climb / ITEM.ramp.launch);
       if (this.height <= 0) {
         this.height = 0;
         this.climb = 0;
         this.air = 0;
         this.rollRate = 0;
-        this.pitchRate = 0;
+        // The bumper. It comes down on its nose, loses a little, and settles
+        // back onto four wheels — which is the difference between landing a
+        // jump and teleporting to the far side of one.
+        this.landing = ITEM.ramp.landFor;
+        this.pitch = -ITEM.ramp.landDip;
+        this.velocity.multiplyScalar(ITEM.ramp.landKeep);
       }
     } else if (this.roll !== 0 || this.pitch !== 0) {
+      this.landing = Math.max(0, this.landing - dt);
       // Back on the ground it rights itself — towards whichever whole turn it
       // is nearest, so a car that went all the way over lands the right way up
       // rather than winding a full revolution backwards.
@@ -373,7 +419,7 @@ export class Car {
       // Once it is upright, say so exactly. A car that has been over three
       // times is upright at 1080 degrees, and leaving it there would have the
       // number climbing for the whole race.
-      if (Math.abs(this.roll % TAU) < 0.001) {
+      if (Math.abs(this.roll - Math.round(this.roll / TAU) * TAU) < 0.01) {
         this.roll = 0;
       }
     }

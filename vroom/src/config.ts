@@ -260,6 +260,24 @@ export const STAND = {
 } as const;
 
 /**
+ * Getting a race ready before anybody drives it.
+ *
+ * Shaders compile the first time a material is drawn and geometry goes to the
+ * card on its first frame, so the opening seconds of a race were always the
+ * slowest of it — which is exactly when a child is trying to take the first
+ * corner. All of it is done behind the waiting card now.
+ */
+export const LOADING = {
+  /** How many frames to draw before letting anybody see it. Three: one to
+   *  upload everything, and two to be sure nothing was left until the second. */
+  warmFrames: 3,
+  /** The least time the card stays up, in seconds. A card that flashes past in
+   *  eighty milliseconds on a fast machine reads as a glitch; a moment of
+   *  "getting ready" reads as the game getting ready. */
+  atLeast: 0.7,
+} as const;
+
+/**
  * How much the renderer is allowed to spend, and how it gives it up.
  *
  * The neon city is far heavier than the other two — a dozen dynamic lights, a
@@ -286,55 +304,81 @@ export const STAND = {
  * and the hunting is more distracting than the lower setting ever was.
  */
 export const QUALITY = {
-  /** Below this many frames a second, for `patience` windows running, the
-   *  game gives something up. Forty-five rather than sixty: a steady
-   *  forty-eight is fine to drive and dropping a tier is not free. */
+  /** Below this many frames a second, for `patience` windows running, the game
+   *  gives one more thing up. Forty-five rather than sixty: a steady
+   *  forty-eight is fine to drive, and every concession costs something. */
   floor: 45,
   /** How long a window is, in seconds, and how many bad ones in a row it
-   *  takes. Two windows so that one stutter — a garbage collection, a texture
-   *  upload — cannot cost a machine its quality for good. */
+   *  takes. Two, so one stutter — a collection, a texture upload — cannot cost
+   *  a machine its quality for good. */
   window: 2,
   patience: 2,
   /** How long after the flag before it starts counting. The first seconds of a
-   *  race are shaders compiling and textures uploading, which is the slowest
-   *  the game will ever be and the least representative. */
+   *  race used to be the slowest and least representative; they are spent
+   *  behind the loading card now, and this is belt and braces. */
   warmup: 3,
-  /** Where a machine starts if nothing is known about it. */
-  start: "high",
-  tiers: [
-    {
-      name: "high",
-      pixels: 2,
-      bloom: true,
-      lights: 10,
-      shadows: true,
-      shadowMap: 2048,
-      /** How much of the scenery is built. Applied when a race is built, so
-       *  this one takes effect on the next race rather than immediately. */
-      scenery: 1,
-    },
-    {
-      name: "medium",
-      pixels: 1.5,
-      bloom: true,
-      lights: 6,
-      shadows: true,
-      shadowMap: 1024,
-      scenery: 0.7,
-    },
-    {
-      name: "low",
-      pixels: 1.15,
-      bloom: false,
-      lights: 4,
-      shadows: false,
-      shadowMap: 512,
-      scenery: 0.45,
-    },
-  ],
+
+  /** What everything starts at, before anything has been given up. */
+  full: {
+    pixels: 2,
+    bloom: true,
+    lights: 10,
+    shadows: true,
+    shadowMap: 2048,
+    scenery: 1,
+  },
+
+  /**
+   * The concessions, in the order they are made.
+   *
+   * One at a time rather than in tiers, and ordered by what each buys against
+   * what it costs to look at. Three coarse tiers meant a machine a few frames
+   * short of smooth lost its shadows, its bloom and a third of its scenery all
+   * at once, when turning the resolution down a notch would have done — and a
+   * machine that needed rather more got no say in which half it kept.
+   *
+   * The order is the whole design, so the reasoning is written down:
+   *
+   *  1. **Resolution first.** On a retina screen a device ratio of two is
+   *     already past what an eye resolves at arm's length, and fragments are
+   *     what a mobile GPU runs out of before anything else. Dropping to 1.5
+   *     cuts the pixels drawn by nearly half and costs a little edge
+   *     sharpness. Nothing else comes close on that trade.
+   *  2. **Shadow resolution.** A quarter of the texels for a slightly softer
+   *     edge on a shadow nobody is looking directly at.
+   *  3. **Distant lights.** The tenth-nearest street lamp lights almost
+   *     nothing you can see, and every light is another iteration inside every
+   *     fragment of every lit surface.
+   *  4. **Bloom.** Five full-screen blurs, which is real money on a tile-based
+   *     GPU — but it is also the neon city's whole look, so it goes after the
+   *     three things nobody would notice and before the two they would.
+   *  5. **Resolution again**, harder.
+   *  6. **Shadows entirely.** Cars start to look pasted onto the road.
+   *  7. **Scenery**, which changes the world rather than the picture of it,
+   *     and cannot take effect until the next race.
+   */
+  ladder: [
+    {name: "sharpness", pixels: 1.5},
+    {name: "shadow detail", shadowMap: 1024},
+    {name: "distant lights", lights: 6},
+    {name: "glow", bloom: false},
+    {name: "more sharpness", pixels: 1.2},
+    {name: "shadows", shadows: false},
+    {name: "scenery", scenery: 0.6},
+    {name: "most sharpness", pixels: 1},
+    {name: "most scenery", scenery: 0.4},
+  ] as ReadonlyArray<{
+    name: string;
+    pixels?: number;
+    bloom?: boolean;
+    lights?: number;
+    shadows?: boolean;
+    shadowMap?: number;
+    scenery?: number;
+  }>,
 } as const;
 
-export type Tier = (typeof QUALITY.tiers)[number];
+export type Settings = typeof QUALITY.full;
 
 /**
  * The map in the corner.
@@ -764,12 +808,30 @@ export const ITEM = {
      * at full speed.
      */
     roll: 7.5,
-    /** And how much it pitches nose-up off the lip. */
-    pitch: 1.4,
-    /** How fast it goes up. The arc is a real one now — gravity brings it
-     *  back — so this is a speed and not a duration. */
+    /**
+     * How far the nose comes up off the lip.
+     *
+     * Tied to how fast the car is still climbing rather than run off a timer,
+     * so the nose rises while it is going up and drops while it is coming
+     * down. That is the whole shape of a jump and it comes out for free.
+     */
+    pitch: 0.42,
+    /** How fast it goes up. The arc is a real one — gravity brings it back —
+     *  so this is a speed and not a duration. */
     launch: 62,
     gravity: 150,
+    /**
+     * Landing.
+     *
+     * A car coming down on its nose does not simply carry on: the front hits,
+     * it loses a little, and it settles back onto four wheels. `dip` is how
+     * far the nose goes past level as the bumper touches, and `keep` is what
+     * is left of the speed afterwards — a jump should cost a little, or the
+     * ramps would be a short cut rather than a risk.
+     */
+    landDip: 0.2,
+    landKeep: 0.9,
+    landFor: 0.28,
   },
 } as const;
 

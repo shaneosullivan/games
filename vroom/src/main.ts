@@ -4,9 +4,11 @@ import {lockZoom} from "./core/lockZoom";
 import {Editor} from "./ui/editor";
 import {Menu} from "./ui/menu";
 import {ModelViewer, MODELS_HASH} from "./ui/models";
+import {Loading} from "./ui/loading";
+import {LOADING} from "./config";
 import {BUILT_IN, TrackSpec} from "./track/spec";
 import {saveTrack} from "./track/store";
-import {setQuality, tierName} from "./core/quality";
+import {givenUp, setQuality} from "./core/quality";
 
 // Before anything else. On an iPad a stray pinch or a double tap zooms the
 // page, and a zoomed page puts the readouts and the corner buttons off the top
@@ -49,7 +51,7 @@ function showMenu(): void {
     window.history.replaceState(null, "", window.location.pathname);
   }
   const menu = new Menu({
-    onPlay: showRace,
+    onPlay: spec => void showRace(spec),
     onBuild: () => showEditor(),
     onEdit: spec => showEditor(spec),
     onModels: showModels,
@@ -86,7 +88,7 @@ function showEditor(existing?: TrackSpec): void {
       // and then taps the gallery button still has it tomorrow.
       onTest: spec => {
         saveTrack(spec);
-        showRace(spec);
+        void showRace(spec);
       },
     },
     existing,
@@ -94,15 +96,48 @@ function showEditor(existing?: TrackSpec): void {
   app!.appendChild(editor.root);
 }
 
-function showRace(spec: TrackSpec): void {
+/**
+ * A race, built behind a waiting card.
+ *
+ * Nothing is shown until it is ready. The card is put up first and given a
+ * frame to paint, then the game builds itself in steps — each handing the
+ * frame back so the bar moves — and the last of those steps compiles every
+ * shader and draws a few frames nobody sees. Only then does the card come
+ * down. Before this, all of that happened with the countdown already running,
+ * which is exactly the wrong moment for a game to be at its slowest.
+ */
+async function showRace(spec: TrackSpec): Promise<void> {
   clear();
+  const card = new Loading(spec.name);
+  card.mount(app!);
+
   // The UI layer sits over the canvas: the readouts, the stick, the overlays
   // and the corner buttons all live here rather than in the scene.
   const ui = document.createElement("div");
   ui.className = "ui";
   app!.appendChild(ui);
-  game = new Game(app!, ui, spec, showMenu, () => showRace(spec));
-  window.game = game;
+
+  const mine = new Game(app!, ui, spec, showMenu, () => void showRace(spec));
+  game = mine;
+  window.game = mine;
+
+  const began = performance.now();
+  await mine.load((done, what) => card.set(done, what));
+
+  // A card that flashes past in eighty milliseconds on a fast machine reads as
+  // a glitch rather than as the game getting ready.
+  const spent = (performance.now() - began) / 1000;
+  if (spent < LOADING.atLeast) {
+    await new Promise(done =>
+      setTimeout(done, (LOADING.atLeast - spent) * 1000),
+    );
+  }
+  // Unless the child has already gone somewhere else while it loaded.
+  if (game === mine) {
+    await card.close();
+  } else {
+    card.root.remove();
+  }
 }
 
 // Straight into the list rather than into a race — unless the URL says the
@@ -122,8 +157,9 @@ declare global {
      *  through the list. */
     play: (spec?: TrackSpec) => void;
     builtIn: TrackSpec;
-    /** Reads or sets the rendering quality; see the note where it is defined. */
-    quality: (name?: string) => string;
+    /** Reads or sets how many quality concessions have been made; see the
+     *  note where it is defined. */
+    quality: (level?: number) => string;
   }
 }
 window.game = null;
@@ -131,15 +167,18 @@ window.game = null;
  * The quality knob, at the console.
  *
  * The game finds its own level by watching its frame rate, which is the right
- * behaviour and a slow way to see what a tier looks like on a machine that
- * never needs one. `quality("low")` puts it there at once and remembers it,
- * the same as if the game had decided; `quality()` says where it is.
+ * behaviour and a slow way to see what a machine in trouble is looking at.
+ * `quality(4)` gives up the first four things at once and remembers it, the
+ * same as if the game had decided; `quality()` says what has gone.
  */
-window.quality = (name?: string) => {
-  if (name && !setQuality(name)) {
-    return `no such tier: ${name}`;
+window.quality = (level?: number) => {
+  if (level !== undefined) {
+    setQuality(level);
   }
-  return tierName();
+  const gone = givenUp();
+  return gone.length === 0
+    ? "everything on"
+    : `given up (${gone.length}): ${gone.join(", ")}`;
 };
-window.play = (spec?: TrackSpec) => showRace(spec ?? BUILT_IN);
+window.play = (spec?: TrackSpec) => void showRace(spec ?? BUILT_IN);
 window.builtIn = BUILT_IN;

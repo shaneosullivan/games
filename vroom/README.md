@@ -133,39 +133,52 @@ lap — without it there is no telling whether the next corner is the hairpin or
 the sweeper, nor whether the car being chased is a second ahead or most of a
 lap.
 
-## Quality, and how it finds its own level
+## Getting ready, and finding its own level
 
-The neon city is far heavier than the other two — a dozen dynamic lights, a
-skyline and a bloom pass with a great deal to bloom — and an older iPad cannot
-hold sixty frames a second through it. Rather than cut the level down for
-everybody, the game watches its own frame rate, steps down a tier when it
-cannot keep up, and remembers that for the machine it is on
-(`vroom.quality.v1` in local storage).
+**Nothing is shown until a race is ready.** Shaders compile the first time a
+material is drawn and geometry goes to the card on its first frame, so the
+opening seconds of a race used to be the slowest of it — which is exactly when
+a child is trying to take the first corner. `Game.load()` builds the race in
+steps behind a waiting card, each step handing the frame back so the bar can
+paint, and the last steps call `compileAsync` and draw a few frames nobody
+sees. The card also stays up for a moment on a fast machine: one that flashes
+past in eighty milliseconds reads as a glitch rather than as the game getting
+ready.
 
-`QUALITY.tiers` in `config.ts` scales the four things that actually cost
-anything on a tile-based mobile GPU, in the order they cost it: **how many
-pixels are drawn** (a retina iPad at a device ratio of two is four times the
-fragments of one at one — much the biggest lever), **the bloom pass** (five
-more full-screen blurs), **dynamic lights** (every point light is another
-iteration in every fragment of every lit surface), and **shadows** (a second
-render of the scene plus a filtered lookup per fragment).
+**And it gives things up one at a time.** The neon city is far heavier than the
+other two levels, and an older iPad cannot hold sixty frames a second through
+it. The game watches its own frame rate and makes one concession when it
+cannot keep up, then remembers how many it has made (`vroom.quality.v2` in
+local storage).
 
-Three decisions in it are worth knowing:
+One at a time, in a stated order, rather than in tiers. This started as three
+coarse tiers and that was worse: a machine a few frames short of smooth lost
+its shadows, its bloom and a third of its scenery at once, when turning the
+resolution down a notch would have done. `QUALITY.ladder` in `config.ts` holds
+the order and the reasoning, cheapest-looking concession first:
 
-- **It only ever goes down.** A version that turned the quality back up on a
-  good stretch would hunt between two settings all race, and the hunting is
-  more distracting than the lower setting ever was.
-- **It ignores the first three seconds** of a race, which are shaders
-  compiling and textures uploading — the slowest the game will ever be and the
-  least representative — and it needs two bad two-second windows in a row, so
-  one stutter cannot cost a machine its quality for good.
-- **Everything except the scenery count changes mid-race.** How much scenery
-  was built cannot, so a machine that steps down gets the lighter world on its
-  next race.
+1. **Resolution.** On a retina screen a device ratio of two is already past
+   what an eye resolves at arm's length, and fragments are what a mobile GPU
+   runs out of before anything else. Dropping to 1.5 cuts the pixels drawn by
+   nearly half. Nothing else comes close on that trade.
+2. **Shadow resolution** — a quarter of the texels, for a softer edge on
+   something nobody looks at directly.
+3. **Distant lights** — the tenth-nearest lamp lights almost nothing you can
+   see, and every light is another iteration in every fragment of every lit
+   surface.
+4. **Bloom** — five full-screen blurs, real money on a tile-based GPU, but also
+   the neon city's whole look, so it goes after the three nobody would notice.
+5. **Resolution again**, then **shadows entirely**, then **scenery** — which
+   changes the world rather than the picture of it, and cannot take effect
+   until the next race.
 
-In a development build `quality("low")` at the console puts it at a tier and
-remembers it, and `quality()` says where it is — the only practical way to see
-what "low" looks like on a machine that never needs it.
+It only ever goes down: a version that put things back on a good stretch would
+hunt between two settings all race, and the hunting is worse than the
+concession. It needs two bad two-second windows running, so one stutter cannot
+cost a machine its quality for good.
+
+In a development build `quality(4)` gives up the first four at once and
+remembers it; `quality()` says what has gone.
 
 ## The model viewer
 

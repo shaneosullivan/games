@@ -116,10 +116,10 @@ function cockpit(a: Assembly, L: number, W: number): void {
  * shoulders inside the car. So this is a reclined torso, two arms out to the
  * wheel, and a helmet, and that is the whole of what anybody can see.
  *
- * The overalls and the helmet crest take the car's own colour, so each car has
- * its own driver rather than four copies of one. The helmet shell stays pale
- * whatever the car is: at this size it is the one thing that reads as a person
- * rather than as more bodywork, and it has to stand off the car behind it.
+ * The overalls take the car's own colour, so each car has its own driver
+ * rather than four copies of one. The helmet stays pale whatever the car is:
+ * at this size it is the one thing that reads as a person rather than as more
+ * bodywork, and it has to stand off the car behind it.
  */
 export function driver(
   a: Assembly,
@@ -186,9 +186,9 @@ export function driver(
   visor.translate(0, floor + 2.5, seat - L * 0.005);
   a.add(visor, "glass", 0x0b0d13);
 
-  const crest = rounded(0.5, 0.34, 2.5, 0.14);
-  crest.translate(0, floor + 3.72, seat - L * 0.01);
-  a.add(crest, "bodywork", colour);
+  // No crest. It was a bar across the top of the helmet in the car's colour,
+  // and at this size it did not read as a stripe on a helmet — it read as a
+  // coloured thing stuck to one. A plain round helmet is a helmet.
 }
 
 /** Front and rear wings, with their endplates and stays. */

@@ -2,7 +2,7 @@ import * as THREE from "three";
 import {mergeGeometries} from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import {ENVIRONMENTS, LAMP, NEON, Palette, SCENERY} from "../config";
 import {Rng} from "../core/rng";
-import {tier} from "../core/quality";
+import {settings} from "../core/quality";
 import {instance, neonSign, plant} from "../models";
 import {building, lamp, litMaterial} from "../models/city";
 import {fadingGlow} from "../render/materials";
@@ -41,7 +41,7 @@ export class Scenery {
     // decides, this one cannot change while a race is running — the scenery is
     // built once — so a machine that steps down mid-race gets the lighter
     // world on its next one.
-    const share = tier().scenery;
+    const share = settings().scenery;
     const some = (n: number): number => Math.max(1, Math.round(n * share));
     const p = new THREE.Vector3();
     const s = new THREE.Vector3();
@@ -278,7 +278,7 @@ export class Scenery {
     };
 
     // Low-rise along the street, towers set back behind it.
-    const share = tier().scenery;
+    const share = settings().scenery;
     const some = (n: number): number => Math.max(1, Math.round(n * share));
     for (let i = 0; i < some(NEON.nearBlocks); i++) {
       put(true, NEON.nearTo, NEON.nearFrom);

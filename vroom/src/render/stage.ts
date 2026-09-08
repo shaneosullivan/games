@@ -4,8 +4,8 @@ import {RenderPass} from "three/examples/jsm/postprocessing/RenderPass.js";
 import {UnrealBloomPass} from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
 import {OutputPass} from "three/examples/jsm/postprocessing/OutputPass.js";
 import {RoomEnvironment} from "three/examples/jsm/environments/RoomEnvironment.js";
-import {CAMERA, FILM, LIGHT, Palette, Tier} from "../config";
-import {onQualityChange, tier} from "../core/quality";
+import {CAMERA, FILM, LIGHT, Palette, Settings} from "../config";
+import {offQualityChange, onQualityChange, settings} from "../core/quality";
 import {material, setEnvironment} from "./materials";
 import {paint} from "./sprites";
 
@@ -166,7 +166,7 @@ export class Stage {
     // it the composer hands back linear light and the picture comes out grey.
     this.composer.addPass(new OutputPass());
 
-    this.applyQuality(tier());
+    this.applyQuality(settings());
     onQualityChange(this.applyQuality);
     this.resize();
     window.addEventListener("resize", this.resize);
@@ -180,7 +180,7 @@ export class Stage {
    * cheaper. The one thing that cannot is how much scenery was built, so that
    * is read at construction and takes effect on the next race.
    */
-  applyQuality = (at: Tier): void => {
+  applyQuality = (at: Settings): void => {
     // The device ratio is still the ceiling — asking for two on a screen that
     // only has one would draw four times the pixels for nothing.
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, at.pixels));
@@ -277,6 +277,7 @@ export class Stage {
    *  hand out so many contexts before it starts silently dropping the oldest. */
   dispose(): void {
     window.removeEventListener("resize", this.resize);
+    offQualityChange(this.applyQuality);
     this.environment.dispose();
     this.sky.dispose();
     this.composer.dispose();

@@ -18,6 +18,7 @@ import {Bridges} from "./entities/bridges";
 import {Tyres} from "./entities/tyres";
 import {Stands} from "./entities/stands";
 import {beginWatching, sawFrame} from "./core/quality";
+import {LOADING, SIM} from "./config";
 import {MiniMap} from "./ui/minimap";
 import {NearFade} from "../../shared/fadeInFront";
 import {GameLoop} from "./core/loop";
@@ -50,25 +51,28 @@ import {SoundButton} from "../../shared/soundButton";
  * with the render interpolating between steps, the same as the other games.
  */
 export class Game {
-  readonly stage: Stage;
-  readonly track: Track;
-  readonly car: Car;
-  readonly rivals: Rivals;
-  readonly skids: Skids;
+  stage!: Stage;
+  private readonly spec: TrackSpec;
+  private readonly host: HTMLElement;
+  private readonly ui: HTMLElement;
+  track!: Track;
+  car!: Car;
+  rivals!: Rivals;
+  skids!: Skids;
   /** Oil and mud tracked out of a patch, in their own pool: they last ten
    *  seconds where rubber lasts seven, and they are not black. */
-  readonly trails: Skids;
-  readonly patches: Patches;
-  readonly bridges: Bridges;
-  readonly tyres: Tyres;
-  readonly stands: Stands;
-  private readonly scenery: Scenery;
+  trails!: Skids;
+  patches!: Patches;
+  bridges!: Bridges;
+  tyres!: Tyres;
+  stands!: Stands;
+  private scenery!: Scenery;
   /** Everything that dissolves when it stands between the camera and the car. */
-  private readonly fades: Array<NearFade>;
+  private fades: Array<NearFade> = [];
   readonly engine: Engine;
   readonly hud: Hud;
   readonly stick: Joystick;
-  readonly loop: GameLoop;
+  loop!: GameLoop;
 
   /** update() does nothing unless this is set, so a card can hold the race
    *  still while the circuit is already being drawn behind it. */
@@ -94,13 +98,13 @@ export class Game {
    */
   private shot = 0;
   private readonly countdown = document.createElement("div");
-  private readonly map: MiniMap;
+  private map!: MiniMap;
   /** Reused every frame rather than rebuilt: the map wants four points and
    *  there are sixty frames a second of them. */
   private readonly onMap: Array<{x: number; z: number}> = [];
   private shownBeat = -1;
   /** How many times round this race is. */
-  private readonly laps: number;
+  private laps = 1;
 
   private readonly intro: Overlay;
   private readonly done: Overlay;
@@ -141,47 +145,13 @@ export class Game {
      *  finished race in place. */
     private readonly onAgain: () => void,
   ) {
-    // Seeded, so the trees and the crowd are in the same places every time. A
-    // driver who learns a corner by the tree beside it should find that tree
-    // there tomorrow.
-    const rng = new Rng(SCENERY.seed);
-
-    this.laps = spec.laps;
-    this.track = new Track(spec);
-    const palette = this.track.palette;
-    this.stage = new Stage(host, palette);
-    this.car = new Car(PLAYER.colour);
-    this.rivals = new Rivals(this.track);
-    this.skids = new Skids(palette);
-    this.trails = new Skids(palette, TRAIL.max);
-    this.patches = new Patches(this.track, spec.items);
-    this.bridges = new Bridges(this.track, palette);
-    this.tyres = new Tyres(rng, this.track, palette);
-    this.stands = new Stands(rng, this.track, palette);
-
-    this.stage.scene.add(this.track.group);
-    this.scenery = new Scenery(rng, this.track, palette);
-    this.fades = [...this.track.fades, ...this.scenery.fades];
-    this.stage.scene.add(this.scenery.group);
-    this.stage.scene.add(this.tyres.group);
-    this.stage.scene.add(this.stands.group);
-    this.stage.scene.add(this.patches.group);
-    this.stage.scene.add(this.skids.mesh);
-    this.stage.scene.add(this.trails.mesh);
-    this.stage.scene.add(this.rivals.group);
-    this.stage.scene.add(this.car.group);
-    // Last, and drawn over everything: where the circuit runs over itself, the
-    // later part of the lap is on top of the earlier one.
-    this.stage.scene.add(this.bridges.group);
-
-    this.gridUp();
+    this.spec = spec;
+    this.host = host;
+    this.ui = ui;
 
     this.engine = new Engine();
     this.hud = new Hud();
-    this.hud.setLaps(this.laps);
     this.hud.mount(ui);
-    this.map = new MiniMap(this.track);
-    this.map.mount(ui);
     this.stick = new Joystick(ui);
     this.stick.enabled = false;
 
@@ -228,8 +198,89 @@ export class Game {
     // games are pages rather than tabs: a page left revving behind the one a
     // child has moved on to is a bug the caterpillar game had once already.
     window.addEventListener("pagehide", () => this.engine.stop());
+  }
 
+  /**
+   * Builds the race, in steps, with the screen held while it happens.
+   *
+   * All of this used to be done in the constructor and the loop started on top
+   * of it — so the opening seconds of a race were shaders compiling and
+   * geometry going to the card while the countdown was already running. Doing
+   * it here, behind the waiting card, is the whole difference between a race
+   * that starts and one that stutters into life.
+   *
+   * The awaits are not decoration. Each hands the frame back to the browser so
+   * the bar can actually paint; without them this would still be one long
+   * block and the bar would jump from nothing to done.
+   */
+  async load(report: (done: number, what?: string) => void): Promise<void> {
+    const spec = this.spec;
+    // Seeded, so the trees and the crowd are in the same places every time. A
+    // driver who learns a corner by the tree beside it should find that tree
+    // there tomorrow.
+    const rng = new Rng(SCENERY.seed);
+
+    report(0.05, "Laying the road\u2026");
+    await frame();
+    this.laps = spec.laps;
+    this.track = new Track(spec);
+    const palette = this.track.palette;
+    this.stage = new Stage(this.host, palette);
+
+    report(0.25, "Rolling out the cars\u2026");
+    await frame();
+    this.car = new Car(PLAYER.colour);
+    this.rivals = new Rivals(this.track);
+    this.skids = new Skids(palette);
+    this.trails = new Skids(palette, TRAIL.max);
+    this.patches = new Patches(this.track, spec.items);
+    this.bridges = new Bridges(this.track, palette);
+    this.tyres = new Tyres(rng, this.track, palette);
+    this.stands = new Stands(rng, this.track, palette);
+
+    report(0.45, "Building the scenery\u2026");
+    await frame();
+    this.scenery = new Scenery(rng, this.track, palette);
+    this.fades = [...this.track.fades, ...this.scenery.fades];
+
+    report(0.65, "Putting it all together\u2026");
+    await frame();
+    this.stage.scene.add(this.track.group);
+    this.stage.scene.add(this.scenery.group);
+    this.stage.scene.add(this.tyres.group);
+    this.stage.scene.add(this.stands.group);
+    this.stage.scene.add(this.patches.group);
+    this.stage.scene.add(this.skids.mesh);
+    this.stage.scene.add(this.trails.mesh);
+    this.stage.scene.add(this.rivals.group);
+    this.stage.scene.add(this.car.group);
+    // Last, and drawn over everything: where the circuit runs over itself, the
+    // later part of the lap is on top of the earlier one.
+    this.stage.scene.add(this.bridges.group);
+
+    this.hud.setLaps(this.laps);
+    this.map = new MiniMap(this.track);
+    this.map.mount(this.ui);
+    this.gridUp();
     this.snapCamera();
+
+    report(0.75, "Warming up the shaders\u2026");
+    await frame();
+    // The one that matters. Every material compiles the first time it is
+    // drawn, and on a heavy level that is most of a second — which used to be
+    // spent with the countdown already running.
+    await this.stage.renderer.compileAsync(this.stage.scene, this.stage.camera);
+
+    report(0.9, "Nearly there\u2026");
+    // And a few real frames, because compiling is not the whole of it:
+    // geometry and textures go to the card the first time they are drawn, and
+    // the bloom pass has shaders of its own that compileAsync never sees.
+    for (let i = 0; i < LOADING.warmFrames; i++) {
+      await frame();
+      this.render(1, SIM.step);
+    }
+
+    report(1, "Ready");
     this.loop = new GameLoop(this.update, this.render);
     this.loop.start();
   }
@@ -714,4 +765,9 @@ export class Game {
     // frame rather than an empty white box until the flag drops.
     this.drawMap();
   }
+}
+
+/** Hands the frame back to the browser, so the waiting card can paint. */
+function frame(): Promise<void> {
+  return new Promise(done => requestAnimationFrame(() => done()));
 }
