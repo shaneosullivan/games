@@ -55,10 +55,9 @@ export function cone(palette: Palette): Assembly {
   body.translate(0, 3, 0);
   a.add(body, "matte", palette.kerbA);
 
-  const band = new THREE.CylinderGeometry(1.5, 1.75, 1.1, DETAIL.round);
-  band.translate(0, 3.2, 0);
-  a.add(band, "matte", palette.kerbB);
-
+  // No white band. A cone is one colour: the reflective stripe on a real one
+  // is a strip of tape, and at this size a band of white across the middle
+  // reads as a different object stacked on top of it.
   const base = rounded(4.6, 0.7, 4.6, 0.25);
   base.translate(0, 0.35, 0);
   a.add(base, "matte", palette.kerbA);

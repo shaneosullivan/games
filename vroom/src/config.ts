@@ -63,6 +63,7 @@ export const ENVIRONMENTS = {
     crowd: [0xe0b13c, 0x3f7fd6, 0xd6473c, 0xf2efe6, 0x49b45a],
     /** What grows here. Each environment plants something different. */
     flora: "broadleaf",
+    centreLine: false,
     /** The sky, and the haze where it meets the ground. Only ever seen from
      *  down on the grid — the racing camera never looks that far up. */
     /* Deeper than it looks, on purpose: the tone curve takes a good deal of
@@ -87,6 +88,7 @@ export const ENVIRONMENTS = {
     tyre: 0x2a2622,
     crowd: [0xe8d16a, 0xd0663c, 0xf6efdd, 0x8fb07a, 0xb44a3a],
     flora: "cactus",
+    centreLine: false,
     sky: 0x4f9ecd,
     haze: 0xe8d3a4,
   },
@@ -107,6 +109,9 @@ export const ENVIRONMENTS = {
     tyre: 0x0d0a18,
     crowd: [0xff2d95, 0x2de2ff, 0xfaff5c, 0x7b3cff, 0xf4eaff],
     flora: "palm",
+    /** A dashed line down the middle of the road. Only the city has one — it
+     *  is a street as much as a circuit. */
+    centreLine: true,
     /* Night. The haze is the city's own glow on the underside of the cloud,
        which is what a city looks like from outside it after dark. */
     sky: 0x0a0716,
@@ -162,6 +167,43 @@ export const CAMERA = {
    *  no edge, and gives the road somewhere to go. */
   fogFrom: 420,
   fogTo: 1150,
+} as const;
+
+/**
+ * The street lights, and the pool of real lights that follows the car.
+ *
+ * A city has a hundred things giving off light and WebGL does not want a
+ * hundred lights. So everything that glows is drawn as emissive geometry —
+ * which the bloom pass turns into a glow for free and costs nothing — and a
+ * small pool of *real* lights is moved to whichever emitters are nearest the
+ * car each frame. What lights the road is always the lamp you are under, which
+ * is the only one you could tell the difference about.
+ */
+export const LAMP = {
+  /** How far apart they stand along the road, and how far off the kerb. */
+  every: 95,
+  from: 14,
+  /** How tall the post is, and how far the arm reaches over the road. */
+  height: 42,
+  reach: 16,
+  /** The colour of the light and how hard it is driven. Sodium, because a
+   *  white street light in a neon city competes with the signs. */
+  colour: 0xffc98a,
+  power: 4400,
+  bulb: 3.4,
+  /** How far the light carries. Short enough that two lamps do not add up
+   *  into daylight. */
+  falls: 240,
+} as const;
+
+/** How many real lights follow the car. Eight is plenty — anything further
+ *  away than the eighth nearest is not lighting anything you can see. */
+export const GLOW = {
+  lights: 8,
+  /** How often the pool works out what is nearest, in seconds. A car covers
+   *  two units in a frame and the lamps are ninety apart, so doing it every
+   *  frame would be ninety-nine per cent the same answer. */
+  every: 0.12,
 } as const;
 
 /**
@@ -788,6 +830,20 @@ export const NEON = {
   /** The light each one throws, and how far it carries. */
   lampPower: 900,
   lampReach: 190,
+  /** How far out the buildings stand, how big they are, and how many. */
+  blocks: 46,
+  blockFrom: 120,
+  blockTo: 520,
+  blockWide: 60,
+  blockDeep: 60,
+  blockLow: 90,
+  blockHigh: 330,
+  /** The windows: how big one is, how far apart they sit, and how many are
+   *  lit. Not all of them — a tower with every window on is an office block at
+   *  five o'clock, not a city at night. */
+  window: 4.4,
+  windowGap: 11,
+  windowsLit: 0.55,
   /** How many are faulty, how fast they stutter, and how far down they drop
    *  when they do. Not to nothing — a dead tube still catches the streetlight. */
   brokenChance: 0.35,

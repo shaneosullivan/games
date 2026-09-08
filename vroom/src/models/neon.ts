@@ -22,6 +22,16 @@ import {Assembly, DETAIL, rounded} from "./assembly";
  */
 export interface NeonSign {
   group: THREE.Group;
+  /** Where the tubes are and what colour, for the light pool to point a real
+   *  light at. `power` drops when the sign is stuttering. */
+  emitter: {
+    x: number;
+    y: number;
+    z: number;
+    colour: number;
+    power: number;
+    reach: number;
+  };
   /** Ticked every frame: this is what flickers. */
   update(time: number): void;
 }
@@ -62,11 +72,19 @@ export function neonSign(
   const lit = new THREE.Mesh(paint(tubes, colour), glow(NEON.emissive));
   group.add(lit);
 
-  // And the light it throws. One per sign, and the reason a neon city is worth
-  // the trouble: the ground under a sign is its colour.
-  const lamp = new THREE.PointLight(colour, NEON.lampPower, NEON.lampReach, 2);
-  lamp.position.set(0, height + height * 0.26, 4);
-  group.add(lamp);
+  // What it throws, as a description rather than as a light. Thirty signs is
+  // thirty point lights and WebGL wants nothing to do with that; the pool in
+  // `Glow` moves a handful of real ones to whichever are nearest the car. The
+  // position is filled in by whoever places the sign, since it is the only one
+  // who knows where that is.
+  const emitter: NeonSign["emitter"] = {
+    x: 0,
+    y: height + height * 0.26,
+    z: 0,
+    colour,
+    power: NEON.lampPower,
+    reach: NEON.lampReach,
+  };
 
   // Whether this one is faulty, and how it fails. A dying tube does not blink
   // politely on a timer — it stutters, catches, and holds.
@@ -79,6 +97,7 @@ export function neonSign(
 
   return {
     group,
+    emitter,
     update(time: number): void {
       if (!broken) {
         return;
@@ -90,7 +109,7 @@ export function neonSign(
       const b = Math.sin((time + phase) * rate * 2.7 + 1.3);
       const on = a + b * 0.6 > stutter - 0.9 ? 1 : NEON.dimmed;
       material.emissiveIntensity = fullEmissive * on;
-      lamp.intensity = NEON.lampPower * on;
+      emitter.power = NEON.lampPower * on;
     },
   };
 }

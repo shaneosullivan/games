@@ -1,10 +1,12 @@
 import * as THREE from "three";
 import {mergeGeometries} from "three/examples/jsm/utils/BufferGeometryUtils.js";
-import {NEON, Palette, SCENERY} from "../config";
+import {ENVIRONMENTS, LAMP, NEON, Palette, SCENERY} from "../config";
 import {Rng} from "../core/rng";
 import {instance, neonSign, plant} from "../models";
+import {building, lamp, litMaterial} from "../models/city";
 import type {NeonSign} from "../models/neon";
 import {flatVertex, LAYER, order, tile} from "../render/sprites";
+import {Glow} from "./glow";
 import {Track} from "./track";
 
 const UP = new THREE.Vector3(0, 1, 0);
@@ -25,6 +27,8 @@ export class Scenery {
   readonly group = new THREE.Group();
   /** The signs that flicker. Empty everywhere but the city. */
   readonly signs: Array<NeonSign> = [];
+  /** Everything that gives off light, and the few real lights that chase it. */
+  readonly glow = new Glow();
 
   constructor(rng: Rng, track: Track, palette: Palette) {
     const p = new THREE.Vector3();
@@ -115,9 +119,11 @@ export class Scenery {
       this.group.add(dots);
     }
 
-    // And the city. Signs are not instanced: each one has its own light, its
-    // own fault and its own tubes, and there are few enough of them that a
-    // draw call each is the right price for that.
+    this.group.add(this.glow.group);
+
+    // And the city. Signs are not instanced: each one has its own fault and
+    // its own tubes, and there are few enough of them that a draw call each is
+    // the right price for that.
     if (palette.flora === "palm") {
       for (let i = 0; i < NEON.count; i++) {
         if (!place(at, NEON.to, NEON.from)) {
@@ -130,14 +136,126 @@ export class Scenery {
         sign.group.rotation.y = Math.atan2(-at.x, -at.z) + rng.range(-0.6, 0.6);
         this.group.add(sign.group);
         this.signs.push(sign);
+        sign.emitter.x = at.x;
+        sign.emitter.z = at.z;
+        this.glow.add(sign.emitter);
       }
+      this.streetLights(track, palette);
+      this.city(rng, track, place, at);
     }
   }
 
-  /** Ticked so the faulty signs stutter. */
-  update(time: number): void {
+  /**
+   * Lamps down both sides of the road, evenly spaced.
+   *
+   * Along the circuit rather than scattered, because that is what a street is
+   * — an even row of lights is most of what tells you a road is a road at
+   * night, and a random one reads as wreckage.
+   */
+  private streetLights(track: Track, palette: Palette): void {
+    const p = new THREE.Vector3();
+    const s = new THREE.Vector3();
+    const off = Track.limit + LAMP.from;
+    const many = Math.max(4, Math.round(track.length / LAMP.every));
+
+    const {solid, bulb} = lamp();
+    const posts: Array<{x: number; z: number; turn: number}> = [];
+    const bulbs: Array<THREE.BufferGeometry> = [];
+
+    for (let i = 0; i < many; i++) {
+      const t = i / many;
+      track.pointAt(t, p);
+      track.sideAt(t, s);
+      const side = i % 2 === 0 ? 1 : -1;
+      const x = p.x + s.x * off * side;
+      const z = p.z + s.z * off * side;
+      // The arm reaches over the road, so the post is turned to face it.
+      const turn = Math.atan2(-s.x * side, -s.z * side);
+      posts.push({x, z, turn});
+
+      const copy = bulb.clone();
+      copy.rotateY(turn);
+      copy.translate(x, 0, z);
+      bulbs.push(copy);
+
+      this.glow.add({
+        x: x - s.x * side * LAMP.reach,
+        y: LAMP.height - 4,
+        z: z - s.z * side * LAMP.reach,
+        colour: LAMP.colour,
+        power: LAMP.power,
+        reach: LAMP.falls,
+      });
+    }
+
+    const m = new THREE.Matrix4();
+    const q = new THREE.Quaternion();
+    const pos = new THREE.Vector3();
+    const one = new THREE.Vector3(1, 1, 1);
+    for (const mesh of instance(solid, posts.length)) {
+      posts.forEach((post, i) => {
+        q.setFromAxisAngle(UP, post.turn);
+        m.compose(pos.set(post.x, 0, post.z), q, one);
+        mesh.setMatrixAt(i, m);
+      });
+      mesh.instanceMatrix.needsUpdate = true;
+      this.group.add(mesh);
+    }
+
+    const lit = new THREE.Mesh(mergeGeometries(bulbs, false), litMaterial());
+    lit.frustumCulled = false;
+    this.group.add(lit);
+    void palette;
+  }
+
+  /**
+   * The skyline: blocks with their lights on, beyond the barrier.
+   *
+   * Each is its own model rather than one instanced tower, because the whole
+   * of a building at night is which of its windows happen to be lit — and two
+   * identical towers side by side is the one thing that would give it away.
+   */
+  private city(
+    rng: Rng,
+    track: Track,
+    place: (out: THREE.Vector3, band: number, from?: number) => boolean,
+    at: THREE.Vector3,
+  ): void {
+    const windows: Array<THREE.BufferGeometry> = [];
+    for (let i = 0; i < NEON.blocks; i++) {
+      if (!place(at, NEON.blockTo, NEON.blockFrom)) {
+        continue;
+      }
+      const {solid, windows: panes} = building(ENVIRONMENTS.neon, rng);
+      const turn = rng.range(0, Math.PI * 2);
+      const built = solid.build();
+      built.position.set(at.x, 0, at.z);
+      built.rotation.y = turn;
+      this.group.add(built);
+
+      if (panes.attributes.position) {
+        panes.rotateY(turn);
+        panes.translate(at.x, 0, at.z);
+        windows.push(panes);
+      }
+    }
+    if (windows.length > 0) {
+      const lit = new THREE.Mesh(
+        mergeGeometries(windows, false),
+        litMaterial(),
+      );
+      lit.frustumCulled = false;
+      this.group.add(lit);
+    }
+    void track;
+  }
+
+  /** Ticked so the faulty signs stutter, and so the real lights follow the
+   *  car. */
+  update(time: number, dt: number, x: number, z: number): void {
     for (const sign of this.signs) {
       sign.update(time);
     }
+    this.glow.update(dt, x, z);
   }
 }

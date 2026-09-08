@@ -336,7 +336,12 @@ export class Game {
     this.rivals.setAbove(i => this.bridges.above(i));
     this.bridges.update(dt, this.car.hint);
     // The city's faulty signs, which stutter on their own clock.
-    this.scenery.update(this.time);
+    this.scenery.update(
+      this.time,
+      dt,
+      this.car.position.x,
+      this.car.position.z,
+    );
 
     this.layRubber(dt);
     this.layTrails(dt);

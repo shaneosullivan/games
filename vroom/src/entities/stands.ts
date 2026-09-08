@@ -56,9 +56,17 @@ export class Stands {
     for (const side of [-1, 1]) {
       const x = p.x + s.x * STAND.from * side;
       const z = p.z + s.z * STAND.from * side;
-      // Turned to face the road: one stand looks one way across it and the
-      // other looks back.
-      const turn = facing + (side > 0 ? -Math.PI / 2 : Math.PI / 2);
+      // Square to the camera, always — not to the road.
+      //
+      // This looks wrong written down and is right: the camera in this game
+      // never turns. It sits behind the car and looks along world −Z from one
+      // end of a race to the other, whatever direction the track happens to
+      // run. So "facing the player" is a fixed direction, and a stand turned
+      // to face the *road* would present its side to the shot on any circuit
+      // whose start line does not happen to run east-west — which is what it
+      // was doing: a grey slab with a few heads peeking over the top of it.
+      const turn = 0;
+      void facing;
 
       const built = stand(palette).build();
       built.position.set(x, 0, z);

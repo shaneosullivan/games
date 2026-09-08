@@ -108,6 +108,16 @@ export class Track {
     this.group.add(this.barriers());
     this.group.add(this.walls());
     this.group.add(this.startLine());
+    if (this.palette.centreLine) {
+      // Dashed, down the middle. Painted over the tarmac and under everything
+      // else, the same as the start line is.
+      this.group.add(
+        this.ribbon(-1.4, 1.4, this.palette.line, LAYER.paint, {
+          other: this.palette.tarmac,
+          every: 7,
+        }),
+      );
+    }
   }
 
   /** Where the centre line is at this fraction of a lap. */
