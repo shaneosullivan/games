@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import {fadeInFront, NearFade} from "../../../shared/fadeInFront";
 
 /**
  * Every material in the game, by what a thing is made of.
@@ -120,6 +121,41 @@ export function glow(strength: number): THREE.MeshStandardMaterial {
   made.customProgramCacheKey = () => `glow${strength}`;
   cache.set(key, made);
   return made;
+}
+
+/**
+ * A glowing thing that also dissolves when it stands in front of the car.
+ *
+ * Both effects are shader rewrites hung off `onBeforeCompile`, and three only
+ * has one of those per material — so they are chained rather than one of them
+ * quietly winning. The near-fade is applied first because it is the shared
+ * machinery and knows nothing about this file; the emissive tint is layered on
+ * top of whatever it produced.
+ */
+export function fadingGlow(
+  strength: number,
+  cacheKey: string,
+): {material: THREE.MeshStandardMaterial; fade: NearFade} {
+  const made = new THREE.MeshStandardMaterial({
+    vertexColors: true,
+    emissive: 0xffffff,
+    emissiveIntensity: strength,
+    color: 0x000000,
+    roughness: 1,
+    metalness: 0,
+  });
+  const fade = fadeInFront(made, {band: 40, cutoff: 0.3, cacheKey});
+  const inner = made.onBeforeCompile.bind(made);
+  const innerKey = made.customProgramCacheKey.bind(made);
+  made.onBeforeCompile = (shader: {fragmentShader: string}, ...rest) => {
+    (inner as (s: unknown, ...r: Array<unknown>) => void)(shader, ...rest);
+    shader.fragmentShader = shader.fragmentShader.replace(
+      "vec3 totalEmissiveRadiance = emissive;",
+      "vec3 totalEmissiveRadiance = emissive * vColor.rgb;",
+    );
+  };
+  made.customProgramCacheKey = () => `${innerKey()}|glow${strength}`;
+  return {material: made, fade};
 }
 
 /** Forgets every material. Called when a race is torn down, so a second race

@@ -57,11 +57,14 @@ export function lamp(): {solid: Assembly; bulb: THREE.BufferGeometry} {
 export function building(
   palette: Palette,
   rng: Rng,
-): {solid: Assembly; windows: THREE.BufferGeometry} {
+  low = false,
+): {solid: Assembly; windows: THREE.BufferGeometry; height: number} {
   const solid = new Assembly();
   const w = NEON.blockWide * rng.range(0.7, 1.3);
   const d = NEON.blockDeep * rng.range(0.7, 1.3);
-  const h = rng.range(NEON.blockLow, NEON.blockHigh);
+  const h = low
+    ? rng.range(NEON.nearLow, NEON.nearHigh)
+    : rng.range(NEON.blockLow, NEON.blockHigh);
 
   const shell = rounded(w, h, d, 2);
   shell.translate(0, h / 2, 0);
@@ -113,7 +116,7 @@ export function building(
       ? (mergeGeometries(lit, false) ?? lit[0])
       : new THREE.BufferGeometry();
   void palette;
-  return {solid, windows};
+  return {solid, windows, height: h};
 }
 
 /** The material lit windows and lamp heads share. */

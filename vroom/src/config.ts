@@ -199,7 +199,7 @@ export const LAMP = {
 /** How many real lights follow the car. Eight is plenty — anything further
  *  away than the eighth nearest is not lighting anything you can see. */
 export const GLOW = {
-  lights: 8,
+  lights: 10,
   /** How often the pool works out what is nearest, in seconds. A car covers
    *  two units in a frame and the lamps are ninety apart, so doing it every
    *  frame would be ninety-nine per cent the same answer. */
@@ -830,14 +830,39 @@ export const NEON = {
   /** The light each one throws, and how far it carries. */
   lampPower: 900,
   lampReach: 190,
-  /** How far out the buildings stand, how big they are, and how many. */
-  blocks: 46,
-  blockFrom: 120,
+  /**
+   * The buildings, in two rows.
+   *
+   * The near row is right on the street and **low**, and that is not a style
+   * choice. The camera sits a hundred and fifty units up and a hundred and
+   * fifty behind, so the line of sight to the car passes through a height of
+   * roughly however far a thing is in front of it — meaning anything close to
+   * the road and taller than about ninety units will sooner or later stand
+   * between the player and their own car. Low-rise along the street and towers
+   * set back is also simply what a city looks like.
+   */
+  nearBlocks: 30,
+  nearFrom: 6,
+  nearTo: 70,
+  nearLow: 46,
+  nearHigh: 88,
+  blocks: 40,
+  blockFrom: 150,
   blockTo: 520,
   blockWide: 60,
   blockDeep: 60,
-  blockLow: 90,
-  blockHigh: 330,
+  blockLow: 110,
+  blockHigh: 340,
+  /**
+   * The light a building's windows throw onto the street.
+   *
+   * Only the near row is given one — a tower three hundred units away lights
+   * nothing you can see, and every emitter registered is one more the light
+   * pool has to weigh up. Weaker than a street lamp, and warmer, so the lamps
+   * still do the work of lighting the road and the buildings tint it.
+   */
+  blockPower: 2600,
+  blockFalls: 165,
   /** The windows: how big one is, how far apart they sit, and how many are
    *  lit. Not all of them — a tower with every window on is an office block at
    *  five o'clock, not a city at night. */

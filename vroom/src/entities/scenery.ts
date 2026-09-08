@@ -4,8 +4,10 @@ import {ENVIRONMENTS, LAMP, NEON, Palette, SCENERY} from "../config";
 import {Rng} from "../core/rng";
 import {instance, neonSign, plant} from "../models";
 import {building, lamp, litMaterial} from "../models/city";
+import {fadingGlow} from "../render/materials";
+import {NearFade} from "../../../shared/fadeInFront";
 import type {NeonSign} from "../models/neon";
-import {flatVertex, LAYER, order, tile} from "../render/sprites";
+import {fadingVertex, flatVertex, LAYER, order, tile} from "../render/sprites";
 import {Glow} from "./glow";
 import {Track} from "./track";
 
@@ -29,6 +31,9 @@ export class Scenery {
   readonly signs: Array<NeonSign> = [];
   /** Everything that gives off light, and the few real lights that chase it. */
   readonly glow = new Glow();
+  /** The skyline, which dissolves when it stands between the camera and the
+   *  car — which, close to the road, it occasionally does. */
+  readonly fades: Array<NearFade> = [];
 
   constructor(rng: Rng, track: Track, palette: Palette) {
     const p = new THREE.Vector3();
@@ -222,30 +227,75 @@ export class Scenery {
     at: THREE.Vector3,
   ): void {
     const windows: Array<THREE.BufferGeometry> = [];
-    for (let i = 0; i < NEON.blocks; i++) {
-      if (!place(at, NEON.blockTo, NEON.blockFrom)) {
-        continue;
+    const shells: Array<THREE.BufferGeometry> = [];
+
+    const put = (low: boolean, band: number, from: number): void => {
+      if (!place(at, band, from)) {
+        return;
       }
-      const {solid, windows: panes} = building(ENVIRONMENTS.neon, rng);
+      const {
+        solid,
+        windows: panes,
+        height,
+      } = building(ENVIRONMENTS.neon, rng, low);
       const turn = rng.range(0, Math.PI * 2);
-      const built = solid.build();
-      built.position.set(at.x, 0, at.z);
-      built.rotation.y = turn;
-      this.group.add(built);
+      // Baked into world space and merged rather than built as its own object.
+      // Seventy buildings is seventy draw calls kept apart for no reason — and
+      // one mesh is also one material, which is what lets the whole skyline
+      // share a single fade.
+      for (const part of solid.parts()) {
+        part.geometry.rotateY(turn);
+        part.geometry.translate(at.x, 0, at.z);
+        shells.push(part.geometry);
+      }
 
       if (panes.attributes.position) {
         panes.rotateY(turn);
         panes.translate(at.x, 0, at.z);
         windows.push(panes);
       }
+
+      // Only the near row throws light. A tower three hundred units away
+      // lights nothing anybody can see, and every emitter registered is one
+      // more for the pool to weigh up every time it looks.
+      if (low) {
+        this.glow.add({
+          x: at.x,
+          y: height * 0.55,
+          z: at.z,
+          colour: 0xffd0a0,
+          power: NEON.blockPower,
+          reach: NEON.blockFalls,
+        });
+      }
+    };
+
+    // Low-rise along the street, towers set back behind it.
+    for (let i = 0; i < NEON.nearBlocks; i++) {
+      put(true, NEON.nearTo, NEON.nearFrom);
+    }
+    for (let i = 0; i < NEON.blocks; i++) {
+      put(false, NEON.blockTo, NEON.blockFrom);
+    }
+
+    if (shells.length > 0) {
+      const {material, fade} = fadingVertex("city");
+      const walls = new THREE.Mesh(mergeGeometries(shells, false), material);
+      walls.castShadow = true;
+      walls.receiveShadow = true;
+      walls.frustumCulled = false;
+      this.group.add(walls);
+      this.fades.push(fade);
     }
     if (windows.length > 0) {
-      const lit = new THREE.Mesh(
-        mergeGeometries(windows, false),
-        litMaterial(),
-      );
+      // The windows dissolve with the walls they are in. Without this a
+      // building that got out of the way would leave its lit windows hanging
+      // in the air, which is worse than the building was.
+      const {material, fade} = fadingGlow(NEON.emissive * 0.75, "cityWindows");
+      const lit = new THREE.Mesh(mergeGeometries(windows, false), material);
       lit.frustumCulled = false;
       this.group.add(lit);
+      this.fades.push(fade);
     }
     void track;
   }

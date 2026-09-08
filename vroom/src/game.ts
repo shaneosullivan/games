@@ -160,7 +160,7 @@ export class Game {
 
     this.stage.scene.add(this.track.group);
     this.scenery = new Scenery(rng, this.track, palette);
-    this.fades = [...this.track.fades];
+    this.fades = [...this.track.fades, ...this.scenery.fades];
     this.stage.scene.add(this.scenery.group);
     this.stage.scene.add(this.tyres.group);
     this.stage.scene.add(this.stands.group);
