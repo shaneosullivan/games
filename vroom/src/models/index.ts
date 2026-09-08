@@ -1,14 +1,14 @@
 import * as THREE from "three";
-import {ENVIRONMENTS, Environment, Palette, TRACK} from "../config";
+import {CAR, ENVIRONMENTS, Environment, Palette, TRACK} from "../config";
 import {Rng} from "../core/rng";
 import {material as materialFor} from "../render/materials";
 import {Assembly} from "./assembly";
-import {car} from "./car";
+import {car, driver} from "./car";
 import {plant} from "./flora";
 import {neonSign} from "./neon";
 import {barrier, cone, gantry, tyreStack} from "./props";
 
-export {car} from "./car";
+export {car, driver} from "./car";
 export {plant} from "./flora";
 export {neonSign} from "./neon";
 export {barrier, cone, gantry, tyreStack} from "./props";
@@ -44,6 +44,22 @@ export const MODELS: Array<ModelEntry> = [
     name: "Rival car",
     size: 22,
     make: () => car(0x3f7fd6),
+  },
+  {
+    id: "driver",
+    name: "Driver",
+    size: 9,
+    make: () => {
+      // On their own, away from the car, so a helmet that is inside out or an
+      // arm going through the wheel is obvious rather than hidden in a tub.
+      const a = new Assembly();
+      driver(a, CAR.length, CAR.width, 0xd6473c);
+      const built = a.build();
+      built.position.y = -4.5;
+      const holder = new THREE.Group();
+      holder.add(built);
+      return holder;
+    },
   },
   {
     id: "tyre-stack",
