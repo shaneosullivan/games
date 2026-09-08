@@ -46,6 +46,16 @@ export class GameLoop {
     if (frame > SIM.maxFrame) {
       frame = SIM.maxFrame;
     }
+    // And never below nothing. A requestAnimationFrame timestamp is the time
+    // the *frame* began, which can be earlier than the performance.now() taken
+    // in start() — so the first frame after starting can genuinely arrive with
+    // a negative step. Anything easing with 1 - exp(-rate * dt) then gets a
+    // negative factor and extrapolates away from its target instead of towards
+    // it; the camera ran off to ten million units the first time this
+    // happened.
+    if (frame < 0) {
+      frame = 0;
+    }
     if (frame > 0) {
       this.fps += (1 / frame - this.fps) * 0.08;
     }

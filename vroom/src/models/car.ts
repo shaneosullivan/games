@@ -172,7 +172,12 @@ export function driver(
     DETAIL.round,
     // Only the front, and only a band of it: a visor that went all the way
     // round would be a helmet on backwards as well as forwards.
-    -Math.PI * 0.42,
+    //
+    // Centred on a quarter turn, not on zero. Three builds a sphere with phi
+    // measured from −X, so a band centred on zero looks out of the side of the
+    // driver's head — which is where this was, and it is why they were not
+    // looking where they were going.
+    Math.PI * (0.5 - 0.42),
     Math.PI * 0.84,
     Math.PI * 0.34,
     Math.PI * 0.28,

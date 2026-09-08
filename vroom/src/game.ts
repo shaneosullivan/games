@@ -8,6 +8,7 @@ import {
   PLAYER,
   RIVALS,
   SCENERY,
+  START,
   SKID,
   TRACK,
 } from "./config";
@@ -15,6 +16,8 @@ import {TrackSpec} from "./track/spec";
 import {Patches} from "./entities/patches";
 import {Bridges} from "./entities/bridges";
 import {Tyres} from "./entities/tyres";
+import {Stands} from "./entities/stands";
+import {MiniMap} from "./ui/minimap";
 import {NearFade} from "../../shared/fadeInFront";
 import {GameLoop} from "./core/loop";
 import {Joystick} from "./core/input";
@@ -57,6 +60,7 @@ export class Game {
   readonly patches: Patches;
   readonly bridges: Bridges;
   readonly tyres: Tyres;
+  readonly stands: Stands;
   private readonly scenery: Scenery;
   /** Everything that dissolves when it stands between the camera and the car. */
   private readonly fades: Array<NearFade>;
@@ -74,6 +78,26 @@ export class Game {
   private lastT = 0;
   /** Over the line. */
   private finished = false;
+  /**
+   * How far into the start sequence, or -1 once the flag has dropped.
+   *
+   * While this is running the race is held still — nobody moves, the stick
+   * does nothing — and the camera is down in front of the grid.
+   */
+  private counting = -1;
+  /**
+   * Where the shot is between the two poses: 0 is the grid, 1 is racing.
+   *
+   * It starts at the grid, so the circuit is already being looked at head-on
+   * behind the opening card.
+   */
+  private shot = 0;
+  private readonly countdown = document.createElement("div");
+  private readonly map: MiniMap;
+  /** Reused every frame rather than rebuilt: the map wants four points and
+   *  there are sixty frames a second of them. */
+  private readonly onMap: Array<{x: number; z: number}> = [];
+  private shownBeat = -1;
   /** How many times round this race is. */
   private readonly laps: number;
 
@@ -132,12 +156,14 @@ export class Game {
     this.patches = new Patches(this.track, spec.items);
     this.bridges = new Bridges(this.track, palette);
     this.tyres = new Tyres(rng, this.track, palette);
+    this.stands = new Stands(rng, this.track, palette);
 
     this.stage.scene.add(this.track.group);
     this.scenery = new Scenery(rng, this.track, palette);
     this.fades = [...this.track.fades];
     this.stage.scene.add(this.scenery.group);
     this.stage.scene.add(this.tyres.group);
+    this.stage.scene.add(this.stands.group);
     this.stage.scene.add(this.patches.group);
     this.stage.scene.add(this.skids.mesh);
     this.stage.scene.add(this.trails.mesh);
@@ -153,6 +179,8 @@ export class Game {
     this.hud = new Hud();
     this.hud.setLaps(this.laps);
     this.hud.mount(ui);
+    this.map = new MiniMap(this.track);
+    this.map.mount(ui);
     this.stick = new Joystick(ui);
     this.stick.enabled = false;
 
@@ -167,6 +195,9 @@ export class Game {
       this.onAgain(),
     );
     this.done.hide();
+
+    this.countdown.className = "countdown hidden";
+    ui.appendChild(this.countdown);
 
     const corner = document.createElement("div");
     corner.className = "corner-buttons";
@@ -219,14 +250,56 @@ export class Game {
 
   private begin(): void {
     this.intro.hide();
-    this.stick.enabled = true;
-    this.running = true;
+    // Not running yet: the lights have to go out first. The stick is dead and
+    // so is everybody else on the grid until they do.
+    this.counting = 0;
+    this.shownBeat = -1;
+    this.countdown.classList.remove("hidden");
     // Here and not in the constructor: a browser will not start an audio
     // context outside a real gesture, and the button that got us here is one.
     this.engine.start();
   }
 
+  /**
+   * Three, two, one, go.
+   *
+   * The camera leaves before "one" rather than on "go", because the pull-back
+   * is the thing that tells a child the race is about to start — it has to be
+   * over by the time it is.
+   */
+  private tickStart(dt: number): void {
+    this.counting += dt;
+
+    const beat = Math.floor(this.counting / START.beat);
+    if (beat !== this.shownBeat) {
+      this.shownBeat = beat;
+      const word = beat >= 3 ? "Go!" : `${3 - beat}`;
+      this.countdown.textContent = word;
+      this.countdown.classList.toggle("go", beat >= 3);
+      // Restarted rather than left running, so each number lands with its own
+      // beat instead of the animation drifting away from the clock.
+      this.countdown.style.animation = "none";
+      void this.countdown.offsetWidth;
+      this.countdown.style.animation = "";
+    }
+
+    const pulling = Math.max(0, this.counting - START.pullsAt);
+    this.shot = Math.min(1, pulling / START.pullsFor);
+
+    if (this.counting >= START.beat * 3) {
+      this.running = true;
+      this.stick.enabled = true;
+    }
+    if (this.counting >= START.beat * 3 + START.goFor) {
+      this.counting = -1;
+      this.countdown.classList.add("hidden");
+    }
+  }
+
   update = (dt: number): void => {
+    if (this.counting >= 0) {
+      this.tickStart(dt);
+    }
     if (!this.running || this.finished) {
       return;
     }
@@ -275,6 +348,7 @@ export class Game {
       Math.max(0, Math.min(1, this.progress / this.laps)),
       this.place(),
     );
+    this.drawMap();
   };
 
   /**
@@ -394,6 +468,19 @@ export class Game {
     }
   }
 
+  /** The player first, then the rivals, which is the order their colours are
+   *  in. */
+  private drawMap(): void {
+    const cars = [this.car, ...this.rivals.cars];
+    for (let i = 0; i < cars.length; i++) {
+      const at = this.onMap[i] ?? {x: 0, z: 0};
+      at.x = cars[i].position.x;
+      at.z = cars[i].position.z;
+      this.onMap[i] = at;
+    }
+    this.map.update(this.onMap);
+  }
+
   /**
    * The mess a car tracks out of a patch.
    *
@@ -481,11 +568,18 @@ export class Game {
     this.stick.enabled = false;
     this.stick.release();
     this.hud.setVisible(false);
+    this.map.setVisible(false);
     this.engine.flag();
     this.engine.setMuted(true);
 
     const place = this.place();
     const clean = this.knocks === 0;
+    // Everybody up — unless the player came last, in which case they stay
+    // sitting down. Being cheered for finishing fourth of four is how a game
+    // starts feeling like it is humouring you, and a child can tell.
+    if (place < RIVALS.count + 1) {
+      this.stands.cheer(this.car.position, this.track.palette);
+    }
     this.done.setTitle(place === 1 ? "You won!" : "Chequered flag!");
     const round = this.laps === 1 ? "" : ` over ${this.laps} laps`;
     this.done.setBody(
@@ -498,6 +592,9 @@ export class Game {
   }
 
   render = (alpha: number, dt: number): void => {
+    // Here rather than in update, because the crowd's whole job happens after
+    // the flag — and update stops the moment the race is over.
+    this.stands.update(dt);
     this.car.render(alpha);
     this.rivals.render(alpha);
     this.followCamera(dt);
@@ -528,7 +625,12 @@ export class Game {
     );
     const ease = 1 - Math.exp(-CAMERA.ease * dt);
     this.eye.lerp(this.wantEye, ease);
-    this.stage.watch(this.eye.x, this.eye.z);
+
+    if (this.shot >= 1) {
+      this.stage.watch(this.eye.x, this.eye.z);
+    } else {
+      this.gridShot(p);
+    }
 
     // Anything standing between the camera and the car gets out of the way.
     // From a diagonal there is always something that can: a tree on the inside
@@ -547,6 +649,45 @@ export class Game {
     this.stage.dispose();
   }
 
+  /**
+   * The shot during the countdown, and the move out of it.
+   *
+   * Down at grid height, ahead of the whole grid, looking back along it — the
+   * player is at the back, so the camera has to stand in front of the leaders
+   * to have all four cars between itself and what it is aiming at.
+   *
+   * Then it is simply mixed with the racing pose. Both are a point and a
+   * target, so moving between them is two lerps and needs no path: the camera
+   * rises, swings behind and pulls back all at once, which is one movement to
+   * watch rather than three.
+   */
+  private gridShot(p: THREE.Vector3): void {
+    const facing = this.car.group.rotation.y;
+    const ahead = Math.sin(facing);
+    const side = Math.cos(facing);
+
+    // Where it stands and what it aims at, on the grid.
+    const gridEyeX = p.x + ahead * START.ahead;
+    const gridEyeZ = p.z + side * START.ahead;
+    const gridAtX = p.x + ahead * START.aim;
+    const gridAtZ = p.z + side * START.aim;
+
+    // And the racing pose, in the same terms.
+    const raceEyeX = this.eye.x;
+    const raceEyeZ = this.eye.z + CAMERA.back;
+
+    // Eased rather than linear, so it leaves gently and arrives gently.
+    const k = this.shot * this.shot * (3 - 2 * this.shot);
+    this.stage.place(
+      gridEyeX + (raceEyeX - gridEyeX) * k,
+      START.height + (CAMERA.up - START.height) * k,
+      gridEyeZ + (raceEyeZ - gridEyeZ) * k,
+      gridAtX + (this.eye.x - gridAtX) * k,
+      0,
+      gridAtZ + (this.eye.z - gridAtZ) * k,
+    );
+  }
+
   /** Puts the camera over the car straight away, so the first frame is not a
    *  swoop in from the origin. */
   private snapCamera(): void {
@@ -554,7 +695,10 @@ export class Game {
     this.rivals.render(1);
     const p = this.car.group.position;
     this.eye.set(p.x, 0, p.z);
-    this.stage.watch(p.x, p.z);
+    this.gridShot(p);
     this.hud.update(0, RIVALS.count + 1);
+    // Drawn once before anybody moves, so the corner is a map from the first
+    // frame rather than an empty white box until the flag drops.
+    this.drawMap();
   }
 }

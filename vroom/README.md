@@ -114,6 +114,41 @@ Worth knowing before changing anything:
   turn than grip can give is a skid. `CAR.grip` and `CAR.skidAt` are the two
   numbers the whole feel hangs off.
 
+## Starting and finishing
+
+A race opens down on the grid, looking back at the cars head-on, and counts
+three, two, one, go. The camera leaves on the beat _before_ "one" rather than
+on "go": the pull-back is what tells a child the race is about to start, so it
+has to be over by the time it is. Nobody moves until the flag — the stick is
+dead and so are the rivals.
+
+There are grandstands at the line with a crowd in them, and they jump when the
+player finishes anywhere but last. That exception is the feature rather than a
+detail of it: a child knows when they have been beaten, and an ovation for
+coming fourth of four is how a game starts feeling like it is humouring them.
+Confetti goes off over the line on the same condition.
+
+The map in the corner exists because the racing camera sees about a fifth of a
+lap — without it there is no telling whether the next corner is the hairpin or
+the sweeper, nor whether the car being chased is a second ahead or most of a
+lap.
+
+## The model viewer
+
+In a development build the track list has a **🧊 Models** button, and
+`#models` in the URL opens it directly. Every model in the game gets a card it
+can be turned in, and any card can be maximised to fill the page.
+
+The URL carries what is open — environment and maximised model — and that is
+the point of it rather than a nicety: the tool exists to be used while a model
+is being edited, and editing reloads the page every few seconds.
+
+One renderer serves the whole page. Each card is an empty div; a single canvas
+sits behind the grid and every frame the renderer sets its scissor to each
+card's rectangle in turn. Thirty cards is one WebGL context rather than thirty,
+and browsers hand out about sixteen before they start quietly dropping the
+oldest.
+
 ## Commands
 
 ```bash

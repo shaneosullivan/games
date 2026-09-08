@@ -9,6 +9,42 @@ import {material, setEnvironment} from "./materials";
 import {paint} from "./sprites";
 
 /**
+ * The sky, as a two-stop gradient wrapped round the world.
+ *
+ * Drawn as an equirectangular background rather than a plain colour, which is
+ * what puts the join exactly on the horizon however the camera is pointed —
+ * a screen-space gradient would slide about as the shot moved.
+ *
+ * Painted rather than loaded. Three colours and a canvas sixty-four pixels
+ * tall is a sky; an image file would be a hundred kilobytes in a game that
+ * ships as one html file.
+ */
+function skyOf(palette: Palette): THREE.Texture {
+  const canvas = document.createElement("canvas");
+  canvas.width = 4;
+  canvas.height = 64;
+  const g = canvas.getContext("2d");
+  if (!g) {
+    throw new Error("no 2d canvas");
+  }
+  const hex = (c: number): string => `#${c.toString(16).padStart(6, "0")}`;
+  const grad = g.createLinearGradient(0, 0, 0, 64);
+  grad.addColorStop(0, hex(palette.sky));
+  // The haze sits just above the join, which is where the air is thickest and
+  // where every real horizon goes pale.
+  grad.addColorStop(0.46, hex(palette.haze));
+  grad.addColorStop(0.5, hex(palette.ground));
+  grad.addColorStop(1, hex(palette.ground));
+  g.fillStyle = grad;
+  g.fillRect(0, 0, 4, 64);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.mapping = THREE.EquirectangularReflectionMapping;
+  texture.colorSpace = THREE.SRGBColorSpace;
+  return texture;
+}
+
+/**
  * The renderer, the scene, the camera, the light and the film.
  *
  * A **perspective** camera at a fixed forty-five degrees — behind the car,
@@ -33,6 +69,7 @@ export class Stage {
   private readonly sun: THREE.DirectionalLight;
   private readonly environment: THREE.Texture;
   private readonly ground: THREE.Mesh;
+  private readonly sky: THREE.Texture;
 
   constructor(host: HTMLElement, palette: Palette) {
     this.renderer = new THREE.WebGLRenderer({antialias: true});
@@ -47,8 +84,21 @@ export class Stage {
     host.appendChild(this.renderer.domElement);
 
     const ground = new THREE.Color(palette.ground);
-    this.scene.background = ground;
-    this.scene.fog = new THREE.Fog(ground, CAMERA.fogFrom, CAMERA.fogTo);
+    // A real sky, and it earns its place at exactly one moment: the shot on
+    // the grid before a race, which is low enough to see the horizon. The
+    // racing camera looks down at forty-five degrees and never does — the
+    // background was the ground colour for that reason and looked like a green
+    // wall the first time anything looked up.
+    this.sky = skyOf(palette);
+    this.scene.background = this.sky;
+    // Fog in the haze colour rather than the ground's, so the far end of the
+    // road runs out where the sky begins instead of stopping short of it.
+    this.scene.fog = new THREE.Fog(
+      new THREE.Color(palette.haze),
+      CAMERA.fogFrom,
+      CAMERA.fogTo,
+    );
+    void ground;
 
     // Something for the metal to reflect. Generated rather than loaded — a
     // self-contained html file has no room for an HDR, and a room is a
@@ -131,8 +181,28 @@ export class Stage {
    * keeps its map sharp, so it has to travel with the car.
    */
   watch(x: number, z: number): void {
-    this.camera.position.set(x, CAMERA.up, z + CAMERA.back);
-    this.camera.lookAt(x, 0, z);
+    this.place(x, CAMERA.up, z + CAMERA.back, x, 0, z);
+  }
+
+  /**
+   * The shot, said in full: where the camera is and what it is looking at.
+   *
+   * `watch` is this with the racing offset already worked out. The start of a
+   * race needs something else entirely — down at grid height, in front of the
+   * cars, looking back at them — so the general form exists as well.
+   */
+  place(
+    eyeX: number,
+    eyeY: number,
+    eyeZ: number,
+    atX: number,
+    atY: number,
+    atZ: number,
+  ): void {
+    this.camera.position.set(eyeX, eyeY, eyeZ);
+    this.camera.lookAt(atX, atY, atZ);
+    const x = atX;
+    const z = atZ;
     this.sun.target.position.set(x, 0, z);
     this.ground.position.set(x, this.ground.position.y, z);
     this.sun.position.set(
@@ -171,6 +241,7 @@ export class Stage {
   dispose(): void {
     window.removeEventListener("resize", this.resize);
     this.environment.dispose();
+    this.sky.dispose();
     this.composer.dispose();
     this.renderer.dispose();
     this.renderer.domElement.remove();

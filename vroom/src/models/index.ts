@@ -7,11 +7,13 @@ import {car, driver} from "./car";
 import {plant} from "./flora";
 import {neonSign} from "./neon";
 import {barrier, cone, gantry, tyreStack} from "./props";
+import {spectator, stand} from "./stand";
 
 export {car, driver} from "./car";
 export {plant} from "./flora";
 export {neonSign} from "./neon";
 export {barrier, cone, gantry, tyreStack} from "./props";
+export {spectator, stand} from "./stand";
 export {Assembly, DETAIL, rounded} from "./assembly";
 
 /**
@@ -84,6 +86,24 @@ export const MODELS: Array<ModelEntry> = [
     name: "Start gantry",
     size: 110,
     make: p => gantry(p, TRACK.half * 2.4).build(),
+  },
+  {
+    id: "stand",
+    name: "Grandstand",
+    size: 150,
+    make: p => stand(p).build(),
+  },
+  {
+    id: "spectator",
+    name: "Spectator",
+    size: 11,
+    make: () => {
+      const built = spectator().build();
+      built.position.y = -5;
+      const holder = new THREE.Group();
+      holder.add(built);
+      return holder;
+    },
   },
   {
     id: "tree",

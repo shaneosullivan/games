@@ -63,6 +63,13 @@ export const ENVIRONMENTS = {
     crowd: [0xe0b13c, 0x3f7fd6, 0xd6473c, 0xf2efe6, 0x49b45a],
     /** What grows here. Each environment plants something different. */
     flora: "broadleaf",
+    /** The sky, and the haze where it meets the ground. Only ever seen from
+     *  down on the grid — the racing camera never looks that far up. */
+    /* Deeper than it looks, on purpose: the tone curve takes a good deal of
+       the colour out of anything this bright, and a sky picked to look right
+       as a hex comes out of the camera as grey. */
+    sky: 0x3f95d6,
+    haze: 0xc3dbe8,
   },
   desert: {
     name: "Desert",
@@ -80,6 +87,8 @@ export const ENVIRONMENTS = {
     tyre: 0x2a2622,
     crowd: [0xe8d16a, 0xd0663c, 0xf6efdd, 0x8fb07a, 0xb44a3a],
     flora: "cactus",
+    sky: 0x4f9ecd,
+    haze: 0xe8d3a4,
   },
   neon: {
     name: "Neon city",
@@ -98,6 +107,10 @@ export const ENVIRONMENTS = {
     tyre: 0x0d0a18,
     crowd: [0xff2d95, 0x2de2ff, 0xfaff5c, 0x7b3cff, 0xf4eaff],
     flora: "palm",
+    /* Night. The haze is the city's own glow on the underside of the cloud,
+       which is what a city looks like from outside it after dark. */
+    sky: 0x0a0716,
+    haze: 0x3c1d52,
   },
 } as const;
 
@@ -149,6 +162,110 @@ export const CAMERA = {
    *  no edge, and gives the road somewhere to go. */
   fogFrom: 420,
   fogTo: 1150,
+} as const;
+
+/**
+ * The grandstands, and the crowd in them.
+ *
+ * They go at the start line, which is the one place on a circuit a crowd
+ * actually gathers and the one place the player is guaranteed to look — it is
+ * where the race begins and where it ends.
+ */
+export const STAND = {
+  /** Two of them, one each side of the road at the line. Far enough out that
+   *  they frame the straight rather than leaning over it. */
+  from: 124,
+  /** How big one is: rows deep, and how much each row rises and steps back. */
+  rows: 7,
+  /** How thick each tier is, and how deep. Chunky on purpose: a thin slab
+   *  reads as scaffolding, and a grandstand is concrete. */
+  rise: 4.8,
+  tread: 6.4,
+  width: 130,
+  headroom: 13,
+  /**
+   * How tall a spectator is, and how many are in a stand.
+   *
+   * Sized off the driver rather than picked: their head comes out the same
+   * size as a helmet, so the crowd and the person in the car are plainly the
+   * same kind of creature. That is also what makes the stand read as stairs
+   * with people on it — a step is a good deal shorter than they are, so every
+   * row shows above the one in front.
+   */
+  person: 4,
+  perStand: 280,
+  /**
+   * The celebration.
+   *
+   * They jump when the player finishes anywhere but last. Coming fourth of
+   * four to an ovation would be worse than no crowd at all — a child knows
+   * perfectly well when they have been beaten, and being cheered for it is
+   * how a game starts feeling like it is humouring you.
+   */
+  jumpFor: 6,
+  jumpHeight: 3.4,
+  jumpRate: 7,
+  /** The confetti over the line when the flag falls. */
+  confetti: 260,
+  confettiSpeed: 34,
+  confettiLift: 46,
+  confettiFall: 42,
+  confettiLasts: 3.4,
+  confettiSize: 22,
+} as const;
+
+/**
+ * The map in the corner.
+ *
+ * The racing camera sees about a fifth of a lap, so without this there is no
+ * telling whether the next corner is the hairpin or the sweeper, nor whether
+ * the car being chased is a second ahead or most of a lap — which between them
+ * are the whole of what a race is.
+ */
+export const MAP = {
+  /** How big it is on the glass, in CSS pixels. */
+  size: 104,
+  /** How much room to leave round the circuit inside that. */
+  pad: 12,
+  /** How wide the road is drawn, and how big the dots are. The player's is
+   *  bigger, because on a map this size the dot that matters has to win. */
+  road: 5,
+  dot: 3.4,
+  you: 4.6,
+  /** How many points the circuit is drawn from. Enough for a hairpin to be a
+   *  hairpin; it is sampled once and never again. */
+  samples: 160,
+} as const;
+
+/**
+ * The start of a race.
+ *
+ * The cars are looked at head-on from in front of the grid while the lights
+ * count down, and the shot pulls back into the racing position on the last
+ * beat — so the countdown ends with the camera already where it needs to be
+ * and the child already looking down the road.
+ */
+export const START = {
+  /** Where the camera stands: how far ahead of the player's car, how high, and
+   *  how far ahead of the player it looks. The whole grid is between those two
+   *  points, which is what puts four cars in the shot rather than one. */
+  ahead: 128,
+  height: 15,
+  aim: 45,
+  /** A second a beat: three, two, one, go. */
+  beat: 1,
+  /**
+   * When the camera starts moving, and how long it takes.
+   *
+   * It leaves before "one" rather than on "go" — the pull-back is what tells a
+   * child the race is about to start, and it has to be finished by the time it
+   * does. Arriving with the flag would mean the first corner is taken by
+   * somebody who is still watching the camera.
+   */
+  pullsAt: 1.7,
+  pullsFor: 1.3,
+  /** How long "Go!" stays up after the flag. */
+  goFor: 0.7,
 } as const;
 
 /**

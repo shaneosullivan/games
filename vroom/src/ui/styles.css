@@ -764,3 +764,70 @@ canvas {
 .model-view:active {
   cursor: grabbing;
 }
+
+/* ---------- The lights going out ---------- */
+
+/* Three, two, one, go. Big enough to read from across a room and short-lived
+   enough not to be in the way of the first corner. */
+.countdown {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: clamp(90px, 26vw, 240px);
+  font-weight: 800;
+  line-height: 1;
+  color: #fff;
+  text-shadow:
+    0 6px 0 rgba(20, 24, 32, 0.35),
+    0 0 40px rgba(0, 0, 0, 0.55);
+  pointer-events: none;
+  animation: countdown-beat 900ms ease-out both;
+}
+
+.countdown.go {
+  color: #7fe86a;
+  font-size: clamp(70px, 20vw, 190px);
+}
+
+.countdown.hidden {
+  display: none;
+}
+
+/* Each number arrives large and settles, so the beat is visible as well as
+   readable — a number that simply appeared would be easy to miss at a glance. */
+@keyframes countdown-beat {
+  0% {
+    opacity: 0;
+    transform: scale(1.7);
+  }
+  22% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0.92;
+    transform: scale(0.97);
+  }
+}
+
+/* ---------- The map in the corner ---------- */
+
+/* Top right, under the buttons. It is a diagram rather than a view: flat,
+   always the same way up, and readable at about a centimetre across. */
+.minimap {
+  position: absolute;
+  top: calc(var(--safe-t) + 72px);
+  right: calc(var(--safe-r) + 12px);
+  width: 104px;
+  height: 104px;
+  border-radius: 16px;
+  border: 1px solid var(--stroke);
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(8px);
+  pointer-events: none;
+}
+
+.minimap.hidden {
+  display: none;
+}
