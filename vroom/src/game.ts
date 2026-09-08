@@ -17,6 +17,7 @@ import {Patches} from "./entities/patches";
 import {Bridges} from "./entities/bridges";
 import {Tyres} from "./entities/tyres";
 import {Stands} from "./entities/stands";
+import {beginWatching, sawFrame} from "./core/quality";
 import {MiniMap} from "./ui/minimap";
 import {NearFade} from "../../shared/fadeInFront";
 import {GameLoop} from "./core/loop";
@@ -254,6 +255,8 @@ export class Game {
     // so is everybody else on the grid until they do.
     this.counting = 0;
     this.shownBeat = -1;
+    // From here on the game judges how well it is keeping up.
+    beginWatching();
     this.countdown.classList.remove("hidden");
     // Here and not in the constructor: a browser will not start an audio
     // context outside a real gesture, and the button that got us here is one.
@@ -597,6 +600,11 @@ export class Game {
   }
 
   render = (alpha: number, dt: number): void => {
+    // Every frame is evidence about the machine. Only while actually racing:
+    // a card on the screen or a countdown is not what the race will feel like.
+    if (this.running) {
+      sawFrame(dt);
+    }
     // Here rather than in update, because the crowd's whole job happens after
     // the flag — and update stops the moment the race is over.
     this.stands.update(dt);

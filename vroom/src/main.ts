@@ -6,6 +6,7 @@ import {Menu} from "./ui/menu";
 import {ModelViewer, MODELS_HASH} from "./ui/models";
 import {BUILT_IN, TrackSpec} from "./track/spec";
 import {saveTrack} from "./track/store";
+import {setQuality, tierName} from "./core/quality";
 
 // Before anything else. On an iPad a stray pinch or a double tap zooms the
 // page, and a zoomed page puts the readouts and the corner buttons off the top
@@ -121,8 +122,24 @@ declare global {
      *  through the list. */
     play: (spec?: TrackSpec) => void;
     builtIn: TrackSpec;
+    /** Reads or sets the rendering quality; see the note where it is defined. */
+    quality: (name?: string) => string;
   }
 }
 window.game = null;
+/**
+ * The quality knob, at the console.
+ *
+ * The game finds its own level by watching its frame rate, which is the right
+ * behaviour and a slow way to see what a tier looks like on a machine that
+ * never needs one. `quality("low")` puts it there at once and remembers it,
+ * the same as if the game had decided; `quality()` says where it is.
+ */
+window.quality = (name?: string) => {
+  if (name && !setQuality(name)) {
+    return `no such tier: ${name}`;
+  }
+  return tierName();
+};
 window.play = (spec?: TrackSpec) => showRace(spec ?? BUILT_IN);
 window.builtIn = BUILT_IN;

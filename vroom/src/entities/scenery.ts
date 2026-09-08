@@ -2,6 +2,7 @@ import * as THREE from "three";
 import {mergeGeometries} from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import {ENVIRONMENTS, LAMP, NEON, Palette, SCENERY} from "../config";
 import {Rng} from "../core/rng";
+import {tier} from "../core/quality";
 import {instance, neonSign, plant} from "../models";
 import {building, lamp, litMaterial} from "../models/city";
 import {fadingGlow} from "../render/materials";
@@ -36,6 +37,12 @@ export class Scenery {
   readonly fades: Array<NearFade> = [];
 
   constructor(rng: Rng, track: Track, palette: Palette) {
+    // How much of it to build at all. Unlike everything else the quality tier
+    // decides, this one cannot change while a race is running — the scenery is
+    // built once — so a machine that steps down mid-race gets the lighter
+    // world on its next one.
+    const share = tier().scenery;
+    const some = (n: number): number => Math.max(1, Math.round(n * share));
     const p = new THREE.Vector3();
     const s = new THREE.Vector3();
     const limit = Track.limit + 12;
@@ -64,7 +71,7 @@ export class Scenery {
     const at = new THREE.Vector3();
     const spots: Array<{x: number; z: number; turn: number; scale: number}> =
       [];
-    for (let i = 0; i < SCENERY.trees; i++) {
+    for (let i = 0; i < some(SCENERY.trees); i++) {
       if (!place(at, SCENERY.band)) {
         continue;
       }
@@ -101,7 +108,7 @@ export class Scenery {
     const shirts = palette.crowd;
     let cx = 0;
     let cz = 0;
-    for (let i = 0; i < SCENERY.crowd; i++) {
+    for (let i = 0; i < some(SCENERY.crowd); i++) {
       if (i % 12 === 0) {
         if (!place(at, 26)) {
           continue;
@@ -130,7 +137,7 @@ export class Scenery {
     // its own tubes, and there are few enough of them that a draw call each is
     // the right price for that.
     if (palette.flora === "palm") {
-      for (let i = 0; i < NEON.count; i++) {
+      for (let i = 0; i < some(NEON.count); i++) {
         if (!place(at, NEON.to, NEON.from)) {
           continue;
         }
@@ -271,10 +278,12 @@ export class Scenery {
     };
 
     // Low-rise along the street, towers set back behind it.
-    for (let i = 0; i < NEON.nearBlocks; i++) {
+    const share = tier().scenery;
+    const some = (n: number): number => Math.max(1, Math.round(n * share));
+    for (let i = 0; i < some(NEON.nearBlocks); i++) {
       put(true, NEON.nearTo, NEON.nearFrom);
     }
-    for (let i = 0; i < NEON.blocks; i++) {
+    for (let i = 0; i < some(NEON.blocks); i++) {
       put(false, NEON.blockTo, NEON.blockFrom);
     }
 

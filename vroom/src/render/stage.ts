@@ -4,7 +4,8 @@ import {RenderPass} from "three/examples/jsm/postprocessing/RenderPass.js";
 import {UnrealBloomPass} from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
 import {OutputPass} from "three/examples/jsm/postprocessing/OutputPass.js";
 import {RoomEnvironment} from "three/examples/jsm/environments/RoomEnvironment.js";
-import {CAMERA, FILM, LIGHT, Palette} from "../config";
+import {CAMERA, FILM, LIGHT, Palette, Tier} from "../config";
+import {onQualityChange, tier} from "../core/quality";
 import {material, setEnvironment} from "./materials";
 import {paint} from "./sprites";
 
@@ -73,13 +74,9 @@ export class Stage {
 
   constructor(host: HTMLElement, palette: Palette) {
     this.renderer = new THREE.WebGLRenderer({antialias: true});
-    // Capped at 2: a modern iPad reports 3, which triples the pixels drawn for
-    // a difference nobody can see.
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = FILM.exposure;
-    this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     host.appendChild(this.renderer.domElement);
 
@@ -169,9 +166,49 @@ export class Stage {
     // it the composer hands back linear light and the picture comes out grey.
     this.composer.addPass(new OutputPass());
 
+    this.applyQuality(tier());
+    onQualityChange(this.applyQuality);
     this.resize();
     window.addEventListener("resize", this.resize);
   }
+
+  /**
+   * Spends what the machine can afford.
+   *
+   * Everything here can be changed while a race is running, which is the whole
+   * point: when the game decides an iPad cannot keep up, the next frame is
+   * cheaper. The one thing that cannot is how much scenery was built, so that
+   * is read at construction and takes effect on the next race.
+   */
+  applyQuality = (at: Tier): void => {
+    // The device ratio is still the ceiling — asking for two on a screen that
+    // only has one would draw four times the pixels for nothing.
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, at.pixels));
+    this.bloom.enabled = at.bloom;
+
+    if (this.renderer.shadowMap.enabled !== at.shadows) {
+      this.renderer.shadowMap.enabled = at.shadows;
+      // Turning shadows on or off changes what every shader in the scene has
+      // to compile, and three will not notice on its own.
+      this.scene.traverse(o => {
+        const mesh = o as THREE.Mesh;
+        if (mesh.material) {
+          for (const m of [mesh.material].flat()) {
+            m.needsUpdate = true;
+          }
+        }
+      });
+    }
+    this.sun.castShadow = at.shadows;
+    if (this.sun.shadow.mapSize.width !== at.shadowMap) {
+      this.sun.shadow.mapSize.set(at.shadowMap, at.shadowMap);
+      // The map is allocated at its old size and has to go before a new one is
+      // made; three rebuilds it on the next frame that needs it.
+      this.sun.shadow.map?.dispose();
+      this.sun.shadow.map = null;
+    }
+    this.resize();
+  };
 
   /**
    * Aims the shot at a point on the ground.

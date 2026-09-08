@@ -133,6 +133,40 @@ lap — without it there is no telling whether the next corner is the hairpin or
 the sweeper, nor whether the car being chased is a second ahead or most of a
 lap.
 
+## Quality, and how it finds its own level
+
+The neon city is far heavier than the other two — a dozen dynamic lights, a
+skyline and a bloom pass with a great deal to bloom — and an older iPad cannot
+hold sixty frames a second through it. Rather than cut the level down for
+everybody, the game watches its own frame rate, steps down a tier when it
+cannot keep up, and remembers that for the machine it is on
+(`vroom.quality.v1` in local storage).
+
+`QUALITY.tiers` in `config.ts` scales the four things that actually cost
+anything on a tile-based mobile GPU, in the order they cost it: **how many
+pixels are drawn** (a retina iPad at a device ratio of two is four times the
+fragments of one at one — much the biggest lever), **the bloom pass** (five
+more full-screen blurs), **dynamic lights** (every point light is another
+iteration in every fragment of every lit surface), and **shadows** (a second
+render of the scene plus a filtered lookup per fragment).
+
+Three decisions in it are worth knowing:
+
+- **It only ever goes down.** A version that turned the quality back up on a
+  good stretch would hunt between two settings all race, and the hunting is
+  more distracting than the lower setting ever was.
+- **It ignores the first three seconds** of a race, which are shaders
+  compiling and textures uploading — the slowest the game will ever be and the
+  least representative — and it needs two bad two-second windows in a row, so
+  one stutter cannot cost a machine its quality for good.
+- **Everything except the scenery count changes mid-race.** How much scenery
+  was built cannot, so a machine that steps down gets the lighter world on its
+  next race.
+
+In a development build `quality("low")` at the console puts it at a tier and
+remembers it, and `quality()` says where it is — the only practical way to see
+what "low" looks like on a machine that never needs it.
+
 ## The model viewer
 
 In a development build the track list has a **🧊 Models** button, and

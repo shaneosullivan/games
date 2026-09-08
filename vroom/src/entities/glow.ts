@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import {GLOW} from "../config";
+import {tier} from "../core/quality";
 
 /**
  * Something that gives off light: a street lamp, a neon sign, a lit window.
@@ -96,9 +97,13 @@ export class Glow {
       }
     }
 
+    // How many are allowed to be on at all. Every point light is another
+    // iteration inside every fragment of every lit surface in the scene, so
+    // this is one of the biggest things a slower machine can give up.
+    const allowed = tier().lights;
     for (let i = 0; i < this.lights.length; i++) {
       const light = this.lights[i];
-      const pick = this.best[i];
+      const pick = i < allowed ? this.best[i] : undefined;
       if (!pick) {
         light.visible = false;
         continue;

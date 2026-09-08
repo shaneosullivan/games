@@ -107,7 +107,10 @@ export const ENVIRONMENTS = {
     treeB: 0x2de2ff,
     trunk: 0xff2d95,
     tyre: 0x0d0a18,
-    crowd: [0xff2d95, 0x2de2ff, 0xfaff5c, 0x7b3cff, 0xf4eaff],
+    /* Pink and cyan are the colours everybody reaches for and a city of only
+       those two reads as a single sign repeated. The green and the yellow are
+       what make it a street with different shops on it. */
+    crowd: [0xff2d95, 0x2de2ff, 0x3dff8f, 0xffe93d, 0x7b3cff, 0xd8ff4a],
     flora: "palm",
     /** A dashed line down the middle of the road. Only the city has one — it
      *  is a street as much as a circuit. */
@@ -255,6 +258,83 @@ export const STAND = {
   confettiLasts: 3.4,
   confettiSize: 22,
 } as const;
+
+/**
+ * How much the renderer is allowed to spend, and how it gives it up.
+ *
+ * The neon city is far heavier than the other two — a dozen dynamic lights, a
+ * skyline, a bloom pass with a great deal to bloom — and an older iPad cannot
+ * hold sixty frames a second through it. Rather than cut the level down for
+ * everybody, the game watches its own frame rate and steps down a tier when it
+ * cannot keep up, then remembers that for the machine it is on.
+ *
+ * The tiers scale the four things that actually cost anything on a tile-based
+ * mobile GPU, in the order they cost it:
+ *
+ *  - **How many pixels are drawn.** A retina iPad at a device ratio of two is
+ *    four times the fragments of one at one. This is the biggest single lever
+ *    there is and it is first for that reason.
+ *  - **The bloom pass**, which is five more full-screen passes of blur and is
+ *    bandwidth these machines do not have.
+ *  - **Dynamic lights.** Every point light is another iteration inside every
+ *    fragment of every lit surface, whether or not it reaches it.
+ *  - **Shadows**, which are a second render of the scene plus a filtered
+ *    lookup per fragment.
+ *
+ * It only ever goes down. A game that noticed it was running well and turned
+ * the quality back up would spend the whole race hunting between two settings,
+ * and the hunting is more distracting than the lower setting ever was.
+ */
+export const QUALITY = {
+  /** Below this many frames a second, for `patience` windows running, the
+   *  game gives something up. Forty-five rather than sixty: a steady
+   *  forty-eight is fine to drive and dropping a tier is not free. */
+  floor: 45,
+  /** How long a window is, in seconds, and how many bad ones in a row it
+   *  takes. Two windows so that one stutter — a garbage collection, a texture
+   *  upload — cannot cost a machine its quality for good. */
+  window: 2,
+  patience: 2,
+  /** How long after the flag before it starts counting. The first seconds of a
+   *  race are shaders compiling and textures uploading, which is the slowest
+   *  the game will ever be and the least representative. */
+  warmup: 3,
+  /** Where a machine starts if nothing is known about it. */
+  start: "high",
+  tiers: [
+    {
+      name: "high",
+      pixels: 2,
+      bloom: true,
+      lights: 10,
+      shadows: true,
+      shadowMap: 2048,
+      /** How much of the scenery is built. Applied when a race is built, so
+       *  this one takes effect on the next race rather than immediately. */
+      scenery: 1,
+    },
+    {
+      name: "medium",
+      pixels: 1.5,
+      bloom: true,
+      lights: 6,
+      shadows: true,
+      shadowMap: 1024,
+      scenery: 0.7,
+    },
+    {
+      name: "low",
+      pixels: 1.15,
+      bloom: false,
+      lights: 4,
+      shadows: false,
+      shadowMap: 512,
+      scenery: 0.45,
+    },
+  ],
+} as const;
+
+export type Tier = (typeof QUALITY.tiers)[number];
 
 /**
  * The map in the corner.
