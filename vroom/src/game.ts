@@ -263,7 +263,10 @@ export class Game {
     this.stage.scene.add(this.bridges.group);
 
     this.hud.setLaps(this.laps);
-    this.map = new MiniMap(this.track, carColour(spec.environment));
+    this.map = new MiniMap(this.track, [
+      carColour(spec.environment),
+      ...this.rivals.colours,
+    ]);
     this.map.mount(this.ui);
     this.gridUp();
     this.snapCamera();

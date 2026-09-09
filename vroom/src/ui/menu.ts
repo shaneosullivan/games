@@ -112,16 +112,17 @@ export class Menu {
     const foot = document.createElement("div");
     foot.className = "menu-foot";
 
-    // Development only. It is a tool for building the game, not part of it,
-    // and Vite strips the whole branch out of a production build.
-    if (import.meta.env.DEV) {
-      const models = document.createElement("button");
-      models.type = "button";
-      models.className = "chip";
-      models.textContent = "🧊 Models";
-      models.addEventListener("click", () => this.handlers.onModels());
-      foot.appendChild(models);
-    }
+    // In the built game as well as the dev server. It began as a tool for
+    // building the game and it was hidden in a production build, which meant
+    // the one place anybody actually plays this was the one place it could not
+    // be reached. It is a room full of the things in the game, turning round;
+    // there is nothing in it a child should not find.
+    const models = document.createElement("button");
+    models.type = "button";
+    models.className = "chip";
+    models.textContent = "🧊 Models";
+    models.addEventListener("click", () => this.handlers.onModels());
+    foot.appendChild(models);
     const home = document.createElement("a");
     home.className = "chip";
     home.href = "../../";

@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import {CAR, PLAYER, RIVALS} from "../config";
-import {myColour} from "../core/garage";
+import {myColour, neonised} from "../core/garage";
 import {Car, Drive} from "./car";
 import {Patches} from "./patches";
 import {Track, wrap} from "./track";
@@ -21,6 +21,9 @@ import {Track, wrap} from "./track";
 export class Rivals {
   readonly group = new THREE.Group();
   readonly cars: Array<Car> = [];
+  /** What each one is painted, in the order they were built. The minimap draws
+   *  a dot per car and it has to be the colour of the car it stands for. */
+  readonly colours: Array<number> = [];
 
   /** How far round the lap each one is, and how fast it goes. */
   private readonly at: Array<number> = [];
@@ -46,7 +49,10 @@ export class Rivals {
     // three first, then the rest of the garage to fill any gap. Filtering the
     // rivals' list and falling back by index was not enough — take blue and
     // the third rival fell through to a colour the second already had.
-    const used = new Set<number>([myColour()]);
+    // Both versions of the player's colour are spoken for, whichever track
+    // this is: under the neon they drive the turned-up one, and a rival in the
+    // daylight version of it is the same car from the height the camera sits.
+    const used = new Set<number>([myColour(), neonised(myColour())]);
     const nextColour = (): number => {
       for (const c of [...RIVALS.colours, ...PLAYER.choices]) {
         if (!used.has(c)) {
@@ -57,7 +63,9 @@ export class Rivals {
       return RIVALS.colours[0];
     };
     for (let i = 0; i < RIVALS.count; i++) {
-      const car = new Car(nextColour());
+      const colour = nextColour();
+      this.colours.push(colour);
+      const car = new Car(colour);
       // Left, right, left: a grid, not a queue.
       const off = (i % 2 === 0 ? 1 : -1) * RIVALS.offset;
       const t = wrap(track.startAt - 0.006 - i * RIVALS.gridGap);

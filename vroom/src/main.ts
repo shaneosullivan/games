@@ -157,7 +157,7 @@ async function showRace(spec: TrackSpec): Promise<void> {
 
 // Straight into the list rather than into a race — unless the URL says the
 // model viewer was open, in which case a reload goes back to it.
-if (import.meta.env.DEV && window.location.hash.startsWith(MODELS_HASH)) {
+if (window.location.hash.startsWith(MODELS_HASH)) {
   showModels(window.location.hash);
 } else {
   showMenu();
