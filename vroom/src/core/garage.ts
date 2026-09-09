@@ -1,4 +1,5 @@
-import {PLAYER} from "../config";
+import * as THREE from "three";
+import {Environment, PLAYER} from "../config";
 
 /**
  * Which car is yours.
@@ -21,6 +22,35 @@ export function myColour(): number {
     // A blocked store just means everybody drives the red one.
   }
   return PLAYER.colour;
+}
+
+/**
+ * Your colour as it is painted for a given track.
+ *
+ * Everywhere but the neon city this is simply the colour you chose. There it
+ * is that colour turned up — see `PLAYER.neonSaturation`.
+ */
+export function carColour(environment: Environment): number {
+  return environment === "neon" ? neonised(myColour()) : myColour();
+}
+
+/** The same hue, wound out to full. Colours with no hue come back unchanged. */
+export function neonised(colour: number): number {
+  const c = new THREE.Color(colour);
+  const hsl = {h: 0, s: 0, l: 0};
+  // In sRGB rather than the working space, so these are the saturation and
+  // lightness the palette was picked in and not their linear counterparts.
+  c.getHSL(hsl, THREE.SRGBColorSpace);
+  if (hsl.s < PLAYER.neonNeedsHue) {
+    return colour;
+  }
+  c.setHSL(
+    hsl.h,
+    Math.max(hsl.s, PLAYER.neonSaturation),
+    Math.max(hsl.l, PLAYER.neonLightness),
+    THREE.SRGBColorSpace,
+  );
+  return c.getHex(THREE.SRGBColorSpace);
 }
 
 export function chooseColour(colour: number): void {

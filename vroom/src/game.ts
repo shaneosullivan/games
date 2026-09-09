@@ -18,7 +18,7 @@ import {Bridges} from "./entities/bridges";
 import {Tyres} from "./entities/tyres";
 import {Stands} from "./entities/stands";
 import {beginWatching, sawFrame} from "./core/quality";
-import {myColour} from "./core/garage";
+import {carColour} from "./core/garage";
 import {LOADING, SIM} from "./config";
 import {MiniMap} from "./ui/minimap";
 import {NearFade} from "../../shared/fadeInFront";
@@ -233,7 +233,7 @@ export class Game {
 
     report(0.25, "Rolling out the cars\u2026");
     await frame();
-    this.car = new Car(myColour());
+    this.car = new Car(carColour(spec.environment));
     this.rivals = new Rivals(this.track);
     this.skids = new Skids(palette);
     this.trails = new Skids(palette, TRAIL.max);
@@ -263,7 +263,7 @@ export class Game {
     this.stage.scene.add(this.bridges.group);
 
     this.hud.setLaps(this.laps);
-    this.map = new MiniMap(this.track);
+    this.map = new MiniMap(this.track, carColour(spec.environment));
     this.map.mount(this.ui);
     this.gridUp();
     this.snapCamera();

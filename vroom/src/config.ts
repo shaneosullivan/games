@@ -773,6 +773,23 @@ export const PLAYER = {
     0xd6473c, 0x3f7fd6, 0x49b45a, 0xe0b13c, 0xa356d6, 0xf2f0ea, 0x21242b,
     0xff7a2f, 0x2ec7c7, 0xef62a8,
   ] as ReadonlyArray<number>,
+  /**
+   * Your colour, under the neon.
+   *
+   * The city is lit in pinks and cyans that are brighter than anything on the
+   * cars, and a car painted for daylight goes flat and muddy in the middle of
+   * it. So on that track the colour you chose is turned up rather than
+   * swapped: the same hue, wound out to full saturation and lifted, which
+   * reads as the neon version of your own car and not as somebody else's.
+   *
+   * A colour with no hue to wind out is left alone. Black and white are
+   * choices in their own right — a "neon black" is a blue car, which is not
+   * what the child who picked black asked for — so anything below this much
+   * saturation keeps exactly the paint it had.
+   */
+  neonSaturation: 1,
+  neonLightness: 0.62,
+  neonNeedsHue: 0.3,
   /** How far off the centre line the player starts, and how far back. */
   offset: -22,
 } as const;
