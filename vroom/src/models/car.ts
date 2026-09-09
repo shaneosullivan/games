@@ -52,7 +52,7 @@ export function car(
 
   const group = a.build();
   group.name = "car";
-  stick(group, stickers);
+  stick(group, stickers, colour);
   return group;
 }
 
@@ -136,6 +136,7 @@ export function decalColour(colour: number): number {
 export function stick(
   group: THREE.Group,
   stickers: ReadonlyArray<Sticker>,
+  colour: number,
 ): void {
   for (const old of [...group.children]) {
     if (old.userData.sticker === undefined) {
@@ -151,7 +152,7 @@ export function stick(
     });
   }
   stickers.forEach((sticker, i) => {
-    const mesh = stickerMesh(sticker, i);
+    const mesh = stickerMesh(sticker, i, colour);
     if (mesh) {
       group.add(mesh);
     }

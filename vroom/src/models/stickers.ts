@@ -204,11 +204,14 @@ export const PICTURE_KINDS = Object.keys(PICTURES) as Array<
 export function stickerMesh(
   sticker: Sticker,
   index: number,
+  paintwork: number,
 ): THREE.Object3D | null {
   const L = CAR.length;
   const W = CAR.width;
   const built =
-    sticker.kind === "text" ? writing(sticker, L, W) : picture(sticker, L, W);
+    sticker.kind === "text"
+      ? writing(sticker, L, W)
+      : picture(sticker, L, W, paintwork);
   if (!built) {
     return null;
   }
@@ -225,7 +228,12 @@ export function stickerMesh(
 }
 
 /** A picture: its layers, stacked, laid on whichever deck it is over. */
-function picture(sticker: Sticker, L: number, W: number): THREE.Group | null {
+function picture(
+  sticker: Sticker,
+  L: number,
+  W: number,
+  paintwork: number,
+): THREE.Group | null {
   const build = PICTURES[sticker.kind as Exclude<StickerKind, "text">];
   if (!build) {
     return null;
@@ -238,7 +246,7 @@ function picture(sticker: Sticker, L: number, W: number): THREE.Group | null {
     flat.rotateX(-Math.PI / 2);
     flat.translate(acrossOf(sticker, W), i * STICKER.layer, sticker.v * L);
     const on = dropOnDeck(flat, L, W, STICKER.lift);
-    group.add(new THREE.Mesh(on, paint(layer.colour)));
+    group.add(new THREE.Mesh(on, paint(inkFor(layer.colour, paintwork))));
     flat.dispose();
   });
   return group;
@@ -316,6 +324,51 @@ export function heightOf(sticker: Sticker): number {
  *  the wings at either end, which are not the car's side. */
 export function alongFlank(v: number): number {
   return Math.max(STICKER.sideTo, Math.min(STICKER.sideFrom, v));
+}
+
+/**
+ * A picture's colour: turned up, and never the car's own.
+ *
+ * Two jobs in one pass, because they pull against each other. Saturation goes
+ * to the top — a sticker is printed ink, and printed ink is louder than paint
+ * — and then, if what comes out is close to the car in both hue and lightness,
+ * the lightness is pushed apart until it reads. A red heart on a red car is a
+ * dent rather than a decoration.
+ *
+ * The hue is never touched. A heart that solved the problem by turning blue
+ * would have solved the wrong problem. Colours with no hue to speak of — the
+ * bone of a skull, the black of a flag pole — take the lightness rule against
+ * any car at all, since white on white is invisible whatever the hues say.
+ */
+function inkFor(colour: number, paintwork: number): number {
+  const ink = {h: 0, s: 0, l: 0};
+  const paint = {h: 0, s: 0, l: 0};
+  new THREE.Color(colour).getHSL(ink, THREE.SRGBColorSpace);
+  new THREE.Color(paintwork).getHSL(paint, THREE.SRGBColorSpace);
+
+  const coloured =
+    ink.s >= STICKER.hasHue &&
+    ink.l > STICKER.hueBetween[0] &&
+    ink.l < STICKER.hueBetween[1];
+  const s = coloured
+    ? Math.max(ink.s, STICKER.vivid)
+    : Math.min(ink.s, STICKER.neutral);
+
+  const apart = Math.abs(ink.h - paint.h);
+  const hueGap = Math.min(apart, 1 - apart);
+  const sameish =
+    !coloured || paint.s < STICKER.hasHue || hueGap < STICKER.hueApart;
+  let l = ink.l;
+  if (sameish && Math.abs(l - paint.l) < STICKER.lightApart) {
+    // Away from the car, in whichever direction there is room for.
+    l =
+      paint.l < STICKER.darkAt
+        ? Math.min(0.96, paint.l + STICKER.lightApart)
+        : Math.max(0.06, paint.l - STICKER.lightApart);
+  }
+  return new THREE.Color()
+    .setHSL(ink.h, s, l, THREE.SRGBColorSpace)
+    .getHex(THREE.SRGBColorSpace);
 }
 
 /** The paint a picture layer is in. Not the car's paint: these have their own

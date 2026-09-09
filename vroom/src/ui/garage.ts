@@ -417,7 +417,7 @@ export class Garage {
    *  here, and a convex hull and four wheels a letter is not worth it. */
   private restick(): void {
     if (this.model) {
-      stick(this.model, this.stickers);
+      stick(this.model, this.stickers, this.colour);
       this.glow();
     }
   }

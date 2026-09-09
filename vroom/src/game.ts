@@ -28,7 +28,7 @@ import {Joystick} from "./core/input";
 import {Rng} from "./core/rng";
 import {Engine} from "./core/audio";
 import {Stage} from "./render/stage";
-import {Track, wrap} from "./entities/track";
+import {signed, Track, wrap} from "./entities/track";
 import {Car, Drive} from "./entities/car";
 import {Rivals} from "./entities/rivals";
 import {Skids} from "./entities/skids";
@@ -82,6 +82,8 @@ export class Game {
 
   /** How far the player has come, in laps, and where they were last step. */
   private progress = 0;
+  /** The player's grid slot, as a signed distance from the start line. */
+  private began = 0;
   private lastT = 0;
   /** Over the line. */
   private finished = false;
@@ -295,6 +297,10 @@ export class Game {
   /** Everybody on the grid: the rivals in front, the player at the back. */
   private gridUp(): void {
     const t = this.track.gridAt(RIVALS.count, PLAYER.offset, this.here);
+    // Where the player's grid slot is, relative to the line. Kept because
+    // placing is decided on how far past the line each car is, and the player
+    // starts the furthest back of the four.
+    this.began = signed(t - this.track.startAt);
     const d = this.track.tangentAt(t, this.eye);
     this.car.place(
       this.here.x,
@@ -446,9 +452,15 @@ export class Game {
    * when a child is learning to hold a car sideways.
    */
   private place(): number {
+    // How far past the start line the player is — their own distance plus the
+    // slot they started from, which is behind the line and behind all three
+    // rivals. Comparing bare distances travelled had the player leading a race
+    // with three cars in front of them, because everybody had gone equally far
+    // from wherever they each happened to begin.
+    const me = this.progress + this.began;
     let ahead = 0;
     for (let i = 0; i < RIVALS.count; i++) {
-      if (this.rivals.progress(i) > this.progress) {
+      if (this.rivals.progress(i) > me) {
         ahead++;
       }
     }

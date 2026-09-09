@@ -593,6 +593,18 @@ export function ringGap(a: number, b: number): number {
   return w > TRACK.segments / 2 ? w - TRACK.segments : w;
 }
 
+/**
+ * A lap fraction as a signed distance from zero: -0.5..0.5.
+ *
+ * `wrap` puts everything in 0..1, which makes a car a whisker *behind* the
+ * start line read as almost a whole lap ahead of it. Anything comparing two
+ * places on the circuit wants this instead.
+ */
+export function signed(t: number): number {
+  const w = wrap(t);
+  return w > 0.5 ? w - 1 : w;
+}
+
 /** A sample index, wrapped into the ring. */
 export function wrapIndex(i: number): number {
   return ((i % TRACK.segments) + TRACK.segments) % TRACK.segments;

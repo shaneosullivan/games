@@ -3,7 +3,7 @@ import {CAR, PLAYER, RIVALS} from "../config";
 import {myColour, neonised} from "../core/garage";
 import {Car, Drive} from "./car";
 import {Patches} from "./patches";
-import {Track, wrap} from "./track";
+import {signed, Track, wrap} from "./track";
 
 /**
  * The other cars.
@@ -30,6 +30,9 @@ export class Rivals {
   /** And how far each has travelled in total, in laps — which is a different
    *  number, because `at` wraps and the race is decided on distance. */
   private readonly travelled: Array<number> = [];
+  /** Where each one started, as a signed distance from the start line. The
+   *  grid is behind the line, so these are all a little negative. */
+  private readonly began: Array<number> = [];
   private readonly pace: Array<number> = [];
   private readonly offset: Array<number> = [];
 
@@ -80,6 +83,7 @@ export class Rivals {
       this.group.add(car.group);
       this.at.push(t);
       this.travelled.push(0);
+      this.began.push(signed(t - track.startAt));
       this.offset.push(off);
       // Each a little different, so they string out instead of moving as one.
       this.pace.push(CAR.top * (RIVALS.pace + (i - 1) * RIVALS.spread));
@@ -126,7 +130,16 @@ export class Rivals {
   }
 
   /** How far each of them has come, in laps, for working out the order. */
+  /**
+   * How far past the start line this one is, in laps.
+   *
+   * Distance travelled *plus where it started*, and the second half of that is
+   * not a detail: the grid is a queue, the four cars are strung out over a
+   * fiftieth of a lap, and comparing bare distances credits everybody with
+   * having started from the line. The player, who starts at the very back, was
+   * shown as leading a race with three cars visibly in front of them.
+   */
   progress(i: number): number {
-    return this.travelled[i];
+    return this.travelled[i] + this.began[i];
   }
 }

@@ -1006,14 +1006,48 @@ export const STICKER = {
    * pictures stuck on it.
    */
   ink: {
-    gold: 0xffc93c,
-    sun: 0xffe04a,
-    red: 0xe23b3b,
-    bone: 0xf4f1e6,
-    white: 0xf7f5ee,
-    dark: 0x1b1d24,
-    lip: 0xd08a2a,
+    gold: 0xffc400,
+    sun: 0xffe000,
+    red: 0xf01a1a,
+    bone: 0xfbf8ee,
+    white: 0xfdfcf7,
+    dark: 0x14161c,
+    lip: 0xe07a00,
   },
+  /**
+   * How vivid a picture is, and how far it must stay from the car's own paint.
+   *
+   * Wound out to full saturation, because these are stickers: a sticker is
+   * printed ink and printed ink is louder than a car's paint, which has to
+   * live with being looked at for a whole race.
+   *
+   * And never the colour of the car it is stuck to. A red heart on a red car
+   * is a dent, not a decoration — so anything that lands too near the paint in
+   * both hue and lightness is pushed apart in lightness until it reads. The
+   * hue is kept, always: a heart that solved the problem by turning blue would
+   * have solved the wrong problem.
+   *
+   * `hasHue` is the saturation below which a colour is treated as having no
+   * hue at all — a bone-white skull or a black flag pole clashes with a pale
+   * or dark car whatever its hue is doing.
+   */
+  vivid: 0.95,
+  hasHue: 0.25,
+  hueApart: 0.09,
+  lightApart: 0.26,
+  /** A colour this pale or this dark has no hue worth winding out, whatever
+   *  its saturation claims: bone white is a hair off yellow and turning that
+   *  up gives a gold skull. Those are held near neutral instead. */
+  hueBetween: [0.16, 0.84] as ReadonlyArray<number>,
+  neutral: 0.1,
+  /**
+   * Which way a clashing picture moves: darker, unless the car itself is dark.
+   *
+   * Darker keeps the colour. Lighter turns a red heart into a pink one and a
+   * gold star into cream — readable, and pastel, which is the opposite of what
+   * a sticker is for. Only a car too dark to go under pushes them up instead.
+   */
+  darkAt: 0.4,
   /** How far apart the layers of one picture are stacked. Enough that the eyes
    *  of a smiley never flicker through its face, small enough to be paint. */
   layer: 0.05,
