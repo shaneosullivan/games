@@ -5,7 +5,6 @@ import {Rng} from "../core/rng";
 import {settings} from "../core/quality";
 import {instance, neonSign, plant} from "../models";
 import {building, lamp, litMaterial} from "../models/city";
-import {fadingGlow} from "../render/materials";
 import {NearFade} from "../../../shared/fadeInFront";
 import type {NeonSign} from "../models/neon";
 import {fadingVertex, flatVertex, LAYER, order, tile} from "../render/sprites";
@@ -221,7 +220,7 @@ export class Scenery {
   }
 
   /**
-   * The skyline: blocks with their lights on, beyond the barrier.
+   * The skyline: dark blocks beyond the barrier.
    *
    * Each is its own model rather than one instanced tower, because the whole
    * of a building at night is which of its windows happen to be lit — and two
@@ -262,19 +261,7 @@ export class Scenery {
         windows.push(panes);
       }
 
-      // Only the near row throws light. A tower three hundred units away
-      // lights nothing anybody can see, and every emitter registered is one
-      // more for the pool to weigh up every time it looks.
-      if (low) {
-        this.glow.add({
-          x: at.x,
-          y: height * 0.55,
-          z: at.z,
-          colour: 0xffd0a0,
-          power: NEON.blockPower,
-          reach: NEON.blockFalls,
-        });
-      }
+      void height;
     };
 
     // Low-rise along the street, towers set back behind it.
@@ -297,13 +284,13 @@ export class Scenery {
       this.fades.push(fade);
     }
     if (windows.length > 0) {
-      // The windows dissolve with the walls they are in. Without this a
-      // building that got out of the way would leave its lit windows hanging
-      // in the air, which is worse than the building was.
-      const {material, fade} = fadingGlow(NEON.emissive * 0.75, "cityWindows");
-      const lit = new THREE.Mesh(mergeGeometries(windows, false), material);
-      lit.frustumCulled = false;
-      this.group.add(lit);
+      // The panes dissolve with the walls they are in. Without this a building
+      // that got out of the way would leave its glazing hanging in the air,
+      // which is worse than the building was.
+      const {material, fade} = fadingVertex("cityWindows");
+      const glass = new THREE.Mesh(mergeGeometries(windows, false), material);
+      glass.frustumCulled = false;
+      this.group.add(glass);
       this.fades.push(fade);
     }
     void track;

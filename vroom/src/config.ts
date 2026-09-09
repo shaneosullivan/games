@@ -846,6 +846,20 @@ export const ITEM = {
   ramp: {
     colour: 0xe8b23c,
     stripe: 0x2b2b31,
+    /**
+     * The wedge itself, in world units.
+     *
+     * A real ramp, not a picture of one: the car drives up the slope, rides
+     * the surface with its nose in the air, and leaves at the lip. It was a
+     * board painted on the road, which meant a car crossed it without ever
+     * going up — the jump simply happened, from nowhere, on flat tarmac.
+     */
+    wide: 52,
+    long: 42,
+    rise: 11,
+    /** How much the climb costs. Going up a hill is work, and a ramp taken
+     *  slowly should be slower still at the top. */
+    drag: 46,
     /** How long the car is in the air, and how much bigger it looks at the top
      *  of the arc. Seen from straight above there is no other way to say
      *  "off the ground": the sprite grows and its shadow stays put. */
@@ -888,6 +902,19 @@ export const ITEM = {
      * down. That is the whole shape of a jump and it comes out for free.
      */
     pitch: 0.42,
+    /**
+     * The dive: how a square take-off goes over.
+     *
+     * All four wheels on the boards means no roll — nothing is lopsided, so
+     * there is nothing to throw it sideways — and a jump with no rotation at
+     * all is the dullest thing a ramp can do. So a square one goes head first
+     * instead: the nose keeps rotating forward over the top of the arc.
+     * Radians a second at full speed, and how far over it is allowed to get
+     * before it holds there. Just past a right angle, so it comes down looking
+     * over its own bonnet rather than winding all the way round onto its roof.
+     */
+    dive: 1.6,
+    diveMost: 1.1,
     /** How fast it goes up. The arc is a real one — gravity brings it back —
      *  so this is a speed and not a duration. */
     launch: 62,
@@ -1068,21 +1095,17 @@ export const NEON = {
   blockLow: 110,
   blockHigh: 340,
   /**
-   * The light a building's windows throw onto the street.
+   * The windows, with the lights off.
    *
-   * Only the near row is given one — a tower three hundred units away lights
-   * nothing you can see, and every emitter registered is one more the light
-   * pool has to weigh up. Weaker than a street lamp, and warmer, so the lamps
-   * still do the work of lighting the road and the buildings tint it.
+   * They used to be lit, and to throw light on the street with it. Dark now:
+   * the lamps and the signs light this city and the buildings are the shapes
+   * standing behind them. The panes stay — a tower with no windows is a block,
+   * not a building — they are just glass catching what the street gives them,
+   * which is also why every one of them is here rather than a lit share.
    */
-  blockPower: 2600,
-  blockFalls: 165,
-  /** The windows: how big one is, how far apart they sit, and how many are
-   *  lit. Not all of them — a tower with every window on is an office block at
-   *  five o'clock, not a city at night. */
   window: 4.4,
   windowGap: 11,
-  windowsLit: 0.55,
+  windowGlass: 0x191826,
   /** How many are faulty, how fast they stutter, and how far down they drop
    *  when they do. Not to nothing — a dead tube still catches the streetlight. */
   brokenChance: 0.35,

@@ -80,12 +80,22 @@ export class Car {
   roll = 0;
   pitch = 0;
   private rollRate = 0;
+  /** Nose-over-tail, for a take-off with all four wheels on the ramp. */
+  private pitchRate = 0;
   /** Whether it has already taken off from the ramp it is currently on, so a
    *  long ramp cannot launch the same car twice. */
   private launched = false;
+  /** Whether the roll has been settled for the ramp being climbed. */
+  private decided = false;
   /** Which front wheels were on the ramp last frame, so a car that brushes the
    *  very edge and never draws level with the middle still gets a jump. */
   private readonly lastFront = [false, false];
+  /** On the slope of a ramp — on the ground, but above it. Not the same as
+   *  airborne, and telling them apart is what lets a car keep its grip while
+   *  it climbs. */
+  private onSlope = false;
+  /** What the roll will be when it leaves the lip, decided at the middle. */
+  private pendingLean = 0;
   /** How long is left of the jolt as the nose comes down. */
   private landing = 0;
 
@@ -141,8 +151,9 @@ export class Car {
    * The middle is where a ramp throws you, and the back wheels have nothing to
    * add: they go wherever the front ones went.
    */
-  private launch(nearFront: boolean, farFront: boolean): void {
+  private launch(lean: number): void {
     const push = Math.min(1, this.speed / CAR.top);
+    this.onSlope = false;
     this.air = ITEM.ramp.airtime;
     this.boost = ITEM.ramp.carry;
     // Straight onto the velocity, before it is split into along and across:
@@ -151,10 +162,9 @@ export class Car {
     this.velocity.multiplyScalar(ITEM.ramp.boost);
     this.climb = ITEM.ramp.launch * push;
 
-    // Both front wheels on it is a jump; one is a roll towards whichever side
-    // was left hanging.
-    const lean = nearFront === farFront ? 0 : nearFront ? 1 : -1;
     this.rollRate = lean * ITEM.ramp.roll * push;
+    // Square onto the boards: nothing to roll it, so it goes head first.
+    this.pitchRate = lean === 0 ? -ITEM.ramp.dive * push : 0;
   }
 
   /** Off the ground, and how far through the jump. */
@@ -184,8 +194,12 @@ export class Car {
     this.roll = 0;
     this.pitch = 0;
     this.rollRate = 0;
+    this.pitchRate = 0;
     this.landing = 0;
     this.launched = false;
+    this.decided = false;
+    this.onSlope = false;
+    this.pendingLean = 0;
     this.lastFront[0] = false;
     this.lastFront[1] = false;
     this.carrying.fill(null);
@@ -260,6 +274,8 @@ export class Car {
     if (this.air > 0) {
       this.air = Math.max(0, this.air - dt);
     } else if (frontOn[0] || frontOn[1]) {
+      // Riding the wedge. The ramp is solid, so the car goes up it rather than
+      // across a picture of it.
       // Level with the middle of the ramp, not off the far end of it.
       //
       // Waiting for the car to run out of ramp meant it took off well past the
@@ -273,18 +289,49 @@ export class Car {
           )
         : -1;
       if (which >= 0 && !this.launched) {
+        // How far along the ramp's *own* axis the car is, from the foot of the
+        // slope to the lip.
+        const yaw = patches!.yawOf(which);
+        const ux = Math.sin(yaw);
+        const uz = Math.cos(yaw);
+        const dx = this.position.x - patches!.centreX(which);
+        const dz = this.position.z - patches!.centreZ(which);
+        const up = dx * ux + dz * uz;
+        const half = ITEM.ramp.long / 2;
+        const climbed = Math.max(0, Math.min(1, (up + half) / ITEM.ramp.long));
+
+        // Whether it will roll is settled halfway up, on the front wheels —
+        // by the lip the car is committed and both of them are on the boards
+        // whatever line it took.
         const ax = (this.wheelAt[0].x + this.wheelAt[1].x) / 2;
         const az = (this.wheelAt[0].y + this.wheelAt[1].y) / 2;
-        // How far past the middle the front axle is, measured the way the car
-        // is going. It crosses zero at the closest approach — which is the
-        // middle for a car going over the top, and the nearest point to it for
-        // one clipping the edge.
-        const along =
+        const axle =
           (ax - patches!.centreX(which)) * this.dir.x +
           (az - patches!.centreZ(which)) * this.dir.y;
-        if (along >= 0 && this.speed >= ITEM.ramp.minSpeed) {
+        if (axle >= 0 && !this.decided) {
+          this.decided = true;
+          this.pendingLean =
+            frontOn[0] === frontOn[1] ? 0 : frontOn[0] ? 1 : -1;
+        }
+
+        // Sitting on the surface: up the slope, nose up with it.
+        this.onSlope = true;
+        this.height = climbed * ITEM.ramp.rise;
+        const slope = Math.atan2(ITEM.ramp.rise, ITEM.ramp.long);
+        this.pitch = slope;
+        // Climbing costs something, the way a hill does. A flat number of
+        // units a second off the speed, not a fraction of it: a fraction is
+        // enormous when the speed is small, and a car that crept onto the
+        // wedge had every scrap of speed taken away every frame and sat there
+        // at full throttle, stuck halfway up, for the rest of the race.
+        const slowed = Math.max(0, this.speed - ITEM.ramp.drag * dt);
+        if (this.speed > 0) {
+          this.velocity.multiplyScalar(slowed / this.speed);
+        }
+
+        if (up >= half && this.speed >= ITEM.ramp.minSpeed) {
           this.launched = true;
-          this.launch(frontOn[0], frontOn[1]);
+          this.launch(this.pendingLean);
         }
       }
       this.lastFront[0] = frontOn[0];
@@ -298,14 +345,26 @@ export class Car {
         !this.launched &&
         this.speed >= ITEM.ramp.minSpeed
       ) {
-        this.launch(this.lastFront[0], this.lastFront[1]);
+        const lean = this.decided
+          ? this.pendingLean
+          : this.lastFront[0] === this.lastFront[1]
+            ? 0
+            : this.lastFront[0]
+              ? 1
+              : -1;
+        this.launch(lean);
       }
       this.lastFront[0] = false;
       this.lastFront[1] = false;
       this.launched = false;
+      this.decided = false;
+      this.onSlope = false;
     }
     this.boost = Math.max(0, this.boost - dt);
-    const flying = this.air > 0 || this.height > 0;
+    // On the slope the car is *on the ground*, however high off it that is.
+    // Without telling the two apart, a car climbing a ramp lost its grip and
+    // its steering halfway up one.
+    const flying = this.air > 0 || (this.height > 0 && !this.onSlope);
 
     // How fast the nose can come round. Less and less of the turn survives as
     // the speed comes up — a car that cornered as hard at a hundred as at a
@@ -420,18 +479,30 @@ export class Car {
 
     // The arc. Gravity does this now rather than a timer, so a fast take-off
     // really does go further and land later than a slow one.
-    if (this.air > 0 || this.height > 0) {
+    if (this.onSlope) {
+      // Held to the surface above; nothing to integrate.
+    } else if (this.air > 0 || this.height > 0) {
       this.height += this.climb * dt;
       this.climb -= ITEM.ramp.gravity * dt;
       this.roll += this.rollRate * dt;
-      // The nose follows the climb: up while it is going up, down while it is
-      // coming down. No timer, and the shape of the jump comes out for free.
-      this.pitch = ITEM.ramp.pitch * (this.climb / ITEM.ramp.launch);
+      if (this.pitchRate !== 0) {
+        // Going over the front. Held once it is far enough round, so the car
+        // hangs nose-down for the rest of the drop instead of spinning.
+        this.pitch = Math.max(
+          -ITEM.ramp.diveMost,
+          this.pitch + this.pitchRate * dt,
+        );
+      } else {
+        // The nose follows the climb: up while it is going up, down while it
+        // is coming down. No timer, and the shape of a jump comes out free.
+        this.pitch = ITEM.ramp.pitch * (this.climb / ITEM.ramp.launch);
+      }
       if (this.height <= 0) {
         this.height = 0;
         this.climb = 0;
         this.air = 0;
         this.rollRate = 0;
+        this.pitchRate = 0;
         // The bumper. It comes down on its nose, loses a little, and settles
         // back onto four wheels — which is the difference between landing a
         // jump and teleporting to the far side of one.

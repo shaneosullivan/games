@@ -43,16 +43,12 @@ export function lamp(): {solid: Assembly; bulb: THREE.BufferGeometry} {
 }
 
 /**
- * A tower block with its lights on.
+ * A tower block, dark.
  *
- * The windows are the whole model. A block on its own is a box; a box with a
- * grid of lit windows up it is a building somebody is in, and at night that is
- * the only difference there is. They are emissive well past white so the bloom
- * pass spills a halo off each one, which is what a lit window looks like from
- * across a street.
- *
- * Not every window is lit. A tower with all of them on is an office block at
- * five o'clock rather than a city at night.
+ * The windows are still the whole model — a box is a box, and a box with a
+ * grid of panes up it is a building — but they are glass rather than lights.
+ * Nothing here is emissive and nothing here is a light source: the street
+ * lamps and the signs light the city, and these stand behind them.
  */
 export function building(
   palette: Palette,
@@ -75,9 +71,8 @@ export function building(
   cap.translate(0, h, 0);
   solid.add(cap, "concrete", 0x1d1a2a);
 
-  const lit: Array<THREE.BufferGeometry> = [];
+  const panes: Array<THREE.BufferGeometry> = [];
   const step = NEON.windowGap;
-  const colours = [0xffd9a0, 0xcfe4ff, 0xfff2cc, 0x9fd8ff];
 
   // Up all four faces. The two along Z and the two along X are the same grid
   // turned a quarter turn, which is why this is a loop over sides rather than
@@ -92,9 +87,6 @@ export function building(
     const rows = Math.max(1, Math.floor((h - step * 1.5) / step));
     for (let c = 0; c < columns; c++) {
       for (let r = 0; r < rows; r++) {
-        if (rng.next() > NEON.windowsLit) {
-          continue;
-        }
         const pane = new THREE.PlaneGeometry(NEON.window, NEON.window * 1.2);
         // Turned to face out of whichever wall it is in.
         pane.rotateY(Math.atan2(nx, nz));
@@ -106,14 +98,14 @@ export function building(
         );
         // Slide it along the face it is on.
         pane.translate(nz * along, 0, -nx * along);
-        lit.push(paint(pane, rng.pick(colours)));
+        panes.push(paint(pane, NEON.windowGlass));
       }
     }
   }
 
   const windows =
-    lit.length > 0
-      ? (mergeGeometries(lit, false) ?? lit[0])
+    panes.length > 0
+      ? (mergeGeometries(panes, false) ?? panes[0])
       : new THREE.BufferGeometry();
   void palette;
   return {solid, windows, height: h};

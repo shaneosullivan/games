@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import {HEIGHT, Palette, TYRES} from "../config";
+import {HEIGHT, ITEM, Palette, TYRES} from "../config";
 import {Assembly, DETAIL, rounded} from "./assembly";
 
 /**
@@ -124,6 +124,58 @@ export function gantry(palette: Palette, span: number): Assembly {
     const lamp = new THREE.SphereGeometry(1.5, DETAIL.coarse, DETAIL.coarse);
     lamp.translate((i - 2) * 6, h - 2, 2);
     a.add(lamp, "glass", 0x2a0c0c);
+  }
+  return a;
+}
+
+/**
+ * A ramp: a wedge, low at the near end and cut off at the lip.
+ *
+ * Built pointing +Z, like everything else, so it is turned to the road by the
+ * same yaw the rest of the game uses. The profile is drawn in the XY plane and
+ * extruded across the car, which is the one way of building a wedge that reads
+ * from the code as the shape it actually is.
+ */
+export function ramp(): Assembly {
+  const a = new Assembly();
+  const L = ITEM.ramp.long;
+  const W = ITEM.ramp.wide;
+  const H = ITEM.ramp.rise;
+
+  const profile = new THREE.Shape();
+  profile.moveTo(-L / 2, 0);
+  profile.lineTo(L / 2, 0);
+  profile.lineTo(L / 2, H);
+  profile.closePath();
+
+  const wedge = new THREE.ExtrudeGeometry(profile, {
+    depth: W,
+    bevelEnabled: false,
+  });
+  // The shape is drawn along X and extruded along Z; the quarter turn puts the
+  // slope along the road and the width across it.
+  wedge.translate(0, 0, -W / 2);
+  wedge.rotateY(-Math.PI / 2);
+  a.add(wedge, "matte", ITEM.ramp.colour);
+
+  // Chevrons up the slope, lying on it. They point the way you are going,
+  // which is the one thing a ramp has to say.
+  const slope = Math.atan2(H, L);
+  for (let i = 0; i < 3; i++) {
+    const along = (i - 1) * L * 0.26;
+    const bar = rounded(W * 0.82, 0.5, L * 0.1, 0.2);
+    bar.rotateX(-slope);
+    bar.translate(0, (along + L / 2) * Math.tan(slope) + 0.5, along);
+    a.add(bar, "matte", ITEM.ramp.stripe);
+  }
+
+  // Cheeks down each side, so the wedge has an edge rather than fading into
+  // the tarmac.
+  for (const side of [-1, 1]) {
+    const cheek = rounded(1.6, H * 0.5, L, 0.3);
+    cheek.rotateX(-slope * 0.5);
+    cheek.translate((side * W) / 2, H * 0.32, 0);
+    a.add(cheek, "matte", ITEM.ramp.stripe);
   }
   return a;
 }
