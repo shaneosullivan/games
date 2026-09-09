@@ -38,14 +38,26 @@ export class Rivals {
 
   constructor(track: Track) {
     this.drive = {kind: "aim", aim: this.want};
-    // Nobody else drives the player's colour. Two identical cars in a race of
-    // four is a child watching the wrong one all the way round.
-    const mine = myColour();
-    const spare = PLAYER.choices.filter(c => c !== mine);
-    const palette = RIVALS.colours.filter(c => c !== mine);
+    // Every car in the race is a different colour, and none of them is the
+    // player's. Two the same is a child watching the wrong one all the way
+    // round — and that goes for two rivals as much as for a rival and you.
+    //
+    // Taken in order and skipping whatever is spoken for: the rivals' own
+    // three first, then the rest of the garage to fill any gap. Filtering the
+    // rivals' list and falling back by index was not enough — take blue and
+    // the third rival fell through to a colour the second already had.
+    const used = new Set<number>([myColour()]);
+    const nextColour = (): number => {
+      for (const c of [...RIVALS.colours, ...PLAYER.choices]) {
+        if (!used.has(c)) {
+          used.add(c);
+          return c;
+        }
+      }
+      return RIVALS.colours[0];
+    };
     for (let i = 0; i < RIVALS.count; i++) {
-      const pick = i < palette.length ? palette[i] : spare[i % spare.length];
-      const car = new Car(pick);
+      const car = new Car(nextColour());
       // Left, right, left: a grid, not a queue.
       const off = (i % 2 === 0 ? 1 : -1) * RIVALS.offset;
       const t = wrap(track.startAt - 0.006 - i * RIVALS.gridGap);
