@@ -261,9 +261,10 @@ function writing(sticker: Sticker, L: number, W: number): THREE.Group | null {
     return null;
   }
 
-  // As tall as asked for, until that makes it longer than the side allows.
+  // As tall as asked for, plus a bit for each line under the first, until that
+  // makes it longer than the side allows.
   const room = L * STICKER.sideRoom;
-  let height = sticker.size;
+  let height = sticker.size * (1 + (drawn.lines - 1) * STICKER.lineAdds);
   let width = height * drawn.aspect;
   if (width > room) {
     width = room;
@@ -342,7 +343,7 @@ function paint(colour: number): THREE.Material {
 function paintWords(
   words: string,
   font: string,
-): {canvas: HTMLCanvasElement; aspect: number} | null {
+): {canvas: HTMLCanvasElement; aspect: number; lines: number} | null {
   const family =
     STICKER.fonts.find(f => f.id === font)?.family ?? STICKER.fonts[0].family;
   const canvas = document.createElement("canvas");
@@ -353,9 +354,17 @@ function paintWords(
   const size = STICKER.textPixels;
   const face = `700 ${size}px ${family}`;
   measure.font = face;
-  const wide = Math.ceil(measure.measureText(words).width) + size * 0.5;
-  canvas.width = Math.max(size, Math.min(STICKER.textMost, wide));
-  canvas.height = Math.round(size * 1.5);
+
+  // One word to a line. Two words written end to end across a panel five units
+  // long come out too small to read; stacked, they are each as big as a single
+  // word would have been.
+  const lines = words.split(/\s+/).filter(Boolean).slice(0, STICKER.lines);
+  const step = Math.round(size * 1.28);
+  const wide = Math.max(
+    ...lines.map(line => Math.ceil(measure.measureText(line).width)),
+  );
+  canvas.width = Math.max(size, Math.min(STICKER.textMost, wide + size * 0.5));
+  canvas.height = Math.round(step * lines.length + size * 0.3);
 
   const paintOn = canvas.getContext("2d");
   if (!paintOn) {
@@ -368,9 +377,16 @@ function paintWords(
   paintOn.strokeStyle = "#1b1d24";
   paintOn.lineWidth = size * 0.07;
   paintOn.lineJoin = "round";
-  // Outlined as well as filled: white letters on a white car would otherwise
-  // be a name nobody could read, and the outline costs nothing.
-  paintOn.strokeText(words, canvas.width / 2, canvas.height / 2, canvas.width);
-  paintOn.fillText(words, canvas.width / 2, canvas.height / 2, canvas.width);
-  return {canvas, aspect: canvas.width / canvas.height};
+  lines.forEach((line, i) => {
+    const y = canvas.height / 2 + (i - (lines.length - 1) / 2) * step;
+    // Outlined as well as filled: white letters on a white car would otherwise
+    // be a name nobody could read, and the outline costs nothing.
+    paintOn.strokeText(line, canvas.width / 2, y, canvas.width);
+    paintOn.fillText(line, canvas.width / 2, y, canvas.width);
+  });
+  return {
+    canvas,
+    aspect: canvas.width / canvas.height,
+    lines: lines.length,
+  };
 }

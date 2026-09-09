@@ -1019,6 +1019,18 @@ export const STICKER = {
   /** How tall a word arrives. Smaller than a picture: it is longer than it is
    *  tall and it has to fit between the wheels. */
   textSize: 2.4,
+  /**
+   * Words go on their own lines, up to this many.
+   *
+   * A name and a number, or two names, stack rather than running end to end.
+   * The panel between the wheels is about five units long and there is nothing
+   * to be done about that — but it is a good deal taller than it is long, so a
+   * second word goes *under* the first and both stay big enough to read.
+   */
+  lines: 3,
+  /** How much taller the block gets per extra line. One line is the height
+   *  asked for; each one after adds this much of it. */
+  lineAdds: 0.62,
   /** The longest a word may be along the car, as a fraction of its length,
    *  and how far along it may sit — short of the wings at either end, which
    *  are not the car's side. */
