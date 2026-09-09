@@ -1,6 +1,6 @@
 import {ENVIRONMENTS, LAYOUT} from "../config";
 import {deleteTrack, loadTracks} from "../track/store";
-import {BUILT_IN, TrackSpec} from "../track/spec";
+import {BUILT_INS, TrackSpec} from "../track/spec";
 import {rate, RATING_NAMES} from "../track/rating";
 import {Garage} from "./garage";
 
@@ -81,7 +81,9 @@ export class Menu {
     list.className = "menu-list";
 
     list.appendChild(section("Race"));
-    list.appendChild(this.card(BUILT_IN, false));
+    for (const spec of BUILT_INS) {
+      list.appendChild(this.card(spec, false));
+    }
 
     list.appendChild(section("Custom tracks"));
     const mine = loadTracks();

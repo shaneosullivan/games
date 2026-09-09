@@ -1,4 +1,4 @@
-import {ENVIRONMENTS, RACE, TRACK} from "../config";
+import {CIRCUITS, ENVIRONMENTS, RACE, TRACK} from "../config";
 import type {Environment} from "../config";
 
 export type {Environment};
@@ -51,7 +51,7 @@ export interface TrackSpec {
   items: Array<TrackItem>;
 }
 
-/** The circuit the game ships with. */
+/** The circuit the game opens on. */
 export const BUILT_IN: TrackSpec = {
   version: SPEC_VERSION,
   id: "built-in",
@@ -62,6 +62,37 @@ export const BUILT_IN: TrackSpec = {
   startAt: TRACK.startAt,
   items: [],
 };
+
+/**
+ * The three the game ships with: one for each place there is.
+ *
+ * Three rather than one because two of the three environments were only ever
+ * seen by a child who drew a track and remembered to change the setting — a
+ * whole desert and a whole city, built and lit and never opened.
+ */
+export const BUILT_INS: ReadonlyArray<TrackSpec> = [
+  BUILT_IN,
+  {
+    version: SPEC_VERSION,
+    id: "built-in-desert",
+    name: CIRCUITS.desert.name,
+    environment: "desert",
+    laps: 1,
+    shape: CIRCUITS.desert.shape.map(p => ({x: p.x, z: p.z})),
+    startAt: CIRCUITS.desert.startAt,
+    items: [],
+  },
+  {
+    version: SPEC_VERSION,
+    id: "built-in-neon",
+    name: CIRCUITS.neon.name,
+    environment: "neon",
+    laps: 1,
+    shape: CIRCUITS.neon.shape.map(p => ({x: p.x, z: p.z})),
+    startAt: CIRCUITS.neon.startAt,
+    items: [],
+  },
+];
 
 /** One to ten, whole. Ten is the limit because a child racing an eleventh lap
  *  of their own track has stopped playing and started commuting. */

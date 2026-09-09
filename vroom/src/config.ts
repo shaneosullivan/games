@@ -266,6 +266,33 @@ export const STAND = {
   confettiFall: 38,
   confettiLasts: 4,
   confettiSize: 2.4,
+  /**
+   * The desert gets fire instead.
+   *
+   * Paper falling out of a clear desert sky is a town's idea of a party. What
+   * a desert circuit does at the flag is throw flame off the gantry, and it is
+   * the better ending anyway: the confetti drifts down behind you, and this
+   * goes up in front of you while you are still braking.
+   *
+   * Fire rises, so the gravity is negative — the flames accelerate upward
+   * rather than falling back — and it is thrown in bursts over a second and a
+   * half rather than all at once, because one puff is an explosion and a
+   * handful in a row is a fire.
+   */
+  flame: [0xffd24a, 0xff9a2e, 0xf2542d, 0xd8341f],
+  flameCount: 55,
+  flameSpeed: 9,
+  flameLift: 46,
+  /** Negative: it climbs. */
+  flameRise: -26,
+  flameLasts: 1.15,
+  flameSize: 2.5,
+  /** How long the fire burns, how often it is fed, and how far apart the two
+   *  columns of it stand either side of the line. */
+  flameFor: 1.6,
+  flameEvery: 0.16,
+  flameApart: 30,
+  flameFrom: 2,
 } as const;
 
 /**
@@ -654,6 +681,60 @@ export const TRACK = {
   /** Where the start line sits, as a fraction round the lap. Just before the
    *  first corner, so the grid is on a straight. */
   startAt: 0.02,
+} as const;
+
+/**
+ * The other two circuits the game ships with.
+ *
+ * One for each of the other places: a desert with long straights and one
+ * proper hairpin, and a city with the corners a city has — square, tight, and
+ * one chicane where the road jinks round something nobody has bothered to move.
+ *
+ * The same size as Sunday Hills, about eleven hundred units across, because
+ * that is the size the camera, the field of four and a one-lap race were all
+ * settled around. Drawn as corner points and smoothed into a closed curve the
+ * same way a child's own track is, so these are three examples of the thing
+ * the editor makes rather than three special cases.
+ */
+export const CIRCUITS = {
+  desert: {
+    name: "Dune Run",
+    startAt: 0.02,
+    shape: [
+      {x: -60, z: -560},
+      {x: 260, z: -540},
+      {x: 520, z: -390},
+      {x: 600, z: -140},
+      {x: 470, z: 70},
+      {x: 560, z: 300},
+      {x: 360, z: 500},
+      {x: 40, z: 520},
+      {x: -200, z: 430},
+      {x: -130, z: 220},
+      {x: -390, z: 210},
+      {x: -560, z: 30},
+      {x: -430, z: -230},
+      {x: -260, z: -430},
+    ] as ReadonlyArray<{x: number; z: number}>,
+  },
+  neon: {
+    name: "Neon Mile",
+    startAt: 0.02,
+    shape: [
+      {x: -300, z: -540},
+      {x: 240, z: -540},
+      {x: 520, z: -330},
+      {x: 520, z: -70},
+      {x: 320, z: 60},
+      {x: 500, z: 250},
+      {x: 380, z: 500},
+      {x: 40, z: 540},
+      {x: -240, z: 440},
+      {x: -170, z: 190},
+      {x: -470, z: 210},
+      {x: -570, z: -140},
+    ] as ReadonlyArray<{x: number; z: number}>,
+  },
 } as const;
 
 /**

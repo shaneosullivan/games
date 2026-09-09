@@ -241,7 +241,7 @@ export class Game {
     this.patches = new Patches(this.track, spec.items);
     this.bridges = new Bridges(this.track, palette);
     this.tyres = new Tyres(rng, this.track, palette);
-    this.stands = new Stands(rng, this.track, palette);
+    this.stands = new Stands(rng, this.track, palette, spec.environment);
 
     report(0.45, "Building the scenery\u2026");
     await frame();

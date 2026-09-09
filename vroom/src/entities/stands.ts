@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import {ParticleBurst} from "../../../shared/particles";
-import {Palette, STAND} from "../config";
+import {Environment, Palette, STAND} from "../config";
 import {Rng} from "../core/rng";
 import {instance} from "../models";
 import {spectator, stand} from "../models/stand";
@@ -34,17 +34,36 @@ export class Stands {
     phase: number;
   }> = [];
   private cheering = 0;
-  /** The confetti over the line. Its own pool, because it is the one thing in
-   *  this game that wants to be a shower of coloured paper. */
-  readonly confetti = new ParticleBurst(STAND.confetti, 0.9, false);
+  /**
+   * What goes off over the line. Its own pool, because it is the one thing in
+   * this game that wants to be a shower of coloured paper — or, in the desert,
+   * a fire. Fire is drawn additively, which is what makes overlapping flames
+   * brighten each other instead of hiding each other; paper is not, because
+   * additive paper is a glowing smear.
+   */
+  readonly confetti: ParticleBurst;
+  /** How much of the desert's fire is left to throw. */
+  private burning = 0;
+  private feed = 0;
 
   private readonly m = new THREE.Matrix4();
   private readonly q = new THREE.Quaternion();
   private readonly pos = new THREE.Vector3();
   private readonly one = new THREE.Vector3(1, 1, 1);
   private readonly tint = new THREE.Color();
+  private readonly flare = new THREE.Vector3();
 
-  constructor(rng: Rng, track: Track, palette: Palette) {
+  constructor(
+    rng: Rng,
+    track: Track,
+    palette: Palette,
+    private readonly environment: Environment = "hills",
+  ) {
+    this.confetti = new ParticleBurst(
+      STAND.confetti,
+      0.9,
+      environment === "desert",
+    );
     const p = new THREE.Vector3();
     const s = new THREE.Vector3();
     const d = new THREE.Vector3();
@@ -116,9 +135,16 @@ export class Stands {
    *  the shot rather than appearing in it. */
   readonly over = new THREE.Vector3();
 
-  /** Everybody on their feet, and paper everywhere. */
+  /** Everybody on their feet, and paper everywhere — or, in the desert, fire.
+   *  See `STAND.flame`. */
   cheer(at: THREE.Vector3, palette: Palette): void {
     this.cheering = STAND.jumpFor;
+    if (this.environment === "desert") {
+      this.over.copy(at);
+      this.burning = STAND.flameFor;
+      this.feed = 0;
+      return;
+    }
     // Three goes, spread across the road, so it falls as a shower rather than
     // as one ball of paper.
     for (let i = -1; i <= 1; i++) {
@@ -137,6 +163,45 @@ export class Stands {
   }
 
   /**
+   * The desert's fire, fed a little at a time.
+   *
+   * Two columns, one either side of the road, thrown up from just above the
+   * ground so they climb through the shot rather than appearing at the top of
+   * it. A single burst is an explosion; a burst every sixth of a second for a
+   * second and a half is a fire.
+   */
+  private burn(dt: number): void {
+    if (this.burning <= 0) {
+      return;
+    }
+    this.burning -= dt;
+    this.feed -= dt;
+    if (this.feed > 0) {
+      return;
+    }
+    this.feed = STAND.flameEvery;
+    for (const side of [-1, 1]) {
+      this.confetti.burst(
+        this.flare.set(
+          this.over.x + side * STAND.flameApart,
+          STAND.flameFrom,
+          this.over.z + side * STAND.flameApart * 0.45,
+        ),
+        {
+          color: STAND.flame,
+          count: STAND.flameCount,
+          speed: STAND.flameSpeed,
+          lift: STAND.flameLift,
+          gravity: STAND.flameRise,
+          ttl: STAND.flameLasts,
+          size: STAND.flameSize,
+          spherical: 0.16,
+        },
+      );
+    }
+  }
+
+  /**
    * Bounces them, while there is anything to bounce about.
    *
    * Each person has their own phase, so the crowd is a crowd. Once the cheer
@@ -146,6 +211,7 @@ export class Stands {
    */
   update(dt: number): void {
     this.confetti.update(dt);
+    this.burn(dt);
     if (this.cheering <= 0) {
       return;
     }
