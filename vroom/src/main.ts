@@ -47,6 +47,7 @@ function clear(): void {
   models = null;
   garage?.dispose();
   garage = null;
+  window.garage = null;
   menu?.dispose();
   menu = null;
   app!.replaceChildren();
@@ -87,6 +88,7 @@ function showModels(hash = ""): void {
 function showGarage(): void {
   clear();
   garage = new Garage(showMenu);
+  window.garage = garage;
   app!.appendChild(garage.root);
 }
 
@@ -175,9 +177,13 @@ declare global {
     /** Reads or sets how many quality concessions have been made; see the
      *  note where it is defined. */
     quality: (level?: number) => string;
+    /** The garage, while it is open, for the same reason `game` is here: the
+     *  only way to check where a sticker actually landed is to ask it. */
+    garage: Garage | null;
   }
 }
 window.game = null;
+window.garage = null;
 /**
  * The quality knob, at the console.
  *

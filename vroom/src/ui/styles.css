@@ -944,12 +944,27 @@ canvas {
   color: #eef0f4;
 }
 
-/* The car itself. Its own canvas, sized to this box. */
+/* The car itself. Its own canvas, sized to this box.
+
+   It never shrinks below a third of the screen and it never scrolls away: the
+   car is the whole point of this screen, everything on the page is a change to
+   it, and a row of buttons that pushes it out of sight is a row of buttons
+   nobody can judge the effect of. So the car holds its share of the height and
+   the controls under it scroll instead. */
 .garage-view {
-  flex: 1;
-  min-height: 0;
+  flex: 1 1 auto;
+  min-height: 34vh;
   touch-action: none;
   cursor: grab;
+}
+
+.screen.garage .garage-controls,
+.garage-panel .garage-controls {
+  flex: 0 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
 .garage-view:active {
@@ -1023,6 +1038,104 @@ canvas {
   transform: scale(0.96);
 }
 
+/* The stickers: a row of things to add, and a row of things to do to the one
+   you have hold of. The second row only appears when there is one, because a
+   row of dead buttons is a row of questions a child cannot answer. */
+.stickers {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 16px 0;
+}
+
+.sticker-add {
+  min-width: 46px;
+  padding: 7px 10px;
+  border-radius: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.08);
+  color: inherit;
+  font: inherit;
+  font-size: 22px;
+  line-height: 1.1;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.sticker-add.wide {
+  font-size: 15px;
+  font-weight: 700;
+  padding: 11px 14px;
+}
+
+.sticker-add.ghost {
+  font-size: 15px;
+  font-weight: 700;
+  padding: 11px 14px;
+  opacity: 0.65;
+}
+
+.sticker-add:active {
+  transform: scale(0.96);
+}
+
+.chosen-bar {
+  display: none;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 16px 0;
+}
+
+.chosen-bar.on {
+  display: flex;
+}
+
+.sticker-words {
+  flex: 1 1 160px;
+  min-width: 0;
+  max-width: 260px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.1);
+  color: inherit;
+  font: inherit;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.sticker-font {
+  padding: 10px 8px;
+  border-radius: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.1);
+  color: inherit;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.sticker-tool {
+  min-width: 46px;
+  padding: 9px 12px;
+  border-radius: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.1);
+  color: inherit;
+  font: inherit;
+  font-size: 18px;
+  font-weight: 700;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.sticker-tool:active {
+  transform: scale(0.96);
+}
+
 .garage-says {
   margin: 0;
   padding: 6px 16px calc(var(--safe-b) + 18px);
@@ -1070,7 +1183,7 @@ canvas {
 }
 
 .garage-panel .garage-view {
-  min-height: 0;
+  min-height: 28vh;
 }
 
 .garage-panel .swatches {
@@ -1103,6 +1216,45 @@ canvas {
 .garage-panel .design.on {
   border-color: var(--ink);
   background: rgba(29, 36, 48, 0.14);
+}
+
+.garage-panel .stickers,
+.garage-panel .chosen-bar {
+  gap: 6px;
+  padding: 8px 10px 0;
+}
+
+.garage-panel .sticker-add,
+.garage-panel .sticker-tool,
+.garage-panel .sticker-words,
+.garage-panel .sticker-font {
+  border-color: rgba(29, 36, 48, 0.18);
+  background: rgba(29, 36, 48, 0.06);
+}
+
+.garage-panel .sticker-add {
+  min-width: 38px;
+  font-size: 19px;
+  padding: 5px 8px;
+}
+
+.garage-panel .sticker-add.wide,
+.garage-panel .sticker-add.ghost {
+  font-size: 13px;
+  padding: 8px 10px;
+}
+
+.garage-panel .sticker-words {
+  flex-basis: 120px;
+  font-size: 15px;
+  padding: 8px 10px;
+}
+
+.garage-panel .sticker-font,
+.garage-panel .sticker-tool {
+  font-size: 14px;
+  padding: 8px 9px;
+  min-width: 38px;
 }
 
 .garage-panel .garage-says {

@@ -759,7 +759,7 @@ export const RIVALS = {
 } as const;
 
 /** What can be painted on a car on top of its colour. */
-export type CarDesign = "plain" | "bolt" | "checkers" | "stripes";
+export type CarDesign = "plain" | "checkers" | "stripes";
 
 /** The player's car, and how the grid is laid out. */
 export const PLAYER = {
@@ -807,7 +807,6 @@ export const PLAYER = {
    */
   designs: [
     {id: "plain", name: "Plain"},
-    {id: "bolt", name: "Lightning"},
     {id: "checkers", name: "Checkers"},
     {id: "stripes", name: "Stripes"},
   ] as ReadonlyArray<{id: CarDesign; name: string}>,
@@ -824,9 +823,158 @@ export const PLAYER = {
   decalSwitchesAt: 0.55,
   /** How far the paint stands off the bodywork. Coplanar faces z-fight, and
    *  this is the smallest gap that never flickers at racing distance. */
-  decalLift: 0.09,
+  decalLift: 0.09 as number,
   /** How far off the centre line the player starts, and how far back. */
   offset: -22,
+} as const;
+
+/** What a sticker can be: one of the cut-out shapes, or something written. */
+export type StickerKind =
+  "star" | "heart" | "flag" | "skull" | "smiley" | "bolt" | "crown" | "text";
+
+/** One thing stuck on the car. `u` is across the deck as a fraction of how
+ *  wide it is there, `v` along the car as a fraction of its length. */
+export interface Sticker {
+  kind: StickerKind;
+  u: number;
+  v: number;
+  size: number;
+  /** How far up the side, for writing. Pictures live on the decks and have no
+   *  use for it. */
+  h?: number;
+  text?: string;
+  font?: string;
+}
+
+/**
+ * Stickers and writing.
+ *
+ * The designs are the four the game offers; this is everything a child puts on
+ * top of them themselves, anywhere on either deck, in any words they like.
+ */
+export const STICKER = {
+  /** How many a car can carry. Not a performance limit — each one is a draw
+   *  call and thirty would still be nothing — but a tidiness one: past about
+   *  this many there is no car left to see under them. */
+  most: 12,
+  /** How big one arrives, and the range a child can pinch it to, in world
+   *  units. The car is sixteen long and seven wide, so four units is a badge
+   *  and eight is a bonnet full. */
+  size: 3.6,
+  smallest: 1.6,
+  largest: 8,
+  /** How much bigger or smaller each tap of the size buttons makes it. */
+  step: 1.25,
+  /** Where a new one lands: the middle of the nose deck, nudged along a little
+   *  each time so a second sticker is not hidden under the first. */
+  dropAt: 0.3,
+  dropStep: 0.055,
+  /** Curve segments in a sticker outline. These are small on screen and there
+   *  is no reason to spend more than a phone would notice. */
+  curve: 10,
+  /** How many strips a written sticker is cut into along the car, so it bends
+   *  with the deck instead of bridging it. */
+  strips: 8,
+  /** The letters, drawn on a canvas: how tall in pixels, and the widest a word
+   *  is allowed to be before it stops growing. */
+  textPixels: 128,
+  textMost: 2048,
+  anisotropy: 4,
+  /** Anything this transparent is not drawn at all, which is what keeps the
+   *  space around the letters from sitting on the paint as a grey pane. */
+  alphaTest: 0.5,
+  roughness: 0.45,
+  /**
+   * The height a sticker is dragged at.
+   *
+   * A finger moving one is followed on a flat plane through the car at about
+   * deck height, not on the car's own surface. Riding the surface sounds more
+   * honest and is worse: the ray meets the driver's helmet, the roll hoop and
+   * the rear wing on the way past, and the sticker jumps to wherever those
+   * happen to be — or stops dead when the finger leaves the bodywork. On a
+   * plane it goes exactly where the finger goes, every frame, and is then put
+   * on whichever deck that turned out to be.
+   */
+  dragHeight: 4,
+  /**
+   * The colours a picture is painted in.
+   *
+   * Fixed, and not offered as a choice. A star is yellow, a heart is red and a
+   * chequered flag is black and white — that is what those things *are*, and a
+   * child asked to pick a colour for a smiley face is being asked a question
+   * with a wrong answer in it. The car's own colour is the choice; these are
+   * pictures stuck on it.
+   */
+  ink: {
+    gold: 0xffc93c,
+    sun: 0xffe04a,
+    red: 0xe23b3b,
+    bone: 0xf4f1e6,
+    white: 0xf7f5ee,
+    dark: 0x1b1d24,
+    lip: 0xd08a2a,
+  },
+  /** How far apart the layers of one picture are stacked. Enough that the eyes
+   *  of a smiley never flicker through its face, small enough to be paint. */
+  layer: 0.05,
+  /** How far a picture stands off the bodywork. Above the liveries, which are
+   *  thinner: a sticker goes *on top of* the stripes it lands on. */
+  lift: 0.22,
+  /**
+   * Writing goes on the flanks: how far it stands off, and where on the side
+   * it is allowed to be.
+   *
+   * The panel it has is the one between the wheels, and it is smaller than it
+   * looks — the tyres on a single-seater are three units of radius standing
+   * proud of the body at both ends, so a name written the length of the car is
+   * a name written mostly on rubber. About five units, then, between the axles
+   * and above the floor.
+   */
+  sideInset: 1.01,
+  sideLift: 0.12,
+  sideAt: 3,
+  sideLowest: 2,
+  sideHighest: 4.2,
+  /** How tall a word arrives. Smaller than a picture: it is longer than it is
+   *  tall and it has to fit between the wheels. */
+  textSize: 2.4,
+  /** The longest a word may be along the car, as a fraction of its length,
+   *  and how far along it may sit — short of the wings at either end, which
+   *  are not the car's side. */
+  sideRoom: 0.32,
+  sideFrom: 0.11,
+  sideTo: -0.09,
+  /**
+   * The kinds of writing on offer.
+   *
+   * Families rather than fonts: an iPad and a laptop do not have the same
+   * ones installed, so each is a first choice with somewhere to fall back to,
+   * ending in a family every machine has. The names are what a child sees.
+   */
+  fonts: [
+    {id: "round", name: "Round", family: '"Avenir Next", Avenir, system-ui'},
+    {
+      id: "marker",
+      name: "Marker",
+      family: '"Marker Felt", "Comic Sans MS", cursive',
+    },
+    {
+      id: "chalk",
+      name: "Chalk",
+      family: 'Chalkduster, "Bradley Hand", cursive',
+    },
+    {
+      id: "typewriter",
+      name: "Typed",
+      family: '"American Typewriter", Courier, monospace',
+    },
+    {
+      id: "fancy",
+      name: "Fancy",
+      family: '"Snell Roundhand", "Brush Script MT", cursive',
+    },
+    {id: "block", name: "Block", family: 'Impact, "Arial Black", sans-serif'},
+  ] as ReadonlyArray<{id: string; name: string; family: string}>,
 } as const;
 
 /**

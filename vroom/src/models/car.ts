@@ -1,6 +1,8 @@
 import * as THREE from "three";
 import {ConvexGeometry} from "three/examples/jsm/geometries/ConvexGeometry.js";
-import {CAR, CarDesign, PLAYER} from "../config";
+import {CAR, CarDesign, PLAYER, Sticker} from "../config";
+import {COVER, NOSE, onDeck, STATIONS} from "./deck";
+import {stickerMesh} from "./stickers";
 import {Assembly, DETAIL, rounded} from "./assembly";
 
 const TYRE = 0x14141a;
@@ -27,7 +29,11 @@ const HELMET = 0xe8e4d8;
  * Pointing +Z, so the group's Y rotation is the heading and nothing has to be
  * offset by a right angle anywhere else in the game.
  */
-export function car(colour: number, design: CarDesign = "plain"): THREE.Group {
+export function car(
+  colour: number,
+  design: CarDesign = "plain",
+  stickers: ReadonlyArray<Sticker> = [],
+): THREE.Group {
   const a = new Assembly();
   const L = CAR.length;
   const W = CAR.width;
@@ -46,121 +52,9 @@ export function car(colour: number, design: CarDesign = "plain"): THREE.Group {
 
   const group = a.build();
   group.name = "car";
+  stick(group, stickers);
   return group;
 }
-
-/**
- * Down the length: how wide and how tall the body is at each station. The
- * waist pinch — narrower in the middle than at either axle — is what stops it
- * reading as a wedge.
- *
- * Out here rather than inside `shell` because the paint laid on the car reads
- * it too. A decal has to sit on the deck the hull actually has, and the only
- * place that shape is written down is this table.
- */
-const STATIONS: ReadonlyArray<[number, number, number, number]> = [
-  // z along the car as a fraction of its length, then half width, floor
-  // height and roof height.
-  [0.5, 0.16, 0.9, 1.5],
-  [0.42, 0.4, 0.6, 2.1],
-  [0.3, 0.72, 0.5, 2.9],
-  [0.12, 0.86, 0.45, 4.2],
-  [-0.04, 0.94, 0.45, 5.0],
-  [-0.2, 0.88, 0.45, 4.6],
-  [-0.36, 0.82, 0.5, 3.4],
-  [-0.48, 0.7, 0.7, 2.6],
-];
-
-/**
- * Where the top of the body is at a point along it.
- *
- * The hull's stations each put their roof points at one height right across
- * the car, so the deck between two of them is a flat panel and a straight
- * interpolation lands exactly on it. That is what makes paint possible at
- * all: no ray casting, no decal projector, just the table the body was
- * built from read back.
- */
-function deck(t: number, W: number): {y: number; half: number} {
-  const first = STATIONS[0];
-  const last = STATIONS[STATIONS.length - 1];
-  if (t >= first[0]) {
-    return {y: first[3], half: (W / 2) * first[1]};
-  }
-  for (let i = 1; i < STATIONS.length; i++) {
-    const a = STATIONS[i - 1];
-    const b = STATIONS[i];
-    if (t >= b[0]) {
-      const k = (a[0] - t) / (a[0] - b[0]);
-      return {
-        y: a[3] + (b[3] - a[3]) * k,
-        half: (W / 2) * (a[1] + (b[1] - a[1]) * k),
-      };
-    }
-  }
-  return {y: last[3], half: (W / 2) * last[1]};
-}
-
-/**
- * A flat shape, dropped onto the deck.
- *
- * Shapes are drawn in the car's own terms — `u` across as a fraction of
- * however wide the deck is *there*, `v` along it as a fraction of the car's
- * length — so one lightning bolt fits both the nose, which tapers, and the
- * engine cover, which does not.
- *
- * The winding is fixed afterwards rather than got right in the drawing. A
- * shape mapped onto a surface can come out facing either way depending on
- * which way its outline happened to be traced, and a decal facing into the
- * bodywork is an invisible decal.
- */
-function onDeck(
-  shape: THREE.Shape,
-  L: number,
-  W: number,
-): THREE.BufferGeometry {
-  // Non-indexed, because the winding is fixed triangle by triangle below and
-  // a shared vertex belongs to triangles that may not agree about it.
-  const flat = new THREE.ShapeGeometry(shape).toNonIndexed();
-  const src = flat.attributes.position;
-  const out = new Float32Array(src.count * 3);
-  for (let i = 0; i < src.count; i++) {
-    const u = src.getX(i);
-    const t = src.getY(i);
-    const on = deck(t, W);
-    out[i * 3] = u * on.half * DECAL_INSET;
-    out[i * 3 + 1] = on.y + PLAYER.decalLift;
-    out[i * 3 + 2] = t * L;
-  }
-  flat.dispose();
-
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute("position", new THREE.BufferAttribute(out, 3));
-  for (let i = 0; i < out.length; i += 9) {
-    const ax = out[i + 3] - out[i];
-    const az = out[i + 5] - out[i + 2];
-    const bx = out[i + 6] - out[i];
-    const bz = out[i + 8] - out[i + 2];
-    // The Y of the cross product, which is all that says which way up it is.
-    if (az * bx - ax * bz < 0) {
-      for (let k = 0; k < 3; k++) {
-        const swap = out[i + 3 + k];
-        out[i + 3 + k] = out[i + 6 + k];
-        out[i + 6 + k] = swap;
-      }
-    }
-  }
-  geometry.computeVertexNormals();
-  return geometry;
-}
-
-/** How much of the deck's width a design is allowed. Short of the shoulder,
- *  where the panel starts to curve away and paint would lift off it. */
-const DECAL_INSET = 0.86;
-
-/** The two decks paint goes on: in front of the driver and behind them. The
- *  cockpit is a hole in the middle and nothing is laid across it. */
-const NOSE: [number, number] = [0.4, 0.15];
-const COVER: [number, number] = [-0.22, -0.45];
 
 /** A rectangle in shape terms: across from `u0` to `u1`, along `v0` to `v1`. */
 function panel(u0: number, u1: number, v0: number, v1: number): THREE.Shape {
@@ -169,20 +63,6 @@ function panel(u0: number, u1: number, v0: number, v1: number): THREE.Shape {
   s.lineTo(u1, v0);
   s.lineTo(u1, v1);
   s.lineTo(u0, v1);
-  s.closePath();
-  return s;
-}
-
-/** A lightning bolt down a deck, struck from the front of it. */
-function bolt([from, to]: [number, number]): THREE.Shape {
-  const at = (a: number): number => from + (to - from) * a;
-  const s = new THREE.Shape();
-  s.moveTo(0.5, at(0));
-  s.lineTo(-0.5, at(0.55));
-  s.lineTo(-0.05, at(0.55));
-  s.lineTo(-0.4, at(1));
-  s.lineTo(0.55, at(0.42));
-  s.lineTo(0.1, at(0.42));
   s.closePath();
   return s;
 }
@@ -207,9 +87,7 @@ function livery(
   const shapes: Array<THREE.Shape> = [];
 
   for (const [from, to] of [NOSE, COVER]) {
-    if (design === "bolt") {
-      shapes.push(bolt([from, to]));
-    } else if (design === "stripes") {
+    if (design === "stripes") {
       // Two down the middle, the width of the gap between them apart.
       shapes.push(panel(-0.42, -0.14, from, to), panel(0.14, 0.42, from, to));
     } else {
@@ -242,10 +120,42 @@ function livery(
  * pale one. Off the lightness of the paint rather than a table, so it is
  * still right for a colour nobody has added yet.
  */
-function decalColour(colour: number): number {
+export function decalColour(colour: number): number {
   const hsl = {h: 0, s: 0, l: 0};
   new THREE.Color(colour).getHSL(hsl, THREE.SRGBColorSpace);
   return hsl.l > PLAYER.decalSwitchesAt ? PLAYER.decalDark : PLAYER.decalLight;
+}
+
+/**
+ * Puts the stickers on, and takes the old ones off first.
+ *
+ * Out here as its own step so the garage can redo it on every keystroke while
+ * a child types their name, without rebuilding a convex hull and four wheels
+ * to find out what "ell" looks like.
+ */
+export function stick(
+  group: THREE.Group,
+  stickers: ReadonlyArray<Sticker>,
+): void {
+  for (const old of [...group.children]) {
+    if (old.userData.sticker === undefined) {
+      continue;
+    }
+    group.remove(old);
+    old.traverse(o => {
+      const mesh = o as THREE.Mesh;
+      mesh.geometry?.dispose();
+      const material = mesh.material as THREE.MeshStandardMaterial | undefined;
+      material?.map?.dispose();
+      material?.dispose();
+    });
+  }
+  stickers.forEach((sticker, i) => {
+    const mesh = stickerMesh(sticker, i);
+    if (mesh) {
+      group.add(mesh);
+    }
+  });
 }
 
 /** The body: a hull over the points a racing car's surface passes through. */

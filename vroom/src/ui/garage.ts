@@ -1,20 +1,46 @@
 import * as THREE from "three";
 import {RoomEnvironment} from "three/examples/jsm/environments/RoomEnvironment.js";
-import {CarDesign, FILM, LIGHT, PLAYER} from "../config";
+import {
+  CAR,
+  CarDesign,
+  FILM,
+  LIGHT,
+  PLAYER,
+  Sticker,
+  STICKER,
+  StickerKind,
+} from "../config";
 import {chooseColour, chooseDesign, myColour, myDesign} from "../core/garage";
-import {car} from "../models/car";
+import {keepStickers, myStickers} from "../core/stickers";
+import {car, stick} from "../models/car";
+import {deck, DECK_INSET, NOSE, nearestDeck} from "../models/deck";
+import {alongFlank, PICTURE_KINDS} from "../models/stickers";
 import {setEnvironment} from "../render/materials";
 
 /**
- * The garage: pick the colour of your car and watch it turn.
+ * The garage: your car, and everything you can do to it.
  *
- * A whole screen for one decision, and worth it. The car is on screen for
- * every second of every race and it is the thing a child thinks of as
- * themselves — "the red car" is only *your* car if you chose red.
+ * A whole screen for one set of decisions, and worth it. The car is on screen
+ * for every second of every race and it is the thing a child thinks of as
+ * themselves — "the red car" is only *your* car if you chose red, and it is
+ * more yours again with your own name across the nose.
  *
  * The car in here is the real model, lit the way the game lights it, so what
- * is chosen is what turns up on the grid.
+ * is chosen is what turns up on the grid. Stickers are dragged on the car
+ * itself rather than set with sliders: a ray from the finger onto the body
+ * says where on the deck it landed, which is the only arrangement a child who
+ * cannot read a coordinate can use.
  */
+const EMOJI: Record<string, string> = {
+  star: "⭐",
+  heart: "❤️",
+  flag: "🏁",
+  skull: "💀",
+  smiley: "🙂",
+  bolt: "⚡",
+  crown: "👑",
+};
+
 export class Garage {
   readonly root = document.createElement("div");
 
@@ -24,10 +50,26 @@ export class Garage {
   private readonly environment: THREE.Texture;
   private readonly stage = new THREE.Group();
   private readonly view = document.createElement("div");
+  private readonly ray = new THREE.Raycaster();
+  /** The flat sheet a dragged sticker slides on; see `STICKER.dragHeight`. */
+  private readonly floor = new THREE.Plane(
+    new THREE.Vector3(0, 1, 0),
+    -STICKER.dragHeight,
+  );
 
-  private model: THREE.Object3D | null = null;
+  /** The bar that appears when a sticker is picked, and the parts of it that
+   *  are only for writing. */
+  private readonly chosenBar = document.createElement("div");
+  private readonly words = document.createElement("input");
+  private readonly fonts = document.createElement("select");
+
+  private model: THREE.Group | null = null;
   private colour = myColour();
   private design: CarDesign = myDesign();
+  private stickers: Array<Sticker> = myStickers();
+  private chosen: number | null = null;
+  private wide = 0;
+  private tall = 0;
   private turn = 0.7;
   private spinning = true;
   private frame = 0;
@@ -152,15 +194,200 @@ export class Garage {
     const says = document.createElement("p");
     says.className = "garage-says";
     says.textContent = this.embedded
-      ? "Your car"
-      : "Pick a colour and something to put on it. This is the car you drive.";
+      ? "Your car. Drag a sticker to move it."
+      : "Tap something to add it, then drag it around the car.";
 
-    if (bar) {
-      this.root.appendChild(bar);
-    }
-    this.root.append(this.view, swatches, designs, says);
+    // The car above, everything that changes it below. The controls are their
+    // own box so they can scroll on a short screen without taking the car with
+    // them — see `.garage-view` in the stylesheet.
+    const controls = document.createElement("div");
+    controls.className = "garage-controls";
+    controls.append(
+      swatches,
+      designs,
+      this.stickerRow(),
+      this.chosenRow(),
+      says,
+    );
+    this.root.append(...(bar ? [bar] : []), this.view, controls);
+
     this.markChosen();
-    this.turnable();
+    this.handle();
+  }
+
+  /** The things you can add: the shapes, then writing, then a way to clear the
+   *  lot when a car has disappeared under them. */
+  private stickerRow(): HTMLElement {
+    const row = document.createElement("div");
+    row.className = "stickers";
+    for (const kind of PICTURE_KINDS) {
+      const add = document.createElement("button");
+      add.type = "button";
+      add.className = "sticker-add";
+      add.textContent = EMOJI[kind] ?? "•";
+      add.setAttribute("aria-label", `Add a ${kind}`);
+      add.addEventListener("click", () => this.add(kind));
+      row.appendChild(add);
+    }
+
+    const write = document.createElement("button");
+    write.type = "button";
+    write.className = "sticker-add wide";
+    write.textContent = "Aa Writing";
+    // Focused straight out of the tap, which is the only way an iPad brings
+    // its keyboard up: ask for it a moment later and the gesture is over and
+    // the keyboard stays down.
+    write.addEventListener("click", () => {
+      this.add("text");
+      this.words.focus();
+      this.words.select();
+    });
+    row.appendChild(write);
+
+    const clear = document.createElement("button");
+    clear.type = "button";
+    clear.className = "sticker-add ghost";
+    clear.textContent = "Clear";
+    clear.addEventListener("click", () => {
+      this.stickers = [];
+      this.chosen = null;
+      this.save();
+      this.paint();
+      this.markChosen();
+    });
+    row.appendChild(clear);
+    return row;
+  }
+
+  /** What you can do to the sticker you have hold of. Hidden until there is
+   *  one, because a row of dead buttons is a row of questions. */
+  private chosenRow(): HTMLElement {
+    this.chosenBar.className = "chosen-bar";
+
+    this.words.type = "text";
+    this.words.className = "sticker-words";
+    this.words.maxLength = 24;
+    this.words.placeholder = "Type here";
+    this.words.setAttribute("aria-label", "What it says");
+    this.words.addEventListener("input", () => {
+      const one = this.held();
+      if (one) {
+        one.text = this.words.value;
+        this.save();
+        this.restick();
+      }
+    });
+
+    this.fonts.className = "sticker-font";
+    this.fonts.setAttribute("aria-label", "Kind of writing");
+    for (const font of STICKER.fonts) {
+      const option = document.createElement("option");
+      option.value = font.id;
+      option.textContent = font.name;
+      this.fonts.appendChild(option);
+    }
+    this.fonts.addEventListener("change", () => {
+      const one = this.held();
+      if (one) {
+        one.font = this.fonts.value;
+        this.save();
+        this.restick();
+      }
+    });
+
+    const smaller = this.tool("−", "Smaller", () =>
+      this.resizeChosen(1 / STICKER.step),
+    );
+    const bigger = this.tool("+", "Bigger", () =>
+      this.resizeChosen(STICKER.step),
+    );
+
+    const remove = this.tool("🗑", "Take it off", () => {
+      if (this.chosen === null) {
+        return;
+      }
+      this.stickers.splice(this.chosen, 1);
+      this.chosen = null;
+      this.save();
+      this.paint();
+      this.markChosen();
+    });
+
+    this.chosenBar.append(this.words, this.fonts, smaller, bigger, remove);
+    return this.chosenBar;
+  }
+
+  private tool(
+    label: string,
+    says: string,
+    onTap: () => void,
+  ): HTMLButtonElement {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "sticker-tool";
+    b.textContent = label;
+    b.setAttribute("aria-label", says);
+    b.addEventListener("click", onTap);
+    return b;
+  }
+
+  private add(kind: StickerKind): void {
+    if (this.stickers.length >= STICKER.most) {
+      return;
+    }
+    if (kind === "text") {
+      this.stickers.push({
+        kind,
+        u: 0,
+        v: 0,
+        h: STICKER.sideAt,
+        size: STICKER.textSize,
+        text: "Go!",
+        font: STICKER.fonts[0].id,
+      });
+    } else {
+      // The nose holds one picture and no more — it is a small panel and two
+      // things on it is a mess rather than a choice — so the first goes there
+      // and everything after it lands on the cover behind the driver, a step
+      // further back each time so they are not hidden under one another.
+      const pictures = this.stickers.filter(s => s.kind !== "text");
+      const nose = pictures.filter(s => onNose(s.v)).length;
+      const along =
+        nose === 0
+          ? STICKER.dropAt
+          : COVER_DROP - (pictures.length - nose) * STICKER.dropStep;
+      this.stickers.push({
+        kind,
+        u: 0,
+        v: nearestDeck(along),
+        size: STICKER.size,
+      });
+    }
+    this.chosen = this.stickers.length - 1;
+    this.save();
+    this.paint();
+    this.markChosen();
+  }
+
+  private resizeChosen(by: number): void {
+    const one = this.held();
+    if (!one) {
+      return;
+    }
+    one.size = Math.max(
+      STICKER.smallest,
+      Math.min(STICKER.largest, one.size * by),
+    );
+    this.save();
+    this.restick();
+  }
+
+  private held(): Sticker | null {
+    return this.chosen === null ? null : (this.stickers[this.chosen] ?? null);
+  }
+
+  private save(): void {
+    keepStickers(this.stickers);
   }
 
   private markChosen(): void {
@@ -170,37 +397,204 @@ export class Garage {
     for (const pick of this.root.querySelectorAll<HTMLElement>(".design")) {
       pick.classList.toggle("on", pick.dataset.design === this.design);
     }
+    const one = this.held();
+    this.chosenBar.classList.toggle("on", one !== null);
+    const writing = one?.kind === "text";
+    this.words.hidden = !writing;
+    this.fonts.hidden = !writing;
+    if (writing) {
+      this.words.value = one?.text ?? "";
+      this.fonts.value = one?.font ?? STICKER.fonts[0].id;
+    }
   }
 
-  /** Rebuilds the car in the chosen colour. */
+  /** Rebuilds the whole car: colour, design and stickers. */
   private paint(): void {
     if (this.model) {
       this.stage.remove(this.model);
     }
-    this.model = car(this.colour, this.design);
+    this.model = car(this.colour, this.design, this.stickers);
     this.stage.add(this.model);
+    this.glow();
   }
 
-  /** Drag to turn it; let go and it goes back to turning itself. */
-  private turnable(): void {
-    let last: number | null = null;
-    this.view.addEventListener("pointerdown", e => {
-      this.view.setPointerCapture(e.pointerId);
-      last = e.clientX;
-      this.spinning = false;
-    });
-    this.view.addEventListener("pointermove", e => {
-      if (last === null) {
+  /** Rebuilds only what is stuck on it. Every keystroke of a name goes through
+   *  here, and a convex hull and four wheels a letter is not worth it. */
+  private restick(): void {
+    if (this.model) {
+      stick(this.model, this.stickers);
+      this.glow();
+    }
+  }
+
+  /** The one you have hold of, lit up, so it is clear what the buttons and the
+   *  keyboard are about to change. */
+  private glow(): void {
+    this.model?.traverse(o => {
+      const mesh = o as THREE.Mesh;
+      const material = mesh.material as THREE.MeshStandardMaterial | undefined;
+      if (mesh.userData.sticker === undefined || !material?.isMaterial) {
         return;
       }
-      this.turn -= (e.clientX - last) * 0.01;
-      last = e.clientX;
+      material.emissive = new THREE.Color(
+        mesh.userData.sticker === this.chosen ? 0x555555 : 0x000000,
+      );
     });
+  }
+
+  /**
+   * The car turns under a finger, and a sticker moves under one.
+   *
+   * Which of the two it is comes from what the finger went down on: a ray into
+   * the scene that hits a sticker takes hold of it, and anything else turns
+   * the car. That is one gesture doing two jobs, and it works because the
+   * stickers are their own meshes and can be told apart.
+   */
+  private handle(): void {
+    let turning: number | null = null;
+    let dragging = false;
+
+    this.view.addEventListener("pointerdown", e => {
+      // Capture so a drag that wanders off the canvas still arrives here, but
+      // never at the cost of the gesture: a pointer the browser has already
+      // let go of throws, and losing the whole handler to that would mean a
+      // car that cannot be turned or a sticker that cannot be picked up.
+      try {
+        this.view.setPointerCapture(e.pointerId);
+      } catch {
+        // Then the events come to the element itself, which is where the
+        // finger is anyway.
+      }
+      this.spinning = false;
+      const hit = this.stickerUnder(e);
+      if (hit === null) {
+        turning = e.clientX;
+        dragging = false;
+        return;
+      }
+      this.chosen = hit;
+      this.markChosen();
+      this.glow();
+      dragging = true;
+      // A tap on writing puts the keyboard up, which is what a child expects
+      // from tapping words. It has to happen inside the gesture.
+      if (this.held()?.kind === "text") {
+        this.words.focus();
+      }
+    });
+
+    this.view.addEventListener("pointermove", e => {
+      if (dragging) {
+        this.dragTo(e);
+        return;
+      }
+      if (turning !== null) {
+        this.turn -= (e.clientX - turning) * 0.01;
+        turning = e.clientX;
+      }
+    });
+
     const stop = (): void => {
-      last = null;
+      if (dragging) {
+        this.save();
+      }
+      turning = null;
+      dragging = false;
     };
     this.view.addEventListener("pointerup", stop);
     this.view.addEventListener("pointercancel", stop);
+  }
+
+  /** Which sticker is under the pointer, if any. */
+  private stickerUnder(e: PointerEvent): number | null {
+    for (const hit of this.cast(e)) {
+      const which = hit.object.userData.sticker;
+      if (typeof which === "number") {
+        return which;
+      }
+      // The first thing the ray meets and it is not a sticker: whatever is
+      // behind it is behind the car as well.
+      return null;
+    }
+    return null;
+  }
+
+  /**
+   * Moves the held sticker to wherever the finger is on the car.
+   *
+   * Off the car entirely, nothing happens — the sticker stays where it was
+   * rather than flying off to whatever the ray hit next.
+   */
+  private dragTo(e: PointerEvent): void {
+    const one = this.held();
+    if (!one || !this.model) {
+      return;
+    }
+    this.aimAt(e);
+    const at = new THREE.Vector3();
+    // Writing is on the sides, so it is dragged on a sheet standing up through
+    // the middle of the car: along it, and up and down it. A picture is on the
+    // decks, so it is dragged on a sheet lying flat.
+    const sheet = one.kind === "text" ? this.pane() : this.floor;
+    if (!this.ray.ray.intersectPlane(sheet, at)) {
+      return;
+    }
+    const local = this.model.worldToLocal(at);
+    if (one.kind === "text") {
+      one.v = alongFlank(local.z / CAR.length);
+      one.h = local.y;
+      this.restick();
+      return;
+    }
+    const v = this.roomFor(one, nearestDeck(local.z / CAR.length));
+    const room = deck(v, CAR.width).half * DECK_INSET;
+    one.v = v;
+    one.u = room > 0 ? Math.max(-1, Math.min(1, local.x / room)) : 0;
+    this.restick();
+  }
+
+  /** Points the ray at whatever is under the pointer. */
+  private aimAt(e: PointerEvent): void {
+    const box = this.view.getBoundingClientRect();
+    const point = new THREE.Vector2(
+      ((e.clientX - box.left) / box.width) * 2 - 1,
+      -((e.clientY - box.top) / box.height) * 2 + 1,
+    );
+    this.ray.setFromCamera(point, this.camera);
+  }
+
+  /**
+   * Where a picture is allowed to end up.
+   *
+   * One picture on the nose. Drag a second one at it and it stops at the front
+   * of the cover instead of landing on top of the one already there — which is
+   * a rule a child meets by watching a sticker refuse to go somewhere, and
+   * needs no telling.
+   */
+  private roomFor(one: Sticker, want: number): number {
+    if (!onNose(want)) {
+      return want;
+    }
+    const already = this.stickers.some(
+      s => s !== one && s.kind !== "text" && onNose(s.v),
+    );
+    return already ? COVER_DROP : want;
+  }
+
+  /**
+   * The sheet a word is dragged on: upright, through the middle of the car,
+   * turned to face the camera so it is never edge-on to the ray.
+   */
+  private pane(): THREE.Plane {
+    const facing = new THREE.Vector3();
+    this.camera.getWorldDirection(facing);
+    const flat = new THREE.Vector3(facing.x, 0, facing.z).normalize();
+    return new THREE.Plane(flat, 0);
+  }
+
+  private cast(e: PointerEvent): Array<THREE.Intersection> {
+    this.aimAt(e);
+    return this.model ? this.ray.intersectObject(this.model, true) : [];
   }
 
   private resize = (): void => {
@@ -208,6 +602,8 @@ export class Garage {
     if (box.width < 4 || box.height < 4) {
       return;
     }
+    this.wide = box.width;
+    this.tall = box.height;
     this.renderer.setSize(box.width, box.height);
     const aspect = box.width / box.height;
     this.camera.aspect = aspect;
@@ -222,6 +618,13 @@ export class Garage {
     if (box.width < 4 || box.height < 4) {
       return;
     }
+    // Measured every frame rather than only on a window resize. The box moves
+    // for reasons the window knows nothing about — the keyboard coming up on
+    // an iPad, the controls under it growing a row — and a canvas left at the
+    // old size spills out of its box and over them.
+    if (box.width !== this.wide || box.height !== this.tall) {
+      this.resize();
+    }
     if (this.spinning) {
       this.turn += 0.006;
     }
@@ -231,6 +634,14 @@ export class Garage {
     this.renderer.render(this.scene, this.camera);
   };
 }
+
+/** Whether something at this point along the car is on the nose deck. */
+function onNose(v: number): boolean {
+  return v <= NOSE[0] && v >= NOSE[1];
+}
+
+/** Where the second picture and everything after it lands. */
+const COVER_DROP = -0.26;
 
 function hex(colour: number): string {
   return `#${colour.toString(16).padStart(6, "0")}`;
