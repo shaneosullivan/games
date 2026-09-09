@@ -177,7 +177,14 @@ canvas {
   transition: opacity 320ms ease-out;
 }
 
-.overlay.hidden {
+/* Gone means gone, for its children too.
+   `pointer-events` is inherited, so setting it on the card ought to be enough
+   — except the button inside carries `.ui-interactive`, which sets
+   `pointer-events: auto` on itself and wins. The result was an invisible
+   button sitting in the middle of the screen eating every touch that landed
+   on it: a dead patch in the one place a child is most likely to press. */
+.overlay.hidden,
+.overlay.hidden * {
   opacity: 0;
   pointer-events: none;
 }
@@ -230,11 +237,14 @@ canvas {
   opacity: 1;
 }
 
+/* The target under the finger: where the car is being sent. Smaller than the
+   old thumbstick ring, because it is a marker rather than a control — the
+   control is the whole screen. */
 .stick-ring {
   position: absolute;
-  width: 136px;
-  height: 136px;
-  margin: -68px 0 0 -68px;
+  width: 78px;
+  height: 78px;
+  margin: -39px 0 0 -39px;
   border-radius: 50%;
   /* Dark rather than white. It sits over grass and tarmac, and a pale ring on
      either of those is a control nobody can find. */
@@ -243,11 +253,17 @@ canvas {
   backdrop-filter: blur(2px);
 }
 
+.stick.pulling .stick-ring {
+  border-color: rgba(20, 24, 32, 0.72);
+}
+
+/* A dot in the middle of the target, so the exact point being aimed at is
+   visible under a finger that covers the rest of it. */
 .stick-knob {
   position: absolute;
-  width: 58px;
-  height: 58px;
-  margin: -29px 0 0 -29px;
+  width: 16px;
+  height: 16px;
+  margin: -8px 0 0 -8px;
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.95);
   box-shadow: 0 4px 14px rgba(20, 24, 32, 0.45);
@@ -733,13 +749,38 @@ canvas {
 }
 
 /* Maximised: the same card, over everything. Nothing is rebuilt — the renderer
-   simply finds a much larger rectangle where the card used to be. */
+   simply finds a much larger rectangle where the card used to be.
+   Transparent, and that is the whole trick: the shared canvas is *behind* the
+   grid, so a card with a background of its own paints straight over the model
+   it is supposed to be showing. It had an opaque one, and maximising a card
+   showed a blank screen. */
 .model-card.full {
   position: fixed;
   inset: 0;
   z-index: 3;
   border-radius: 0;
-  background: #191b20;
+  border: none;
+  background: transparent;
+}
+
+/* The header still needs to be readable over whatever is behind it. */
+.model-card.full .model-head {
+  background: rgba(25, 27, 32, 0.86);
+  backdrop-filter: blur(8px);
+}
+
+/* And the rest of the grid gets out of the way, or its cards sit over the
+   canvas the maximised one is being drawn into. */
+.models-grid.zoomed .model-card:not(.full) {
+  visibility: hidden;
+}
+
+/* The grid is positioned with a z-index of its own, which makes it a stacking
+   context — so the maximised card's z-index counts only *inside* it, and its
+   header came out underneath the bar at the top of the page however high it
+   was set. Lifting the grid lifts the card with it. */
+.models-grid.zoomed {
+  z-index: 4;
 }
 
 .model-head {

@@ -269,6 +269,35 @@ export const STAND = {
 } as const;
 
 /**
+ * Steering by touch.
+ *
+ * Touch a point and the car drives to it. Not a thumbstick you drag from
+ * wherever your thumb landed — that is what this was, and it meant a child who
+ * touched the screen and held still watched nothing happen, because a relative
+ * stick has no direction until the finger has moved away from where it
+ * started. Pointing at a place on the road is what a child does anyway.
+ *
+ * It works because the camera never turns: screen right is world +X and screen
+ * down is world +Z at every moment of the game, so a point on the glass is a
+ * point on the road without any arithmetic at all.
+ */
+export const AIM = {
+  /**
+   * How close to the car counts as "here", in screen pixels.
+   *
+   * Touching the car itself has no direction in it, so this is a small circle
+   * where the car simply coasts — which doubles as the way to lift off without
+   * taking your hand off the screen.
+   */
+  near: 30,
+  /** How far away is flat out. Beyond this it makes no further difference. */
+  far: 165,
+  /** The least throttle a touch outside the dead zone gives. Pointing just
+   *  ahead of the car should still move it, not creep. */
+  least: 0.3,
+} as const;
+
+/**
  * Getting a race ready before anybody drives it.
  *
  * Shaders compile the first time a material is drawn and geometry goes to the

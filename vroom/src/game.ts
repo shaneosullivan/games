@@ -134,6 +134,7 @@ export class Game {
   private readonly eye = new THREE.Vector3();
   private readonly wantEye = new THREE.Vector3();
   private readonly here = new THREE.Vector3();
+  private readonly onScreen = new THREE.Vector3();
 
   constructor(
     host: HTMLElement,
@@ -160,7 +161,7 @@ export class Game {
     this.intro = new Overlay(
       ui,
       spec.name,
-      "You are the red car, and you are starting at the back. Drag anywhere on the screen to drive: push the way you want to go, and push harder to go faster. Pull back against yourself to brake. On a computer the arrow keys steer left and right, and up and down are the pedals. Take a corner too fast and the back end will step out and leave black marks all over the road — that is the whole fun of it, and it is quicker than it looks if you can catch it. The grass will slow you down and the wall at the edge will not let you past. One lap.",
+      "You are the red car, and you are starting at the back. Touch anywhere on the screen and the car drives to your finger — the further away you point, the faster it goes, and touching the car itself lets it coast. On a computer the arrow keys steer left and right, and up and down are the pedals. Take a corner too fast and the back end will step out and leave black marks all over the road — that is the whole fun of it, and it is quicker than it looks if you can catch it. The grass will slow you down and the wall at the edge will not let you past. One lap.",
       "Lights out",
       () => this.begin(),
     );
@@ -721,6 +722,15 @@ export class Game {
     } else {
       this.gridShot(p);
     }
+
+    // Where the car is on the glass, so a touch can be measured against it.
+    // The stick steers towards the finger, and only the thing drawing the car
+    // knows where on the screen it ended up.
+    this.onScreen.set(p.x, p.y, p.z).project(this.stage.camera);
+    this.stick.follow(
+      ((this.onScreen.x + 1) / 2) * window.innerWidth,
+      ((1 - this.onScreen.y) / 2) * window.innerHeight,
+    );
 
     // Anything standing between the camera and the car gets out of the way.
     // From a diagonal there is always something that can: a tree on the inside

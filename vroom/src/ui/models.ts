@@ -28,6 +28,10 @@ import {setEnvironment} from "../render/materials";
  */
 export const MODELS_HASH = "#models";
 
+/** How wide the lens on a card is, before the card's shape is taken into
+ *  account. */
+const CARD_FOV = 38;
+
 interface Card {
   entry: ModelEntry;
   root: HTMLElement;
@@ -189,7 +193,7 @@ export class ModelViewer {
       holder.add(model);
       scene.add(holder);
 
-      const camera = new THREE.PerspectiveCamera(38, 1, 0.5, 3000);
+      const camera = new THREE.PerspectiveCamera(CARD_FOV, 1, 0.5, 3000);
 
       this.cards.push({
         entry,
@@ -205,9 +209,16 @@ export class ModelViewer {
 
       grow.addEventListener("click", () => {
         const going = this.full !== mine;
-        this.full?.root.parentElement?.classList.remove("full");
+        const was = this.full;
+        was?.root.parentElement?.classList.remove("full");
+        const wasButton =
+          was?.root.parentElement?.querySelector(".model-head button");
+        if (wasButton) {
+          wasButton.textContent = "Maximise";
+        }
         this.full = going ? mine : null;
         card.classList.toggle("full", going);
+        this.grid.classList.toggle("zoomed", going);
         grow.textContent = going ? "Minimise" : "Maximise";
         this.saveHash();
         this.resize();
@@ -302,6 +313,12 @@ export class ModelViewer {
     const clip = this.grid.getBoundingClientRect();
 
     for (const card of this.cards) {
+      // While one is maximised the others are hidden, and a hidden card still
+      // has a rectangle — drawn into, it would paint over the one being
+      // looked at.
+      if (this.full && card !== this.full) {
+        continue;
+      }
       const raw = card.root.getBoundingClientRect();
       const full = card.root.parentElement?.classList.contains("full");
       const top = full ? raw.top : Math.max(raw.top, clip.top);
@@ -333,7 +350,13 @@ export class ModelViewer {
         Math.cos(card.pitch) * distance,
       );
       card.camera.lookAt(0, size * 0.22, 0);
-      card.camera.aspect = box.width / box.height;
+      // The field of view is vertical, so a tall card sees less across than a
+      // wide one — and a car is a wide thing. Widening the lens as the card
+      // narrows keeps the whole model in frame whatever shape it is in, the
+      // same trick the game's own camera uses for a phone held upright.
+      const aspect = box.width / box.height;
+      card.camera.aspect = aspect;
+      card.camera.fov = aspect < 1 ? CARD_FOV / aspect : CARD_FOV;
       card.camera.updateProjectionMatrix();
 
       const bottom = height - box.bottom;

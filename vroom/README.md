@@ -22,15 +22,23 @@ icon.
 
 ## Playing it
 
-One floating thumbstick, planted wherever the finger lands — the caterpillar
-game's, which the plan asks for by name. Here it is the tiller and the throttle
-at once: push the way you want to go, push harder to go faster, and push back
-against yourself to brake. There is no separate brake button and there does not
-need to be one.
+**Touch anywhere and the car drives to your finger.** The further from the car
+you point, the faster it goes; touch the car itself and it coasts. Slide your
+finger about and it follows.
 
-The shot looks straight down and never turns, so the way you push the stick is
-the way on the screen the car goes. That is the one reason this game needs no
-camera-relative arithmetic anywhere in it.
+It was a floating thumbstick — planted where the finger landed, steered by
+dragging away from that point — and that had a hole in it: touch the screen and
+hold still and _nothing happened_, because until the finger moves a relative
+stick has no direction in it. Pointing at a place on the road is what a child
+does anyway.
+
+It works because the camera never turns: screen right is world +X and screen
+down is world +Z at every moment of the game, so a point on the glass is a
+point on the road with no arithmetic at all. The stick is told where the car is
+on screen each frame by whoever draws it, since nothing else knows.
+
+There is no brake button and there does not need to be one: point behind the
+car and it turns round, point at it and it coasts.
 
 **A keyboard is a different control, not a squarer stick.** Arrow keys and WASD
 steer left and right _of the car's own nose_, with up and down as the pedals —
