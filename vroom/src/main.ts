@@ -36,6 +36,7 @@ let game: Game | null = null;
 let editor: Editor | null = null;
 let models: ModelViewer | null = null;
 let garage: Garage | null = null;
+let menu: Menu | null = null;
 
 function clear(): void {
   game?.dispose();
@@ -46,6 +47,8 @@ function clear(): void {
   models = null;
   garage?.dispose();
   garage = null;
+  menu?.dispose();
+  menu = null;
   app!.replaceChildren();
 }
 
@@ -54,7 +57,7 @@ function showMenu(): void {
   if (window.location.hash.startsWith(MODELS_HASH)) {
     window.history.replaceState(null, "", window.location.pathname);
   }
-  const menu = new Menu({
+  menu = new Menu({
     onPlay: spec => void showRace(spec),
     onBuild: () => showEditor(),
     onEdit: spec => showEditor(spec),

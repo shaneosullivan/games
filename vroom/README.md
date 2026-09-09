@@ -55,10 +55,22 @@ shove with it, oil takes your grip away and mud takes your speed.
 
 ## Your car
 
-**🎨 Your car** on the front screen opens the garage: ten colours, and the real
-model turning while you choose, lit the way the game lights it — so what you
-pick is what turns up on the grid. The choice is kept in this browser
-(`vroom.car.v1`).
+Ten colours, with the real model turning while you choose, lit the way the game
+lights it — so what you pick is what turns up on the grid. The choice is kept
+in this browser (`vroom.car.v1`).
+
+**Where it lives depends on the screen.** Above `LAYOUT.wide` — every iPad
+either way up, and every laptop — it sits beside the track list, and there is
+no button for it because you are already looking at it. Below that, on a phone
+held upright, two columns would be two things nobody can use, so it goes behind
+a **🎨 Your car** button and opens as its own screen.
+
+The menu watches for the crossing and rebuilds when it happens. That matters
+more than it sounds: the garage owns a WebGL context, so it is built when shown
+and given back when not — a browser hands out about sixteen of those before it
+starts quietly dropping the oldest, and a phone turned back and forth would get
+through them. Checked across eight crossings: one canvas when wide, none when
+narrow, and no accumulation.
 
 The rivals give way to it. Two identical cars in a race of four is a child
 watching the wrong one all the way round.

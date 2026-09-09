@@ -998,3 +998,67 @@ canvas {
   font-weight: 700;
   opacity: 0.65;
 }
+
+/* ---------- The car beside the races ---------- */
+
+/* Above LAYOUT.wide there is room for both, which is every iPad either way up
+   and every laptop. Below it — a phone held upright — the car goes behind a
+   button instead, because two columns on a 390px screen is two things nobody
+   can use. */
+.menu-split {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  gap: 4px;
+}
+
+.menu-races {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 58%;
+  min-width: 0;
+}
+
+.menu-car {
+  display: flex;
+  flex: 1 1 42%;
+  min-width: 0;
+  border-left: 1px solid var(--stroke);
+}
+
+/* Embedded, the garage is a panel rather than a screen: no bar, no way out,
+   and the page's own colours rather than the dark ones it wears alone. */
+.garage-panel {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  padding: 8px 0;
+}
+
+.garage-panel .garage-view {
+  min-height: 0;
+}
+
+.garage-panel .swatches {
+  gap: 10px;
+  padding: 10px 12px 0;
+}
+
+.garage-panel .swatch {
+  width: 42px;
+  height: 42px;
+  border-color: rgba(29, 36, 48, 0.18);
+}
+
+.garage-panel .swatch.on {
+  border-color: var(--ink);
+}
+
+.garage-panel .garage-says {
+  padding: 8px 12px 4px;
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  opacity: 0.5;
+}

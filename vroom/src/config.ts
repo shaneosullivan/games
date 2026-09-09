@@ -269,6 +269,18 @@ export const STAND = {
 } as const;
 
 /**
+ * When there is room for two things side by side.
+ *
+ * Above this width the track list and the garage share the screen, which is
+ * every iPad either way up and every laptop. Below it — a phone held upright —
+ * there is only room for one thing at a time, so the garage goes behind a
+ * button instead.
+ */
+export const LAYOUT = {
+  wide: 700,
+} as const;
+
+/**
  * Steering by touch.
  *
  * Touch a point and the car drives to it. Not a thumbstick you drag from

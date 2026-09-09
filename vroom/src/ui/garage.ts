@@ -31,8 +31,15 @@ export class Garage {
   private spinning = true;
   private frame = 0;
 
-  constructor(private readonly onDone: () => void) {
-    this.root.className = "screen garage";
+  /**
+   * @param onDone  back to the track list; only used when this is a screen of
+   *   its own. Embedded beside the list there is nowhere to go back to.
+   */
+  constructor(
+    private readonly onDone: (() => void) | null,
+    private readonly embedded = false,
+  ) {
+    this.root.className = embedded ? "garage-panel" : "screen garage";
 
     this.renderer = new THREE.WebGLRenderer({antialias: true, alpha: true});
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -84,17 +91,22 @@ export class Garage {
   }
 
   private build(): void {
-    const bar = document.createElement("header");
-    bar.className = "editor-bar";
-    const back = document.createElement("button");
-    back.type = "button";
-    back.className = "chip ghost";
-    back.textContent = "◀ Tracks";
-    back.addEventListener("click", () => this.onDone());
-    const title = document.createElement("strong");
-    title.className = "models-title";
-    title.textContent = "Your car";
-    bar.append(back, title);
+    // A screen of its own needs a way out and a title; embedded beside the
+    // track list it is simply part of the page and needs neither.
+    let bar: HTMLElement | null = null;
+    if (!this.embedded) {
+      bar = document.createElement("header");
+      bar.className = "editor-bar";
+      const back = document.createElement("button");
+      back.type = "button";
+      back.className = "chip ghost";
+      back.textContent = "◀ Tracks";
+      back.addEventListener("click", () => this.onDone?.());
+      const title = document.createElement("strong");
+      title.className = "models-title";
+      title.textContent = "Your car";
+      bar.append(back, title);
+    }
 
     this.view.className = "garage-view";
     this.view.appendChild(this.renderer.domElement);
@@ -119,9 +131,14 @@ export class Garage {
 
     const says = document.createElement("p");
     says.className = "garage-says";
-    says.textContent = "Pick a colour. This is the car you drive.";
+    says.textContent = this.embedded
+      ? "Your car"
+      : "Pick a colour. This is the car you drive.";
 
-    this.root.append(bar, this.view, swatches, says);
+    if (bar) {
+      this.root.appendChild(bar);
+    }
+    this.root.append(this.view, swatches, says);
     this.markChosen();
     this.turnable();
   }

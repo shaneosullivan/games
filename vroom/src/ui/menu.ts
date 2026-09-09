@@ -1,7 +1,8 @@
-import {ENVIRONMENTS} from "../config";
+import {ENVIRONMENTS, LAYOUT} from "../config";
 import {deleteTrack, loadTracks} from "../track/store";
 import {BUILT_IN, TrackSpec} from "../track/spec";
 import {rate, RATING_NAMES} from "../track/rating";
+import {Garage} from "./garage";
 
 /**
  * The track list: what you see when the game opens.
@@ -24,14 +25,48 @@ export interface MenuHandlers {
 export class Menu {
   readonly root = document.createElement("div");
 
+  /** The car, beside the list, when there is room for it. */
+  private garage: Garage | null = null;
+  private wide = Menu.roomForBoth();
+
   constructor(private readonly handlers: MenuHandlers) {
     this.root.className = "screen menu";
     this.draw();
+    window.addEventListener("resize", this.onResize);
+  }
+
+  /** Is there room for the track list and the car side by side? */
+  private static roomForBoth(): boolean {
+    return window.innerWidth >= LAYOUT.wide;
+  }
+
+  /**
+   * Rebuilt only when the answer changes.
+   *
+   * The garage owns a WebGL context, so it is built when it is shown and given
+   * back when it is not — a browser hands out about sixteen of those and then
+   * starts quietly dropping the oldest, and a phone turned back and forth
+   * would get through them.
+   */
+  private onResize = (): void => {
+    const now = Menu.roomForBoth();
+    if (now !== this.wide) {
+      this.wide = now;
+      this.draw();
+    }
+  };
+
+  dispose(): void {
+    window.removeEventListener("resize", this.onResize);
+    this.garage?.dispose();
+    this.garage = null;
   }
 
   /** Rebuilt from the store rather than patched, so deleting a track and the
    *  list agreeing about it cannot come apart. */
   private draw(): void {
+    this.garage?.dispose();
+    this.garage = null;
     this.root.replaceChildren();
 
     const head = document.createElement("header");
@@ -66,6 +101,8 @@ export class Menu {
     build.textContent = "Build your own track";
     build.addEventListener("click", () => this.handlers.onBuild());
 
+    // On a phone the car goes behind a button; on anything wider it is already
+    // on the screen and the button would only lead to where you are.
     const garage = document.createElement("button");
     garage.type = "button";
     garage.className = "chip";
@@ -89,9 +126,31 @@ export class Menu {
     home.className = "chip";
     home.href = "../../";
     home.textContent = "🏠 Chofter Games";
-    foot.append(build, garage, home);
+    foot.append(build);
+    if (!this.wide) {
+      foot.appendChild(garage);
+    }
+    foot.appendChild(home);
 
-    this.root.append(head, list, foot);
+    if (!this.wide) {
+      this.root.append(head, list, foot);
+      return;
+    }
+
+    // Two columns: the races on one side, the car on the other.
+    const split = document.createElement("div");
+    split.className = "menu-split";
+    const races = document.createElement("div");
+    races.className = "menu-races";
+    races.append(list, foot);
+
+    this.garage = new Garage(null, true);
+    const beside = document.createElement("div");
+    beside.className = "menu-car";
+    beside.appendChild(this.garage.root);
+
+    split.append(races, beside);
+    this.root.append(head, split);
   }
 
   private card(spec: TrackSpec, mine: boolean): HTMLElement {
