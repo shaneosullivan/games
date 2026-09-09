@@ -758,6 +758,9 @@ export const RIVALS = {
   colours: [0x3f7fd6, 0x49b45a, 0xe0b13c] as const,
 } as const;
 
+/** What can be painted on a car on top of its colour. */
+export type CarDesign = "plain" | "bolt" | "checkers" | "stripes";
+
 /** The player's car, and how the grid is laid out. */
 export const PLAYER = {
   /** The colour a car is until somebody chooses otherwise. */
@@ -790,6 +793,38 @@ export const PLAYER = {
   neonSaturation: 1,
   neonLightness: 0.62,
   neonNeedsHue: 0.3,
+  /**
+   * What is painted on top of the colour.
+   *
+   * The colour is the car; this is the child's own mark on it. They go on the
+   * decks — the nose in front of the driver and the engine cover behind them —
+   * because the camera looks down at forty-five degrees and the top of a car
+   * is nearly all it ever sees of one.
+   *
+   * Laid on the surface the body already has rather than modelled: each shape
+   * is cut flat and then dropped onto the deck, so it follows the taper of the
+   * nose and the slope of the cover instead of hovering over them.
+   */
+  designs: [
+    {id: "plain", name: "Plain"},
+    {id: "bolt", name: "Lightning"},
+    {id: "checkers", name: "Checkers"},
+    {id: "stripes", name: "Stripes"},
+  ] as ReadonlyArray<{id: CarDesign; name: string}>,
+  /**
+   * The two colours a design is ever painted in, and where the line between
+   * them falls.
+   *
+   * One or the other, picked on how light the car is: white on a dark car and
+   * near-black on a pale one. A third colour would be a second decision, and
+   * the point of this one is that whatever is chosen looks deliberate.
+   */
+  decalLight: 0xf7f5ee,
+  decalDark: 0x1b1d24,
+  decalSwitchesAt: 0.55,
+  /** How far the paint stands off the bodywork. Coplanar faces z-fight, and
+   *  this is the smallest gap that never flickers at racing distance. */
+  decalLift: 0.09,
   /** How far off the centre line the player starts, and how far back. */
   offset: -22,
 } as const;
@@ -932,6 +967,17 @@ export const ITEM = {
      */
     dive: 1.6,
     diveMost: 1.1,
+    /**
+     * How much of that a jump gets when it is also rolling.
+     *
+     * Every take-off goes over the front, not only the square ones: a car
+     * comes off a ramp nose up and it has to be nose down by the time it
+     * arrives, because landing on the front wheels is what a jump looks like
+     * and landing flat is what a dropped brick looks like. A rolling one gets
+     * less of it — it already has one rotation to read and two at full rate is
+     * a car nobody can follow.
+     */
+    diveRolling: 0.55,
     /** How fast it goes up. The arc is a real one — gravity brings it back —
      *  so this is a speed and not a duration. */
     launch: 62,

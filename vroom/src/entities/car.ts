@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import {CAR, ITEM, TRAIL} from "../config";
+import {CAR, CarDesign, ITEM, TRAIL} from "../config";
 import {flatVertex, LAYER, order, tile} from "../render/sprites";
 import {car as carModel} from "../models/car";
 import {Patches} from "./patches";
@@ -123,8 +123,8 @@ export class Car {
   ];
   private readonly shadow: THREE.Mesh;
 
-  constructor(colour: number) {
-    this.sprite = carModel(colour);
+  constructor(colour: number, design: CarDesign = "plain") {
+    this.sprite = carModel(colour, design);
     // Under the car and only ever seen in mid-air. It stays the size the car
     // was on the ground, which is what makes the car look as though it has
     // left it rather than merely got bigger.
@@ -163,8 +163,10 @@ export class Car {
     this.climb = ITEM.ramp.launch * push;
 
     this.rollRate = lean * ITEM.ramp.roll * push;
-    // Square onto the boards: nothing to roll it, so it goes head first.
-    this.pitchRate = lean === 0 ? -ITEM.ramp.dive * push : 0;
+    // Over the front, always: square onto the boards it goes head first, and
+    // caught down one side it rolls and still comes down nose first.
+    const over = lean === 0 ? 1 : ITEM.ramp.diveRolling;
+    this.pitchRate = -ITEM.ramp.dive * push * over;
   }
 
   /** Off the ground, and how far through the jump. */

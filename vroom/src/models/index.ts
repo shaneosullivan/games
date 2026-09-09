@@ -6,13 +6,13 @@ import {Assembly} from "./assembly";
 import {car, driver} from "./car";
 import {plant} from "./flora";
 import {neonSign} from "./neon";
-import {barrier, cone, gantry, tyreStack} from "./props";
+import {barrier, cone, gantry, ramp, tyreStack} from "./props";
 import {spectator, stand} from "./stand";
 
 export {car, driver} from "./car";
 export {plant} from "./flora";
 export {neonSign} from "./neon";
-export {barrier, cone, gantry, tyreStack} from "./props";
+export {barrier, cone, gantry, ramp, tyreStack} from "./props";
 export {spectator, stand} from "./stand";
 export {Assembly, DETAIL, rounded} from "./assembly";
 
@@ -68,6 +68,12 @@ export const MODELS: Array<ModelEntry> = [
     name: "Tyre stack",
     size: 24,
     make: p => tyreStack(p).build(),
+  },
+  {
+    id: "ramp",
+    name: "Ramp",
+    size: 60,
+    make: () => ramp().build(),
   },
   {
     id: "cone",

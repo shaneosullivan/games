@@ -990,6 +990,39 @@ canvas {
   transform: scale(0.94);
 }
 
+/* The designs. Words rather than little pictures of each one: the car in
+   front of you changes the moment one is tapped, which is a better picture of
+   what a design is than any icon would be. */
+.designs {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 16px 0;
+}
+
+.design {
+  padding: 9px 16px;
+  border-radius: 999px;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.08);
+  color: inherit;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.design.on {
+  border-color: #fff;
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.design:active {
+  transform: scale(0.96);
+}
+
 .garage-says {
   margin: 0;
   padding: 6px 16px calc(var(--safe-b) + 18px);
@@ -1053,6 +1086,23 @@ canvas {
 
 .garage-panel .swatch.on {
   border-color: var(--ink);
+}
+
+.garage-panel .designs {
+  gap: 6px;
+  padding: 10px 12px 0;
+}
+
+.garage-panel .design {
+  padding: 7px 12px;
+  font-size: 14px;
+  border-color: rgba(29, 36, 48, 0.18);
+  background: rgba(29, 36, 48, 0.06);
+}
+
+.garage-panel .design.on {
+  border-color: var(--ink);
+  background: rgba(29, 36, 48, 0.14);
 }
 
 .garage-panel .garage-says {

@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import {RoomEnvironment} from "three/examples/jsm/environments/RoomEnvironment.js";
-import {FILM, LIGHT, PLAYER} from "../config";
-import {chooseColour, myColour} from "../core/garage";
+import {CarDesign, FILM, LIGHT, PLAYER} from "../config";
+import {chooseColour, chooseDesign, myColour, myDesign} from "../core/garage";
 import {car} from "../models/car";
 import {setEnvironment} from "../render/materials";
 
@@ -27,6 +27,7 @@ export class Garage {
 
   private model: THREE.Object3D | null = null;
   private colour = myColour();
+  private design: CarDesign = myDesign();
   private turn = 0.7;
   private spinning = true;
   private frame = 0;
@@ -129,16 +130,35 @@ export class Garage {
       swatches.appendChild(dot);
     }
 
+    // The designs, under the colours and in the same shape of row: two rows of
+    // buttons that both change the car in front of you is one idea, not two.
+    const designs = document.createElement("div");
+    designs.className = "designs";
+    for (const choice of PLAYER.designs) {
+      const pick = document.createElement("button");
+      pick.type = "button";
+      pick.className = "design";
+      pick.dataset.design = choice.id;
+      pick.textContent = choice.name;
+      pick.addEventListener("click", () => {
+        this.design = choice.id;
+        chooseDesign(choice.id);
+        this.paint();
+        this.markChosen();
+      });
+      designs.appendChild(pick);
+    }
+
     const says = document.createElement("p");
     says.className = "garage-says";
     says.textContent = this.embedded
       ? "Your car"
-      : "Pick a colour. This is the car you drive.";
+      : "Pick a colour and something to put on it. This is the car you drive.";
 
     if (bar) {
       this.root.appendChild(bar);
     }
-    this.root.append(this.view, swatches, says);
+    this.root.append(this.view, swatches, designs, says);
     this.markChosen();
     this.turnable();
   }
@@ -147,6 +167,9 @@ export class Garage {
     for (const dot of this.root.querySelectorAll<HTMLElement>(".swatch")) {
       dot.classList.toggle("on", Number(dot.dataset.colour) === this.colour);
     }
+    for (const pick of this.root.querySelectorAll<HTMLElement>(".design")) {
+      pick.classList.toggle("on", pick.dataset.design === this.design);
+    }
   }
 
   /** Rebuilds the car in the chosen colour. */
@@ -154,7 +177,7 @@ export class Garage {
     if (this.model) {
       this.stage.remove(this.model);
     }
-    this.model = car(this.colour);
+    this.model = car(this.colour, this.design);
     this.stage.add(this.model);
   }
 

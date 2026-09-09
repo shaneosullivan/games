@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import {Environment, PLAYER} from "../config";
+import {CarDesign, Environment, PLAYER} from "../config";
 
 /**
  * Which car is yours.
@@ -8,6 +8,7 @@ import {Environment, PLAYER} from "../config";
  * thing a child asks for: the red car is only *your* car if you picked it.
  */
 const KEY = "vroom.car.v1";
+const DESIGN_KEY = "vroom.car.design.v1";
 
 export function myColour(): number {
   try {
@@ -51,6 +52,29 @@ export function neonised(colour: number): number {
     THREE.SRGBColorSpace,
   );
   return c.getHex(THREE.SRGBColorSpace);
+}
+
+/** What is painted on it. The colour and the design are stored apart: a child
+ *  changing one is not choosing the other again. */
+export function myDesign(): CarDesign {
+  try {
+    const saved = window.localStorage.getItem(DESIGN_KEY);
+    const known = PLAYER.designs.find(d => d.id === saved);
+    if (known) {
+      return known.id;
+    }
+  } catch {
+    // A blocked store just means everybody drives a plain one.
+  }
+  return "plain";
+}
+
+export function chooseDesign(design: CarDesign): void {
+  try {
+    window.localStorage.setItem(DESIGN_KEY, design);
+  } catch {
+    // As above.
+  }
 }
 
 export function chooseColour(colour: number): void {

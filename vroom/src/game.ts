@@ -18,7 +18,7 @@ import {Bridges} from "./entities/bridges";
 import {Tyres} from "./entities/tyres";
 import {Stands} from "./entities/stands";
 import {beginWatching, sawFrame} from "./core/quality";
-import {carColour} from "./core/garage";
+import {carColour, myDesign} from "./core/garage";
 import {LOADING, SIM} from "./config";
 import {MiniMap} from "./ui/minimap";
 import {NearFade} from "../../shared/fadeInFront";
@@ -233,7 +233,7 @@ export class Game {
 
     report(0.25, "Rolling out the cars\u2026");
     await frame();
-    this.car = new Car(carColour(spec.environment));
+    this.car = new Car(carColour(spec.environment), myDesign());
     this.rivals = new Rivals(this.track);
     this.skids = new Skids(palette);
     this.trails = new Skids(palette, TRAIL.max);
@@ -744,13 +744,22 @@ export class Game {
     }
   }
 
-  /** Everything off, for a screen that is going away. */
+  /**
+   * Everything off, for a screen that is going away.
+   *
+   * Written as though half of it might not exist yet, because it might: a race
+   * is built in awaited steps behind the loading card, and anything that takes
+   * the player away before the last of them — tapping Home while it loads, or
+   * starting a second race on top of the first — disposes a game that has no
+   * loop and no stage. That threw, and a throw in here left the whole screen
+   * stuck behind a card that never came down.
+   */
   dispose(): void {
     this.running = false;
-    this.loop.stop();
+    this.loop?.stop();
     this.engine.stop();
     this.stick.enabled = false;
-    this.stage.dispose();
+    this.stage?.dispose();
   }
 
   /**
