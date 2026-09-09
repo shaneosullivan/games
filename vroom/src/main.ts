@@ -5,6 +5,7 @@ import {Editor} from "./ui/editor";
 import {Menu} from "./ui/menu";
 import {ModelViewer, MODELS_HASH} from "./ui/models";
 import {Loading} from "./ui/loading";
+import {Garage} from "./ui/garage";
 import {LOADING} from "./config";
 import {BUILT_IN, TrackSpec} from "./track/spec";
 import {saveTrack} from "./track/store";
@@ -34,6 +35,7 @@ if (!app) {
 let game: Game | null = null;
 let editor: Editor | null = null;
 let models: ModelViewer | null = null;
+let garage: Garage | null = null;
 
 function clear(): void {
   game?.dispose();
@@ -42,6 +44,8 @@ function clear(): void {
   editor = null;
   models?.dispose();
   models = null;
+  garage?.dispose();
+  garage = null;
   app!.replaceChildren();
 }
 
@@ -55,6 +59,7 @@ function showMenu(): void {
     onBuild: () => showEditor(),
     onEdit: spec => showEditor(spec),
     onModels: showModels,
+    onGarage: showGarage,
   });
   app!.appendChild(menu.root);
 }
@@ -73,6 +78,13 @@ function showModels(hash = ""): void {
   if (hash) {
     models.restore(hash);
   }
+}
+
+/** The garage: which car is yours. */
+function showGarage(): void {
+  clear();
+  garage = new Garage(showMenu);
+  app!.appendChild(garage.root);
 }
 
 function showEditor(existing?: TrackSpec): void {

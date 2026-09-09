@@ -53,6 +53,16 @@ past, and there are tyre stacks on the outside of some corners to bounce off.
 Cars bounce off each other too, ramps throw you into the air and give you a
 shove with it, oil takes your grip away and mud takes your speed.
 
+## Your car
+
+**🎨 Your car** on the front screen opens the garage: ten colours, and the real
+model turning while you choose, lit the way the game lights it — so what you
+pick is what turns up on the grid. The choice is kept in this browser
+(`vroom.car.v1`).
+
+The rivals give way to it. Two identical cars in a race of four is a child
+watching the wrong one all the way round.
+
 ## Building a track
 
 **Build your own track** on the front screen opens the builder. Draw a loop with

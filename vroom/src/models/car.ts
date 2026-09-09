@@ -94,17 +94,19 @@ function cockpit(a: Assembly, L: number, W: number): void {
   tub.translate(0, 4.3, -L * 0.02);
   a.add(tub, "glass", GLASS);
 
-  // A roll hoop behind the head. Small, and the one thing that says which end
-  // of the car is which when it is spinning.
+  // A roll hoop behind the head: an arch **across** the car, which is the way
+  // a roll hoop goes. A torus lies in the XY plane already, so it was the
+  // quarter turn that was wrong — it stood the arch front to back, along the
+  // car, where it protected nothing and read as a handle. Taller than the
+  // helmet too, which is the entire point of one.
   const hoop = new THREE.TorusGeometry(
-    W * 0.2,
-    0.28,
+    W * 0.45,
+    0.34,
     8,
-    DETAIL.coarse,
+    DETAIL.round,
     Math.PI,
   );
-  hoop.rotateY(Math.PI / 2);
-  hoop.translate(0, 5.1, -L * 0.19);
+  hoop.translate(0, 4.8, -L * 0.19);
   a.add(hoop, "chrome", RIM);
 }
 

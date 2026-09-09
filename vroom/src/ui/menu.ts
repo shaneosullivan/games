@@ -17,6 +17,8 @@ export interface MenuHandlers {
   onEdit: (spec: TrackSpec) => void;
   /** The model viewer. Development builds only. */
   onModels: () => void;
+  /** The garage: which car is yours. */
+  onGarage: () => void;
 }
 
 export class Menu {
@@ -64,6 +66,12 @@ export class Menu {
     build.textContent = "Build your own track";
     build.addEventListener("click", () => this.handlers.onBuild());
 
+    const garage = document.createElement("button");
+    garage.type = "button";
+    garage.className = "chip";
+    garage.textContent = "🎨 Your car";
+    garage.addEventListener("click", () => this.handlers.onGarage());
+
     const foot = document.createElement("div");
     foot.className = "menu-foot";
 
@@ -81,7 +89,7 @@ export class Menu {
     home.className = "chip";
     home.href = "../../";
     home.textContent = "🏠 Chofter Games";
-    foot.append(build, home);
+    foot.append(build, garage, home);
 
     this.root.append(head, list, foot);
   }

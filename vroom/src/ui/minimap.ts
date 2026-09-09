@@ -1,5 +1,6 @@
 import * as THREE from "three";
-import {MAP, PLAYER, RIVALS} from "../config";
+import {MAP, RIVALS} from "../config";
+import {myColour} from "../core/garage";
 import {Track} from "../entities/track";
 
 /**
@@ -128,7 +129,7 @@ export class MiniMap {
       g.beginPath();
       g.arc(at.x, at.y, mine ? MAP.you : MAP.dot, 0, Math.PI * 2);
       g.fillStyle = hex(
-        mine ? PLAYER.colour : RIVALS.colours[(i - 1) % RIVALS.colours.length],
+        mine ? myColour() : RIVALS.colours[(i - 1) % RIVALS.colours.length],
       );
       g.fill();
       // A dark ring, so a dot on the white road is still a dot.

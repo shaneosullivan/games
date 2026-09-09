@@ -1,5 +1,6 @@
 import * as THREE from "three";
-import {CAR, RIVALS} from "../config";
+import {CAR, PLAYER, RIVALS} from "../config";
+import {myColour} from "../core/garage";
 import {Car, Drive} from "./car";
 import {Patches} from "./patches";
 import {Track, wrap} from "./track";
@@ -37,8 +38,14 @@ export class Rivals {
 
   constructor(track: Track) {
     this.drive = {kind: "aim", aim: this.want};
+    // Nobody else drives the player's colour. Two identical cars in a race of
+    // four is a child watching the wrong one all the way round.
+    const mine = myColour();
+    const spare = PLAYER.choices.filter(c => c !== mine);
+    const palette = RIVALS.colours.filter(c => c !== mine);
     for (let i = 0; i < RIVALS.count; i++) {
-      const car = new Car(RIVALS.colours[i % RIVALS.colours.length]);
+      const pick = i < palette.length ? palette[i] : spare[i % spare.length];
+      const car = new Car(pick);
       // Left, right, left: a grid, not a queue.
       const off = (i % 2 === 0 ? 1 : -1) * RIVALS.offset;
       const t = wrap(track.startAt - 0.006 - i * RIVALS.gridGap);

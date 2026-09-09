@@ -926,3 +926,75 @@ canvas {
     transform: translateX(10px) rotate(3deg);
   }
 }
+
+/* ---------- The garage ---------- */
+
+.screen.garage {
+  background: #191b20;
+  color: #eef0f4;
+}
+
+.screen.garage .editor-bar {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.screen.garage .chip {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.16);
+  color: #eef0f4;
+}
+
+/* The car itself. Its own canvas, sized to this box. */
+.garage-view {
+  flex: 1;
+  min-height: 0;
+  touch-action: none;
+  cursor: grab;
+}
+
+.garage-view:active {
+  cursor: grabbing;
+}
+
+.garage-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* The colours. Big round targets — this is the one screen in the game whose
+   whole job is being tapped by a small finger. */
+.swatches {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+  padding: 14px 16px 4px;
+}
+
+.swatch {
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  border: 3px solid rgba(255, 255, 255, 0.2);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.swatch.on {
+  border-color: #fff;
+  transform: scale(1.12);
+}
+
+.swatch:active {
+  transform: scale(0.94);
+}
+
+.garage-says {
+  margin: 0;
+  padding: 6px 16px calc(var(--safe-b) + 18px);
+  text-align: center;
+  font-size: 15px;
+  font-weight: 700;
+  opacity: 0.65;
+}

@@ -18,6 +18,7 @@ import {Bridges} from "./entities/bridges";
 import {Tyres} from "./entities/tyres";
 import {Stands} from "./entities/stands";
 import {beginWatching, sawFrame} from "./core/quality";
+import {myColour} from "./core/garage";
 import {LOADING, SIM} from "./config";
 import {MiniMap} from "./ui/minimap";
 import {NearFade} from "../../shared/fadeInFront";
@@ -232,7 +233,7 @@ export class Game {
 
     report(0.25, "Rolling out the cars\u2026");
     await frame();
-    this.car = new Car(PLAYER.colour);
+    this.car = new Car(myColour());
     this.rivals = new Rivals(this.track);
     this.skids = new Skids(palette);
     this.trails = new Skids(palette, TRAIL.max);

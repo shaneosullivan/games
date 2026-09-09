@@ -748,7 +748,19 @@ export const RIVALS = {
 
 /** The player's car, and how the grid is laid out. */
 export const PLAYER = {
+  /** The colour a car is until somebody chooses otherwise. */
   colour: 0xd6473c,
+  /**
+   * What can be chosen in the garage.
+   *
+   * Ten, all saturated and none close to another: a child picking a colour is
+   * picking *their* car, and two reds a shade apart is a choice that means
+   * nothing.
+   */
+  choices: [
+    0xd6473c, 0x3f7fd6, 0x49b45a, 0xe0b13c, 0xa356d6, 0xf2f0ea, 0x21242b,
+    0xff7a2f, 0x2ec7c7, 0xef62a8,
+  ] as ReadonlyArray<number>,
   /** How far off the centre line the player starts, and how far back. */
   offset: -22,
 } as const;
