@@ -928,6 +928,35 @@ export const PLAYER = {
   offset: -22,
 } as const;
 
+/**
+ * The driver, who is a person and not part of the car.
+ *
+ * Their kit is chosen apart from the paint, because it is a separate thing to
+ * be pleased about: a child who has spent a minute on the car has *made* that
+ * car, and the driver sitting in it should be theirs too. Helmets have their
+ * own list — white and black belong on a helmet and read as one from above —
+ * and the overalls take any of the colours a car can be.
+ */
+export const DRIVER = {
+  /** What everybody wore before there was a choice. Rivals still do. */
+  helmet: 0xe8e4d8,
+  suit: 0xd6473c,
+  helmets: [
+    0xe8e4d8, 0x21242b, 0xd6473c, 0x3f7fd6, 0x49b45a, 0xe0b13c, 0xa356d6,
+    0xff7a2f, 0x2ec7c7, 0xef62a8,
+  ] as ReadonlyArray<number>,
+  suits: [
+    0xd6473c, 0x3f7fd6, 0x49b45a, 0xe0b13c, 0xa356d6, 0xf2f0ea, 0x21242b,
+    0xff7a2f, 0x2ec7c7, 0xef62a8,
+  ] as ReadonlyArray<number>,
+} as const;
+
+/** What a driver is wearing. */
+export interface DriverKit {
+  helmet: number;
+  suit: number;
+}
+
 /** What a sticker can be: one of the cut-out shapes, or something written. */
 export type StickerKind =
   "star" | "heart" | "flag" | "skull" | "smiley" | "bolt" | "crown" | "text";

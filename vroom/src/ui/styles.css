@@ -943,6 +943,67 @@ canvas {
   color: #eef0f4;
 }
 
+/* The switch between the car and the driver.
+
+   Across the top of the screen and the width of it, because what is behind the
+   second one is a whole set of choices a child would otherwise never find:
+   this is the first thing on the page and it says what it is. */
+.garage-tabs {
+  display: flex;
+  gap: 8px;
+  padding: 10px 12px 4px;
+  flex: 0 0 auto;
+}
+
+.garage-tab {
+  flex: 1 1 0;
+  padding: 14px 8px;
+  border-radius: 18px;
+  border: 3px solid rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.08);
+  color: inherit;
+  font: inherit;
+  font-size: 19px;
+  font-weight: 800;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.garage-tab.on {
+  border-color: #fff;
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.garage-tab:active {
+  transform: scale(0.98);
+}
+
+.garage-panel .garage-tab {
+  padding: 10px 6px;
+  font-size: 16px;
+  border-color: rgba(29, 36, 48, 0.18);
+  background: rgba(29, 36, 48, 0.06);
+}
+
+.garage-panel .garage-tab.on {
+  border-color: var(--ink);
+  background: rgba(29, 36, 48, 0.16);
+}
+
+/* One part of the driver's kit: what it is, and the colours it can be. */
+.kit-row {
+  padding-top: 4px;
+}
+
+.kit-title {
+  margin: 0;
+  padding: 8px 16px 0;
+  text-align: center;
+  font-size: 15px;
+  font-weight: 800;
+  opacity: 0.7;
+}
+
 /* The car itself. Its own canvas, sized to this box.
 
    It never shrinks below a third of the screen and it never scrolls away: the

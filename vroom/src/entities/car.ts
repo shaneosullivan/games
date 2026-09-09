@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import {CAR, CarDesign, ITEM, Sticker, TRAIL} from "../config";
+import {CAR, CarDesign, DriverKit, ITEM, Sticker, TRAIL} from "../config";
 import {flatVertex, LAYER, order, tile} from "../render/sprites";
 import {car as carModel} from "../models/car";
 import {Patches} from "./patches";
@@ -127,8 +127,9 @@ export class Car {
     colour: number,
     design: CarDesign = "plain",
     stickers: ReadonlyArray<Sticker> = [],
+    kit?: DriverKit,
   ) {
-    this.sprite = carModel(colour, design, stickers);
+    this.sprite = carModel(colour, design, stickers, kit);
     // Under the car and only ever seen in mid-air. It stays the size the car
     // was on the ground, which is what makes the car look as though it has
     // left it rather than merely got bigger.

@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import {ConvexGeometry} from "three/examples/jsm/geometries/ConvexGeometry.js";
-import {CAR, CarDesign, PLAYER, Sticker} from "../config";
+import {CAR, CarDesign, DRIVER, DriverKit, PLAYER, Sticker} from "../config";
 import {COVER, NOSE, onDeck, STATIONS} from "./deck";
 import {stickerMesh} from "./stickers";
 import {Assembly, DETAIL, rounded} from "./assembly";
@@ -9,8 +9,6 @@ const TYRE = 0x14141a;
 const RIM = 0xb9bec6;
 const DARK = 0x1a1c22;
 const GLASS = 0x0d1016;
-/** Helmets stay pale whatever the car is — it is what reads as a person. */
-const HELMET = 0xe8e4d8;
 
 /**
  * The car.
@@ -33,6 +31,7 @@ export function car(
   colour: number,
   design: CarDesign = "plain",
   stickers: ReadonlyArray<Sticker> = [],
+  kit?: DriverKit,
 ): THREE.Group {
   const a = new Assembly();
   const L = CAR.length;
@@ -41,7 +40,7 @@ export function car(
   shell(a, colour, L, W);
   livery(a, design, colour, L, W);
   cockpit(a, L, W);
-  driver(a, L, W, colour);
+  driver(a, L, W, colour, kit);
   wings(a, colour, L, W);
   for (const along of [0.33, -0.31]) {
     for (const side of [-1, 1]) {
@@ -224,7 +223,13 @@ export function driver(
   L: number,
   W: number,
   colour: number,
+  kit?: DriverKit,
 ): void {
+  // The player's driver wears what the player chose. A rival's takes their
+  // car's colour, which is part of what tells four cars apart at a hundred
+  // units, and a pale helmet, which is what reads as a person up there.
+  const suit = kit?.suit ?? colour;
+  const helmet = kit?.helmet ?? DRIVER.helmet;
   const seat = -L * 0.04;
   const floor = 4.0;
 
@@ -232,12 +237,12 @@ export function driver(
   const torso = rounded(W * 0.44, 2.1, L * 0.15, 0.55);
   torso.rotateX(-0.38);
   torso.translate(0, floor + 0.7, seat - L * 0.035);
-  a.add(torso, "matte", colour);
+  a.add(torso, "matte", suit);
 
   const shoulders = rounded(W * 0.52, 1.0, L * 0.09, 0.4);
   shoulders.rotateX(-0.2);
   shoulders.translate(0, floor + 1.5, seat - L * 0.012);
-  a.add(shoulders, "matte", colour);
+  a.add(shoulders, "matte", suit);
 
   // Arms forward to the wheel, and gloves on the rim.
   for (const side of [-1, 1]) {
@@ -245,7 +250,7 @@ export function driver(
     arm.rotateX(Math.PI / 2);
     arm.rotateY(-side * 0.2);
     arm.translate(side * W * 0.17, floor + 1.25, seat + L * 0.075);
-    a.add(arm, "matte", colour);
+    a.add(arm, "matte", suit);
 
     const glove = new THREE.SphereGeometry(0.52, DETAIL.coarse, DETAIL.coarse);
     glove.translate(side * W * 0.14, floor + 1.12, seat + L * 0.14);
@@ -262,7 +267,7 @@ export function driver(
   const shell = new THREE.SphereGeometry(1.3, DETAIL.round, DETAIL.round);
   shell.scale(1, 1.06, 1.02);
   shell.translate(0, floor + 2.5, seat - L * 0.005);
-  a.add(shell, "bodywork", HELMET);
+  a.add(shell, "bodywork", helmet);
 
   const visor = new THREE.SphereGeometry(
     1.33,

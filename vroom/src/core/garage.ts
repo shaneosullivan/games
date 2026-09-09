@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import {CarDesign, Environment, PLAYER} from "../config";
+import {CarDesign, DRIVER, DriverKit, Environment, PLAYER} from "../config";
 
 /**
  * Which car is yours.
@@ -9,6 +9,7 @@ import {CarDesign, Environment, PLAYER} from "../config";
  */
 const KEY = "vroom.car.v1";
 const DESIGN_KEY = "vroom.car.design.v1";
+const KIT_KEY = "vroom.driver.v1";
 
 export function myColour(): number {
   try {
@@ -72,6 +73,43 @@ export function myDesign(): CarDesign {
 export function chooseDesign(design: CarDesign): void {
   try {
     window.localStorage.setItem(DESIGN_KEY, design);
+  } catch {
+    // As above.
+  }
+}
+
+/**
+ * What your driver is wearing.
+ *
+ * Kept apart from the car's own colour and design, so changing one is never
+ * choosing the others again — and so a save from before there were drivers to
+ * dress opens with the kit everybody used to wear rather than with nothing.
+ */
+export function myKit(): DriverKit {
+  const kit: DriverKit = {helmet: DRIVER.helmet, suit: DRIVER.suit};
+  try {
+    const saved: unknown = JSON.parse(
+      window.localStorage.getItem(KIT_KEY) ?? "null",
+    );
+    if (saved && typeof saved === "object") {
+      const {helmet, suit} = saved as Partial<DriverKit>;
+      if (DRIVER.helmets.includes(helmet as number)) {
+        kit.helmet = helmet as number;
+      }
+      if (DRIVER.suits.includes(suit as number)) {
+        kit.suit = suit as number;
+      }
+    }
+  } catch {
+    // A blocked store, or a colour that is no longer on offer: the kit
+    // everybody started in is a perfectly good driver.
+  }
+  return kit;
+}
+
+export function chooseKit(kit: DriverKit): void {
+  try {
+    window.localStorage.setItem(KIT_KEY, JSON.stringify(kit));
   } catch {
     // As above.
   }

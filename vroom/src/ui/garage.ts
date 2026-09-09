@@ -3,6 +3,8 @@ import {RoomEnvironment} from "three/examples/jsm/environments/RoomEnvironment.j
 import {
   CAR,
   CarDesign,
+  DRIVER,
+  DriverKit,
   FILM,
   LIGHT,
   PLAYER,
@@ -10,7 +12,14 @@ import {
   STICKER,
   StickerKind,
 } from "../config";
-import {chooseColour, chooseDesign, myColour, myDesign} from "../core/garage";
+import {
+  chooseColour,
+  chooseDesign,
+  chooseKit,
+  myColour,
+  myDesign,
+  myKit,
+} from "../core/garage";
 import {keepStickers, myStickers} from "../core/stickers";
 import {car, stick} from "../models/car";
 import {deck, DECK_INSET, nearestDeck} from "../models/deck";
@@ -57,6 +66,11 @@ export class Garage {
     -STICKER.dragHeight,
   );
 
+  /** The two halves of the controls, and the line under them. */
+  private readonly carSide = document.createElement("div");
+  private readonly driverSide = document.createElement("div");
+  private readonly says = document.createElement("p");
+
   /** The bar that appears when a sticker is picked, and the parts of it that
    *  are only for writing. */
   private readonly chosenBar = document.createElement("div");
@@ -67,6 +81,9 @@ export class Garage {
   private colour = myColour();
   private design: CarDesign = myDesign();
   private stickers: Array<Sticker> = myStickers();
+  private kit: DriverKit = myKit();
+  /** Which half of the garage is open: the car, or the person in it. */
+  private showing: "car" | "driver" = "car";
   private chosen: number | null = null;
   private wide = 0;
   private tall = 0;
@@ -191,28 +208,89 @@ export class Garage {
       designs.appendChild(pick);
     }
 
-    const says = document.createElement("p");
-    says.className = "garage-says";
-    says.textContent = this.embedded
-      ? "Your car. Drag a sticker to move it."
-      : "Tap something to add it, then drag it around the car.";
+    this.says.className = "garage-says";
+
+    this.carSide.className = "garage-half";
+    this.carSide.append(swatches, designs, this.stickerRow(), this.chosenRow());
+    this.driverSide.className = "garage-half";
+    this.driverSide.append(
+      this.kitRow("helmet", DRIVER.helmets),
+      this.kitRow("suit", DRIVER.suits),
+    );
 
     // The car above, everything that changes it below. The controls are their
     // own box so they can scroll on a short screen without taking the car with
     // them — see `.garage-view` in the stylesheet.
     const controls = document.createElement("div");
     controls.className = "garage-controls";
-    controls.append(
-      swatches,
-      designs,
-      this.stickerRow(),
-      this.chosenRow(),
-      says,
-    );
-    this.root.append(...(bar ? [bar] : []), this.view, controls);
+    controls.append(this.carSide, this.driverSide, this.says);
+    this.root.append(...(bar ? [bar] : []), this.tabs(), this.view, controls);
 
     this.markChosen();
     this.handle();
+  }
+
+  /**
+   * The two halves, as one big switch across the top of the screen.
+   *
+   * Above the car rather than below it, and the width of the page: what is
+   * behind it — a whole second set of things to choose — is not something a
+   * child should have to find, so it is the first thing on the screen and it
+   * says what it is.
+   */
+  private tabs(): HTMLElement {
+    const row = document.createElement("div");
+    row.className = "garage-tabs";
+    for (const [id, label] of [
+      ["car", "🚗 The car"],
+      ["driver", "🧑 The driver"],
+    ] as Array<[typeof this.showing, string]>) {
+      const tab = document.createElement("button");
+      tab.type = "button";
+      tab.className = "garage-tab";
+      tab.dataset.side = id;
+      tab.textContent = label;
+      tab.addEventListener("click", () => {
+        this.showing = id;
+        this.markChosen();
+      });
+      row.appendChild(tab);
+    }
+    return row;
+  }
+
+  /** A row of colours for one part of the driver's kit. */
+  private kitRow(
+    part: keyof DriverKit,
+    choices: ReadonlyArray<number>,
+  ): HTMLElement {
+    const row = document.createElement("div");
+    row.className = "swatches";
+    const title = document.createElement("p");
+    title.className = "kit-title";
+    title.textContent = part === "helmet" ? "Helmet" : "Overalls";
+
+    for (const choice of choices) {
+      const dot = document.createElement("button");
+      dot.type = "button";
+      dot.className = "swatch";
+      dot.dataset.kit = part;
+      dot.dataset.colour = String(choice);
+      dot.style.background = hex(choice);
+      dot.setAttribute("aria-label", `${title.textContent} ${hex(choice)}`);
+      dot.addEventListener("click", () => {
+        this.kit = {...this.kit, [part]: choice};
+        chooseKit(this.kit);
+        this.paint();
+        this.markChosen();
+      });
+      row.appendChild(dot);
+    }
+
+    const box = document.createElement("div");
+    box.className = "kit-row";
+    box.append(title, row);
+    return box;
   }
 
   /** The things you can add: the shapes, then writing, then a way to clear the
@@ -387,8 +465,21 @@ export class Garage {
 
   private markChosen(): void {
     for (const dot of this.root.querySelectorAll<HTMLElement>(".swatch")) {
-      dot.classList.toggle("on", Number(dot.dataset.colour) === this.colour);
+      const kit = dot.dataset.kit as keyof DriverKit | undefined;
+      const want = kit ? this.kit[kit] : this.colour;
+      dot.classList.toggle("on", Number(dot.dataset.colour) === want);
     }
+    for (const tab of this.root.querySelectorAll<HTMLElement>(".garage-tab")) {
+      tab.classList.toggle("on", tab.dataset.side === this.showing);
+    }
+    this.carSide.hidden = this.showing !== "car";
+    this.driverSide.hidden = this.showing !== "driver";
+    this.says.textContent =
+      this.showing === "driver"
+        ? "Your driver. Pick a helmet and overalls."
+        : this.embedded
+          ? "Your car. Drag a sticker to move it."
+          : "Tap something to add it, then drag it around the car.";
     for (const pick of this.root.querySelectorAll<HTMLElement>(".design")) {
       pick.classList.toggle("on", pick.dataset.design === this.design);
     }
@@ -408,7 +499,7 @@ export class Garage {
     if (this.model) {
       this.stage.remove(this.model);
     }
-    this.model = car(this.colour, this.design, this.stickers);
+    this.model = car(this.colour, this.design, this.stickers, this.kit);
     this.stage.add(this.model);
     this.glow();
   }
