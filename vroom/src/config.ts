@@ -308,32 +308,33 @@ export const LAYOUT = {
 } as const;
 
 /**
- * Steering by touch.
+ * Steering by touch: a floating thumbstick, planted wherever the finger lands.
  *
- * Touch a point and the car drives to it. Not a thumbstick you drag from
- * wherever your thumb landed — that is what this was, and it meant a child who
- * touched the screen and held still watched nothing happen, because a relative
- * stick has no direction until the finger has moved away from where it
- * started. Pointing at a place on the road is what a child does anyway.
+ * The penguin game's control, and deliberately the same one — a child moving
+ * between two games in the same gallery should not have to learn the stick
+ * twice.
  *
- * It works because the camera never turns: screen right is world +X and screen
- * down is world +Z at every moment of the game, so a point on the glass is a
- * point on the road without any arithmetic at all.
+ * It was an absolute aim for a while: touch a point and the car drives to it.
+ * That reads well and drives badly. Touching behind the car is an instruction
+ * to go that way, so the car braked, turned round and drove back — every
+ * stray touch on the wrong half of the glass was a U-turn, and a control you
+ * can trigger by brushing is not a control.
+ *
+ * Either way it works because the camera never turns: screen right is world
+ * +X and screen down is world +Z at every moment of the game, so the way the
+ * stick is pushed is the way on the road the car goes, with no arithmetic.
  */
-export const AIM = {
+export const STICK = {
   /**
-   * How close to the car counts as "here", in screen pixels.
+   * How far the knob travels from where the finger landed, in screen pixels,
+   * and how much of that is nothing at all.
    *
-   * Touching the car itself has no direction in it, so this is a small circle
-   * where the car simply coasts — which doubles as the way to lift off without
-   * taking your hand off the screen.
+   * The penguin game's numbers, and this is the penguin game's stick — the
+   * same control in two games should feel the same in both, and a child moving
+   * between them should not have to learn it twice.
    */
-  near: 30,
-  /** How far away is flat out. Beyond this it makes no further difference. */
-  far: 165,
-  /** The least throttle a touch outside the dead zone gives. Pointing just
-   *  ahead of the car should still move it, not creep. */
-  least: 0.3,
+  radius: 68,
+  deadzone: 0.08,
 } as const;
 
 /**
@@ -764,6 +765,24 @@ export const CAR = {
    *  have no corners in it. */
   turn: 3,
   turnAtSpeed: 0.42,
+  /**
+   * How much of the steering a car has at a crawl.
+   *
+   * A car turns by driving round a corner. It cannot spin on the spot, and
+   * this game let it: point the finger behind the car and it braked to a stop
+   * — asking to go the other way is the brake — and then, standing still,
+   * swung its nose through a half turn in a second and drove back the way it
+   * came. Which is not a car and is not a race; a mistake ought to cost a
+   * corner, not a shrug.
+   *
+   * So the nose only comes round in proportion to how fast the car is actually
+   * rolling, up to `turnsFrom`, and a U-turn becomes what it is on a road: a
+   * wide arc, or a stop and a fresh start. `turnStill` is what is left when it
+   * is barely moving at all — not nothing, or a car nose-first into the tyres
+   * could never be worked out of them.
+   */
+  turnsFrom: 34,
+  turnStill: 0.12,
   /**
    * Grip: how fast sideways speed is scrubbed off, per second.
    *
@@ -1376,40 +1395,16 @@ export const NEON = {
   lampPower: 900,
   lampReach: 190,
   /**
-   * The buildings, in two rows.
+   * There are no buildings.
    *
-   * The near row is right on the street and **low**, and that is not a style
-   * choice. The camera sits a hundred and fifty units up and a hundred and
-   * fifty behind, so the line of sight to the car passes through a height of
-   * roughly however far a thing is in front of it — meaning anything close to
-   * the road and taller than about ninety units will sooner or later stand
-   * between the player and their own car. Low-rise along the street and towers
-   * set back is also simply what a city looks like.
+   * There were: two rows of them, low along the street and towers set back,
+   * with a grid of windows up every face. They were handsome and they were
+   * also the thing most often between the camera and the car — the shot comes
+   * in over the scenery at forty-five degrees, and anything tall near the road
+   * eventually stands in it. A street at night with lamps and signs along it
+   * reads as a city perfectly well without them, and the frames they cost buy
+   * a longer view instead.
    */
-  nearBlocks: 30,
-  nearFrom: 6,
-  nearTo: 70,
-  nearLow: 46,
-  nearHigh: 88,
-  blocks: 40,
-  blockFrom: 150,
-  blockTo: 520,
-  blockWide: 60,
-  blockDeep: 60,
-  blockLow: 110,
-  blockHigh: 340,
-  /**
-   * The windows, with the lights off.
-   *
-   * They used to be lit, and to throw light on the street with it. Dark now:
-   * the lamps and the signs light this city and the buildings are the shapes
-   * standing behind them. The panes stay — a tower with no windows is a block,
-   * not a building — they are just glass catching what the street gives them,
-   * which is also why every one of them is here rather than a lit share.
-   */
-  window: 4.4,
-  windowGap: 11,
-  windowGlass: 0x191826,
   /** How many are faulty, how fast they stutter, and how far down they drop
    *  when they do. Not to nothing — a dead tube still catches the streetlight. */
   brokenChance: 0.35,

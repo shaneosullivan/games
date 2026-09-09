@@ -136,7 +136,6 @@ export class Game {
   private readonly eye = new THREE.Vector3();
   private readonly wantEye = new THREE.Vector3();
   private readonly here = new THREE.Vector3();
-  private readonly onScreen = new THREE.Vector3();
 
   constructor(
     host: HTMLElement,
@@ -727,15 +726,6 @@ export class Game {
     } else {
       this.gridShot(p);
     }
-
-    // Where the car is on the glass, so a touch can be measured against it.
-    // The stick steers towards the finger, and only the thing drawing the car
-    // knows where on the screen it ended up.
-    this.onScreen.set(p.x, p.y, p.z).project(this.stage.camera);
-    this.stick.follow(
-      ((this.onScreen.x + 1) / 2) * window.innerWidth,
-      ((1 - this.onScreen.y) / 2) * window.innerHeight,
-    );
 
     // Anything standing between the camera and the car gets out of the way.
     // From a diagonal there is always something that can: a tree on the inside

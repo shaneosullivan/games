@@ -376,7 +376,13 @@ export class Car {
     // the speed comes up — a car that cornered as hard at a hundred as at a
     // walk would have no corners in it — and in mid-air there is barely any.
     const ease = Math.min(1, this.speed / CAR.top);
-    let rate = CAR.turn * (1 - ease * (1 - CAR.turnAtSpeed));
+    // And nothing like all of it standing still: a car turns by driving round
+    // a corner, not by spinning on the spot. See `CAR.turnsFrom`.
+    const rolling = Math.max(
+      CAR.turnStill,
+      Math.min(1, this.speed / CAR.turnsFrom),
+    );
+    let rate = CAR.turn * (1 - ease * (1 - CAR.turnAtSpeed)) * rolling;
     if (flying) {
       rate *= ITEM.ramp.steer;
     }

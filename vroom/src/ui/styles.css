@@ -237,14 +237,14 @@ canvas {
   opacity: 1;
 }
 
-/* The target under the finger: where the car is being sent. Smaller than the
-   old thumbstick ring, because it is a marker rather than a control — the
-   control is the whole screen. */
+/* The ring the stick lives in, drawn where the finger landed. The penguin
+   game's size — 136px across for a 68px throw — because it is the penguin
+   game's stick and the same control should feel the same in both. */
 .stick-ring {
   position: absolute;
-  width: 78px;
-  height: 78px;
-  margin: -39px 0 0 -39px;
+  width: 136px;
+  height: 136px;
+  margin: -68px 0 0 -68px;
   border-radius: 50%;
   /* Dark rather than white. It sits over grass and tarmac, and a pale ring on
      either of those is a control nobody can find. */
@@ -257,13 +257,12 @@ canvas {
   border-color: rgba(20, 24, 32, 0.72);
 }
 
-/* A dot in the middle of the target, so the exact point being aimed at is
-   visible under a finger that covers the rest of it. */
+/* The knob, which moves with the thumb. */
 .stick-knob {
   position: absolute;
-  width: 16px;
-  height: 16px;
-  margin: -8px 0 0 -8px;
+  width: 58px;
+  height: 58px;
+  margin: -29px 0 0 -29px;
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.95);
   box-shadow: 0 4px 14px rgba(20, 24, 32, 0.45);

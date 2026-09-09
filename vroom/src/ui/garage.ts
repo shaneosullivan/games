@@ -13,7 +13,7 @@ import {
 import {chooseColour, chooseDesign, myColour, myDesign} from "../core/garage";
 import {keepStickers, myStickers} from "../core/stickers";
 import {car, stick} from "../models/car";
-import {deck, DECK_INSET, NOSE, nearestDeck} from "../models/deck";
+import {deck, DECK_INSET, nearestDeck} from "../models/deck";
 import {alongFlank, PICTURE_KINDS} from "../models/stickers";
 import {setEnvironment} from "../render/materials";
 
@@ -346,21 +346,16 @@ export class Garage {
         font: STICKER.fonts[0].id,
       });
     } else {
-      // The nose holds one picture and no more — it is a small panel and two
-      // things on it is a mess rather than a choice — so the first goes there
-      // and everything after it lands on the cover behind the driver, a step
-      // further back each time so they are not hidden under one another.
-      const pictures = this.stickers.filter(s => s.kind !== "text");
-      const nose = pictures.filter(s => onNose(s.v)).length;
-      const along =
-        nose === 0
-          ? STICKER.dropAt
-          : COVER_DROP - (pictures.length - nose) * STICKER.dropStep;
+      // One picture, and picking another swaps it. Tapping a crown when there
+      // is already a star is a child changing their mind, not asking for both
+      // — and a nose is a small panel with room for one thing on it.
+      const was = this.stickers.find(s => s.kind !== "text");
+      this.stickers = this.stickers.filter(s => s.kind === "text");
       this.stickers.push({
         kind,
-        u: 0,
-        v: nearestDeck(along),
-        size: STICKER.size,
+        u: was?.u ?? 0,
+        v: was?.v ?? nearestDeck(STICKER.dropAt),
+        size: was?.size ?? STICKER.size,
       });
     }
     this.chosen = this.stickers.length - 1;
@@ -546,7 +541,7 @@ export class Garage {
       this.restick();
       return;
     }
-    const v = this.roomFor(one, nearestDeck(local.z / CAR.length));
+    const v = nearestDeck(local.z / CAR.length);
     const room = deck(v, CAR.width).half * DECK_INSET;
     one.v = v;
     one.u = room > 0 ? Math.max(-1, Math.min(1, local.x / room)) : 0;
@@ -561,24 +556,6 @@ export class Garage {
       -((e.clientY - box.top) / box.height) * 2 + 1,
     );
     this.ray.setFromCamera(point, this.camera);
-  }
-
-  /**
-   * Where a picture is allowed to end up.
-   *
-   * One picture on the nose. Drag a second one at it and it stops at the front
-   * of the cover instead of landing on top of the one already there — which is
-   * a rule a child meets by watching a sticker refuse to go somewhere, and
-   * needs no telling.
-   */
-  private roomFor(one: Sticker, want: number): number {
-    if (!onNose(want)) {
-      return want;
-    }
-    const already = this.stickers.some(
-      s => s !== one && s.kind !== "text" && onNose(s.v),
-    );
-    return already ? COVER_DROP : want;
   }
 
   /**
@@ -634,14 +611,6 @@ export class Garage {
     this.renderer.render(this.scene, this.camera);
   };
 }
-
-/** Whether something at this point along the car is on the nose deck. */
-function onNose(v: number): boolean {
-  return v <= NOSE[0] && v >= NOSE[1];
-}
-
-/** Where the second picture and everything after it lands. */
-const COVER_DROP = -0.26;
 
 function hex(colour: number): string {
   return `#${colour.toString(16).padStart(6, "0")}`;

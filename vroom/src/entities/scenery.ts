@@ -1,13 +1,13 @@
 import * as THREE from "three";
 import {mergeGeometries} from "three/examples/jsm/utils/BufferGeometryUtils.js";
-import {ENVIRONMENTS, LAMP, NEON, Palette, SCENERY} from "../config";
+import {LAMP, NEON, Palette, SCENERY} from "../config";
 import {Rng} from "../core/rng";
 import {settings} from "../core/quality";
 import {instance, neonSign, plant} from "../models";
-import {building, lamp, litMaterial} from "../models/city";
+import {lamp, litMaterial} from "../models/city";
 import {NearFade} from "../../../shared/fadeInFront";
 import type {NeonSign} from "../models/neon";
-import {fadingVertex, flatVertex, LAYER, order, tile} from "../render/sprites";
+import {flatVertex, LAYER, order, tile} from "../render/sprites";
 import {Glow} from "./glow";
 import {Track} from "./track";
 
@@ -152,7 +152,6 @@ export class Scenery {
         this.glow.add(sign.emitter);
       }
       this.streetLights(track, palette);
-      this.city(rng, track, place, at);
     }
   }
 
@@ -217,83 +216,6 @@ export class Scenery {
     lit.frustumCulled = false;
     this.group.add(lit);
     void palette;
-  }
-
-  /**
-   * The skyline: dark blocks beyond the barrier.
-   *
-   * Each is its own model rather than one instanced tower, because the whole
-   * of a building at night is which of its windows happen to be lit — and two
-   * identical towers side by side is the one thing that would give it away.
-   */
-  private city(
-    rng: Rng,
-    track: Track,
-    place: (out: THREE.Vector3, band: number, from?: number) => boolean,
-    at: THREE.Vector3,
-  ): void {
-    const windows: Array<THREE.BufferGeometry> = [];
-    const shells: Array<THREE.BufferGeometry> = [];
-
-    const put = (low: boolean, band: number, from: number): void => {
-      if (!place(at, band, from)) {
-        return;
-      }
-      const {
-        solid,
-        windows: panes,
-        height,
-      } = building(ENVIRONMENTS.neon, rng, low);
-      const turn = rng.range(0, Math.PI * 2);
-      // Baked into world space and merged rather than built as its own object.
-      // Seventy buildings is seventy draw calls kept apart for no reason — and
-      // one mesh is also one material, which is what lets the whole skyline
-      // share a single fade.
-      for (const part of solid.parts()) {
-        part.geometry.rotateY(turn);
-        part.geometry.translate(at.x, 0, at.z);
-        shells.push(part.geometry);
-      }
-
-      if (panes.attributes.position) {
-        panes.rotateY(turn);
-        panes.translate(at.x, 0, at.z);
-        windows.push(panes);
-      }
-
-      void height;
-    };
-
-    // Low-rise along the street, towers set back behind it.
-    const share = settings().scenery;
-    const some = (n: number): number => Math.max(1, Math.round(n * share));
-    for (let i = 0; i < some(NEON.nearBlocks); i++) {
-      put(true, NEON.nearTo, NEON.nearFrom);
-    }
-    for (let i = 0; i < some(NEON.blocks); i++) {
-      put(false, NEON.blockTo, NEON.blockFrom);
-    }
-
-    if (shells.length > 0) {
-      const {material, fade} = fadingVertex("city");
-      const walls = new THREE.Mesh(mergeGeometries(shells, false), material);
-      walls.castShadow = true;
-      walls.receiveShadow = true;
-      walls.frustumCulled = false;
-      this.group.add(walls);
-      this.fades.push(fade);
-    }
-    if (windows.length > 0) {
-      // The panes dissolve with the walls they are in. Without this a building
-      // that got out of the way would leave its glazing hanging in the air,
-      // which is worse than the building was.
-      const {material, fade} = fadingVertex("cityWindows");
-      const glass = new THREE.Mesh(mergeGeometries(windows, false), material);
-      glass.frustumCulled = false;
-      this.group.add(glass);
-      this.fades.push(fade);
-    }
-    void track;
   }
 
   /** Ticked so the faulty signs stutter, and so the real lights follow the

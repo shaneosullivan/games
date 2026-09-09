@@ -1,23 +1,24 @@
-import {AIM} from "../config";
+import {STICK} from "../config";
 
 /**
- * The controls the plan asks for by name: the caterpillar game's floating
- * thumbstick.
+ * The controls, which are the penguin game's: a floating thumbstick.
  *
- * The car drives to wherever the finger is. Touch a point on the road and it
- * goes there; slide the finger about and it follows.
+ * The base is planted wherever the finger lands rather than living in a fixed
+ * corner, so a child never has to find a control before they can move, and the
+ * car goes the way the stick is pushed.
  *
- * It used to be a *relative* stick — planted where the finger landed, steered
- * by dragging away from that point — and that had a hole in it: a child who
- * touched the screen and held still saw nothing happen at all, because until
- * the finger moves a relative stick has no direction in it. Pointing at a
- * place is what a child does anyway.
+ * It was an *absolute* aim for a while — the car drove to wherever the finger
+ * was on the screen — and that is a lovely control for pointing at a place and
+ * a poor one for driving. Touching behind the car meant "go that way", so the
+ * car braked, spun on the spot and drove back where it came from, and every
+ * accidental touch on the wrong half of the glass was a U-turn. A stick has to
+ * be *pushed* somewhere, which is the difference between asking for a
+ * direction and brushing the screen.
  *
- * Here it is a tiller and a throttle at once, and it needs no camera-relative
- * arithmetic at all — the shot in this game looks straight down and never
- * turns, so the way you push the stick *is* the way on the screen you want the
- * car to go. Every other game in this repo has to read the stick against a
- * swinging camera; this one is the direction, full stop.
+ * Screen axes straight into world axes: the shot in this game looks down at a
+ * fixed angle and never turns, so the way the stick is pushed *is* the way on
+ * the screen the car should go. Every other game in this repo has to read its
+ * stick against a swinging camera; this one does not.
  *
  * Tracks a single pointerId, so a second finger on the glass can't steal the
  * stick out from under the first.
@@ -50,11 +51,9 @@ export class Joystick {
   }
 
   private pointerId: number | null = null;
-  /** Where the finger is, and where the car is, both in screen pixels. */
-  private atX = 0;
-  private atY = 0;
-  private carX = 0;
-  private carY = 0;
+  /** Where the finger went down: the middle of the stick, in screen pixels. */
+  private baseX = 0;
+  private baseY = 0;
   private readonly keys = new Set<string>();
 
   private readonly root: HTMLDivElement;
@@ -95,10 +94,13 @@ export class Joystick {
 
     e.preventDefault();
     this.pointerId = e.pointerId;
-    this.atX = e.clientX;
-    this.atY = e.clientY;
+    this.baseX = e.clientX;
+    this.baseY = e.clientY;
+    this.root.style.transform = `translate(${this.baseX}px, ${this.baseY}px)`;
     this.root.classList.add("active");
-    this.aim();
+    this.setKnob(0, 0);
+    // Planted, not pushed: a finger down and still is a car coasting.
+    this.x = this.y = this.magnitude = 0;
   };
 
   private onMove = (e: PointerEvent): void => {
@@ -106,56 +108,36 @@ export class Joystick {
       return;
     }
     e.preventDefault();
-    this.atX = e.clientX;
-    this.atY = e.clientY;
-    this.aim();
-  };
-
-  /**
-   * Where the car is on the screen, so a touch can be measured against it.
-   *
-   * Pushed in every frame by whoever is drawing the car — the stick has no way
-   * of knowing on its own, and the answer moves.
-   */
-  follow(x: number, y: number): void {
-    this.carX = x;
-    this.carY = y;
-    if (this.pointerId !== null) {
-      this.aim();
+    let dx = e.clientX - this.baseX;
+    let dy = e.clientY - this.baseY;
+    const dist = Math.hypot(dx, dy);
+    if (dist > STICK.radius) {
+      dx = (dx / dist) * STICK.radius;
+      dy = (dy / dist) * STICK.radius;
     }
-  }
+    this.setKnob(dx, dy);
 
-  /**
-   * The direction and the throttle, from where the finger is relative to the
-   * car.
-   *
-   * Screen straight into world: the camera never turns, so screen right is
-   * world +X and screen down is world +Z, and there is nothing to convert.
-   */
-  private aim(): void {
-    const dx = this.atX - this.carX;
-    const dy = this.atY - this.carY;
-    const d = Math.hypot(dx, dy);
-    if (d < AIM.near) {
-      // On the car. No direction in it, and a good place to coast.
-      this.magnitude = 0;
-      this.x = this.y = 0;
-      this.ring(this.atX, this.atY, false);
+    let nx = dx / STICK.radius;
+    let ny = dy / STICK.radius;
+    const mag = Math.min(1, Math.hypot(nx, ny));
+    if (mag < STICK.deadzone) {
+      this.x = this.y = this.magnitude = 0;
+      this.root.classList.remove("pulling");
       return;
     }
-    this.x = dx / d;
-    this.y = dy / d;
-    this.magnitude = Math.max(
-      AIM.least,
-      Math.min(1, (d - AIM.near) / (AIM.far - AIM.near)),
-    );
-    this.ring(this.atX, this.atY, true);
-  }
+    // Rescaled past the deadzone, so the first pixel that responds still moves
+    // you gently rather than jumping to a third of full deflection.
+    const scaled = (mag - STICK.deadzone) / (1 - STICK.deadzone);
+    nx = (nx / mag) * scaled;
+    ny = (ny / mag) * scaled;
+    this.x = nx;
+    this.y = ny;
+    this.magnitude = scaled;
+    this.root.classList.add("pulling");
+  };
 
-  /** The marker under the finger: where the car is being sent. */
-  private ring(x: number, y: number, pulling: boolean): void {
-    this.root.style.transform = `translate(${x}px, ${y}px)`;
-    this.root.classList.toggle("pulling", pulling);
+  private setKnob(dx: number, dy: number): void {
+    this.knob.style.transform = `translate(${dx}px, ${dy}px)`;
   }
 
   /** Lets go of the pointer. The stick has no memory of where it was. */
@@ -166,6 +148,7 @@ export class Joystick {
     this.pointerId = null;
     this.root.classList.remove("active");
     this.root.classList.remove("pulling");
+    this.setKnob(0, 0);
     this.x = this.y = this.magnitude = 0;
   };
 
@@ -181,6 +164,7 @@ export class Joystick {
     this.keys.clear();
     this.root.classList.remove("active");
     this.root.classList.remove("pulling");
+    this.setKnob(0, 0);
     this.x = this.y = this.magnitude = 0;
     this.steer = this.throttle = 0;
   };
