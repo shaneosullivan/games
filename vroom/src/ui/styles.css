@@ -364,12 +364,17 @@ canvas {
 
 /* The world the track is set in, at a glance: its ground with its kerb round
    the outside. Two colours say more about a track than any words would. */
+/* The circuit itself, drawn on the environment's own ground. Overflow hidden
+   because the road is a stroke *on* the path and half of it would otherwise
+   sit outside the rounded corners. */
 .track-swatch {
   width: 40px;
   height: 40px;
   border-radius: 12px;
   border: 3px solid;
   flex: 0 0 auto;
+  overflow: hidden;
+  display: block;
 }
 
 .track-words {

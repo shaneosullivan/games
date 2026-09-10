@@ -511,7 +511,16 @@ export class Garage {
       const want = kit ? this.kit[kit] : this.colour;
       dot.classList.toggle("on", Number(dot.dataset.colour) === want);
     }
+    // A cow has nobody on it, so there is nobody to dress: the rider's tab is
+    // not disabled, it is not there. And if it was the one open when the cow
+    // was chosen, the garage falls back to the paint rather than showing an
+    // empty page.
+    const ridden = this.shape === "racer";
+    if (!ridden && this.showing === "driver") {
+      this.showing = "car";
+    }
     for (const tab of this.root.querySelectorAll<HTMLElement>(".garage-tab")) {
+      tab.hidden = tab.dataset.side === "driver" && !ridden;
       tab.classList.toggle("on", tab.dataset.side === this.showing);
     }
     for (const pick of this.root.querySelectorAll<HTMLElement>(".shape")) {
@@ -522,7 +531,7 @@ export class Garage {
     this.driverSide.hidden = this.showing !== "driver";
     // A cow takes the paint and nothing else: the designs and the stickers go
     // on the deck of a single-seater, and there is no deck on a chicken.
-    const plain = this.shape !== "racer";
+    const plain = !ridden;
     for (const row of this.carSide.children) {
       if (row.className !== "swatches") {
         (row as HTMLElement).hidden = plain;
