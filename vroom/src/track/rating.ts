@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import {CAR, RATING} from "../config";
+import {CAR, PHYSICS, RATING} from "../config";
 import {TrackSpec} from "./spec";
 
 /**
@@ -53,7 +53,10 @@ export function score(spec: TrackSpec): number {
   // — which is the spread the bands below are cut from.
   const samples = 240;
   const step = length / samples;
-  const turnRate = CAR.turn * CAR.turnAtSpeed;
+  // What a corner of radius r can be taken at: the square root of the tyres'
+  // grip times gravity times the radius. The same arithmetic the cars are
+  // driven by, rather than a rate of turn that no longer exists.
+  const bite = PHYSICS.grip * PHYSICS.gravity * PHYSICS.scale;
   const allowed: Array<number> = [];
   const here = new THREE.Vector3();
   const next = new THREE.Vector3();
@@ -65,7 +68,7 @@ export function score(spec: TrackSpec): number {
     const dot = Math.max(-1, Math.min(1, here.dot(next)));
     const turn = Math.acos(dot);
     const radius = turn > 1e-6 ? step / turn : Infinity;
-    allowed.push(Math.min(CAR.top, radius * turnRate));
+    allowed.push(Math.min(CAR.top, Math.sqrt(bite * radius)));
   }
   allowed.sort((a, b) => a - b);
   const worst = allowed.slice(0, Math.max(1, Math.round(samples / 10)));

@@ -5,7 +5,10 @@ import {
   CarShape,
   DriverKit,
   ITEM,
+  PHYSICS,
+  SIM,
   Sticker,
+  SURFACE,
   TRAIL,
 } from "../config";
 import {flatVertex, LAYER, order, tile} from "../render/sprites";
@@ -33,8 +36,30 @@ export type Drive =
   | {kind: "aim"; aim: THREE.Vector2}
   | {kind: "wheel"; steer: number; throttle: number};
 
-function shortestAngle(from: number, to: number): number {
+export function shortestAngle(from: number, to: number): number {
   return ((((to - from) % TAU) + TAU + Math.PI) % TAU) - Math.PI;
+}
+
+function clamp(v: number, low: number, high: number): number {
+  return Math.max(low, Math.min(high, v));
+}
+
+/**
+ * The friction circle: a tyre's grip spent in any direction at all.
+ *
+ * An axle has one budget — what the weight on it and the surface under it will
+ * hold — and it does not get a separate one for turning and for driving. Ask
+ * for more than the budget in total and both are scaled back together, which
+ * is why a car cannot brake and turn at full strength at once, and why full
+ * throttle out of a corner lets the back end go.
+ */
+function circle(fx: number, fy: number, limit: number): [number, number] {
+  const asked = Math.hypot(fx, fy);
+  if (asked <= limit || asked < 1e-6) {
+    return [fx, fy];
+  }
+  const share = limit / asked;
+  return [fx * share, fy * share];
 }
 
 /**
@@ -58,6 +83,14 @@ export class Car {
   /** In units a second, in world axes. */
   readonly velocity = new THREE.Vector2();
   heading = 0;
+  /** Radians a second the car is turning, and where the front wheels point.
+   *  Both are state now: a car has angular momentum and a steering rack, and
+   *  neither of them is instant. */
+  yawRate = 0;
+  steer = 0;
+  /** Last step's forward acceleration, in m/s², which is what moves the weight
+   *  fore and aft. */
+  private lastPush = 0;
   private prevHeading = 0;
 
   /** How fast it is going sideways. The skid marks and the tyre noise both
@@ -89,7 +122,6 @@ export class Car {
   pitch = 0;
   private rollRate = 0;
   /** Nose-over-tail, for a take-off with all four wheels on the ramp. */
-  private pitchRate = 0;
   /** Whether it has already taken off from the ramp it is currently on, so a
    *  long ramp cannot launch the same car twice. */
   private launched = false;
@@ -118,7 +150,6 @@ export class Car {
 
   /** How long the ramp's extra speed lingers. The ceiling is lifted while this
    *  runs and eased back as it empties. */
-  private boost = 0;
 
   private readonly dir = new THREE.Vector2();
   private readonly side = new THREE.Vector2();
@@ -166,21 +197,28 @@ export class Car {
    * add: they go wherever the front ones went.
    */
   private launch(lean: number): void {
-    const push = Math.min(1, this.speed / CAR.top);
     this.onSlope = false;
-    this.air = ITEM.ramp.airtime;
-    this.boost = ITEM.ramp.carry;
-    // Straight onto the velocity, before it is split into along and across:
-    // the shove is in the direction the car was actually travelling, which on
-    // a ramp taken sideways is not where the nose is pointing.
-    this.velocity.multiplyScalar(ITEM.ramp.boost);
-    this.climb = ITEM.ramp.launch * push;
 
-    this.rollRate = lean * ITEM.ramp.roll * push;
-    // Over the front, always: square onto the boards it goes head first, and
-    // caught down one side it rolls and still comes down nose first.
-    const over = lean === 0 ? 1 : ITEM.ramp.diveRolling;
-    this.pitchRate = -ITEM.ramp.dive * push * over;
+    // The launch is arithmetic, not a number: a car leaving a slope of angle
+    // θ at speed v leaves with v·sinθ going up and v·cosθ going on. Nothing
+    // is added and nothing is scaled — how far it flies is decided by how fast
+    // it arrived, exactly as it is on a real ramp, and the airtime is however
+    // long gravity takes to bring that back down.
+    // The wedge rises `rise` over its whole length, so that — and not half of
+    // it — is the angle the car leaves at.
+    const slope = Math.atan2(ITEM.ramp.rise, ITEM.ramp.long);
+    const speed = this.speed;
+    this.climb = speed * Math.sin(slope);
+    if (speed > 1e-4) {
+      this.velocity.multiplyScalar(Math.cos(slope));
+    }
+    this.air = (2 * this.climb) / (PHYSICS.gravity * PHYSICS.scale);
+
+    // The one thing that is not physics: a car caught down one side of the
+    // ramp is thrown into a roll. Two wheels lifted before the other two is a
+    // real moment about a real axis, and modelling it properly would need a
+    // suspension and a roll centre; this is that moment, as a rate.
+    this.rollRate = lean * ITEM.ramp.roll * Math.min(1, this.speed / CAR.top);
   }
 
   /** Off the ground, and how far through the jump. */
@@ -200,17 +238,18 @@ export class Car {
     this.heading = heading;
     this.prevHeading = heading;
     this.velocity.set(0, 0);
+    this.yawRate = 0;
+    this.steer = 0;
+    this.lastPush = 0;
     this.slip = 0;
     this.hint = hint;
     this.lap = lap;
     this.air = 0;
-    this.boost = 0;
     this.height = 0;
     this.climb = 0;
     this.roll = 0;
     this.pitch = 0;
     this.rollRate = 0;
-    this.pitchRate = 0;
     this.landing = 0;
     this.launched = false;
     this.decided = false;
@@ -246,9 +285,14 @@ export class Car {
     // not a point: half on a slick and half on dry tarmac is the interesting
     // case, and it was not expressible before.
     this.corners(this.wheelAt);
-    let leftGrip = 0;
-    let rightGrip = 0;
-    let slowest = 1;
+    // What each wheel is standing on, as physics: how much of dry-tarmac grip
+    // it has, and how hard it is to roll through. Per axle, because the front
+    // and the rear can be on different things and that is the interesting
+    // case — and because the two axles are what the model is built from.
+    const off = !tarmac ? SURFACE.grass : SURFACE.tarmac;
+    let gripFront = 0;
+    let gripRear = 0;
+    let rollMult: number = off.roll;
     const frontOn = [false, false];
     for (let i = 0; i < 4; i++) {
       const w = this.wheelAt[i];
@@ -268,23 +312,27 @@ export class Car {
         }
       }
 
-      let grip = 1;
-      if (under === "oil") {
-        grip = ITEM.oil.grip;
-      } else if (under === "mud") {
-        slowest = Math.min(slowest, ITEM.mud.top);
+      const on =
+        under === "oil"
+          ? SURFACE.oil
+          : under === "mud"
+            ? SURFACE.mud
+            : under === "ramp"
+              ? SURFACE.tarmac
+              : off;
+      if (i < 2) {
+        gripFront += on.grip / 2;
+      } else {
+        gripRear += on.grip / 2;
       }
+      rollMult = Math.max(rollMult, on.roll);
       if (under === "ramp" && i < 2) {
         // Front wheels only. The back two follow wherever the front two went,
         // so they have nothing to add — and waiting for them is what made the
         // car take off long after it had left the ramp.
         frontOn[i] = true;
       }
-      if (nearSide) {
-        leftGrip += grip / 2;
-      } else {
-        rightGrip += grip / 2;
-      }
+      void nearSide;
     }
 
     if (this.air > 0) {
@@ -335,12 +383,13 @@ export class Car {
         this.height = climbed * ITEM.ramp.rise;
         const slope = Math.atan2(ITEM.ramp.rise, ITEM.ramp.long);
         this.pitch = slope;
-        // Climbing costs something, the way a hill does. A flat number of
-        // units a second off the speed, not a fraction of it: a fraction is
-        // enormous when the speed is small, and a car that crept onto the
-        // wedge had every scrap of speed taken away every frame and sat there
-        // at full throttle, stuck halfway up, for the rest of the race.
-        const slowed = Math.max(0, this.speed - ITEM.ramp.drag * dt);
+        // Climbing costs what climbing costs: gravity down the slope. A car
+        // that arrives slowly does not get up, which is correct, and one that
+        // arrives quickly barely notices — both of which used to be a single
+        // fixed number of units a second.
+        const pull =
+          PHYSICS.gravity * PHYSICS.scale * Math.sin(this.pitch) * dt;
+        const slowed = Math.max(0, this.speed - pull);
         if (this.speed > 0) {
           this.velocity.multiplyScalar(slowed / this.speed);
         }
@@ -376,161 +425,195 @@ export class Car {
       this.decided = false;
       this.onSlope = false;
     }
-    this.boost = Math.max(0, this.boost - dt);
     // On the slope the car is *on the ground*, however high off it that is.
     // Without telling the two apart, a car climbing a ramp lost its grip and
     // its steering halfway up one.
     const flying = this.air > 0 || (this.height > 0 && !this.onSlope);
 
-    // How fast the nose can come round. Less and less of the turn survives as
-    // the speed comes up — a car that cornered as hard at a hundred as at a
-    // walk would have no corners in it — and in mid-air there is barely any.
-    const ease = Math.min(1, this.speed / CAR.top);
-    // And nothing like all of it standing still: a car turns by driving round
-    // a corner, not by spinning on the spot. See `CAR.turnsFrom`.
-    const rolling = Math.max(
-      CAR.turnStill,
-      Math.min(1, this.speed / CAR.turnsFrom),
-    );
-    let rate = CAR.turn * (1 - ease * (1 - CAR.turnAtSpeed)) * rolling;
-    if (flying) {
-      rate *= ITEM.ramp.steer;
-    }
+    // ---- what the driver is asking for -------------------------------------
+    //
+    // Two numbers out of either control: where the front wheels should point,
+    // and what the pedals are doing. Everything after this is the same for a
+    // thumb and for a keyboard, which is the point of turning both into a
+    // steering angle rather than into a rate of turn.
+    const s = PHYSICS.scale;
+    const speed = this.velocity.length() / s;
+    const fast = Math.min(1, speed / (CAR.top / s));
+    const lock = PHYSICS.steerMax * (1 - fast * (1 - PHYSICS.steerAtSpeed));
 
-    let push: number;
-    /** Asking to slow down, however this car is being driven. */
-    let backwards: boolean;
-    /** The stick's direction, kept so the brake test can be made below —
-     *  after the nose has been turned, since it is asked against the nose. */
-    let aim: THREE.Vector2 | null = null;
-
+    let wantSteer = 0;
+    let throttle = 0;
+    let braking = 0;
     if (drive.kind === "wheel") {
-      push = Math.min(1, Math.abs(drive.throttle));
-      backwards = drive.throttle < 0;
-      // Steering is not throttle here: a coasting car still turns, so this is
-      // outside the `push` test that the stick's version lives inside.
-      this.heading += drive.steer * rate * dt;
+      wantSteer = drive.steer * lock;
+      throttle = Math.max(0, drive.throttle);
+      braking = Math.max(0, -drive.throttle);
     } else {
-      aim = drive.aim;
-      push = Math.min(1, aim.length());
-      backwards = false;
+      const push = Math.min(1, drive.aim.length());
       if (push > 1e-4) {
-        const target = Math.atan2(aim.x, aim.y);
+        const target = Math.atan2(drive.aim.x, drive.aim.y);
         const diff = shortestAngle(this.heading, target);
-        this.heading += Math.sign(diff) * Math.min(Math.abs(diff), rate * dt);
+        wantSteer = Math.max(-lock, Math.min(lock, diff));
+        // Pushing against the way the car is pointing is the brake. There is
+        // no separate brake button and there does not need to be one: asking
+        // to go the other way is asking to slow down, which is what a child
+        // does without being told.
+        const facing =
+          (this.dir.x * drive.aim.x + this.dir.y * drive.aim.y) / push;
+        if (facing < -0.2) {
+          braking = push;
+        } else {
+          throttle = push;
+        }
       }
     }
+    // The rack takes time to turn, which is most of why a car feels like it
+    // has weight. Instant lock is a mouse pointer.
+    const swing = PHYSICS.steerRate * dt * (flying ? ITEM.ramp.steer : 1);
+    this.steer += Math.max(-swing, Math.min(swing, wantSteer - this.steer));
+    this.steer = Math.max(-lock, Math.min(lock, this.steer));
 
+    // ---- the tyres ---------------------------------------------------------
     this.dir.set(Math.sin(this.heading), Math.cos(this.heading));
     this.side.set(this.dir.y, -this.dir.x);
+    // Body axes, in metres a second: along the nose, and out of the door.
+    let vx = this.velocity.dot(this.dir) / s;
+    let vy = this.velocity.dot(this.side) / s;
 
-    if (aim && push > 1e-4) {
-      // Pushing against the way you are already going is the brake. There is
-      // no separate brake button and there does not need to be one — asking to
-      // go the other way is asking to slow down, which is what a child does
-      // without being told.
-      backwards = (this.dir.x * aim.x + this.dir.y * aim.y) / push < -0.2;
-    }
-
-    // The two halves of the velocity: the way the nose points, and sideways.
-    let along = this.velocity.dot(this.dir);
-    let across = this.velocity.dot(this.side);
+    const b = PHYSICS.toFront;
+    const c = PHYSICS.toRear;
+    const L = b + c;
+    const M = PHYSICS.mass;
+    const g = PHYSICS.gravity;
 
     if (flying) {
-      // Nothing to push against up here: whatever the car had going into the
-      // ramp is what it lands with.
-    } else if (push > 1e-4) {
-      if (backwards) {
-        // Brake while it is still rolling forward, and reverse once it is not.
-        // The stick never reaches the second case — pushing back on it turns
-        // the car round instead — but a keyboard's down arrow should back out
-        // of a wall rather than sit there.
-        along -= (along > 0 ? CAR.brake : CAR.accel) * push * dt;
-      } else {
-        along += CAR.accel * push * dt;
-      }
+      // Nothing to push against up here. Only drag, which is why a jump lands
+      // at very nearly the speed it left at.
+      const air = Math.exp((-PHYSICS.drag / M) * Math.abs(vx) * dt);
+      vx *= air;
+      vy *= air;
+      this.yawRate *= Math.exp(-dt);
     } else {
-      along -= Math.sign(along) * Math.min(Math.abs(along), CAR.coast * dt);
-    }
+      // Weight on each axle: the static split, plus what the last step's
+      // acceleration threw forward or back. This is why braking gives the
+      // front tyres more to work with and lifting mid-corner unsettles a car.
+      const shift = (PHYSICS.cgHeight / L) * M * this.lastPush;
+      const loadFront = Math.max(0, (c / L) * M * g - shift);
+      const loadRear = Math.max(0, (b / L) * M * g + shift);
+      const muFront = PHYSICS.grip * gripFront;
+      const muRear = PHYSICS.grip * gripRear;
 
-    // Grip. Frame-rate independent decay rather than a fixed subtraction, so
-    // the slide behaves the same on a 60Hz laptop and a 120Hz iPad.
-    let grip = CAR.grip * (tarmac ? 1 : CAR.grassGrip);
-    let top = CAR.top * (tarmac ? 1 : CAR.grassTop);
-    if (!flying) {
-      // Grip is the average of what the four wheels have; the top speed is set
-      // by the worst of them, because one wheel in mud holds a whole car back.
-      grip *= (leftGrip + rightGrip) / 2;
-      top *= slowest;
-      if (slowest < 1) {
-        along -=
-          Math.sign(along) * Math.min(Math.abs(along), ITEM.mud.drag * dt);
+      // Slip angles: where each axle points against where it is going. The
+      // guard on the forward speed is not a fudge — the arithmetic genuinely
+      // has no answer at a standstill, which is why a crawling car is steered
+      // geometrically instead, below.
+      const fwd = Math.max(Math.abs(vx), 0.8);
+      const turn = Math.sign(vx || 1);
+      const slipFront =
+        Math.atan2(vy + this.yawRate * b, fwd) - this.steer * turn;
+      const slipRear = Math.atan2(vy - this.yawRate * c, fwd);
+
+      // The tyre: force proportional to slip until it saturates at what the
+      // surface will hold. That saturation *is* the skid.
+      //
+      // Faded out as the car comes to rest, which is both true and necessary.
+      // True, because a tyre's grip comes from tread being dragged sideways
+      // and a stationary tyre is not being dragged anywhere. Necessary,
+      // because at a crawl the slip angle of a car pointing even slightly
+      // across its own path is enormous, and a saturated lateral force leaves
+      // nothing in the friction circle for the engine — a car nudged sideways
+      // at walking pace sat there with the wheels spinning and could not move.
+      const bite = Math.min(1, speed / PHYSICS.crawl);
+      let fyFront =
+        -clamp(PHYSICS.stiffFront * slipFront, -1, 1) *
+        muFront *
+        loadFront *
+        bite;
+      let fyRear =
+        -clamp(PHYSICS.stiffRear * slipRear, -1, 1) * muRear * loadRear * bite;
+
+      // Longitudinal. Drive at the rear, brakes at both ends, and the two
+      // resistances that decide the top speed between them.
+      // Force from power, which is what an engine actually has: hard at the
+      // bottom of the range and fading with speed. Capped, because no tyre
+      // takes an infinite shove at a standstill.
+      const pull = Math.min(
+        PHYSICS.drive,
+        PHYSICS.power / Math.max(2, Math.abs(vx)),
+      );
+      let fxRear = throttle * pull;
+      if (braking > 0) {
+        fxRear -=
+          braking * (vx > 0.5 ? PHYSICS.brake : PHYSICS.drive * 0.6) * 0.6;
       }
+      let fxFront =
+        braking > 0 && vx > 0.5 ? -braking * PHYSICS.brake * 0.4 : 0;
 
-      // And the part that makes a patch worth avoiding rather than merely
-      // slow: if one side has grip and the other does not, the car turns
-      // towards the side that still bites. Two wheels on oil is not "a bit
-      // less grip", it is a spin — which is why clipping the edge of a slick
-      // is worse than driving over the middle of it.
-      const split = rightGrip - leftGrip;
-      if (Math.abs(split) > 0.01) {
-        this.heading +=
-          split * CAR.spinFromSplit * Math.min(1, this.speed / CAR.top) * dt;
-      }
+      // The friction circle. An axle has one budget of grip and spends it on
+      // whatever is asked of it first — so a rear tyre already at full
+      // throttle has nothing left to hold the back end in, which is a
+      // power slide, and one under full braking cannot also turn.
+      [fxRear, fyRear] = circle(fxRear, fyRear, muRear * loadRear);
+      [fxFront, fyFront] = circle(fxFront, fyFront, muFront * loadFront);
+
+      const resist =
+        -PHYSICS.drag * vx * Math.abs(vx) - PHYSICS.rollResist * rollMult * vx;
+      const fx = fxRear + fxFront * Math.cos(this.steer) + resist;
+      const fy = fyRear + fyFront * Math.cos(this.steer);
+
+      const ax = fx / M;
+      const ay = fy / M;
+      this.lastPush = ax;
+
+      // The centripetal terms: in the car's own turning frame, going forward
+      // while yawing *is* a sideways acceleration.
+      vx += (ax + this.yawRate * vy) * dt;
+      vy += (ay - this.yawRate * vx) * dt;
+
+      const torque = fyFront * Math.cos(this.steer) * b - fyRear * c;
+      const spin = torque / PHYSICS.inertia;
+      // Under about walking pace the slip-angle model is dividing by nothing
+      // and says nonsense, so the car turns the way a shopping trolley does:
+      // geometry, not forces. Blended across, or the changeover is a jolt.
+      const rolling = Math.min(1, Math.max(0, speed / PHYSICS.crawl - 1));
+      const kinematic = (vx * Math.tan(this.steer)) / L;
+      this.yawRate =
+        rolling * (this.yawRate + spin * dt) + (1 - rolling) * kinematic;
     }
-    if (flying) {
-      // In the air the velocity is simply carried: no grip to pull it round,
-      // and no surface to take it away.
-      grip = 0;
-    }
-    across *= Math.exp(-grip * dt);
 
-    // The ceiling, lifted by whatever is left of a ramp's boost and easing
-    // back to the ordinary top speed as that runs out.
-    const ceiling =
-      top * (1 + (ITEM.ramp.boost - 1) * (this.boost / ITEM.ramp.carry));
-    along = Math.max(-ceiling * 0.35, Math.min(ceiling, along));
-
+    this.heading += this.yawRate * dt;
+    this.dir.set(Math.sin(this.heading), Math.cos(this.heading));
+    this.side.set(this.dir.y, -this.dir.x);
     this.velocity.set(
-      this.dir.x * along + this.side.x * across,
-      this.dir.y * along + this.side.y * across,
+      (this.dir.x * vx + this.side.x * vy) * s,
+      (this.dir.y * vx + this.side.y * vy) * s,
     );
-    // No rubber in mid-air, which is both true and the only thing stopping a
-    // jump from painting a stripe across the grass it flew over.
-    this.slip = flying ? 0 : Math.abs(across);
+    // A skid is sideways travel, and there is no rubber on the road in mid-air.
+    this.slip = flying ? 0 : Math.abs(vy) * s;
 
-    // The arc. Gravity does this now rather than a timer, so a fast take-off
-    // really does go further and land later than a slow one.
+    // ---- the air, which is only ever gravity -------------------------------
     if (this.onSlope) {
       // Held to the surface above; nothing to integrate.
     } else if (this.air > 0 || this.height > 0) {
       this.height += this.climb * dt;
-      this.climb -= ITEM.ramp.gravity * dt;
+      this.climb -= PHYSICS.gravity * s * dt;
       this.roll += this.rollRate * dt;
-      if (this.pitchRate !== 0) {
-        // Going over the front. Held once it is far enough round, so the car
-        // hangs nose-down for the rest of the drop instead of spinning.
-        this.pitch = Math.max(
-          -ITEM.ramp.diveMost,
-          this.pitch + this.pitchRate * dt,
-        );
-      } else {
-        // The nose follows the climb: up while it is going up, down while it
-        // is coming down. No timer, and the shape of a jump comes out free.
-        this.pitch = ITEM.ramp.pitch * (this.climb / ITEM.ramp.launch);
-      }
+      // The nose follows the trajectory, because that is where the car is
+      // going: up off the lip, over at the top, down on the way in. Nothing
+      // schedules this and nothing clamps it.
+      this.pitch = Math.atan2(this.climb, Math.max(20, this.speed));
       if (this.height <= 0) {
         this.height = 0;
+        // Landing. The vertical speed is absorbed by the suspension and a
+        // share of the horizontal goes with it, which is the difference
+        // between landing a jump and teleporting to the far side of one.
+        const bump = Math.min(1, -this.climb / (ITEM.ramp.landHard * s));
+        this.velocity.multiplyScalar(1 - bump * (1 - ITEM.ramp.landKeep));
         this.climb = 0;
         this.air = 0;
         this.rollRate = 0;
-        this.pitchRate = 0;
-        // The bumper. It comes down on its nose, loses a little, and settles
-        // back onto four wheels — which is the difference between landing a
-        // jump and teleporting to the far side of one.
-        this.landing = ITEM.ramp.landFor;
-        this.pitch = -ITEM.ramp.landDip;
-        this.velocity.multiplyScalar(ITEM.ramp.landKeep);
+        this.landing = ITEM.ramp.landFor * bump;
+        this.pitch = -ITEM.ramp.landDip * bump;
       }
     } else if (this.roll !== 0 || this.pitch !== 0) {
       this.landing = Math.max(0, this.landing - dt);
@@ -563,7 +646,7 @@ export class Car {
    * track is kept — scraping the wall should cost you time, not stop you dead
    * and leave a child stranded facing a fence.
    */
-  keepIn(track: Track): boolean {
+  keepIn(track: Track, dt = SIM.step): boolean {
     const found = track.nearest(this.position.x, this.position.z, this.hint);
     const limit = Track.limit;
     if (Math.abs(found.offset) <= limit) {
@@ -575,12 +658,18 @@ export class Car {
     this.position.x -= side.x * over * sign;
     this.position.z -= side.z * over * sign;
 
+    // The wall takes the speed that was going into it and nothing else, and
+    // then rubs along it. Written as a rate rather than as a fraction per
+    // frame: it used to take fourteen per cent of *everything* every step,
+    // which at sixty steps a second is a car that can never leave a wall it
+    // has touched — the rivals ended up pinned to the barrier at walking pace,
+    // steering at a track they could not get back to.
     const outward = this.velocity.x * side.x + this.velocity.y * side.z;
     if (outward * sign > 0) {
       this.velocity.x -= side.x * outward;
       this.velocity.y -= side.z * outward;
     }
-    this.velocity.multiplyScalar(0.86);
+    this.velocity.multiplyScalar(Math.exp(-CAR.wallDrag * dt));
     return true;
   }
 

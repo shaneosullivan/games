@@ -750,6 +750,128 @@ export const CIRCUITS = {
 } as const;
 
 /**
+ * The car, as physics rather than as a feel.
+ *
+ * This is a **two-axle (bicycle) model with slip-angle tyre forces**, which is
+ * the model most driving games use and the one Marco Monster's "Car Physics
+ * for Games" sets out. It replaced a heuristic — turn the nose at a rate, then
+ * decay the sideways velocity — that behaved plausibly on a straight and gave
+ * itself away everywhere else, most obviously off a ramp.
+ *
+ * How it works, in one breath: the velocity is split into the car's own
+ * forward and sideways axes; each axle's **slip angle** is the difference
+ * between where that axle points and where it is actually travelling; the tyre
+ * answers with a lateral force proportional to that angle until it saturates
+ * at what the surface can hold, and the two forces together both push the car
+ * sideways and yaw it. Grip is a **friction circle**, so a rear axle already
+ * spending its grip on acceleration has less left to hold a corner. Weight
+ * moves fore and aft under acceleration and braking and takes grip with it.
+ *
+ * Everything downstream comes free. Oil is a patch of low friction, and a car
+ * on it slides because there is nothing to hold it, not because a number was
+ * turned down. A ramp launches whatever vertical speed the slope and the car's
+ * own speed produce, and the nose points along the trajectory because that is
+ * where the car is going.
+ *
+ * These are **SI units** — kilograms, metres, newtons, seconds — and the world
+ * is `scale` units to the metre. Keeping the arithmetic in SI is what lets the
+ * numbers be looked up rather than guessed: 780 kg, a 2.6 m wheelbase and 1.5
+ * of grip are a small racing car, and they behave like one.
+ */
+export const PHYSICS = {
+  /** World units to the metre. The car is sixteen units long and four metres
+   *  long, so: four. */
+  scale: 4,
+  gravity: 9.81,
+  mass: 780,
+  /** Yaw inertia, kg·m². About mass × (L/2)², which is the usual estimate for
+   *  a car-shaped thing. */
+  inertia: 1100,
+  /** Wheelbase, and how the mass sits between the axles: a shade rearward, as
+   *  a mid-engined car is. */
+  toFront: 1.25,
+  toRear: 1.35,
+  /** Centre of gravity height, which is what makes weight transfer happen at
+   *  all. Low, because this is a single-seater. */
+  cgHeight: 0.4,
+  /**
+   * Grip: the coefficient of friction between rubber and dry tarmac.
+   *
+   * 1.6 is a racing tyre. Everything the car can do — how fast it corners, how
+   * hard it can brake, how much throttle the rear will take — comes out of
+   * this one number and the weight on each axle, which is why it is the only
+   * "handling" number worth tuning.
+   */
+  grip: 1.6,
+  /**
+   * Cornering stiffness, as a multiplier on slip angle before saturation.
+   *
+   * Twelve means the tyre is at its limit at about a twelfth of a radian, or
+   * five degrees of slip — which is where a real tyre peaks. The rear is
+   * stiffer than the front so the car understeers a little at the limit rather
+   * than snapping round, which is what a child can catch.
+   */
+  stiffFront: 11,
+  stiffRear: 13,
+  /**
+   * Drive force at the rear wheels, and the brakes, in newtons.
+   *
+   * Both are more than the tyres can take on their own — the friction circle
+   * decides how much of either actually reaches the road, which is why a car
+   * with more power than grip simply spins its wheels.
+   */
+  drive: 9000,
+  brake: 12000,
+  /**
+   * And the engine behind that force, in watts.
+   *
+   * A force alone has no top speed: it accelerates until the drag matches it,
+   * and drag that matched 9000 N would be a brick wall at walking pace. An
+   * engine has *power*, and force is power over speed — hard at the bottom,
+   * fading as the car gains speed — which is what actually settles a top
+   * speed, and settles this one at about a hundred kilometres an hour against
+   * the drag below.
+   */
+  power: 39000,
+  /** Aerodynamic drag, N per (m/s)², and rolling resistance, N per (m/s).
+   *  Set so the car runs out of acceleration at about a hundred kilometres an
+   *  hour, which is what it did before. */
+  drag: 1.05,
+  rollResist: 22,
+  /** How far the front wheels can be turned, how fast they turn, and how much
+   *  of the lock is left at speed — a real rack does not give full lock at a
+   *  hundred, and a stick that asks for it would spin the car every time. */
+  steerMax: 0.62,
+  steerRate: 4.2,
+  steerAtSpeed: 0.36,
+  /** Below this speed, in m/s, the slip-angle model is nonsense — dividing by
+   *  a forward speed of nothing — so the car steers geometrically instead, the
+   *  way a shopping trolley does. */
+  crawl: 2,
+} as const;
+
+/**
+ * What each surface does to the tyres.
+ *
+ * Two numbers each, and both of them are physical: what fraction of dry-tarmac
+ * grip it offers, and how much harder it is to roll through. Oil is grip and
+ * nothing else — it is slippery, not sticky. Mud is the other way about: it
+ * still grips reasonably and it drags like a ploughed field. Grass is a bit of
+ * both.
+ *
+ * Because these feed the same friction circle everything else uses, the
+ * behaviour follows without being written: a car that hits oil mid-corner has
+ * no lateral force available and carries straight on, and one that hits it in
+ * a straight line simply cannot accelerate.
+ */
+export const SURFACE = {
+  tarmac: {grip: 1, roll: 1},
+  grass: {grip: 0.55, roll: 4},
+  oil: {grip: 0.16, roll: 0.9},
+  mud: {grip: 0.72, roll: 7},
+} as const;
+
+/**
  * The car.
  *
  * An arcade drift model, which is the whole game: the car has a heading and a
@@ -762,73 +884,29 @@ export const CAR = {
    *  which is a real racing car. */
   length: 16,
   width: 7,
-  /** Units a second flat out on tarmac, and how hard it gets there. A hundred
-   *  and ten is twenty-seven metres a second, or a hundred kilometres an hour
-   *  — quick enough to be exciting and slow enough for a child to hold a line. */
+  /**
+   * Units a second flat out on tarmac.
+   *
+   * Quoted rather than set: the physics decides it — the engine's power
+   * against the drag — and this is what that comes out as, to within a unit. A
+   * hundred and ten units a second is twenty-seven and a half metres a second,
+   * or a hundred kilometres an hour. Everything that needs to know how fast
+   * the car *can* go, from the rivals' pace tables to the steering that fades
+   * with speed, reads it from here.
+   */
   top: 110,
-  accel: 105,
-  /** How hard it slows with nothing pressed, and how hard the brakes are when
-   *  the stick is pushed against the way you are going. */
-  coast: 26,
-  brake: 130,
-  /** Radians a second the nose comes round, and how much of that survives at
-   *  full speed. A car that turned as hard at a hundred as at a walk would
-   *  have no corners in it. */
-  turn: 3,
-  turnAtSpeed: 0.42,
-  /**
-   * How much of the steering a car has at a crawl.
-   *
-   * A car turns by driving round a corner. It cannot spin on the spot, and
-   * this game let it: point the finger behind the car and it braked to a stop
-   * — asking to go the other way is the brake — and then, standing still,
-   * swung its nose through a half turn in a second and drove back the way it
-   * came. Which is not a car and is not a race; a mistake ought to cost a
-   * corner, not a shrug.
-   *
-   * So the nose only comes round in proportion to how fast the car is actually
-   * rolling, up to `turnsFrom`, and a U-turn becomes what it is on a road: a
-   * wide arc, or a stop and a fresh start. `turnStill` is what is left when it
-   * is barely moving at all — not nothing, or a car nose-first into the tyres
-   * could never be worked out of them.
-   */
-  turnsFrom: 34,
-  turnStill: 0.12,
-  /**
-   * Grip: how fast sideways speed is scrubbed off, per second.
-   *
-   * This is the number the game lives or dies by. High and the car is on
-   * rails; low and it is a hovercraft. Six means a hard corner taken flat out
-   * steps the back end out and holds it there for about a second, which is a
-   * drift you can see, steer and be pleased with.
-   */
-  grip: 6,
-  /** How much of that grip is left on grass. A third: the car understeers wide
-   *  and will not stop, which is what makes running wide cost you. */
-  grassGrip: 0.34,
-  grassTop: 0.55,
-  /**
-   * How fast it has to be sliding sideways before it lays rubber.
-   *
-   * Measured, not guessed: an autopilot holding a tidy racing line peaks at a
-   * sideways 16.6, and a hard yank of the stick at speed reaches the thirties.
-   * Eighteen sits between the two, so a clean lap marks only the tightest
-   * corners and throwing the car about blacks the road — which is the game.
-   * Twenty-six was above everything driving normally ever produced, so the
-   * marks never appeared at all.
-   */
+  /** How much sideways speed counts as a skid, for laying rubber and for the
+   *  noise. In units a second: a tyre scrubbing this fast is a tyre leaving a
+   *  mark, whatever the reason it is scrubbing. */
   skidAt: 18,
-  /**
-   * How hard a left-to-right difference in grip turns the car.
-   *
-   * Radians a second at full speed for a complete split — every wheel down
-   * one side gripping and none down the other. This is what makes the edge of
-   * an oil slick more dangerous than the middle of it.
-   */
-  spinFromSplit: 2.6,
-  /** How fast the car rights itself once it is back on the ground, after a
-   *  roll. Frame-rate independent, so it is a rate and not a fraction. */
+  /** How fast a car that has been turned over rights itself once it is back
+   *  on the ground, per second. Nothing to do with the tyre model: this is the
+   *  stunt landing settling, and a car that is upside down is a car that has
+   *  had a moment rather than a car with a suspension problem. */
   rightsItself: 5,
+  /** How fast a car scrubbing along the barrier loses speed, per second. A
+   *  wall should cost you time, not stop you dead and pin you to it. */
+  wallDrag: 1.6,
 } as const;
 
 /** The marks the road is left covered in. */
@@ -885,19 +963,65 @@ export const RIVALS = {
    * trundling scenery rather than as cars with somebody in them. Now the road
    * is measured once and they drive what it says.
    *
-   * `bite` is how hard a car can lean on a corner: the speed for a bend of
-   * radius r is the square root of `bite` times r, which is the real
-   * arithmetic and the reason a hairpin is slow. At 34, the tightest corner on
-   * the built-in circuits comes out at about a third of top speed and a fast
-   * kink is flat.
+   * `bite` is how hard a car can lean on a corner, in units a second squared:
+   * the speed for a bend of radius r is the square root of `bite` times r,
+   * which is the real arithmetic and the reason a hairpin is slow. The tyres
+   * themselves are good for grip × gravity — about sixty-three units a second
+   * squared — so this is a driver using ninety-odd per cent of the car, which
+   * is a quick driver who is not crashing.
    *
    * `sees` is how far ahead they look for the slowest thing coming, in world
    * units — a driver brakes *before* the corner, and a driver who brakes at
    * the corner is a driver in the gravel. It is roughly the distance it takes
    * to shed the speed.
    */
-  bite: 55,
-  sees: 150,
+  bite: 45,
+  /** A margin on top of the braking distance, for reaction and for the corner
+   *  being a little tighter than its entry. */
+  sees: 40,
+  /** How hard they will brake, in units a second squared — a little under
+   *  what the tyres would give, because braking is also steering. */
+  slows: 46,
+  /**
+   * How far ahead they steer at, in seconds of travel.
+   *
+   * Pure pursuit: aim at the point on the line you will reach in this much
+   * time, and steer at it. Which is what a driver does — you look further up
+   * the road the faster you are going — and it is the only way to follow a
+   * line with a car that has a steering rack and a mass, rather than one whose
+   * heading can simply be set. Aiming at a fixed distance had them turning in
+   * far too late and ploughing off the outside of every corner.
+   */
+  eyes: 0.75,
+  eyesLeast: 44,
+  corners: 0.55,
+  /** How far wrong the nose has to be before they stop being clever about the
+   *  steering and simply wind on full lock. */
+  sharp: 0.6,
+  /** Being stuck: under this speed with the throttle open for this long means
+   *  something is in the way, and this is how long they reverse for. */
+  stalled: 8,
+  patience: 1.2,
+  backsUp: 0.9,
+  /** How much over the limit is worth lifting for, and how much over means
+   *  standing on the brakes. Units a second: a couple of units is a rounding
+   *  error and twenty is a corner arriving. */
+  slack: 2,
+  hard: 20,
+  /**
+   * Traffic.
+   *
+   * A car ahead is two things: a speed limit and a reason to move over. Before
+   * the cars had different speeds through a corner they never really met; now
+   * a quick one catches a slow one at every hairpin, and without this they
+   * simply drove into the back of each other and both of them stopped.
+   *
+   * `near` is how far ahead counts as in the way, `wide` how far across, and
+   * `dodge` how much road they pull out by to have a look.
+   */
+  near: 60,
+  wide: 16,
+  dodge: 18,
   smooth: 6,
   /**
    * The line: how far toward the inside of a corner they run, as a fraction of
@@ -1311,7 +1435,6 @@ export const ITEM = {
     /** What is left of the car's grip on oil. Six per cent: the back end goes
      *  and stays gone, which is the joke, and it is survivable because a spin
      *  on a wide track costs a second and not the race. */
-    grip: 0.06,
   },
   mud: {
     colour: 0x6b4a2c,
@@ -1334,15 +1457,14 @@ export const ITEM = {
      */
     wide: 52,
     long: 42,
-    rise: 11,
-    /** How much the climb costs. Going up a hill is work, and a ramp taken
-     *  slowly should be slower still at the top. */
-    drag: 46,
+    rise: 8,
+    /** What the climb costs is now gravity down the slope rather than a number
+     *  — see `Car.update` — so there is nothing to set here. Eight units of
+     *  rise over forty-two of length is a shade under eleven degrees, which
+     *  throws a car about thirty metres at full speed. */
     /** How long the car is in the air, and how much bigger it looks at the top
      *  of the arc. Seen from straight above there is no other way to say
      *  "off the ground": the sprite grows and its shadow stays put. */
-    airtime: 1,
-    lift: 0.55,
     /** How slow you can be and still take off. Roll onto it and nothing
      *  happens, which is the right lesson. */
     minSpeed: 40,
@@ -1360,7 +1482,6 @@ export const ITEM = {
      * given, and landing would snap the car back to walking pace at exactly
      * the moment it should feel fastest.
      */
-    boost: 1.35,
     carry: 2.5,
     /**
      * How hard a lopsided take-off throws the car over.
@@ -1379,7 +1500,6 @@ export const ITEM = {
      * so the nose rises while it is going up and drops while it is coming
      * down. That is the whole shape of a jump and it comes out for free.
      */
-    pitch: 0.42,
     /**
      * The dive: how a square take-off goes over.
      *
@@ -1391,8 +1511,6 @@ export const ITEM = {
      * before it holds there. Just past a right angle, so it comes down looking
      * over its own bonnet rather than winding all the way round onto its roof.
      */
-    dive: 1.6,
-    diveMost: 1.1,
     /**
      * How much of that a jump gets when it is also rolling.
      *
@@ -1403,11 +1521,8 @@ export const ITEM = {
      * less of it — it already has one rotation to read and two at full rate is
      * a car nobody can follow.
      */
-    diveRolling: 0.55,
     /** How fast it goes up. The arc is a real one — gravity brings it back —
      *  so this is a speed and not a duration. */
-    launch: 62,
-    gravity: 150,
     /**
      * Landing.
      *
@@ -1420,6 +1535,10 @@ export const ITEM = {
     landDip: 0.2,
     landKeep: 0.9,
     landFor: 0.28,
+    /** The vertical speed, in metres a second, at which a landing costs the
+     *  whole of `landKeep`. Below it the car keeps more, because it did not
+     *  fall as far — a hop off a kerb is not a jump. */
+    landHard: 9,
   },
 } as const;
 
@@ -1512,13 +1631,15 @@ export const RATING = {
   /**
    * Where the bands fall.
    *
-   * Read off real tracks rather than picked: the circuit the game ships with
-   * scores 2, a lazy oval scores nothing at all, a figure of eight with a
-   * flyover scores 12, the same circuit with two oil slicks and a mud patch on
-   * it scores 20, and a scribble of hairpins scores 39.
+   * Read off real tracks rather than picked, and re-read when the cars started
+   * obeying physics: a corner is now worth the square root of grip times
+   * radius rather than a rate of turn, and every score moved. A lazy oval
+   * still scores nothing at all; Sunday Hills scores 18, Dune Run 21, Neon
+   * Mile 23, a ring of alternating fast and slow corners 35, and a scribble of
+   * hairpins 39 — with the hazards on top of that.
    */
-  medium: 10,
-  hard: 28,
+  medium: 21,
+  hard: 34,
 } as const;
 
 /**

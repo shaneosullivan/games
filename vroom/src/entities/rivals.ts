@@ -1,7 +1,7 @@
 import * as THREE from "three";
-import {PLAYER, RIVALS, TRACK} from "../config";
+import {PHYSICS, PLAYER, RIVALS, TRACK} from "../config";
 import {myColour, neonised} from "../core/garage";
-import {Car, Drive} from "./car";
+import {Car, shortestAngle} from "./car";
 import {Patches} from "./patches";
 import {signed, Track, wrap} from "./track";
 
@@ -35,16 +35,20 @@ export class Rivals {
   private readonly began: Array<number> = [];
   /** How brave each one is, as a fraction of what the road allows. */
   private readonly nerve: Array<number> = [];
+  /** How long each has been trying to go somewhere and failing, and how long
+   *  it has left of backing out of it. */
+  private readonly stuck: Array<number> = [];
+  private readonly reversing: Array<number> = [];
   private readonly offset: Array<number> = [];
 
   private readonly aim = new THREE.Vector3();
   private readonly want = new THREE.Vector2();
   private readonly here = new THREE.Vector3();
   /** Held rather than made each step: three cars, sixty steps a second. */
-  private readonly drive: Drive;
+  private readonly drive: {kind: "wheel"; steer: number; throttle: number};
 
   constructor(track: Track) {
-    this.drive = {kind: "aim", aim: this.want};
+    this.drive = {kind: "wheel", steer: 0, throttle: 0};
     // Every car in the race is a different colour, and none of them is the
     // player's. Two the same is a child watching the wrong one all the way
     // round — and that goes for two rivals as much as for a rival and you.
@@ -97,33 +101,66 @@ export class Rivals {
       // Each a little braver or more cautious than the next, so they string
       // out over a lap instead of driving round nose to tail.
       this.nerve.push(RIVALS.pace + (i - 1) * RIVALS.nerve);
+      this.stuck.push(0);
+      this.reversing.push(0);
     }
   }
 
+  /**
+   * One step of driving, for each of them.
+   *
+   * They drive the car rather than being moved along the road. Where they are
+   * is read off the car itself; what they do about it is a driver's two jobs,
+   * done in the order a driver does them:
+   *
+   * - **Steer** at a point on the racing line about half a second up the road
+   *   (pure pursuit — you look further ahead the faster you are going).
+   * - **Pedal** toward the speed the road allows between here and as far as
+   *   they can see, which is braking for the corner and accelerating out of
+   *   it.
+   *
+   * This replaced a point that walked the circuit at a set pace with the car
+   * chasing it. That worked while a car's heading could simply be set; with a
+   * steering rack and a mass it does not, because the point runs away up the
+   * road and a car eighty units behind it is aiming at something nearly
+   * straight ahead however far sideways it has got. They drove into the
+   * scenery on almost every corner.
+   */
   update(dt: number, track: Track, patches?: Patches): void {
     for (let i = 0; i < this.cars.length; i++) {
       const car = this.cars[i];
-      // Walk their point along the circuit and aim the car at where it will
-      // be. Aiming *ahead* rather than at the point itself is what makes them
-      // turn in early and hold a line, instead of sawing at the wheel trying
-      // to sit on a moving dot.
-      //
-      // How fast the point walks is the road's business, not a constant: the
-      // slowest thing within sight of it, which is a corner coming, times how
-      // brave this particular driver is. Braking, in other words — and the
-      // acceleration out the far side comes for free, because the moment the
-      // corner is behind the point the limit goes back up.
-      const speed = this.paceFor(track, this.at[i], i);
-      const step = (speed * dt) / track.length;
-      this.at[i] = wrap(this.at[i] + step);
+      const where = track.nearest(car.position.x, car.position.z, car.hint);
+
+      // Where they are, and how much lap that added. Accumulated the same way
+      // the player's is, and for the same reason: the curve's own parameter
+      // wraps at the line, and a car that has done ninety-nine per cent of a
+      // lap must not read as one per cent.
+      let step = where.t - this.at[i];
+      if (step > 0.5) {
+        step -= 1;
+      } else if (step < -0.5) {
+        step += 1;
+      }
+      this.at[i] = where.t;
       this.travelled[i] += step;
-      const lead = wrap(this.at[i] + 0.012);
+
+      const speed = car.speed;
+
+      // Steering: the point on the line they will reach in about half a
+      // second — never nearer than a couple of car lengths, and never further
+      // than a fraction of how tight the corner is. That last clamp is what
+      // gets them round a hairpin: pure pursuit aimed further ahead than the
+      // corner's own radius cuts straight across it and arrives on the outside
+      // kerb, which is exactly what they did on the desert circuit.
+      const here = Math.round(where.t * TRACK.segments);
+      const radius = track.paceAt(here) ** 2 / RIVALS.bite;
+      const look = Math.min(
+        Math.max(RIVALS.eyesLeast, speed * RIVALS.eyes),
+        radius * RIVALS.corners,
+      );
+      const lead = wrap(where.t + look / track.length);
       track.pointAt(lead, this.aim);
       track.sideAt(lead, this.here);
-      // On the racing line, plus their own foot of daylight, so three cars on
-      // the same line are three cars and not one — and both of those together
-      // held inside the road, because an apex plus an offset is how a car ends
-      // up racing along the grass.
       const sample = Math.round(lead * TRACK.segments);
       const room = TRACK.half - RIVALS.margin;
       let across = Math.max(
@@ -134,9 +171,7 @@ export class Rivals {
       // And if they are already wide of that — a corner taken a shade too fast
       // runs the car out to the kerb whatever it was aiming at — the aim is
       // pulled back across the road by however far they have overshot. That is
-      // a driver catching it and tucking back in, and without it a fast corner
-      // ended with a car in the sand, which is not a driver at all.
-      const where = track.nearest(car.position.x, car.position.z, car.hint);
+      // a driver catching it and tucking back in.
       const wide = Math.abs(where.offset) - room;
       if (wide > 0) {
         across -=
@@ -145,13 +180,94 @@ export class Rivals {
       this.aim.addScaledVector(this.here, across);
 
       this.want.set(this.aim.x - car.position.x, this.aim.z - car.position.z);
-      const d = this.want.length();
-      if (d > 1e-4) {
-        // Full throttle unless they are already past where they should be.
-        this.want.multiplyScalar(Math.min(1, d / 30) / d);
+      const range = Math.max(1e-3, this.want.length());
+
+      /**
+       * Pure pursuit, as the geometry rather than as a gain.
+       *
+       * The steering angle that puts a car of wheelbase L on a circle through
+       * a point at distance d and angle α is atan(2·L·sinα / d). That is the
+       * whole law, and using it instead of "turn the wheel in proportion to
+       * how wrong you are" is the difference between a driver and a metronome:
+       * the proportional version sawed lock to lock, weaved across the whole
+       * road and scrubbed a third of its speed off doing it.
+       */
+      const off = shortestAngle(
+        car.heading,
+        Math.atan2(this.want.x, this.want.y),
+      );
+      const wheelbase = (PHYSICS.toFront + PHYSICS.toRear) * PHYSICS.scale;
+      // Pure pursuit only answers sensibly while the car is roughly pointing
+      // where it is going. Sideways or facing the wrong way it says "ease it
+      // round gently", which is how a spun car drove serenely off into the
+      // desert at full throttle. Past this much of an angle, it is full lock
+      // and no arithmetic — which is what anybody does.
+      const wheel =
+        Math.abs(off) > RIVALS.sharp
+          ? Math.sign(off) * PHYSICS.steerMax
+          : Math.atan2(2 * wheelbase * Math.sin(off), range);
+
+      // Traffic: anybody just ahead is both a speed limit and a reason to
+      // pull out. Without it a quick car meeting a slow one at a hairpin
+      // simply drove into the back of it and both of them stopped.
+      let ahead = Infinity;
+      for (let j = 0; j < this.cars.length; j++) {
+        if (j === i) {
+          continue;
+        }
+        const them = this.cars[j];
+        const dx = them.position.x - car.position.x;
+        const dz = them.position.z - car.position.z;
+        const nose = Math.sin(car.heading);
+        const front = Math.cos(car.heading);
+        const along = dx * nose + dz * front;
+        const beside = dx * front - dz * nose;
+        if (
+          along > 0 &&
+          along < RIVALS.near &&
+          Math.abs(beside) < RIVALS.wide
+        ) {
+          ahead = Math.min(ahead, them.speed);
+          // Out to whichever side they are not on, and stay on the road.
+          const move = beside > 0 ? -RIVALS.dodge : RIVALS.dodge;
+          across = Math.max(-room, Math.min(room, across + move));
+        }
       }
+      const want = Math.min(this.paceFor(track, where.t, i, speed), ahead);
+
+      // The pedals. Under the limit, everything; over it, off the throttle,
+      // and hard on the brakes if it is a corner arriving rather than a
+      // rounding error.
+      const over = speed - want;
+      const push =
+        over < 0
+          ? 1
+          : over < RIVALS.slack
+            ? 0
+            : -Math.min(1, over / RIVALS.hard);
+
+      // Nose in a wall with the throttle open and nothing happening: back out
+      // of it, which is what anybody does. Without this a car that got itself
+      // wedged stayed wedged for the rest of the race, wheels spinning.
+      if (this.reversing[i] > 0) {
+        this.reversing[i] -= dt;
+        this.drive.steer = -Math.max(-1, Math.min(1, wheel / PHYSICS.steerMax));
+        this.drive.throttle = -1;
+        car.update(dt, this.drive, track, patches);
+        car.keepIn(track, dt);
+        continue;
+      }
+      this.stuck[i] =
+        speed < RIVALS.stalled && push > 0 ? this.stuck[i] + dt : 0;
+      if (this.stuck[i] > RIVALS.patience) {
+        this.stuck[i] = 0;
+        this.reversing[i] = RIVALS.backsUp;
+      }
+
+      this.drive.steer = Math.max(-1, Math.min(1, wheel / PHYSICS.steerMax));
+      this.drive.throttle = push;
       car.update(dt, this.drive, track, patches);
-      car.keepIn(track);
+      car.keepIn(track, dt);
     }
   }
 
@@ -163,9 +279,15 @@ export class Rivals {
    * own bumper would arrive at every corner flat out and turn in at a speed no
    * amount of grip could hold.
    */
-  private paceFor(track: Track, at: number, i: number): number {
+  private paceFor(track: Track, at: number, i: number, speed = 0): number {
     const step = track.length / TRACK.segments;
-    const ahead = Math.max(1, Math.round(RIVALS.sees / step));
+    // How far ahead to look is how far it takes to stop: v² over twice the
+    // deceleration, which is the schoolbook formula and the honest answer.
+    // A fixed distance cannot work — it is either miles too far at walking
+    // pace or nowhere near enough at a hundred, and at a hundred what happens
+    // is a car arriving at a hairpin still doing ninety.
+    const stopping = (speed * speed) / (2 * RIVALS.slows) + RIVALS.sees;
+    const ahead = Math.max(1, Math.round(stopping / step));
     const here = Math.round(at * TRACK.segments);
     let slowest = Infinity;
     for (let k = 0; k <= ahead; k++) {
