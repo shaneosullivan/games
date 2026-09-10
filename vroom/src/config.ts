@@ -1095,9 +1095,16 @@ export const STICKER = {
    */
   sideInset: 1.01,
   sideLift: 0.12,
-  sideAt: 3,
-  sideLowest: 2,
-  sideHighest: 4.2,
+  sideAt: 2.6,
+  /**
+   * How high up the flank there is anything to write on, in world units.
+   *
+   * The floor of the body is at about 0.45 and the deck over the sidepod at
+   * about 4.2, so this is that, kept a little inside both. A block of writing
+   * is never taller than the band and never hangs out of it — three words
+   * stacked would otherwise put the top one in the air beside the cockpit.
+   */
+  sideBand: {low: 0.9, high: 4.3},
   /** How tall a word arrives. Smaller than a picture: it is longer than it is
    *  tall and it has to fit between the wheels. */
   textSize: 2.4,
@@ -1113,12 +1120,22 @@ export const STICKER = {
   /** How much taller the block gets per extra line. One line is the height
    *  asked for; each one after adds this much of it. */
   lineAdds: 0.62,
-  /** The longest a word may be along the car, as a fraction of its length,
-   *  and how far along it may sit — short of the wings at either end, which
-   *  are not the car's side. */
-  sideRoom: 0.32,
-  sideFrom: 0.11,
-  sideTo: -0.09,
+  /**
+   * The panel a word gets: the gap between the wheels, in world units along
+   * the car.
+   *
+   * Every letter has to be readable, and a tyre standing proud of the body is
+   * the one thing that can hide one. The front wheel's centre is at 0.33 of
+   * the length with a radius of 2.6, so its trailing edge is at 2.68; the rear
+   * is at -0.31 with a radius of 3, so its leading edge is at -1.96. That
+   * leaves four and a bit units of car between them, and this is that gap with
+   * a quarter of a unit of daylight kept at each end.
+   *
+   * A word is never wider than this panel and never sits half out of it — it
+   * shrinks to fit and stops at the edge when dragged — which is also what
+   * makes a long name come out in small letters and a short one in big ones.
+   */
+  sidePanel: {from: 2.43, to: -1.71},
   /**
    * The kinds of writing on offer.
    *

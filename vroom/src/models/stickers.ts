@@ -269,15 +269,32 @@ function writing(sticker: Sticker, L: number, W: number): THREE.Group | null {
     return null;
   }
 
-  // As tall as asked for, plus a bit for each line under the first, until that
-  // makes it longer than the side allows.
-  const room = L * STICKER.sideRoom;
-  let height = sticker.size * (1 + (drawn.lines - 1) * STICKER.lineAdds);
+  // As tall as asked for, plus a bit for each line under the first — until
+  // that makes it wider than the panel between the wheels, and then it is as
+  // big as the panel allows and no bigger. That one clamp is what makes a long
+  // name come out in small letters: the longer the word, the wider it wants to
+  // be, and the more it has to give up in height to fit the same gap.
+  const panel = STICKER.sidePanel;
+  const room = panel.from - panel.to;
+  const band = STICKER.sideBand.high - STICKER.sideBand.low;
+  let height = Math.min(
+    band,
+    sticker.size * (1 + (drawn.lines - 1) * STICKER.lineAdds),
+  );
   let width = height * drawn.aspect;
   if (width > room) {
     width = room;
     height = width / drawn.aspect;
   }
+
+  // And held inside the panel rather than centred on wherever the finger left
+  // it: a word half behind a tyre is a word you cannot read, which is the
+  // whole point of putting it on the car.
+  const half = width / 2;
+  const along = Math.min(
+    panel.from - half,
+    Math.max(panel.to + half, sticker.v * L),
+  );
 
   const texture = new THREE.CanvasTexture(drawn.canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
@@ -298,7 +315,7 @@ function writing(sticker: Sticker, L: number, W: number): THREE.Group | null {
     // Turning the far one the other way is what puts the word the right way
     // round for somebody standing on that side of the car.
     flat.rotateY(side > 0 ? Math.PI / 2 : -Math.PI / 2);
-    flat.translate(0, heightOf(sticker), sticker.v * L);
+    flat.translate(0, heightOf(sticker, height), along);
     group.add(new THREE.Mesh(onFlank(flat, side, L, W), material));
     flat.dispose();
   }
@@ -312,18 +329,23 @@ function acrossOf(sticker: Sticker, W: number): number {
   return Math.max(-room, Math.min(room, sticker.u * room));
 }
 
-/** How far up the flank a word sits, inside the panel there is to write on. */
-export function heightOf(sticker: Sticker): number {
+/** How far up the flank a word sits: where it was put, held so that the whole
+ *  block stays on the bodywork rather than half of it in the air. */
+export function heightOf(sticker: Sticker, height: number): number {
+  const half = height / 2;
   return Math.max(
-    STICKER.sideLowest,
-    Math.min(STICKER.sideHighest, sticker.h ?? STICKER.sideAt),
+    STICKER.sideBand.low + half,
+    Math.min(STICKER.sideBand.high - half, sticker.h ?? STICKER.sideAt),
   );
 }
 
 /** How far along the car a word can go, and holding one inside that. Short of
  *  the wings at either end, which are not the car's side. */
 export function alongFlank(v: number): number {
-  return Math.max(STICKER.sideTo, Math.min(STICKER.sideFrom, v));
+  return Math.max(
+    STICKER.sidePanel.to / CAR.length,
+    Math.min(STICKER.sidePanel.from / CAR.length, v),
+  );
 }
 
 /**
