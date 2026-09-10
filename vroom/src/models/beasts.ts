@@ -18,6 +18,11 @@ import {wheel} from "./car";
  * more parts between them than the entire body does.
  */
 
+/** How much of their built height they keep, so the top of a cow sits where
+ *  the top of the racing car does. The wheels are added afterwards and are not
+ *  squashed: they are the same wheels as everything else on the grid. */
+const BEASTS = {squash: 0.68} as const;
+
 const HOOF = 0x2a2320;
 const EYE = 0x14141a;
 const WHITE = 0xf6f3ea;
@@ -40,11 +45,20 @@ export function beast(
   // cars that happen to be a cow and a chicken — which is both funnier and the
   // thing a child asked for twice: no saddle, and then no rider at all.
   void kit;
+
+  // Built at animal proportions and then squashed to a car's. They have always
+  // *driven* the same as the racing car — identical mass, wheels, tyres and
+  // engine, since the model is only a model — but they stood half again as
+  // tall, and a tall thing swings much further on the same lean, the same
+  // pitch off a ramp and the same landing. So they looked like they handled
+  // differently, which for a child is the same as handling differently.
+  const animal = new Assembly();
   if (kind === "cow") {
-    cow(a, colour, L, W);
+    cow(animal, colour, L, W);
   } else {
-    chicken(a, colour, L, W);
+    chicken(animal, colour, L, W);
   }
+  a.absorb(animal, BEASTS.squash);
 
   for (const along of [0.33, -0.31]) {
     for (const side of [-1, 1]) {

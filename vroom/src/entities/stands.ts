@@ -52,6 +52,9 @@ export class Stands {
   private readonly one = new THREE.Vector3(1, 1, 1);
   private readonly tint = new THREE.Color();
   private readonly flare = new THREE.Vector3();
+  /** Where the two grandstands stand. The desert's fireworks go off beside
+   *  them rather than over the road — the shot comes down the road. */
+  private readonly beside: Array<{x: number; z: number}> = [];
 
   constructor(
     rng: Rng,
@@ -87,6 +90,15 @@ export class Stands {
       const turn = 0;
       void facing;
 
+      // Where the fireworks go off: beside the road, level with the stand and
+      // most of the way in from it. Level with the stand itself they are out
+      // of frame at the flag — the shot comes down in front of the car and the
+      // stands are wide of it — and a firework nobody sees is a firework that
+      // did not happen.
+      this.beside.push({
+        x: p.x + (x - p.x) * STAND.flameIn,
+        z: p.z + (z - p.z) * STAND.flameIn,
+      });
       const built = stand(palette).build();
       built.position.set(x, 0, z);
       built.rotation.y = turn;
@@ -180,24 +192,25 @@ export class Stands {
       return;
     }
     this.feed = STAND.flameEvery;
-    for (const side of [-1, 1]) {
-      this.confetti.burst(
-        this.flare.set(
-          this.over.x + side * STAND.flameApart,
-          STAND.flameFrom,
-          this.over.z + side * STAND.flameApart * 0.45,
-        ),
-        {
-          color: STAND.flame,
-          count: STAND.flameCount,
-          speed: STAND.flameSpeed,
-          lift: STAND.flameLift,
-          gravity: STAND.flameRise,
-          ttl: STAND.flameLasts,
-          size: STAND.flameSize,
-          spherical: 0.16,
-        },
-      );
+    // Beside the grandstands, not over the road. Two columns of fire either
+    // side of the finish line put the biggest, brightest thing on the screen
+    // exactly where the car is, at the moment a child most wants to see the
+    // car — which is the wrong place for a firework and the right place for a
+    // blindfold.
+    for (const at of this.beside) {
+      this.confetti.burst(this.flare.set(at.x, STAND.flameFrom, at.z), {
+        color: STAND.flame,
+        count: STAND.flameCount,
+        speed: STAND.flameSpeed,
+        lift: STAND.flameLift,
+        gravity: STAND.flameRise,
+        ttl: STAND.flameLasts,
+        size: STAND.flameSize,
+        // A full sphere of sparks that arc and fall, rather than a jet: this
+        // is a firework going off at the side of a circuit, not a flamethrower
+        // in the fast lane.
+        spherical: 1,
+      });
     }
   }
 

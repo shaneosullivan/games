@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import {PHYSICS, PLAYER, RIVALS, TRACK} from "../config";
+import {CarShape, PHYSICS, PLAYER, RIVALS, TRACK} from "../config";
 import {myColour, neonised} from "../core/garage";
 import {Car, shortestAngle} from "./car";
 import {Patches} from "./patches";
@@ -81,7 +81,17 @@ export class Rivals {
       // wearing something a child had made.
       const design =
         PLAYER.designs[Math.floor(Math.random() * PLAYER.designs.length)].id;
-      const car = new Car(colour, design);
+      // And now and again one of them is not a car at all. A cow and a chicken
+      // drive exactly as a racing car does — same mass, wheels, tyres, engine
+      // — so this changes nothing about the race and everything about looking
+      // in the mirror.
+      const shape: CarShape =
+        Math.random() < RIVALS.beastly
+          ? Math.random() < 0.5
+            ? "cow"
+            : "chicken"
+          : "racer";
+      const car = new Car(colour, design, [], undefined, shape);
       // Left, right, left: a grid, not a queue.
       const off = (i % 2 === 0 ? 1 : -1) * RIVALS.offset;
       const t = wrap(track.startAt - 0.006 - i * RIVALS.gridGap);
@@ -238,10 +248,16 @@ export class Rivals {
       // The pedals. Under the limit, everything; over it, off the throttle,
       // and hard on the brakes if it is a corner arriving rather than a
       // rounding error.
+      // Feathered rather than flat out. A car already near what the road
+      // allows does not need the whole engine, and giving it the whole engine
+      // on a corner exit spends the rear tyres' grip on wheelspin — the
+      // friction circle then has nothing left to hold the back end in, and
+      // they ran wide. So: everything when there is speed to find, easing off
+      // as the limit comes up, and the brakes when it has been passed.
       const over = speed - want;
       const push =
         over < 0
-          ? 1
+          ? Math.min(1, -over / RIVALS.eases)
           : over < RIVALS.slack
             ? 0
             : -Math.min(1, over / RIVALS.hard);

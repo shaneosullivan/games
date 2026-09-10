@@ -31,6 +31,28 @@ export class Assembly {
     return this;
   }
 
+  /**
+   * Everything another assembly holds, taken as it stands.
+   *
+   * The pieces are already painted, so they arrive with their colours rather
+   * than being repainted one flat colour — which is the whole reason this is
+   * not `add` in a loop. `squash` scales them vertically on the way in, which
+   * is how an animal built at animal proportions ends up the height of a car.
+   */
+  absorb(other: Assembly, squash = 1): this {
+    for (const [substance, pile] of other.piles) {
+      const mine = this.piles.get(substance) ?? [];
+      for (const geometry of pile) {
+        if (squash !== 1) {
+          geometry.scale(1, squash, 1);
+        }
+        mine.push(geometry);
+      }
+      this.piles.set(substance, mine);
+    }
+    return this;
+  }
+
   /** The merged geometry for each substance used, for instancing. */
   parts(): Array<{substance: Substance; geometry: THREE.BufferGeometry}> {
     const out: Array<{substance: Substance; geometry: THREE.BufferGeometry}> =

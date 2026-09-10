@@ -279,20 +279,27 @@ export const STAND = {
    * half rather than all at once, because one puff is an explosion and a
    * handful in a row is a fire.
    */
-  flame: [0xffd24a, 0xff9a2e, 0xf2542d, 0xd8341f],
-  flameCount: 55,
-  flameSpeed: 9,
-  flameLift: 46,
-  /** Negative: it climbs. */
-  flameRise: -26,
-  flameLasts: 1.15,
-  flameSize: 2.5,
+  flame: [0xfff3c4, 0xffd24a, 0xff9a2e, 0xf2542d],
+  flameCount: 110,
+  flameSpeed: 58,
+  flameLift: 34,
+  /** Sparks fall. They are thrown up and out hard and gravity brings them
+   *  back, which is what makes an arc rather than a jet — a firework, in other
+   *  words, which is what the desert throws at the flag. */
+  flameRise: 62,
+  flameLasts: 1.4,
+  flameSize: 1.1,
   /** How long the fire burns, how often it is fed, and how far apart the two
    *  columns of it stand either side of the line. */
-  flameFor: 1.6,
-  flameEvery: 0.16,
-  flameApart: 30,
-  flameFrom: 2,
+  flameFor: 2.2,
+  flameEvery: 0.28,
+  /** How high above the stands they go off. Well clear of the roof: a
+   *  firework that bursts level with a grandstand is a firework nobody in
+   *  front of the grandstand can see. */
+  flameFrom: 40,
+  /** How far out from the middle of the road they stand, as a fraction of the
+   *  way to the grandstand. Outside the barrier, inside the stand. */
+  flameIn: 0.62,
 } as const;
 
 /**
@@ -831,12 +838,19 @@ export const PHYSICS = {
    * fading as the car gains speed — which is what actually settles a top
    * speed, and settles this one at about a hundred kilometres an hour against
    * the drag below.
+   *
+   * A hundred and twenty kilowatts for eight hundred kilograms is a lot, and
+   * deliberately: at half of it the car had the top speed it has now and took
+   * eleven seconds to reach it, which is a school run rather than a race. The
+   * tyres cannot use all of it at low speed anyway — the friction circle sees
+   * to that — so what the power buys is the whole grip-limited launch and then
+   * a strong middle, with the drag below deciding where it stops.
    */
-  power: 39000,
+  power: 120000,
   /** Aerodynamic drag, N per (m/s)², and rolling resistance, N per (m/s).
    *  Set so the car runs out of acceleration at about a hundred kilometres an
    *  hour, which is what it did before. */
-  drag: 1.05,
+  drag: 2.4,
   rollResist: 22,
   /** How far the front wheels can be turned, how fast they turn, and how much
    *  of the lock is left at speed — a real rack does not give full lock at a
@@ -888,13 +902,13 @@ export const CAR = {
    * Units a second flat out on tarmac.
    *
    * Quoted rather than set: the physics decides it — the engine's power
-   * against the drag — and this is what that comes out as, to within a unit. A
-   * hundred and ten units a second is twenty-seven and a half metres a second,
-   * or a hundred kilometres an hour. Everything that needs to know how fast
-   * the car *can* go, from the rivals' pace tables to the steering that fades
-   * with speed, reads it from here.
+   * against the drag — and this is what that comes out as, to within a unit.
+   * A hundred and thirty-six units a second is thirty-four metres a second, or
+   * a hundred and twenty-two kilometres an hour. Everything that needs to know
+   * how fast the car *can* go, from the rivals' pace tables to the steering
+   * that fades with speed, reads it from here.
    */
-  top: 110,
+  top: 136,
   /** How much sideways speed counts as a skid, for laying rubber and for the
    *  noise. In units a second: a tyre scrubbing this fast is a tyre leaving a
    *  mark, whatever the reason it is scrubbing. */
@@ -1008,6 +1022,10 @@ export const RIVALS = {
    *  error and twenty is a corner arriving. */
   slack: 2,
   hard: 20,
+  /** How far under the limit is worth full throttle. Inside this, they feather
+   *  it — which is the difference between driving out of a corner and spinning
+   *  the wheels out of one. */
+  eases: 18,
   /**
    * Traffic.
    *
@@ -1039,6 +1057,10 @@ export const RIVALS = {
   /** How much they differ from one another in commitment. Someone is always
    *  braver than somebody else, and that is what makes a race. */
   nerve: 0.06,
+  /** How often one of them turns up as a cow or a chicken rather than a
+   *  racing car. A field of livestock every race is a farm; one every few
+   *  races is a surprise, which is what it is for. */
+  beastly: 0.25,
   /** The colours, in the order they are handed out. */
   colours: [0x3f7fd6, 0x49b45a, 0xe0b13c] as const,
 } as const;
