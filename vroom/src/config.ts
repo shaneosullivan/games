@@ -794,13 +794,26 @@ export const PHYSICS = {
   /** Yaw inertia, kg·m². About mass × (L/2)², which is the usual estimate for
    *  a car-shaped thing. */
   inertia: 1100,
-  /** Wheelbase, and how the mass sits between the axles: a shade rearward, as
-   *  a mid-engined car is. */
-  toFront: 1.25,
-  toRear: 1.35,
-  /** Centre of gravity height, which is what makes weight transfer happen at
-   *  all. Low, because this is a single-seater. */
-  cgHeight: 0.4,
+  /**
+   * Wheelbase, and how the mass sits between the axles.
+   *
+   * Well rearward — fifty-eight per cent on the back axle — which is where a
+   * mid-engined single-seater carries it and is most of what keeps the back
+   * end in. Nearer the middle, the load thrown forward under braking took so
+   * much off the rear tyres that any steering at all put the car round.
+   */
+  toFront: 1.5,
+  toRear: 1.1,
+  /**
+   * Centre of gravity height, which is what makes weight transfer happen at
+   * all — and how *much* of it happens.
+   *
+   * Twenty-eight centimetres: a single-seater's driver lies down and its
+   * engine sits behind them on the floor. Every centimetre of it is weight
+   * taken off the back tyres under braking and handed to the front, which is
+   * exactly the transaction that spins a car.
+   */
+  cgHeight: 0.28,
   /**
    * Grip: the coefficient of friction between rubber and dry tarmac.
    *
@@ -809,7 +822,19 @@ export const PHYSICS = {
    * this one number and the weight on each axle, which is why it is the only
    * "handling" number worth tuning.
    */
-  grip: 1.6,
+  grip: 1.85,
+  /**
+   * And how much more of it the back has than the front.
+   *
+   * A single-seater's rear tyres are visibly wider than its fronts, and a
+   * wider tyre is a bigger contact patch is more grip. It is also the whole
+   * difference between a car that understeers when it runs out of road — the
+   * nose washes wide, which anybody can catch by lifting — and one that
+   * oversteers, where the back comes round and keeps coming. At full lock and
+   * a hundred and twenty this car used to spin to a hundred and sixty degrees
+   * of slip, which is to say all the way round, in under two seconds.
+   */
+  rearGrip: 1.14,
   /**
    * Cornering stiffness, as a multiplier on slip angle before saturation.
    *
@@ -829,6 +854,18 @@ export const PHYSICS = {
    */
   drive: 9000,
   brake: 12000,
+  /**
+   * How much of the braking the front wheels do.
+   *
+   * Two thirds, as every real car does it, and for the reason every real car
+   * does it: braking throws the weight forward, so the front has the grip to
+   * use and the rear does not. A rear-biased brake locks the back wheels
+   * first, and a car with locked rear wheels and any steering on turns round —
+   * which is precisely what this one did when it was the other way about. Full
+   * lock and full brakes at a hundred and twenty spun it a hundred and eighty
+   * degrees.
+   */
+  brakeFront: 0.68,
   /**
    * And the engine behind that force, in watts.
    *
@@ -852,16 +889,41 @@ export const PHYSICS = {
    *  hour, which is what it did before. */
   drag: 2.4,
   rollResist: 22,
-  /** How far the front wheels can be turned, how fast they turn, and how much
-   *  of the lock is left at speed — a real rack does not give full lock at a
-   *  hundred, and a stick that asks for it would spin the car every time. */
+  /**
+   * How far the front wheels can be turned, how fast they turn, and how much
+   * of that lock is left at speed.
+   *
+   * A tenth, at the top end, and that is not a difficulty setting. A car doing
+   * thirty-four metres a second cannot corner harder than its tyres allow —
+   * about eighteen metres a second squared — which is a radius of sixty
+   * metres, which is two and a half degrees of steering. Offering thirty-five
+   * degrees at that speed is offering an eight-g corner: the tyres saturate,
+   * the back comes round, and the car spins. Every real rack is speed
+   * sensitive for exactly this reason, and every corner the car can actually
+   * take still has lock to spare — a twenty-two metre bend at twenty metres a
+   * second needs 0.12 radians and has 0.29 available.
+   */
   steerMax: 0.62,
   steerRate: 4.2,
-  steerAtSpeed: 0.36,
+  steerAtSpeed: 0.1,
+  /** How much steering is left while the brakes are on hard. Enough to place
+   *  the car, not enough to swap ends with it. */
+  steerWhileBraking: 0.3,
   /** Below this speed, in m/s, the slip-angle model is nonsense — dividing by
    *  a forward speed of nothing — so the car steers geometrically instead, the
    *  way a shopping trolley does. */
   crawl: 2,
+  /**
+   * Tyre relaxation length, in metres.
+   *
+   * A tyre does not produce its cornering force the instant it is asked: the
+   * tread has to be dragged sideways first, and the force builds over roughly
+   * half a metre of rolling. Modelling it is what stops the car snapping — a
+   * force that arrives instantly makes the back end let go between one frame
+   * and the next, and a slide that starts in a sixtieth of a second is a slide
+   * nobody can catch.
+   */
+  relax: 0.55,
 } as const;
 
 /**
@@ -989,7 +1051,7 @@ export const RIVALS = {
    * the corner is a driver in the gravel. It is roughly the distance it takes
    * to shed the speed.
    */
-  bite: 45,
+  bite: 52,
   /** A margin on top of the braking distance, for reaction and for the corner
    *  being a little tighter than its entry. */
   sees: 40,
@@ -1017,6 +1079,9 @@ export const RIVALS = {
   stalled: 8,
   patience: 1.2,
   backsUp: 0.9,
+  /** How much steering they use while backing out. A quarter: enough to change
+   *  the angle, not enough to swing the car round. */
+  backSteer: 0.25,
   /** How much over the limit is worth lifting for, and how much over means
    *  standing on the brakes. Units a second: a couple of units is a rounding
    *  error and twenty is a corner arriving. */
@@ -1399,6 +1464,35 @@ export const STICKER = {
     },
     {id: "block", name: "Block", family: 'Impact, "Arial Black", sans-serif'},
   ] as ReadonlyArray<{id: string; name: string; family: string}>,
+} as const;
+
+/**
+ * The dust the desert throws up.
+ *
+ * Only there: tarmac in the hills or the city is swept, and a car on it lifts
+ * nothing. On a desert circuit the sand blows across the road all day and the
+ * cars pick it up, which is most of what makes that track feel like a
+ * different place to drive rather than the same track in a different colour.
+ *
+ * Off the back wheels, because that is where a rear-drive car throws it, and
+ * more of it the harder the car is working: fast, or sliding, or both.
+ */
+export const DUST = {
+  /** Paler than the sand it comes off, or it cannot be seen against it. */
+  colour: [0xfbf3e2, 0xf3e7cd, 0xffffff] as ReadonlyArray<number>,
+  /** How many puffs the pool can hold, and how many go up at once. */
+  max: 260,
+  perPuff: 4,
+  /** How often a car leaves one, in seconds, at full chat. */
+  every: 0.05,
+  /** How fast it has to be going before it lifts anything at all. */
+  from: 24,
+  /** How it moves: a slow spread, drifting up and settling. */
+  speed: 5,
+  lift: 7,
+  gravity: 6,
+  lasts: 0.9,
+  size: 4.2,
 } as const;
 
 /**

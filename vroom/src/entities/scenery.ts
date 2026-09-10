@@ -5,7 +5,6 @@ import {Rng} from "../core/rng";
 import {settings} from "../core/quality";
 import {instance, neonSign, plant} from "../models";
 import {building, lamp, litMaterial} from "../models/city";
-import {fadingGlow} from "../render/materials";
 import {NearFade} from "../../../shared/fadeInFront";
 import type {NeonSign} from "../models/neon";
 import {fadingVertex, flatVertex, LAYER, order, tile} from "../render/sprites";
@@ -312,7 +311,11 @@ export class Scenery {
       // The windows dissolve with the walls they are in. Without this a
       // building that got out of the way would leave its lit windows hanging
       // in the air, which is worse than the building was.
-      const {material, fade} = fadingGlow(NEON.emissive * 0.75, "cityWindows");
+      // Painted, not lit. The panes used to be emissive, which put a halo
+      // round every one of them through the bloom pass and threw glow across
+      // the whole skyline; a window a quarter of a mile away is a pale
+      // rectangle, not a lamp. They are the same colours, flat.
+      const {material, fade} = fadingVertex("cityWindows");
       const glass = new THREE.Mesh(mergeGeometries(windows, false), material);
       glass.frustumCulled = false;
       this.group.add(glass);

@@ -80,7 +80,10 @@ export function building(
 
   const panes: Array<THREE.BufferGeometry> = [];
   const step = NEON.windowGap;
-  const colours = [0xffd9a0, 0xcfe4ff, 0xfff2cc, 0x9fd8ff];
+  // Warm and cold panes, at the brightness a window has from across a city
+  // rather than the brightness a lamp has. Nothing here is emissive: see the
+  // note where the mesh is built.
+  const colours = [0xb99a63, 0x8ba0b8, 0xc2b58a, 0x6f93a8];
 
   // Up all four faces. The two along Z and the two along X are the same grid
   // turned a quarter turn, which is why this is a loop over sides rather than

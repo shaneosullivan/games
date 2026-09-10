@@ -267,7 +267,13 @@ export class Rivals {
       // wedged stayed wedged for the rest of the race, wheels spinning.
       if (this.reversing[i] > 0) {
         this.reversing[i] -= dt;
-        this.drive.steer = -Math.max(-1, Math.min(1, wheel / PHYSICS.steerMax));
+        // Straight back, near enough. Backing out on opposite lock swings the
+        // car about like a boat and it arrives pointing somewhere new every
+        // time; a nudge of steering is all it takes to unwedge, and it leaves
+        // the car facing roughly where it was.
+        this.drive.steer =
+          -RIVALS.backSteer *
+          Math.max(-1, Math.min(1, wheel / PHYSICS.steerMax));
         this.drive.throttle = -1;
         car.update(dt, this.drive, track, patches);
         car.keepIn(track, dt);

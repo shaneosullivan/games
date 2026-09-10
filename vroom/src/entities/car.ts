@@ -91,6 +91,10 @@ export class Car {
   /** Last step's forward acceleration, in m/s², which is what moves the weight
    *  fore and aft. */
   private lastPush = 0;
+  /** The lateral force each axle is actually making, which lags what the slip
+   *  angle asks for; see `PHYSICS.relax`. */
+  private fyFront = 0;
+  private fyRear = 0;
   private prevHeading = 0;
 
   /** How fast it is going sideways. The skid marks and the tyre noise both
@@ -241,6 +245,8 @@ export class Car {
     this.yawRate = 0;
     this.steer = 0;
     this.lastPush = 0;
+    this.fyFront = 0;
+    this.fyRear = 0;
     this.slip = 0;
     this.hint = hint;
     this.lap = lap;
@@ -462,6 +468,12 @@ export class Car {
           (this.dir.x * drive.aim.x + this.dir.y * drive.aim.y) / push;
         if (facing < -0.2) {
           braking = push;
+          // Pulling the stick back means stop, not turn round. It used to mean
+          // both — the stick was behind the car, so the steering was wound to
+          // full lock as well, and full lock plus full brakes at a hundred and
+          // twenty puts any car on its roof-side. What is left is enough to
+          // steer *while* stopping and nowhere near enough to spin.
+          wantSteer *= PHYSICS.steerWhileBraking;
         } else {
           throttle = push;
         }
@@ -501,7 +513,7 @@ export class Car {
       const loadFront = Math.max(0, (c / L) * M * g - shift);
       const loadRear = Math.max(0, (b / L) * M * g + shift);
       const muFront = PHYSICS.grip * gripFront;
-      const muRear = PHYSICS.grip * gripRear;
+      const muRear = PHYSICS.grip * PHYSICS.rearGrip * gripRear;
 
       // Slip angles: where each axle points against where it is going. The
       // guard on the forward speed is not a fudge — the arithmetic genuinely
@@ -524,13 +536,23 @@ export class Car {
       // nothing in the friction circle for the engine — a car nudged sideways
       // at walking pace sat there with the wheels spinning and could not move.
       const bite = Math.min(1, speed / PHYSICS.crawl);
-      let fyFront =
+      const wantFront =
         -clamp(PHYSICS.stiffFront * slipFront, -1, 1) *
         muFront *
         loadFront *
         bite;
-      let fyRear =
+      const wantRear =
         -clamp(PHYSICS.stiffRear * slipRear, -1, 1) * muRear * loadRear * bite;
+
+      // Relaxation: the force follows what the slip angle asks for over about
+      // half a metre of rolling rather than arriving whole. See PHYSICS.relax
+      // — this is the difference between a back end that lets go and one that
+      // starts to let go.
+      const catchUp = 1 - Math.exp(-(speed * dt) / PHYSICS.relax);
+      this.fyFront += (wantFront - this.fyFront) * catchUp;
+      this.fyRear += (wantRear - this.fyRear) * catchUp;
+      let fyFront = this.fyFront;
+      let fyRear = this.fyRear;
 
       // Longitudinal. Drive at the rear, brakes at both ends, and the two
       // resistances that decide the top speed between them.
@@ -551,9 +573,24 @@ export class Car {
 
       // The friction circle. An axle has one budget of grip and spends it on
       // whatever is asked of it first — so a rear tyre already at full
-      // throttle has nothing left to hold the back end in, which is a
-      // power slide, and one under full braking cannot also turn.
-      [fxRear, fyRear] = circle(fxRear, fyRear, muRear * loadRear);
+      // throttle has nothing left to hold the back end in, which is a power
+      // slide, and one under full braking cannot also turn.
+      //
+      // Except at the back under braking, where the *lateral* force is served
+      // first and the brake gets what is left. That is not a cheat; it is what
+      // every car built in the last thirty years does, and what the valve
+      // before that did: rear brake pressure is given up to keep the back end
+      // stable, because a rear axle that locks while the car is turning puts
+      // the car round. Without it, full brakes and full lock at a hundred and
+      // twenty spun it a hundred and eighty degrees every time.
+      const rearGrip = muRear * loadRear;
+      if (fxRear < 0) {
+        fyRear = clamp(fyRear, -rearGrip, rearGrip);
+        const spare = Math.sqrt(Math.max(0, rearGrip ** 2 - fyRear ** 2));
+        fxRear = Math.max(fxRear, -spare);
+      } else {
+        [fxRear, fyRear] = circle(fxRear, fyRear, rearGrip);
+      }
       [fxFront, fyFront] = circle(fxFront, fyFront, muFront * loadFront);
 
       const resist =

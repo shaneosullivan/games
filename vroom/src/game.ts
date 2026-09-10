@@ -2,6 +2,7 @@ import * as THREE from "three";
 import {
   BUMP,
   CAMERA,
+  DUST,
   ITEM,
   TRAIL,
   CAR,
@@ -17,6 +18,7 @@ import {Patches} from "./entities/patches";
 import {Bridges} from "./entities/bridges";
 import {Tyres} from "./entities/tyres";
 import {Stands} from "./entities/stands";
+import {ParticleBurst} from "../../shared/particles";
 import {beginWatching, sawFrame} from "./core/quality";
 import {carColour, myDesign, myKit, myShape} from "./core/garage";
 import {myStickers} from "./core/stickers";
@@ -64,6 +66,9 @@ export class Game {
   /** Oil and mud tracked out of a patch, in their own pool: they last ten
    *  seconds where rubber lasts seven, and they are not black. */
   trails!: Skids;
+  /** The desert's dust, off the back wheels. Nothing anywhere else. */
+  private dust: ParticleBurst | null = null;
+  private dustIn = 0;
   patches!: Patches;
   bridges!: Bridges;
   tyres!: Tyres;
@@ -245,6 +250,8 @@ export class Game {
     this.rivals = new Rivals(this.track);
     this.skids = new Skids(palette);
     this.trails = new Skids(palette, TRAIL.max);
+    this.dust =
+      spec.environment === "desert" ? new ParticleBurst(DUST.max, 1.2) : null;
     this.patches = new Patches(this.track, spec.items);
     this.bridges = new Bridges(this.track, palette);
     this.tyres = new Tyres(rng, this.track, palette);
@@ -264,6 +271,10 @@ export class Game {
     this.stage.scene.add(this.patches.group);
     this.stage.scene.add(this.skids.mesh);
     this.stage.scene.add(this.trails.mesh);
+    if (this.dust) {
+      this.dust.mesh.frustumCulled = false;
+      this.stage.scene.add(this.dust.mesh);
+    }
     this.stage.scene.add(this.rivals.group);
     this.stage.scene.add(this.car.group);
     // Last, and drawn over everything: where the circuit runs over itself, the
@@ -420,6 +431,8 @@ export class Game {
     this.layTrails(dt);
     this.skids.update(dt);
     this.trails.update(dt);
+    this.dust?.update(dt);
+    this.kickDust(dt);
     this.lapCount();
     this.engine.update(dt, this.car.speed, this.car.slip, CAR.top);
     this.hud.update(
@@ -604,6 +617,49 @@ export class Game {
           ITEM[kind].colour,
           TRAIL.life,
         );
+      }
+    }
+  }
+
+  /**
+   * Dust off the back wheels, in the desert.
+   *
+   * Every car, and only while it is actually working: over a walking pace, and
+   * more of it the faster it is going or the more it is sliding. A puff is
+   * thrown up and outward and settles, which is what dust does — it is not
+   * smoke and it does not billow.
+   */
+  private kickDust(dt: number): void {
+    if (!this.dust) {
+      return;
+    }
+    this.dustIn -= dt;
+    if (this.dustIn > 0) {
+      return;
+    }
+    this.dustIn = DUST.every;
+    for (const car of [this.car, ...this.rivals.cars]) {
+      if (car.height > 0.2 || car.speed < DUST.from) {
+        continue;
+      }
+      const working = Math.min(
+        1,
+        (car.speed - DUST.from) / CAR.top + car.slip / CAR.skidAt,
+      );
+      car.corners(this.corners);
+      // The back two only.
+      for (const w of [this.corners[2], this.corners[3]]) {
+        this.here.set(w.x, 1.4, w.y);
+        this.dust.burst(this.here, {
+          color: DUST.colour,
+          count: Math.max(1, Math.round(DUST.perPuff * working)),
+          speed: DUST.speed,
+          lift: DUST.lift,
+          gravity: DUST.gravity,
+          ttl: DUST.lasts,
+          size: DUST.size,
+          spherical: 0.6,
+        });
       }
     }
   }
