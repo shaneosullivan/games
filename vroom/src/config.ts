@@ -1070,13 +1070,20 @@ export const STICKER = {
   hueBetween: [0.16, 0.84] as ReadonlyArray<number>,
   neutral: 0.1,
   /**
-   * Which way a clashing picture moves: darker, unless the car itself is dark.
+   * What happens when a picture lands on a car its own colour.
    *
-   * Darker keeps the colour. Lighter turns a red heart into a pink one and a
-   * gold star into cream — readable, and pastel, which is the opposite of what
-   * a sticker is for. Only a car too dark to go under pushes them up instead.
+   * It keeps its colour and gets a thin line round it. That was not the first
+   * answer — the first answer moved the colour until it stood out, which meant
+   * a gold star on a gold car came out bronze and a white skull on a white car
+   * came out grey. Both read, and both were the wrong picture: a star is gold.
+   * A line round the outside costs a fraction of a unit and leaves the star
+   * gold, which is what a printed sticker does on a matching background.
+   *
+   * `border` is its width in world units — thin, at the scale of a car sixteen
+   * units long — and the line is dark on a pale car and pale on a dark one.
    */
-  darkAt: 0.4,
+  border: 0.17,
+  borderDark: 0.5,
   /** How far apart the layers of one picture are stacked. Enough that the eyes
    *  of a smiley never flicker through its face, small enough to be paint. */
   layer: 0.05,

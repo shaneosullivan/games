@@ -239,17 +239,62 @@ function picture(
     return null;
   }
   const group = new THREE.Group();
-  build().forEach((layer, i) => {
-    const flat = new THREE.ShapeGeometry(layer.shapes, STICKER.curve);
-    flat.scale(sticker.size, sticker.size, 1);
+  const layers = build();
+  const across = acrossOf(sticker, W);
+
+  // A line round the outside, but only when the picture would otherwise be
+  // lost: the same silhouette, drawn a fraction bigger and underneath. Blown
+  // up about its own middle rather than properly offset, which is not the same
+  // thing — the line is a little fatter at the points of a star than in its
+  // waist — and at a sixth of a unit on a sixteen-unit car, that is a
+  // difference nobody has ever seen.
+  const lay = (
+    shapes: Array<THREE.Shape>,
+    colour: number,
+    step: number,
+  ): void => {
+    const flat = new THREE.ShapeGeometry(shapes, STICKER.curve);
+    const grow = step < 0 ? 1 + STICKER.border / sticker.size : 1;
+    flat.scale(sticker.size * grow, sticker.size * grow, 1);
     // Drawn lying down: what was up the page is along the car, nose forward.
     flat.rotateX(-Math.PI / 2);
-    flat.translate(acrossOf(sticker, W), i * STICKER.layer, sticker.v * L);
+    flat.translate(across, step * STICKER.layer, sticker.v * L);
     const on = dropOnDeck(flat, L, W, STICKER.lift);
-    group.add(new THREE.Mesh(on, paint(inkFor(layer.colour, paintwork))));
+    group.add(new THREE.Mesh(on, paint(colour)));
     flat.dispose();
-  });
+  };
+
+  const body = layers[0];
+  if (body && tooLike(inkFor(body.colour), paintwork)) {
+    lay(body.shapes, edging(paintwork), -1);
+  }
+  layers.forEach((layer, i) => lay(layer.shapes, inkFor(layer.colour), i));
   return group;
+}
+
+/** The line's colour: dark on a pale car, pale on a dark one. */
+function edging(paintwork: number): number {
+  const paint = {h: 0, s: 0, l: 0};
+  new THREE.Color(paintwork).getHSL(paint, THREE.SRGBColorSpace);
+  return paint.l > STICKER.borderDark ? INK.dark : INK.white;
+}
+
+/**
+ * Whether a picture would be lost on this car: near it in hue and near it in
+ * lightness. A colour with no hue to speak of — the bone of a skull, the white
+ * of a flag — is judged on lightness alone, since white on white is invisible
+ * whatever the hues claim.
+ */
+function tooLike(colour: number, paintwork: number): boolean {
+  const ink = {h: 0, s: 0, l: 0};
+  const paint = {h: 0, s: 0, l: 0};
+  new THREE.Color(colour).getHSL(ink, THREE.SRGBColorSpace);
+  new THREE.Color(paintwork).getHSL(paint, THREE.SRGBColorSpace);
+  const apart = Math.abs(ink.h - paint.h);
+  const hueGap = Math.min(apart, 1 - apart);
+  const hueless = ink.s < STICKER.hasHue || paint.s < STICKER.hasHue;
+  const sameish = hueless || hueGap < STICKER.hueApart;
+  return sameish && Math.abs(ink.l - paint.l) < STICKER.lightApart;
 }
 
 /**
@@ -349,25 +394,20 @@ export function alongFlank(v: number): number {
 }
 
 /**
- * A picture's colour: turned up, and never the car's own.
+ * A picture's colour, turned up.
  *
- * Two jobs in one pass, because they pull against each other. Saturation goes
- * to the top — a sticker is printed ink, and printed ink is louder than paint
- * — and then, if what comes out is close to the car in both hue and lightness,
- * the lightness is pushed apart until it reads. A red heart on a red car is a
- * dent rather than a decoration.
+ * Saturation goes to the top and nothing else moves: a sticker is printed ink,
+ * and printed ink is louder than paint. What it is *not* allowed to do is
+ * change to suit the car — a star is gold on every car there is, and a gold
+ * one on a gold car gets a line round it instead. See `STICKER.border`.
  *
- * The hue is never touched. A heart that solved the problem by turning blue
- * would have solved the wrong problem. Colours with no hue to speak of — the
- * bone of a skull, the black of a flag pole — take the lightness rule against
- * any car at all, since white on white is invisible whatever the hues say.
+ * A colour too pale or too dark has no hue worth winding out, whatever its
+ * saturation claims: bone white is a hair off yellow, and turning that up
+ * gives a gold skull. Those are held near neutral.
  */
-function inkFor(colour: number, paintwork: number): number {
+function inkFor(colour: number): number {
   const ink = {h: 0, s: 0, l: 0};
-  const paint = {h: 0, s: 0, l: 0};
   new THREE.Color(colour).getHSL(ink, THREE.SRGBColorSpace);
-  new THREE.Color(paintwork).getHSL(paint, THREE.SRGBColorSpace);
-
   const coloured =
     ink.s >= STICKER.hasHue &&
     ink.l > STICKER.hueBetween[0] &&
@@ -375,21 +415,8 @@ function inkFor(colour: number, paintwork: number): number {
   const s = coloured
     ? Math.max(ink.s, STICKER.vivid)
     : Math.min(ink.s, STICKER.neutral);
-
-  const apart = Math.abs(ink.h - paint.h);
-  const hueGap = Math.min(apart, 1 - apart);
-  const sameish =
-    !coloured || paint.s < STICKER.hasHue || hueGap < STICKER.hueApart;
-  let l = ink.l;
-  if (sameish && Math.abs(l - paint.l) < STICKER.lightApart) {
-    // Away from the car, in whichever direction there is room for.
-    l =
-      paint.l < STICKER.darkAt
-        ? Math.min(0.96, paint.l + STICKER.lightApart)
-        : Math.max(0.06, paint.l - STICKER.lightApart);
-  }
   return new THREE.Color()
-    .setHSL(ink.h, s, l, THREE.SRGBColorSpace)
+    .setHSL(ink.h, s, ink.l, THREE.SRGBColorSpace)
     .getHex(THREE.SRGBColorSpace);
 }
 

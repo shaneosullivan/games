@@ -155,6 +155,13 @@ export class Scenery {
     }
   }
 
+  /** Whether a spot is off every part of the circuit, not merely off the part
+   *  it was measured from. The search is the whole lap: see `place` above,
+   *  which learned the same lesson about a wood on the back straight. */
+  private clear(track: Track, x: number, z: number): boolean {
+    return Math.abs(track.nearest(x, z, 0, 100000).offset) > Track.limit;
+  }
+
   /**
    * Lamps down both sides of the road, evenly spaced.
    *
@@ -176,7 +183,22 @@ export class Scenery {
       const t = i / many;
       track.pointAt(t, p);
       track.sideAt(t, s);
-      const side = i % 2 === 0 ? 1 : -1;
+
+      // Alternating sides — but not blindly. A street circuit doubles back on
+      // itself, and a lamp set safely beyond the kerb of one straight can be
+      // standing in the middle of the next one; there was one planted on the
+      // road at the chicane of the city track. So the spot is checked against
+      // the whole circuit, the other side is tried if it fails, and if both
+      // are on tarmac the lamp is simply not there. A gap in a row of lights
+      // is a street. A lamp post in the fast lane is not.
+      const sides = i % 2 === 0 ? [1, -1] : [-1, 1];
+      const side = sides.find(way =>
+        this.clear(track, p.x + s.x * off * way, p.z + s.z * off * way),
+      );
+      if (side === undefined) {
+        continue;
+      }
+
       const x = p.x + s.x * off * side;
       const z = p.z + s.z * off * side;
       // The arm reaches over the road, so the post is turned to face it.
