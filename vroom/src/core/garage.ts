@@ -1,5 +1,13 @@
 import * as THREE from "three";
-import {CarDesign, DRIVER, DriverKit, Environment, PLAYER} from "../config";
+import {
+  CarDesign,
+  CarShape,
+  DRIVER,
+  DriverKit,
+  Environment,
+  PLAYER,
+  SHAPES,
+} from "../config";
 
 /**
  * Which car is yours.
@@ -10,6 +18,7 @@ import {CarDesign, DRIVER, DriverKit, Environment, PLAYER} from "../config";
 const KEY = "vroom.car.v1";
 const DESIGN_KEY = "vroom.car.design.v1";
 const KIT_KEY = "vroom.driver.v1";
+const SHAPE_KEY = "vroom.car.shape.v1";
 
 export function myColour(): number {
   try {
@@ -110,6 +119,29 @@ export function myKit(): DriverKit {
 export function chooseKit(kit: DriverKit): void {
   try {
     window.localStorage.setItem(KIT_KEY, JSON.stringify(kit));
+  } catch {
+    // As above.
+  }
+}
+
+/** What you race. A save from before there was a choice opens in the racing
+ *  car, which is what it was. */
+export function myShape(): CarShape {
+  try {
+    const saved = window.localStorage.getItem(SHAPE_KEY);
+    const known = SHAPES.find(s => s.id === saved);
+    if (known) {
+      return known.id;
+    }
+  } catch {
+    // A blocked store just means everybody drives the single-seater.
+  }
+  return "racer";
+}
+
+export function chooseShape(shape: CarShape): void {
+  try {
+    window.localStorage.setItem(SHAPE_KEY, shape);
   } catch {
     // As above.
   }

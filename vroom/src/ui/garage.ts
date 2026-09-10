@@ -3,11 +3,13 @@ import {RoomEnvironment} from "three/examples/jsm/environments/RoomEnvironment.j
 import {
   CAR,
   CarDesign,
+  CarShape,
   DRIVER,
   DriverKit,
   FILM,
   LIGHT,
   PLAYER,
+  SHAPES,
   Sticker,
   STICKER,
   StickerKind,
@@ -16,9 +18,11 @@ import {
   chooseColour,
   chooseDesign,
   chooseKit,
+  chooseShape,
   myColour,
   myDesign,
   myKit,
+  myShape,
 } from "../core/garage";
 import {keepStickers, myStickers} from "../core/stickers";
 import {car, stick} from "../models/car";
@@ -69,6 +73,7 @@ export class Garage {
   /** The two halves of the controls, and the line under them. */
   private readonly carSide = document.createElement("div");
   private readonly driverSide = document.createElement("div");
+  private readonly shapeSide = document.createElement("div");
   private readonly says = document.createElement("p");
 
   /** The bar that appears when a sticker is picked, and the parts of it that
@@ -82,8 +87,10 @@ export class Garage {
   private design: CarDesign = myDesign();
   private stickers: Array<Sticker> = myStickers();
   private kit: DriverKit = myKit();
-  /** Which half of the garage is open: the car, or the person in it. */
-  private showing: "car" | "driver" = "car";
+  private shape: CarShape = myShape();
+  /** Which part of the garage is open: what you race, how it is painted, or
+   *  the person riding it. */
+  private showing: "shape" | "car" | "driver" = "car";
   private chosen: number | null = null;
   private wide = 0;
   private tall = 0;
@@ -210,6 +217,8 @@ export class Garage {
 
     this.says.className = "garage-says";
 
+    this.shapeSide.className = "garage-half";
+    this.shapeSide.appendChild(this.shapeRow());
     this.carSide.className = "garage-half";
     this.carSide.append(swatches, designs, this.stickerRow(), this.chosenRow());
     this.driverSide.className = "garage-half";
@@ -223,7 +232,7 @@ export class Garage {
     // them — see `.garage-view` in the stylesheet.
     const controls = document.createElement("div");
     controls.className = "garage-controls";
-    controls.append(this.carSide, this.driverSide, this.says);
+    controls.append(this.shapeSide, this.carSide, this.driverSide, this.says);
     this.root.append(...(bar ? [bar] : []), this.tabs(), this.view, controls);
 
     this.markChosen();
@@ -242,8 +251,9 @@ export class Garage {
     const row = document.createElement("div");
     row.className = "garage-tabs";
     for (const [id, label] of [
-      ["car", "🚗 The car"],
-      ["driver", "🧑 The driver"],
+      ["shape", "🏎️ What you race"],
+      ["car", "🎨 The paint"],
+      ["driver", "🧑 The rider"],
     ] as Array<[typeof this.showing, string]>) {
       const tab = document.createElement("button");
       tab.type = "button";
@@ -255,6 +265,38 @@ export class Garage {
         this.markChosen();
       });
       row.appendChild(tab);
+    }
+    return row;
+  }
+
+  /**
+   * What you race: the single-seater, a cow, or a chicken.
+   *
+   * Big buttons with the animal on them rather than a picture of the model,
+   * because a child picking a chicken knows what a chicken is and does not
+   * need a rendering of one to find it.
+   */
+  private shapeRow(): HTMLElement {
+    const row = document.createElement("div");
+    row.className = "shapes";
+    for (const choice of SHAPES) {
+      const pick = document.createElement("button");
+      pick.type = "button";
+      pick.className = "shape";
+      pick.dataset.shape = choice.id;
+      const face = document.createElement("span");
+      face.className = "shape-face";
+      face.textContent = choice.emoji;
+      const name = document.createElement("span");
+      name.textContent = choice.name;
+      pick.append(face, name);
+      pick.addEventListener("click", () => {
+        this.shape = choice.id;
+        chooseShape(choice.id);
+        this.paint();
+        this.markChosen();
+      });
+      row.appendChild(pick);
     }
     return row;
   }
@@ -472,14 +514,30 @@ export class Garage {
     for (const tab of this.root.querySelectorAll<HTMLElement>(".garage-tab")) {
       tab.classList.toggle("on", tab.dataset.side === this.showing);
     }
+    for (const pick of this.root.querySelectorAll<HTMLElement>(".shape")) {
+      pick.classList.toggle("on", pick.dataset.shape === this.shape);
+    }
+    this.shapeSide.hidden = this.showing !== "shape";
     this.carSide.hidden = this.showing !== "car";
     this.driverSide.hidden = this.showing !== "driver";
+    // A cow takes the paint and nothing else: the designs and the stickers go
+    // on the deck of a single-seater, and there is no deck on a chicken.
+    const plain = this.shape !== "racer";
+    for (const row of this.carSide.children) {
+      if (row.className !== "swatches") {
+        (row as HTMLElement).hidden = plain;
+      }
+    }
     this.says.textContent =
-      this.showing === "driver"
-        ? "Your driver. Pick a helmet and overalls."
-        : this.embedded
-          ? "Your car. Drag a sticker to move it."
-          : "Tap something to add it, then drag it around the car.";
+      this.showing === "shape"
+        ? "What you race. The paint and the rider come with you."
+        : this.showing === "driver"
+          ? "Your rider. Pick a helmet and overalls."
+          : plain
+            ? "Pick a colour."
+            : this.embedded
+              ? "Your car. Drag a sticker to move it."
+              : "Tap something to add it, then drag it around the car.";
     for (const pick of this.root.querySelectorAll<HTMLElement>(".design")) {
       pick.classList.toggle("on", pick.dataset.design === this.design);
     }
@@ -499,7 +557,13 @@ export class Garage {
     if (this.model) {
       this.stage.remove(this.model);
     }
-    this.model = car(this.colour, this.design, this.stickers, this.kit);
+    this.model = car(
+      this.colour,
+      this.design,
+      this.stickers,
+      this.kit,
+      this.shape,
+    );
     this.stage.add(this.model);
     this.glow();
   }

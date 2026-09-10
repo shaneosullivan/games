@@ -957,13 +957,14 @@ canvas {
 
 .garage-tab {
   flex: 1 1 0;
-  padding: 14px 8px;
+  min-width: 0;
+  padding: 13px 6px;
   border-radius: 18px;
   border: 3px solid rgba(255, 255, 255, 0.22);
   background: rgba(255, 255, 255, 0.08);
   color: inherit;
   font: inherit;
-  font-size: 19px;
+  font-size: 16px;
   font-weight: 800;
   cursor: pointer;
   touch-action: manipulation;
@@ -979,8 +980,8 @@ canvas {
 }
 
 .garage-panel .garage-tab {
-  padding: 10px 6px;
-  font-size: 16px;
+  padding: 9px 4px;
+  font-size: 13px;
   border-color: rgba(29, 36, 48, 0.18);
   background: rgba(29, 36, 48, 0.06);
 }
@@ -988,6 +989,73 @@ canvas {
 .garage-panel .garage-tab.on {
   border-color: var(--ink);
   background: rgba(29, 36, 48, 0.16);
+}
+
+/* `hidden` has to win. Half the rows in here are `display: flex`, and a
+   display rule beats the browser's own [hidden] { display: none } — so the
+   design and sticker rows stayed on screen for a cow, which has no deck to
+   put a sticker on. */
+[hidden] {
+  display: none !important;
+}
+
+/* What you race. Big buttons with the animal on them: a child picking a
+   chicken knows what a chicken is. */
+.shapes {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  padding: 14px 16px 0;
+}
+
+.shape {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-width: 104px;
+  padding: 12px 14px;
+  border-radius: 18px;
+  border: 3px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.08);
+  color: inherit;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.shape-face {
+  font-size: 34px;
+  line-height: 1.1;
+}
+
+.shape.on {
+  border-color: #fff;
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.shape:active {
+  transform: scale(0.97);
+}
+
+.garage-panel .shape {
+  min-width: 84px;
+  padding: 9px 10px;
+  font-size: 13px;
+  border-color: rgba(29, 36, 48, 0.18);
+  background: rgba(29, 36, 48, 0.06);
+}
+
+.garage-panel .shape-face {
+  font-size: 26px;
+}
+
+.garage-panel .shape.on {
+  border-color: var(--ink);
+  background: rgba(29, 36, 48, 0.14);
 }
 
 /* One part of the driver's kit: what it is, and the colours it can be. */

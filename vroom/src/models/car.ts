@@ -1,6 +1,15 @@
 import * as THREE from "three";
 import {ConvexGeometry} from "three/examples/jsm/geometries/ConvexGeometry.js";
-import {CAR, CarDesign, DRIVER, DriverKit, PLAYER, Sticker} from "../config";
+import {
+  CAR,
+  CarDesign,
+  CarShape,
+  DRIVER,
+  DriverKit,
+  PLAYER,
+  Sticker,
+} from "../config";
+import {beast} from "./beasts";
 import {COVER, NOSE, onDeck, STATIONS} from "./deck";
 import {stickerMesh} from "./stickers";
 import {Assembly, DETAIL, rounded} from "./assembly";
@@ -32,7 +41,15 @@ export function car(
   design: CarDesign = "plain",
   stickers: ReadonlyArray<Sticker> = [],
   kit?: DriverKit,
+  shape: CarShape = "racer",
 ): THREE.Group {
+  // The two that are not cars are their own model from the ground up. They
+  // take the paint and the rider's kit and nothing else: a design and a set of
+  // stickers are laid on the deck of a single-seater, and a chequered flag
+  // wrapped over a cow is not a livery.
+  if (shape !== "racer") {
+    return beast(shape, colour, kit);
+  }
   const a = new Assembly();
   const L = CAR.length;
   const W = CAR.width;
@@ -262,12 +279,28 @@ export function driver(
   wheel.translate(0, floor + 1.08, seat + L * 0.145);
   a.add(wheel, "chrome", 0x24262c);
 
-  // The helmet: a shell, a dark visor across the front of it, and a crest over
-  // the top in the car's colour.
+  helmetOn(a, 0, floor + 2.5, seat - L * 0.005, helmet);
+}
+
+/**
+ * A helmet, wherever somebody's head is.
+ *
+ * A shell and a dark visor across the front of it. Out here rather than inside
+ * `driver` because a rider on a cow wears one too, and two copies of a visor's
+ * arithmetic is one copy too many — see the note on the angle below, which is
+ * the part that was wrong for a while.
+ */
+export function helmetOn(
+  a: Assembly,
+  x: number,
+  y: number,
+  z: number,
+  colour: number,
+): void {
   const shell = new THREE.SphereGeometry(1.3, DETAIL.round, DETAIL.round);
   shell.scale(1, 1.06, 1.02);
-  shell.translate(0, floor + 2.5, seat - L * 0.005);
-  a.add(shell, "bodywork", helmet);
+  shell.translate(x, y, z);
+  a.add(shell, "bodywork", colour);
 
   const visor = new THREE.SphereGeometry(
     1.33,
@@ -286,12 +319,8 @@ export function driver(
     Math.PI * 0.28,
   );
   visor.scale(1, 1.06, 1.02);
-  visor.translate(0, floor + 2.5, seat - L * 0.005);
+  visor.translate(x, y, z);
   a.add(visor, "glass", 0x0b0d13);
-
-  // No crest. It was a bar across the top of the helmet in the car's colour,
-  // and at this size it did not read as a stripe on a helmet — it read as a
-  // coloured thing stuck to one. A plain round helmet is a helmet.
 }
 
 /** Front and rear wings, with their endplates and stays. */
@@ -320,7 +349,9 @@ function wings(a: Assembly, colour: number, L: number, W: number): void {
 }
 
 /** One wheel: a tyre, a rim and spokes, and a disc behind them. */
-function wheel(a: Assembly, x: number, z: number, front: boolean): void {
+/** One wheel, shared with the beasts — a cow on wheels is still a car, and it
+ *  should be on the same wheels as everything else on the grid. */
+export function wheel(a: Assembly, x: number, z: number, front: boolean): void {
   const radius = front ? 2.6 : 3.0;
   const width = front ? 1.9 : 2.3;
 

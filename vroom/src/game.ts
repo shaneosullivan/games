@@ -18,7 +18,7 @@ import {Bridges} from "./entities/bridges";
 import {Tyres} from "./entities/tyres";
 import {Stands} from "./entities/stands";
 import {beginWatching, sawFrame} from "./core/quality";
-import {carColour, myDesign, myKit} from "./core/garage";
+import {carColour, myDesign, myKit, myShape} from "./core/garage";
 import {myStickers} from "./core/stickers";
 import {LOADING, SIM} from "./config";
 import {MiniMap} from "./ui/minimap";
@@ -240,6 +240,7 @@ export class Game {
       myDesign(),
       myStickers(),
       myKit(),
+      myShape(),
     );
     this.rivals = new Rivals(this.track);
     this.skids = new Skids(palette);

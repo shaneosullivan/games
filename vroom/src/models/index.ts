@@ -3,12 +3,14 @@ import {CAR, ENVIRONMENTS, Environment, Palette, TRACK} from "../config";
 import {Rng} from "../core/rng";
 import {material as materialFor} from "../render/materials";
 import {Assembly} from "./assembly";
+import {beast} from "./beasts";
 import {car, driver} from "./car";
 import {plant} from "./flora";
 import {neonSign} from "./neon";
 import {barrier, cone, gantry, ramp, tyreStack} from "./props";
 import {spectator, stand} from "./stand";
 
+export {beast} from "./beasts";
 export {car, driver} from "./car";
 export {plant} from "./flora";
 export {neonSign} from "./neon";
@@ -46,6 +48,18 @@ export const MODELS: Array<ModelEntry> = [
     name: "Rival car",
     size: 22,
     make: () => car(0x3f7fd6),
+  },
+  {
+    id: "car-cow",
+    name: "Cow car",
+    size: 26,
+    make: () => beast("cow", 0xd6473c),
+  },
+  {
+    id: "car-chicken",
+    name: "Chicken car",
+    size: 26,
+    make: () => beast("chicken", 0xe0b13c),
   },
   {
     id: "driver",

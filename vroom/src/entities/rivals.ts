@@ -56,20 +56,28 @@ export class Rivals {
     // Both versions of the player's colour are spoken for, whichever track
     // this is: under the neon they drive the turned-up one, and a rival in the
     // daylight version of it is the same car from the height the camera sits.
+    // Shuffled rather than taken in order, so the field is a different three
+    // cars every race. A child who has raced the same blue, green and yellow
+    // car forty times is racing a screensaver.
     const used = new Set<number>([myColour(), neonised(myColour())]);
-    const nextColour = (): number => {
-      for (const c of [...RIVALS.colours, ...PLAYER.choices]) {
-        if (!used.has(c)) {
-          used.add(c);
-          return c;
-        }
-      }
-      return RIVALS.colours[0];
-    };
+    const pool = [...RIVALS.colours, ...PLAYER.choices].filter(
+      c => !used.has(c),
+    );
+    for (let i = pool.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [pool[i], pool[j]] = [pool[j], pool[i]];
+    }
+    const nextColour = (): number => pool.pop() ?? RIVALS.colours[0];
+
     for (let i = 0; i < RIVALS.count; i++) {
       const colour = nextColour();
       this.colours.push(colour);
-      const car = new Car(colour);
+      // And something painted on it, chosen the same way. The player's own
+      // stickers stay the player's: a rival with a crown on its nose would be
+      // wearing something a child had made.
+      const design =
+        PLAYER.designs[Math.floor(Math.random() * PLAYER.designs.length)].id;
+      const car = new Car(colour, design);
       // Left, right, left: a grid, not a queue.
       const off = (i % 2 === 0 ? 1 : -1) * RIVALS.offset;
       const t = wrap(track.startAt - 0.006 - i * RIVALS.gridGap);

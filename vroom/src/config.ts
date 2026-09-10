@@ -919,6 +919,24 @@ export const RIVALS = {
   colours: [0x3f7fd6, 0x49b45a, 0xe0b13c] as const,
 } as const;
 
+/** What you race: the single-seater, or one of the two that are not cars. */
+export type CarShape = "racer" | "cow" | "chicken";
+
+/**
+ * The shapes on offer, in the order they are shown.
+ *
+ * A cow and a chicken are the same size as the racing car and run on the same
+ * wheels — they have to, or they would be racing a different game — and the
+ * paint and the driver's kit carry across. What does not carry across is the
+ * designs and the stickers: those are laid on the deck of a single-seater, and
+ * a chequered flag wrapped over a cow is not a livery, it is an accident.
+ */
+export const SHAPES = [
+  {id: "racer", name: "Racing car", emoji: "🏎️"},
+  {id: "cow", name: "Cow", emoji: "🐮"},
+  {id: "chicken", name: "Chicken", emoji: "🐔"},
+] as ReadonlyArray<{id: CarShape; name: string; emoji: string}>;
+
 /** What can be painted on a car on top of its colour. */
 export type CarDesign = "plain" | "checkers" | "stripes";
 
