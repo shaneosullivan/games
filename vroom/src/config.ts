@@ -655,6 +655,17 @@ export const TRACK = {
    *  that a corner is a curve rather than a polygon. */
   segments: 900,
   /**
+   * How many of those segments one stripe of kerb — or of barrier — covers.
+   *
+   * One number for both, because they are stacked one above the other and the
+   * eye reads them as one edge. Two rhythms meant a red kerb block with half a
+   * red barrier and half a white one over it, which looks like a mistake at
+   * every corner. A hundred and fifty blocks to the lap, and 900 divides by it
+   * evenly, so the pattern closes at the start line instead of leaving two of
+   * the same colour side by side.
+   */
+  stripe: 6,
+  /**
    * The corners.
    *
    * Hand-placed rather than generated. A circuit is the one thing in a racing
@@ -848,12 +859,62 @@ export const RIVALS = {
   count: 3,
   /** How fast they go, as a fraction of the player's top speed, and how much
    *  they differ from one another. */
-  pace: 0.78,
+  pace: 0.95,
   spread: 0.05,
-  /** How far off the centre line each one runs, so they are not a train. */
-  offset: 22,
+  /**
+   * How far off the racing line each one runs, so they are not a train, and
+   * how much road is kept under the outside wheels.
+   *
+   * Small, now that there is a racing line to be off. It used to be twenty-two
+   * units of a thirty-eight-unit half width, which was fine when that was the
+   * only thing moving them sideways; on top of an apex it put a third of the
+   * field on the grass.
+   */
+  offset: 9,
+  margin: 12,
+  /** How hard they catch a slide that has run them wide: the aim comes back
+   *  across the road by this much of the overshoot. */
+  catches: 1.6,
   /** How far ahead of the player they start, in fractions of a lap. */
   gridGap: 0.008,
+  /**
+   * How they drive, rather than how fast they go.
+   *
+   * They used to hold one speed for the whole lap — the same through a hairpin
+   * as down the straight — which is the single thing that made them read as
+   * trundling scenery rather than as cars with somebody in them. Now the road
+   * is measured once and they drive what it says.
+   *
+   * `bite` is how hard a car can lean on a corner: the speed for a bend of
+   * radius r is the square root of `bite` times r, which is the real
+   * arithmetic and the reason a hairpin is slow. At 34, the tightest corner on
+   * the built-in circuits comes out at about a third of top speed and a fast
+   * kink is flat.
+   *
+   * `sees` is how far ahead they look for the slowest thing coming, in world
+   * units — a driver brakes *before* the corner, and a driver who brakes at
+   * the corner is a driver in the gravel. It is roughly the distance it takes
+   * to shed the speed.
+   */
+  bite: 55,
+  sees: 150,
+  smooth: 6,
+  /**
+   * The line: how far toward the inside of a corner they run, as a fraction of
+   * the road's half width, and how sharp a bend counts as full commitment.
+   *
+   * Smoothed over a long window — a good deal longer than the corner itself —
+   * which is what turns a row of apexes into a racing line. The smoothing
+   * leaks the apex backwards and forwards, so the car is drifting wide before
+   * the corner and still running out of it afterwards, which is what a driver
+   * does and looks like nothing else.
+   */
+  apex: 0.72,
+  apexAt: 90,
+  lineSmooth: 26,
+  /** How much they differ from one another in commitment. Someone is always
+   *  braver than somebody else, and that is what makes a race. */
+  nerve: 0.06,
   /** The colours, in the order they are handed out. */
   colours: [0x3f7fd6, 0x49b45a, 0xe0b13c] as const,
 } as const;
@@ -1482,16 +1543,43 @@ export const NEON = {
   lampPower: 900,
   lampReach: 190,
   /**
-   * There are no buildings.
+   * The buildings, in two rows.
    *
-   * There were: two rows of them, low along the street and towers set back,
-   * with a grid of windows up every face. They were handsome and they were
-   * also the thing most often between the camera and the car — the shot comes
-   * in over the scenery at forty-five degrees, and anything tall near the road
-   * eventually stands in it. A street at night with lamps and signs along it
-   * reads as a city perfectly well without them, and the frames they cost buy
-   * a longer view instead.
+   * The near row is right on the street and **low**, and that is not a style
+   * choice. The camera sits a hundred and fifty units up and a hundred and
+   * fifty behind, so the line of sight to the car passes through a height of
+   * roughly however far a thing is in front of it — meaning anything close to
+   * the road and taller than about ninety units will sooner or later stand
+   * between the player and their own car. Low-rise along the street and towers
+   * set back is also simply what a city looks like.
    */
+  nearBlocks: 30,
+  nearFrom: 6,
+  nearTo: 70,
+  nearLow: 46,
+  nearHigh: 88,
+  blocks: 40,
+  blockFrom: 150,
+  blockTo: 520,
+  blockWide: 60,
+  blockDeep: 60,
+  blockLow: 110,
+  blockHigh: 340,
+  /**
+   * The windows: lit, and lighting nothing.
+   *
+   * They glow — a tower at night is a grid of lit windows and nothing else —
+   * but not one of them is registered with the light pool, so none of them
+   * throws anything onto the street. The lamps and the signs light this city.
+   * Windows that also lit the road were seventy more emitters for the pool to
+   * weigh up every frame, and the road already had light on it.
+   *
+   * Not every window either. A tower with all of them on is an office block at
+   * five o'clock rather than a city at night.
+   */
+  window: 4.4,
+  windowGap: 11,
+  windowsLit: 0.5,
   /** How many are faulty, how fast they stutter, and how far down they drop
    *  when they do. Not to nothing — a dead tube still catches the streetlight. */
   brokenChance: 0.35,

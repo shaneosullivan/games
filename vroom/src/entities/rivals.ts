@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import {CAR, PLAYER, RIVALS} from "../config";
+import {PLAYER, RIVALS, TRACK} from "../config";
 import {myColour, neonised} from "../core/garage";
 import {Car, Drive} from "./car";
 import {Patches} from "./patches";
@@ -33,7 +33,8 @@ export class Rivals {
   /** Where each one started, as a signed distance from the start line. The
    *  grid is behind the line, so these are all a little negative. */
   private readonly began: Array<number> = [];
-  private readonly pace: Array<number> = [];
+  /** How brave each one is, as a fraction of what the road allows. */
+  private readonly nerve: Array<number> = [];
   private readonly offset: Array<number> = [];
 
   private readonly aim = new THREE.Vector3();
@@ -85,25 +86,55 @@ export class Rivals {
       this.travelled.push(0);
       this.began.push(signed(t - track.startAt));
       this.offset.push(off);
-      // Each a little different, so they string out instead of moving as one.
-      this.pace.push(CAR.top * (RIVALS.pace + (i - 1) * RIVALS.spread));
+      // Each a little braver or more cautious than the next, so they string
+      // out over a lap instead of driving round nose to tail.
+      this.nerve.push(RIVALS.pace + (i - 1) * RIVALS.nerve);
     }
   }
 
   update(dt: number, track: Track, patches?: Patches): void {
     for (let i = 0; i < this.cars.length; i++) {
       const car = this.cars[i];
-      // Walk their point along the circuit at their own pace, and aim the car
-      // at where it will be. Aiming *ahead* rather than at the point itself is
-      // what makes them turn in early and hold a line, instead of sawing at
-      // the wheel trying to sit on a moving dot.
-      const step = (this.pace[i] * dt) / track.length;
+      // Walk their point along the circuit and aim the car at where it will
+      // be. Aiming *ahead* rather than at the point itself is what makes them
+      // turn in early and hold a line, instead of sawing at the wheel trying
+      // to sit on a moving dot.
+      //
+      // How fast the point walks is the road's business, not a constant: the
+      // slowest thing within sight of it, which is a corner coming, times how
+      // brave this particular driver is. Braking, in other words — and the
+      // acceleration out the far side comes for free, because the moment the
+      // corner is behind the point the limit goes back up.
+      const speed = this.paceFor(track, this.at[i], i);
+      const step = (speed * dt) / track.length;
       this.at[i] = wrap(this.at[i] + step);
       this.travelled[i] += step;
       const lead = wrap(this.at[i] + 0.012);
       track.pointAt(lead, this.aim);
       track.sideAt(lead, this.here);
-      this.aim.addScaledVector(this.here, this.offset[i]);
+      // On the racing line, plus their own foot of daylight, so three cars on
+      // the same line are three cars and not one — and both of those together
+      // held inside the road, because an apex plus an offset is how a car ends
+      // up racing along the grass.
+      const sample = Math.round(lead * TRACK.segments);
+      const room = TRACK.half - RIVALS.margin;
+      let across = Math.max(
+        -room,
+        Math.min(room, track.lineAt(sample) + this.offset[i]),
+      );
+
+      // And if they are already wide of that — a corner taken a shade too fast
+      // runs the car out to the kerb whatever it was aiming at — the aim is
+      // pulled back across the road by however far they have overshot. That is
+      // a driver catching it and tucking back in, and without it a fast corner
+      // ended with a car in the sand, which is not a driver at all.
+      const where = track.nearest(car.position.x, car.position.z, car.hint);
+      const wide = Math.abs(where.offset) - room;
+      if (wide > 0) {
+        across -=
+          Math.sign(where.offset) * Math.min(wide * RIVALS.catches, room);
+      }
+      this.aim.addScaledVector(this.here, across);
 
       this.want.set(this.aim.x - car.position.x, this.aim.z - car.position.z);
       const d = this.want.length();
@@ -114,6 +145,25 @@ export class Rivals {
       car.update(dt, this.drive, track, patches);
       car.keepIn(track);
     }
+  }
+
+  /**
+   * How fast to be here: the slowest the road gets between here and as far as
+   * a driver looks, scaled by this one's nerve.
+   *
+   * Looking ahead is the whole of braking. A car that read the limit at its
+   * own bumper would arrive at every corner flat out and turn in at a speed no
+   * amount of grip could hold.
+   */
+  private paceFor(track: Track, at: number, i: number): number {
+    const step = track.length / TRACK.segments;
+    const ahead = Math.max(1, Math.round(RIVALS.sees / step));
+    const here = Math.round(at * TRACK.segments);
+    let slowest = Infinity;
+    for (let k = 0; k <= ahead; k++) {
+      slowest = Math.min(slowest, track.paceAt(here + k));
+    }
+    return slowest * this.nerve[i];
   }
 
   render(alpha: number): void {

@@ -1,6 +1,14 @@
 import * as THREE from "three";
 import {mergeGeometries} from "three/examples/jsm/utils/BufferGeometryUtils.js";
-import {BRIDGE, ENVIRONMENTS, HEIGHT, Palette, TRACK} from "../config";
+import {
+  BRIDGE,
+  CAR,
+  ENVIRONMENTS,
+  HEIGHT,
+  Palette,
+  RIVALS,
+  TRACK,
+} from "../config";
 import {TrackSpec} from "../track/spec";
 import {fadingVertex, flatVertex, LAYER, order, paint} from "../render/sprites";
 import {NearFade} from "../../../shared/fadeInFront";
@@ -74,6 +82,9 @@ export class Track {
   private readonly sides: Array<THREE.Vector3> = [];
 
   private readonly tmp = new THREE.Vector3();
+  /** The racing tables; see `racing()`. */
+  private pace: Array<number> = [];
+  private line: Array<number> = [];
 
   constructor(spec: TrackSpec) {
     this.palette = ENVIRONMENTS[spec.environment];
@@ -95,6 +106,7 @@ export class Track {
       this.sides.push(new THREE.Vector3(-d.z, 0, d.x).normalize());
     }
 
+    this.racing();
     this.tangles = this.crossings();
     this.deckMargin = Math.max(
       4,
@@ -213,6 +225,74 @@ export class Track {
     return Math.abs(offset) <= TRACK.half;
   }
 
+  /**
+   * How fast a car can get round each point of the circuit, and the line a
+   * driver would take through it.
+   *
+   * Worked out once, from the shape of the road, and handed to the rivals so
+   * they can drive it rather than trundle round it at one speed. Two tables:
+   *
+   * - `pace` — how fast this bit of road is. A corner of radius r can be taken
+   *   at about the square root of grip times r, which is the same physics that
+   *   makes a hairpin slow and a kink flat out. Straight road comes out above
+   *   the car's top speed and is clamped to it.
+   * - `line` — how far off the middle a driver would be, in world units.
+   *   Toward the inside of the corner, and then **smoothed along the road**,
+   *   which is what turns a set of apexes into a racing line: the smoothing
+   *   leaks the apex backwards and forwards, so a car is already drifting wide
+   *   before the corner and still running out after it.
+   */
+  private racing(): void {
+    const n = TRACK.segments;
+    const bend: Array<number> = new Array(n).fill(0);
+    for (let i = 0; i < n; i++) {
+      const back = this.points[wrapIndex(i - 1)];
+      const here = this.points[i];
+      const on = this.points[wrapIndex(i + 1)];
+      const ax = here.x - back.x;
+      const az = here.z - back.z;
+      const bx = on.x - here.x;
+      const bz = on.z - here.z;
+      const la = Math.hypot(ax, az);
+      const lb = Math.hypot(bx, bz);
+      if (la < 1e-6 || lb < 1e-6) {
+        continue;
+      }
+      // The sine of the turn between the two segments, over the distance it
+      // took: radians per unit, which is one over the radius.
+      const cross = (ax * bz - az * bx) / (la * lb);
+      bend[i] = Math.asin(Math.max(-1, Math.min(1, cross))) / ((la + lb) / 2);
+    }
+    // Smoothed before it is used for anything: three samples of a curve fitted
+    // through hand-placed corners is noisy, and noise here is a car that
+    // brakes for nothing.
+    const curve = smooth(bend, RIVALS.smooth);
+
+    this.pace = new Array(n).fill(0);
+    const line: Array<number> = new Array(n).fill(0);
+    for (let i = 0; i < n; i++) {
+      const radius = 1 / Math.max(1e-5, Math.abs(curve[i]));
+      this.pace[i] = Math.min(CAR.top, Math.sqrt(RIVALS.bite * radius));
+      // Toward the inside of the corner. Which side that is was settled by
+      // measuring: the line's own length has to come out *shorter* than the
+      // middle of the road, and with the sign the other way round it came out
+      // a hundred and sixty units longer — three cars taking the scenic route
+      // through every bend.
+      const tight = Math.min(1, Math.abs(curve[i]) * RIVALS.apexAt);
+      line[i] = Math.sign(curve[i]) * tight * TRACK.half * RIVALS.apex;
+    }
+    this.line = smooth(line, RIVALS.lineSmooth);
+  }
+
+  /** How fast the road is at a sample, and how far off the middle to be. */
+  paceAt(i: number): number {
+    return this.pace[wrapIndex(i)];
+  }
+
+  lineAt(i: number): number {
+    return this.line[wrapIndex(i)];
+  }
+
   /** And how far off the middle the barrier is. */
   static get limit(): number {
     return TRACK.half + TRACK.grass;
@@ -301,7 +381,7 @@ export class Track {
   /** Red and white, both sides, the way every circuit in the world does it. */
   private kerbs(): THREE.Mesh {
     const w = KERB;
-    const stripe = {other: this.palette.kerbB, every: 6};
+    const stripe = {other: this.palette.kerbB, every: TRACK.stripe};
     return mergeMeshes([
       this.ribbon(
         TRACK.half,
@@ -350,7 +430,8 @@ export class Track {
    */
   private walls(): THREE.Mesh {
     const limit = Track.limit;
-    const stripe = {other: this.palette.kerbB, every: 3};
+    // The same rhythm as the kerb below it, so the two read as one edge.
+    const stripe = {other: this.palette.kerbB, every: TRACK.stripe};
     const parts = [
       this.wallStrip(limit, this.palette.kerbA, stripe),
       this.wallStrip(-limit, this.palette.kerbA, stripe),
@@ -584,6 +665,19 @@ export class Track {
     out.addScaledVector(this.tmp, offset);
     return t;
   }
+}
+
+/** A ring of numbers, averaged over a window either side of each one. */
+function smooth(ring: ReadonlyArray<number>, window: number): Array<number> {
+  const out: Array<number> = [];
+  for (let i = 0; i < ring.length; i++) {
+    let sum = 0;
+    for (let k = -window; k <= window; k++) {
+      sum += ring[wrapIndex(i + k)];
+    }
+    out.push(sum / (window * 2 + 1));
+  }
+  return out;
 }
 
 /** How far apart two sample indices are, the short way round. */
