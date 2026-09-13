@@ -1,8 +1,17 @@
 import * as THREE from "three";
 import {ConvexGeometry} from "three/examples/jsm/geometries/ConvexGeometry.js";
-import {CAR, VINTAGE} from "../config";
+import {CAR, Sticker, VINTAGE} from "../config";
 import {Assembly, DETAIL, rounded} from "./assembly";
-import {across, AXLES, clip, dark, glassFor, pane, rod} from "./coachwork";
+import {
+  across,
+  AXLES,
+  clip,
+  dark,
+  glassFor,
+  pane,
+  plates,
+  rod,
+} from "./coachwork";
 
 /**
  * An old car: a grand saloon from the nineteen-thirties.
@@ -21,7 +30,10 @@ import {across, AXLES, clip, dark, glassFor, pane, rod} from "./coachwork";
  * the race camera sees it: from above, a black roof is most of the car, and
  * nobody could find their own.
  */
-export function vintage(colour: number = 0x6b1f2a): THREE.Group {
+export function vintage(
+  colour: number = 0x6b1f2a,
+  stickers: ReadonlyArray<Sticker> = [],
+): THREE.Group {
   const a = new Assembly();
   const L = CAR.length;
   const trim = dark(colour) ? VINTAGE.cream : VINTAGE.black;
@@ -39,6 +51,11 @@ export function vintage(colour: number = 0x6b1f2a): THREE.Group {
 
   const group = a.build();
   group.name = "vintage";
+  const plate = {wide: 1.8, tall: 0.4};
+  plates(group, stickers, [
+    {y: 1.1, z: L / 2 - 0.15, facing: 1, ...plate},
+    {y: 2.0, z: -L / 2 + 0.18, facing: -1, ...plate},
+  ]);
   return group;
 }
 

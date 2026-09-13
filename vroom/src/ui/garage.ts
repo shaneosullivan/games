@@ -44,6 +44,9 @@ import {setEnvironment} from "../render/materials";
  * says where on the deck it landed, which is the only arrangement a child who
  * cannot read a coordinate can use.
  */
+/** The cars with number plates, whose writing goes on them. */
+const PLATED: ReadonlyArray<CarShape> = ["taxi", "mini", "vintage", "garda"];
+
 const EMOJI: Record<string, string> = {
   star: "⭐",
   heart: "❤️",
@@ -364,10 +367,10 @@ export class Garage {
     // its keyboard up: ask for it a moment later and the gesture is over and
     // the keyboard stays down.
     write.addEventListener("click", () => {
-      // A taxi has one set of plates and so one thing written on them:
-      // tapping Writing again picks up what is already there.
+      // A car with plates has one thing written on them: tapping Writing
+      // again picks up what is already there.
       const already = this.stickers.findIndex(s => s.kind === "text");
-      if (this.shape === "taxi" && already >= 0) {
+      if (PLATED.includes(this.shape) && already >= 0) {
         this.chosen = already;
         this.markChosen();
       } else {
@@ -533,21 +536,12 @@ export class Garage {
     // not disabled, it is not there. And if it was the one open when the cow
     // was chosen, the garage falls back to the paint rather than showing an
     // empty page.
-    //
-    // And a Garda car keeps its livery, so it has no paint page either, and
-    // the garage falls back to what you race.
     const ridden = this.shape === "racer";
-    const painted = this.shape !== "garda";
     if (!ridden && this.showing === "driver") {
-      this.showing = painted ? "car" : "shape";
-    }
-    if (!painted && this.showing === "car") {
-      this.showing = "shape";
+      this.showing = "car";
     }
     for (const tab of this.root.querySelectorAll<HTMLElement>(".garage-tab")) {
-      tab.hidden =
-        (tab.dataset.side === "driver" && !ridden) ||
-        (tab.dataset.side === "car" && !painted);
+      tab.hidden = tab.dataset.side === "driver" && !ridden;
       tab.classList.toggle("on", tab.dataset.side === this.showing);
     }
     for (const pick of this.root.querySelectorAll<HTMLElement>(".shape")) {
@@ -558,15 +552,16 @@ export class Garage {
     this.driverSide.hidden = this.showing !== "driver";
     // A cow takes the paint and nothing else: the designs and the stickers go
     // on the deck of a single-seater, and there is no deck on a chicken. A
-    // taxi takes the paint and writing, and the writing goes on its plates —
-    // its doors already carry its chequers and its badge.
-    const taxi = this.shape === "taxi";
-    const plain = !ridden && !taxi;
+    // road car takes the paint and writing, and the writing goes on its number
+    // plates. A Garda car takes only the writing: it keeps its livery.
+    const plated = PLATED.includes(this.shape);
+    const painted = this.shape !== "garda";
+    const plain = !ridden && !plated;
     for (const row of this.carSide.children) {
       const el = row as HTMLElement;
       el.hidden =
         row.className === "swatches"
-          ? false
+          ? !painted
           : row.className === "designs"
             ? !ridden
             : plain;
@@ -574,27 +569,27 @@ export class Garage {
     for (const b of this.carSide.querySelectorAll<HTMLElement>(
       ".picture, .sizes",
     )) {
-      b.hidden = taxi;
+      b.hidden = plated;
     }
     this.says.textContent =
       this.showing === "shape"
-        ? painted
-          ? "What you race. The paint and the rider come with you."
-          : "A Garda car, in its own yellow and blue."
+        ? "What you race. The paint and the rider come with you."
         : this.showing === "driver"
           ? "Your rider. Pick a helmet and overalls."
           : plain
             ? "Pick a colour."
-            : taxi
-              ? "Pick a colour, and write on the number plates."
-              : this.embedded
-                ? "Your car. Drag a sticker to move it."
-                : "Tap something to add it, then drag it around the car.";
+            : !painted
+              ? "Write on the number plates."
+              : plated
+                ? "Pick a colour, and write on the number plates."
+                : this.embedded
+                  ? "Your car. Drag a sticker to move it."
+                  : "Tap something to add it, then drag it around the car.";
     for (const pick of this.root.querySelectorAll<HTMLElement>(".design")) {
       pick.classList.toggle("on", pick.dataset.design === this.design);
     }
-    // A picture held on the racing car is not something a taxi has.
-    if (taxi && this.held()?.kind !== "text") {
+    // A picture held on the racing car is not something a road car has.
+    if (plated && this.held()?.kind !== "text") {
       this.chosen = null;
     }
     const one = this.held();

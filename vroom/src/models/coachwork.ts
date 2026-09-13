@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import {CAR, WINDOWS} from "../config";
+import {CAR, Sticker, STICKER, WINDOWS} from "../config";
 import {Assembly, DETAIL, rounded} from "./assembly";
 
 /**
@@ -265,4 +265,101 @@ export function rod(
   const middle = from.clone().add(to).multiplyScalar(0.5);
   bar.translate(middle.x, middle.y, middle.z);
   a.add(bar, substance, colour);
+}
+
+/** A number plate, for writing on: its middle, which way it faces, and its
+ *  size. `z` is where the writing goes, just proud of the plate's face. */
+export interface Plate {
+  y: number;
+  z: number;
+  facing: 1 | -1;
+  wide: number;
+  tall: number;
+}
+
+/**
+ * Whatever has been written on the car, on its number plates.
+ *
+ * On the road cars the writing goes where a car's name actually goes: its
+ * plates. All of it, on one line, made as small as it has to be to fit — a
+ * short name fills the plate and a long one gets smaller letters rather than
+ * running off the edge.
+ *
+ * Rebuilt on its own, without the rest of the car, because it changes with
+ * every letter typed. The model remembers where its plates are, so rebuilding
+ * needs only the car and the words.
+ */
+export function plates(
+  group: THREE.Group,
+  stickers: ReadonlyArray<Sticker>,
+  where?: ReadonlyArray<Plate>,
+): void {
+  if (where) {
+    group.userData.plates = where;
+  }
+  const spots = (group.userData.plates ?? []) as ReadonlyArray<Plate>;
+  for (const old of [...group.children]) {
+    if (old.userData.plate) {
+      group.remove(old);
+      const mesh = old as THREE.Mesh;
+      mesh.geometry.dispose();
+      const material = mesh.material as THREE.MeshStandardMaterial;
+      material.map?.dispose();
+      material.dispose();
+    }
+  }
+  const written = stickers.find(s => s.kind === "text");
+  const words = (written?.text ?? "").trim().replace(/\s+/g, " ");
+  if (words === "") {
+    return;
+  }
+  for (const spot of spots) {
+    const face = new THREE.PlaneGeometry(spot.wide * 0.94, spot.tall * 0.9);
+    if (spot.facing < 0) {
+      face.rotateY(Math.PI);
+    }
+    face.translate(0, spot.y, spot.z);
+    const mesh = new THREE.Mesh(
+      face,
+      new THREE.MeshStandardMaterial({
+        map: plateWords(
+          words,
+          written?.font ?? STICKER.fonts[0].id,
+          spot.wide / spot.tall,
+        ),
+        transparent: true,
+        alphaTest: 0.3,
+        roughness: 0.6,
+      }),
+    );
+    mesh.userData.plate = true;
+    group.add(mesh);
+  }
+}
+
+/** The words, in black, as big as will fit on a plate on one line. */
+function plateWords(
+  words: string,
+  font: string,
+  aspect: number,
+): THREE.CanvasTexture {
+  const family =
+    STICKER.fonts.find(f => f.id === font)?.family ?? STICKER.fonts[0].family;
+  const canvas = document.createElement("canvas");
+  canvas.width = 512;
+  canvas.height = Math.round(512 / aspect);
+  const g = canvas.getContext("2d")!;
+  const tallest = canvas.height * 0.86;
+  g.font = `700 ${tallest}px ${family}`;
+  const across = g.measureText(words).width;
+  const size = Math.min(tallest, (tallest * canvas.width * 0.92) / across);
+  g.font = `700 ${size}px ${family}`;
+  g.fillStyle = "#15161a";
+  g.textAlign = "center";
+  g.textBaseline = "middle";
+  g.fillText(words, canvas.width / 2, canvas.height / 2 + size * 0.04);
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.anisotropy = STICKER.anisotropy;
+  return texture;
 }

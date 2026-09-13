@@ -1,8 +1,8 @@
 import * as THREE from "three";
 import {ConvexGeometry} from "three/examples/jsm/geometries/ConvexGeometry.js";
-import {CAR, Sticker, STICKER, TAXI} from "../config";
+import {CAR, Sticker, TAXI} from "../config";
 import {Assembly, DETAIL, rounded} from "./assembly";
-import {clip, glassFor, pane, underbody} from "./coachwork";
+import {clip, glassFor, pane, plates, underbody} from "./coachwork";
 
 /**
  * A taxi: an ordinary four-door saloon, with a sign on its roof and a band of
@@ -48,90 +48,27 @@ export function taxi(
   const group = a.build();
   group.name = "taxi";
   group.add(...livery(L, W), ...sign(L));
-  plates(group, stickers);
+  plates(group, stickers, [
+    {
+      y: PLATE.front,
+      z: L / 2 + 0.17,
+      facing: 1,
+      wide: PLATE.wide,
+      tall: PLATE.tall,
+    },
+    {
+      y: PLATE.back,
+      z: -L / 2 - 0.07,
+      facing: -1,
+      wide: PLATE.wide,
+      tall: PLATE.tall,
+    },
+  ]);
   return group;
 }
 
 /** The number plates, front and back, and where on the car they are. */
 const PLATE = {wide: CAR.width * 0.36, tall: 0.56, front: 1.7, back: 2.2};
-
-/**
- * Whatever has been written on the car, on its number plates.
- *
- * A taxi's doors already carry its chequers and its badge, so the writing
- * goes where a car's name actually goes: the plates. All of it, on one line,
- * made as small as it has to be to fit — a short name fills the plate and a
- * long one gets smaller letters rather than running off the edge.
- *
- * Rebuilt on its own, without the rest of the car, because it changes with
- * every letter typed.
- */
-export function plates(
-  group: THREE.Group,
-  stickers: ReadonlyArray<Sticker>,
-): void {
-  for (const old of [...group.children]) {
-    if (old.userData.plate) {
-      group.remove(old);
-      const mesh = old as THREE.Mesh;
-      mesh.geometry.dispose();
-      const material = mesh.material as THREE.MeshStandardMaterial;
-      material.map?.dispose();
-      material.dispose();
-    }
-  }
-  const written = stickers.find(s => s.kind === "text");
-  const words = (written?.text ?? "").trim().replace(/\s+/g, " ");
-  if (words === "") {
-    return;
-  }
-  const texture = plateWords(words, written?.font ?? STICKER.fonts[0].id);
-  const L = CAR.length;
-  for (const [y, z, facing] of [
-    [PLATE.front, L * 0.5 + 0.17, 1],
-    [PLATE.back, -L * 0.5 - 0.07, -1],
-  ]) {
-    const face = new THREE.PlaneGeometry(PLATE.wide * 0.94, PLATE.tall * 0.9);
-    if (facing < 0) {
-      face.rotateY(Math.PI);
-    }
-    face.translate(0, y, z);
-    const mesh = new THREE.Mesh(
-      face,
-      new THREE.MeshStandardMaterial({
-        map: texture,
-        transparent: true,
-        alphaTest: 0.3,
-        roughness: 0.6,
-      }),
-    );
-    mesh.userData.plate = true;
-    group.add(mesh);
-  }
-}
-
-/** The words, in black, as big as will fit on a plate on one line. */
-function plateWords(words: string, font: string): THREE.CanvasTexture {
-  const family =
-    STICKER.fonts.find(f => f.id === font)?.family ?? STICKER.fonts[0].family;
-  const canvas = document.createElement("canvas");
-  canvas.width = 512;
-  canvas.height = Math.round((512 * PLATE.tall) / PLATE.wide);
-  const g = canvas.getContext("2d")!;
-  const tallest = canvas.height * 0.86;
-  g.font = `700 ${tallest}px ${family}`;
-  const across = g.measureText(words).width;
-  const size = Math.min(tallest, (tallest * canvas.width * 0.92) / across);
-  g.font = `700 ${size}px ${family}`;
-  g.fillStyle = "#15161a";
-  g.textAlign = "center";
-  g.textBaseline = "middle";
-  g.fillText(words, canvas.width / 2, canvas.height / 2 + size * 0.04);
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.colorSpace = THREE.SRGBColorSpace;
-  texture.anisotropy = STICKER.anisotropy;
-  return texture;
-}
 
 /** Where the upper body's surface is, station by station down the car: z as a
  *  fraction of the length, half width as a fraction of the width, and the

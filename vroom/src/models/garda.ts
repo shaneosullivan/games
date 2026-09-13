@@ -1,8 +1,17 @@
 import * as THREE from "three";
 import {ConvexGeometry} from "three/examples/jsm/geometries/ConvexGeometry.js";
-import {CAR, GARDA} from "../config";
+import {CAR, GARDA, Sticker} from "../config";
 import {Assembly, DETAIL, rounded} from "./assembly";
-import {across, AXLES, clip, glassFor, pane, rod, underbody} from "./coachwork";
+import {
+  across,
+  AXLES,
+  clip,
+  glassFor,
+  pane,
+  plates,
+  rod,
+  underbody,
+} from "./coachwork";
 
 /**
  * A Garda car: an Irish police car.
@@ -19,7 +28,7 @@ import {across, AXLES, clip, glassFor, pane, rod, underbody} from "./coachwork";
  *
  * The badge on the doors is a plain star, not the force's own crest.
  */
-export function garda(): THREE.Group {
+export function garda(stickers: ReadonlyArray<Sticker> = []): THREE.Group {
   const a = new Assembly();
   const L = CAR.length;
   const W = CAR.width;
@@ -38,6 +47,11 @@ export function garda(): THREE.Group {
   const group = a.build();
   group.name = "garda";
   group.add(...livery(L, W), ...lightBar(L));
+  const plate = {wide: W * 0.3, tall: 0.45};
+  plates(group, stickers, [
+    {y: 1.85, z: L / 2 + 0.15, facing: 1, ...plate},
+    {y: 2.7, z: -L / 2 - 0.09, facing: -1, ...plate},
+  ]);
   return group;
 }
 

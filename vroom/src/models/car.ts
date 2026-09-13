@@ -10,9 +10,10 @@ import {
   Sticker,
 } from "../config";
 import {beast} from "./beasts";
+import {plates} from "./coachwork";
 import {garda} from "./garda";
 import {mini} from "./mini";
-import {plates, taxi} from "./taxi";
+import {taxi} from "./taxi";
 import {vintage} from "./vintage";
 import {COVER, NOSE, onDeck, STATIONS} from "./deck";
 import {stickerMesh} from "./stickers";
@@ -55,13 +56,13 @@ export function car(
     return taxi(colour, stickers);
   }
   if (shape === "mini") {
-    return mini(colour);
+    return mini(colour, stickers);
   }
   if (shape === "vintage") {
-    return vintage(colour);
+    return vintage(colour, stickers);
   }
   if (shape === "garda") {
-    return garda();
+    return garda(stickers);
   }
   if (shape !== "racer") {
     return beast(shape, colour, kit);
@@ -170,8 +171,8 @@ export function stick(
   stickers: ReadonlyArray<Sticker>,
   colour: number,
 ): void {
-  // A taxi's writing is on its plates, and it has no stickers besides.
-  if (group.name === "taxi") {
+  // A road car's writing is on its plates, and it has no stickers besides.
+  if (group.userData.plates) {
     plates(group, stickers);
     return;
   }

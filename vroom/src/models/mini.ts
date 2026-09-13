@@ -1,8 +1,17 @@
 import * as THREE from "three";
 import {ConvexGeometry} from "three/examples/jsm/geometries/ConvexGeometry.js";
-import {CAR, MINI} from "../config";
+import {CAR, MINI, Sticker} from "../config";
 import {Assembly, DETAIL, rounded} from "./assembly";
-import {AXLES, clip, glassFor, pale, pane, rod, underbody} from "./coachwork";
+import {
+  AXLES,
+  clip,
+  glassFor,
+  pale,
+  pane,
+  plates,
+  rod,
+  underbody,
+} from "./coachwork";
 
 /**
  * A Mini: a small two-door box with a wheel at each corner.
@@ -15,7 +24,10 @@ import {AXLES, clip, glassFor, pale, pane, rod, underbody} from "./coachwork";
  * cars hide theirs, door hinges on the outside, and a roof in a different
  * colour from the car.
  */
-export function mini(colour: number = 0xc8102e): THREE.Group {
+export function mini(
+  colour: number = 0xc8102e,
+  stickers: ReadonlyArray<Sticker> = [],
+): THREE.Group {
   const a = new Assembly();
   const L = CAR.length;
   const W = CAR.width;
@@ -33,6 +45,11 @@ export function mini(colour: number = 0xc8102e): THREE.Group {
 
   const group = a.build();
   group.name = "mini";
+  const plate = {wide: W * 0.3, tall: 0.42};
+  plates(group, stickers, [
+    {y: 1.0, z: L / 2 + 0.17, facing: 1, ...plate},
+    {y: 2.3, z: -L / 2 - 0.13, facing: -1, ...plate},
+  ]);
   return group;
 }
 
