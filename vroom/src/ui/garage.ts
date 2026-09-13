@@ -262,6 +262,12 @@ export class Garage {
       tab.textContent = label;
       tab.addEventListener("click", () => {
         this.showing = id;
+        // Leaving the paint lets go of whatever sticker was held, so it is not
+        // still lit up and waiting on another page.
+        if (id !== "car") {
+          this.chosen = null;
+          this.glow();
+        }
         this.markChosen();
       });
       row.appendChild(tab);
@@ -530,7 +536,8 @@ export class Garage {
     this.carSide.hidden = this.showing !== "car";
     this.driverSide.hidden = this.showing !== "driver";
     // A cow takes the paint and nothing else: the designs and the stickers go
-    // on the deck of a single-seater, and there is no deck on a chicken.
+    // on the deck of a single-seater, and there is no deck on a chicken. Nor
+    // on a taxi, whose doors already carry its stripe and its badge.
     const plain = !ridden;
     for (const row of this.carSide.children) {
       if (row.className !== "swatches") {
@@ -625,7 +632,10 @@ export class Garage {
         // finger is anyway.
       }
       this.spinning = false;
-      const hit = this.stickerUnder(e);
+      // Stickers are only picked up on the paint page, where the tools for
+      // them are. Anywhere else a finger on one turns the car like a finger
+      // anywhere else would, rather than moving a sticker behind your back.
+      const hit = this.showing === "car" ? this.stickerUnder(e) : null;
       if (hit === null) {
         turning = e.clientX;
         dragging = false;

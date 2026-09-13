@@ -1131,7 +1131,7 @@ export const RIVALS = {
 } as const;
 
 /** What you race: the single-seater, or one of the two that are not cars. */
-export type CarShape = "racer" | "cow" | "chicken";
+export type CarShape = "racer" | "cow" | "chicken" | "taxi";
 
 /**
  * The shapes on offer, in the order they are shown.
@@ -1146,7 +1146,61 @@ export const SHAPES = [
   {id: "racer", name: "Racing car", emoji: "🏎️"},
   {id: "cow", name: "Cow", emoji: "🐮"},
   {id: "chicken", name: "Chicken", emoji: "🐔"},
+  {id: "taxi", name: "Taxi", emoji: "🚕"},
 ] as ReadonlyArray<{id: CarShape; name: string; emoji: string}>;
+
+/**
+ * The taxi: a four-door saloon with a cab's sign on its roof.
+ *
+ * Sized in the game's own units — sixteen long, seven wide, four to the metre
+ * — so it is a four-metre saloon a metre and a half tall, which is a good deal
+ * lower and a good deal less dramatic than the racing car and is meant to be.
+ *
+ * Its paint is chosen like any other car's. The sign, the chequered band and
+ * the badge are its own, not any real city's, and they stay the same whatever
+ * colour it is painted.
+ */
+export const TAXI = {
+  /** Its paint when there is no choice to take it from: the model viewer. */
+  body: 0xf5f6f4,
+  glass: 0x222a33,
+  /** The black of the door pillar, the grille and the arch linings. */
+  trim: 0x16181d,
+  /** The two colours of the chequers and the sign. */
+  yellow: 0xffc21a,
+  black: 0x17181c,
+  /** Axles as fractions of the length — the grid's own, so it drives the
+   *  same — and how far out the wheels sit. Inside the body, under arches,
+   *  rather than out on stalks. */
+  front: 0.33,
+  rear: -0.31,
+  track: 2.92,
+  /** Wheel radius. Family-saloon wheels, well under the racing car's, and
+   *  that difference is most of what separates sporty from ordinary. */
+  wheel: 1.35,
+  /** The arch cut round each wheel, a little bigger than the tyre so there is
+   *  a dark gap above it the way there is on a real car. */
+  arch: 1.6,
+  /** How far the sills and bumpers stand off the road. */
+  clearance: 0.6,
+  /** The underside of the upper body, just over the arches; the window line;
+   *  the roof. In the ratio a real saloon has them to its wheels — belt about
+   *  one and a half wheels up, roof about two and a quarter. */
+  floor: 2.95,
+  belt: 4.0,
+  roof: 6.1,
+  /** The chequered band along the doors: how tall, how many rows of squares,
+   *  and how high its middle sits. */
+  chequers: 0.7,
+  rows: 2,
+  chequerHeight: 2.3,
+  /** The badge on each front door. */
+  badge: 1.5,
+  /** The roof sign: how wide, how tall at its peak, and how deep. */
+  signWide: 3.4,
+  signTall: 1.25,
+  signDeep: 0.8,
+} as const;
 
 /** What can be painted on a car on top of its colour. */
 export type CarDesign = "plain" | "checkers" | "stripes";
@@ -1464,35 +1518,6 @@ export const STICKER = {
     },
     {id: "block", name: "Block", family: 'Impact, "Arial Black", sans-serif'},
   ] as ReadonlyArray<{id: string; name: string; family: string}>,
-} as const;
-
-/**
- * The dust the desert throws up.
- *
- * Only there: tarmac in the hills or the city is swept, and a car on it lifts
- * nothing. On a desert circuit the sand blows across the road all day and the
- * cars pick it up, which is most of what makes that track feel like a
- * different place to drive rather than the same track in a different colour.
- *
- * Off the back wheels, because that is where a rear-drive car throws it, and
- * more of it the harder the car is working: fast, or sliding, or both.
- */
-export const DUST = {
-  /** Paler than the sand it comes off, or it cannot be seen against it. */
-  colour: [0xfbf3e2, 0xf3e7cd, 0xffffff] as ReadonlyArray<number>,
-  /** How many puffs the pool can hold, and how many go up at once. */
-  max: 260,
-  perPuff: 4,
-  /** How often a car leaves one, in seconds, at full chat. */
-  every: 0.05,
-  /** How fast it has to be going before it lifts anything at all. */
-  from: 24,
-  /** How it moves: a slow spread, drifting up and settling. */
-  speed: 5,
-  lift: 7,
-  gravity: 6,
-  lasts: 0.9,
-  size: 4.2,
 } as const;
 
 /**

@@ -5,6 +5,7 @@ import {material as materialFor} from "../render/materials";
 import {Assembly} from "./assembly";
 import {beast} from "./beasts";
 import {car, driver} from "./car";
+import {taxi} from "./taxi";
 import {plant} from "./flora";
 import {neonSign} from "./neon";
 import {barrier, cone, gantry, ramp, tyreStack} from "./props";
@@ -12,6 +13,7 @@ import {spectator, stand} from "./stand";
 
 export {beast} from "./beasts";
 export {car, driver} from "./car";
+export {taxi} from "./taxi";
 export {plant} from "./flora";
 export {neonSign} from "./neon";
 export {barrier, cone, gantry, ramp, tyreStack} from "./props";
@@ -60,6 +62,12 @@ export const MODELS: Array<ModelEntry> = [
     name: "Chicken car",
     size: 26,
     make: () => beast("chicken", 0xe0b13c),
+  },
+  {
+    id: "car-taxi",
+    name: "Taxi",
+    size: 22,
+    make: () => taxi(),
   },
   {
     id: "driver",

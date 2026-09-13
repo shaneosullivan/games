@@ -10,6 +10,7 @@ import {
   Sticker,
 } from "../config";
 import {beast} from "./beasts";
+import {taxi} from "./taxi";
 import {COVER, NOSE, onDeck, STATIONS} from "./deck";
 import {stickerMesh} from "./stickers";
 import {Assembly, DETAIL, rounded} from "./assembly";
@@ -47,6 +48,9 @@ export function car(
   // take the paint and the rider's kit and nothing else: a design and a set of
   // stickers are laid on the deck of a single-seater, and a chequered flag
   // wrapped over a cow is not a livery.
+  if (shape === "taxi") {
+    return taxi(colour);
+  }
   if (shape !== "racer") {
     return beast(shape, colour, kit);
   }
