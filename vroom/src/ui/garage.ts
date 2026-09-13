@@ -367,15 +367,7 @@ export class Garage {
     // its keyboard up: ask for it a moment later and the gesture is over and
     // the keyboard stays down.
     write.addEventListener("click", () => {
-      // A car with plates has one thing written on them: tapping Writing
-      // again picks up what is already there.
-      const already = this.stickers.findIndex(s => s.kind === "text");
-      if (PLATED.includes(this.shape) && already >= 0) {
-        this.chosen = already;
-        this.markChosen();
-      } else {
-        this.add("text");
-      }
+      this.add("text");
       this.words.focus();
       this.words.select();
     });
@@ -473,18 +465,23 @@ export class Garage {
   }
 
   private add(kind: StickerKind): void {
-    if (this.stickers.length >= STICKER.most) {
-      return;
-    }
     if (kind === "text") {
+      // One piece of writing, and writing again starts it afresh. Tapping
+      // Writing a second time used to add a second word on top of the first,
+      // and a child writing a new name expects the old one to be gone —
+      // the same as picking a new picture. It keeps its place and its kind of
+      // writing, and starts empty, with the keyboard up, ready for the new
+      // words.
+      const was = this.stickers.find(s => s.kind === "text");
+      this.stickers = this.stickers.filter(s => s.kind !== "text");
       this.stickers.push({
         kind,
-        u: 0,
-        v: 0,
-        h: STICKER.sideAt,
-        size: STICKER.textSize,
-        text: "Go!",
-        font: STICKER.fonts[0].id,
+        u: was?.u ?? 0,
+        v: was?.v ?? 0,
+        h: was?.h ?? STICKER.sideAt,
+        size: was?.size ?? STICKER.textSize,
+        text: "",
+        font: was?.font ?? STICKER.fonts[0].id,
       });
     } else {
       // One picture, and picking another swaps it. Tapping a crown when there
