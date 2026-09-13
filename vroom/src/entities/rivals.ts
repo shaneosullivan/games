@@ -99,7 +99,8 @@ export class Rivals {
       const design =
         PLAYER.designs[Math.floor(Math.random() * PLAYER.designs.length)].id;
       // And now and again one of them is not a racing car at all: a cow or a
-      // chicken, a Mini or an old car out of somebody's garage, or the Gardaí. They all
+      // chicken, a Mini or an old car out of somebody's garage, the Gardaí, or
+      // once in a while a tank engine. They all
       // drive exactly as a racing car does — same mass, wheels, tyres, engine
       // — so this changes nothing about the race and everything about looking
       // in the mirror.
@@ -115,7 +116,13 @@ export class Rivals {
               ? pick(["mini", "vintage"])
               : roll < RIVALS.beastly + RIVALS.classic + RIVALS.garda
                 ? "garda"
-                : "racer";
+                : roll <
+                    RIVALS.beastly +
+                      RIVALS.classic +
+                      RIVALS.garda +
+                      RIVALS.engine
+                  ? "engine"
+                  : "racer";
       // A Garda car is yellow whatever it was dealt, so its dot on the map is
       // too.
       if (shape === "garda") {

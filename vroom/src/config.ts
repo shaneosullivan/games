@@ -1185,6 +1185,8 @@ export const RIVALS = {
   classic: 0.2,
   /** And how often one is a Garda car. */
   garda: 0.12,
+  /** And, less often than any of those, a tank engine. */
+  engine: 0.05,
   /** The colours, in the order they are handed out. */
   colours: [0x3f7fd6, 0x49b45a, 0xe0b13c] as const,
 } as const;
