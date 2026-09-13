@@ -1195,6 +1195,13 @@ export const SHAPES = [
 ] as ReadonlyArray<{id: CarShape; name: string; emoji: string}>;
 
 /**
+ * Window glass on the road cars: dark, as tinted glass is, except on a car that
+ * is dark itself. Dark glass in a black car is no windows at all, so there it
+ * is a paler, bluer grey — the colour of a window with the sky in it.
+ */
+export const WINDOWS = {tint: 0x222a33, onDark: 0x7f93a6} as const;
+
+/**
  * The Mini: the little two-door box from the sixties, with a wheel at each
  * corner and a roof in a different colour from the rest of it.
  *
@@ -1217,7 +1224,6 @@ export const MINI = {
   roofLight: 0xf2f0ea,
   roofDark: 0x1b1d22,
   chrome: 0xd3d8de,
-  glass: 0x222a33,
   trim: 0x16181d,
 } as const;
 
@@ -1246,9 +1252,6 @@ export const VINTAGE = {
   black: 0x17181c,
   cream: 0xe9e2cf,
   chrome: 0xdfe3e8,
-  glass: 0x222a33,
-  /** The glass on a dark car, which would otherwise vanish into it. */
-  glassOnDark: 0x7f93a6,
 } as const;
 
 /**
@@ -1265,7 +1268,6 @@ export const VINTAGE = {
 export const TAXI = {
   /** Its paint when there is no choice to take it from: the model viewer. */
   body: 0xf5f6f4,
-  glass: 0x222a33,
   /** The black of the door pillar, the grille and the arch linings. */
   trim: 0x16181d,
   /** The two colours of the chequers and the sign. */

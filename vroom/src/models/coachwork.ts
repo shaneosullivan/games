@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import {CAR} from "../config";
+import {CAR, WINDOWS} from "../config";
 import {Assembly, DETAIL, rounded} from "./assembly";
 
 /**
@@ -234,6 +234,11 @@ export function dark(colour: number): boolean {
   const hsl = {h: 0, s: 0, l: 0};
   new THREE.Color(colour).getHSL(hsl, THREE.SRGBColorSpace);
   return hsl.l < 0.25;
+}
+
+/** The glass for a car painted `colour`; see WINDOWS. */
+export function glassFor(colour: number): number {
+  return dark(colour) ? WINDOWS.onDark : WINDOWS.tint;
 }
 
 /** Whether a colour is pale enough that white trim would disappear on it. */

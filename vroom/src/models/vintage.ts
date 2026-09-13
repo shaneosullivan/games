@@ -2,7 +2,7 @@ import * as THREE from "three";
 import {ConvexGeometry} from "three/examples/jsm/geometries/ConvexGeometry.js";
 import {CAR, VINTAGE} from "../config";
 import {Assembly, DETAIL, rounded} from "./assembly";
-import {across, AXLES, clip, dark, pane, rod} from "./coachwork";
+import {across, AXLES, clip, dark, glassFor, pane, rod} from "./coachwork";
 
 /**
  * An old car: a grand saloon from the nineteen-thirties.
@@ -53,9 +53,7 @@ function cabin(a: Assembly, colour: number, trim: number, L: number): void {
   const half = VINTAGE.body;
   const bottom = VINTAGE.board;
   const belt = VINTAGE.belt;
-  // Dark glass in a black car is no windows at all. On a dark car the glass
-  // is a paler, bluer grey, the colour of a window with the sky in it.
-  const glass = dark(colour) ? VINTAGE.glassOnDark : VINTAGE.glass;
+  const glass = glassFor(colour);
 
   // Stations: z as a fraction of the length, half width, bottom and top. The
   // front is the scuttle, as narrow as the bonnet it meets; the back rounds

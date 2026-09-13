@@ -2,7 +2,7 @@ import * as THREE from "three";
 import {ConvexGeometry} from "three/examples/jsm/geometries/ConvexGeometry.js";
 import {CAR, MINI} from "../config";
 import {Assembly, DETAIL, rounded} from "./assembly";
-import {AXLES, clip, pale, pane, rod, underbody} from "./coachwork";
+import {AXLES, clip, glassFor, pale, pane, rod, underbody} from "./coachwork";
 
 /**
  * A Mini: a small two-door box with a wheel at each corner.
@@ -77,6 +77,7 @@ function body(a: Assembly, colour: number, L: number, W: number): void {
  */
 function glasshouse(a: Assembly, colour: number, L: number): void {
   const base = MINI.belt;
+  const glass = glassFor(colour);
   const low = (CAR.width / 2) * 0.86;
   const high = (CAR.width / 2) * 0.76;
   const foot = (s: number, z: number): THREE.Vector3 =>
@@ -114,7 +115,7 @@ function glasshouse(a: Assembly, colour: number, L: number): void {
     centre,
     frame,
     "glass",
-    MINI.glass,
+    glass,
   );
   pane(
     a,
@@ -127,7 +128,7 @@ function glasshouse(a: Assembly, colour: number, L: number): void {
     centre,
     frame,
     "glass",
-    MINI.glass,
+    glass,
   );
   const pillar = DOOR.back * L;
   for (const s of [-1, 1]) {
@@ -139,8 +140,8 @@ function glasshouse(a: Assembly, colour: number, L: number): void {
     ];
     // The door's window and the one behind it, with a painted pillar
     // between.
-    pane(a, clip(side, pillar + 0.25, 1), centre, frame, "glass", MINI.glass);
-    pane(a, clip(side, pillar - 0.25, -1), centre, frame, "glass", MINI.glass);
+    pane(a, clip(side, pillar + 0.25, 1), centre, frame, "glass", glass);
+    pane(a, clip(side, pillar - 0.25, -1), centre, frame, "glass", glass);
   }
 
   // The roof, in the other colour, overhanging the glass a little the way the

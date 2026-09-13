@@ -2,7 +2,7 @@ import * as THREE from "three";
 import {ConvexGeometry} from "three/examples/jsm/geometries/ConvexGeometry.js";
 import {CAR, Sticker, STICKER, TAXI} from "../config";
 import {Assembly, DETAIL, rounded} from "./assembly";
-import {clip, pane, underbody} from "./coachwork";
+import {clip, glassFor, pane, underbody} from "./coachwork";
 
 /**
  * A taxi: an ordinary four-door saloon, with a sign on its roof and a band of
@@ -191,6 +191,7 @@ function body(a: Assembly, L: number, W: number, colour: number): void {
  */
 function glasshouse(a: Assembly, L: number, colour: number): void {
   const base = TAXI.belt;
+  const glass = glassFor(colour);
   const low = (CAR.width / 2) * 0.88;
   const high = (CAR.width / 2) * 0.7;
   const foot = (s: number, z: number): THREE.Vector3 =>
@@ -219,14 +220,14 @@ function glasshouse(a: Assembly, L: number, colour: number): void {
     roof(1, GLASS.roofFront),
     roof(-1, GLASS.roofFront),
   ];
-  pane(a, windscreen, centre, frame, "glass", TAXI.glass);
+  pane(a, windscreen, centre, frame, "glass", glass);
   const rearScreen = [
     foot(-1, GLASS.rear),
     roof(-1, GLASS.roofBack),
     roof(1, GLASS.roofBack),
     foot(1, GLASS.rear),
   ];
-  pane(a, rearScreen, centre, frame, "glass", TAXI.glass);
+  pane(a, rearScreen, centre, frame, "glass", glass);
 
   const b = PILLARS.b * L;
   const c = PILLARS.c * L;
@@ -239,16 +240,16 @@ function glasshouse(a: Assembly, L: number, colour: number): void {
       foot(s, GLASS.rear),
     ];
     // Front door, back door, and the quarter light behind it.
-    pane(a, clip(side, b + gap, 1), centre, frame, "glass", TAXI.glass);
+    pane(a, clip(side, b + gap, 1), centre, frame, "glass", glass);
     pane(
       a,
       clip(clip(side, b - gap, -1), c + gap, 1),
       centre,
       frame,
       "glass",
-      TAXI.glass,
+      glass,
     );
-    pane(a, clip(side, c - gap, -1), centre, frame, "glass", TAXI.glass);
+    pane(a, clip(side, c - gap, -1), centre, frame, "glass", glass);
     // The B pillar is black on nearly every saloon, and it is what makes the
     // side glass read as one long window over two doors.
     pane(
