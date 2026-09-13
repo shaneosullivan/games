@@ -1189,7 +1189,14 @@ export const RIVALS = {
 
 /** What you race: the single-seater, or one of the two that are not cars. */
 export type CarShape =
-  "racer" | "cow" | "chicken" | "taxi" | "mini" | "vintage" | "garda";
+  | "racer"
+  | "cow"
+  | "chicken"
+  | "taxi"
+  | "mini"
+  | "vintage"
+  | "garda"
+  | "engine";
 
 /**
  * The shapes on offer, in the order they are shown.
@@ -1208,7 +1215,31 @@ export const SHAPES = [
   {id: "mini", name: "Mini", emoji: "🚗"},
   {id: "vintage", name: "Capone car", emoji: "🎩"},
   {id: "garda", name: "Garda car", emoji: "🚓"},
+  {id: "engine", name: "Tank engine", emoji: "🚂"},
 ] as ReadonlyArray<{id: CarShape; name: string; emoji: string}>;
+
+/**
+ * The tank engine: a little six-wheeled steam locomotive that carries its
+ * water in tanks either side of the boiler, painted in the chosen colour
+ * with a red running board and red buffer beams.
+ *
+ * No face. It is an engine, and the front of the boiler is the smokebox door.
+ */
+export const ENGINE = {
+  /** Three wheels a side, their size, and where along the car they are. */
+  wheel: 1.45,
+  wheels: [0.25, 0.05, -0.15] as ReadonlyArray<number>,
+  track: 2.9,
+  /** The footplate everything stands on, the boiler's middle and radius. */
+  footplate: 3.15,
+  boiler: 5.0,
+  radius: 1.8,
+  /** The cab roof. */
+  roof: 7.9,
+  red: 0xc8262c,
+  black: 0x1a1b1f,
+  brass: 0xc9a23a,
+} as const;
 
 /**
  * Window glass on the road cars: dark, as tinted glass is, except on a car that

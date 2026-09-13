@@ -11,6 +11,7 @@ import {
 } from "../config";
 import {beast} from "./beasts";
 import {plates} from "./coachwork";
+import {engine} from "./engine";
 import {garda} from "./garda";
 import {mini} from "./mini";
 import {taxi} from "./taxi";
@@ -63,6 +64,9 @@ export function car(
   }
   if (shape === "garda") {
     return garda(stickers);
+  }
+  if (shape === "engine") {
+    return engine(colour);
   }
   if (shape !== "racer") {
     return beast(shape, colour, kit);

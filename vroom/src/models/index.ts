@@ -5,6 +5,7 @@ import {material as materialFor} from "../render/materials";
 import {Assembly} from "./assembly";
 import {beast} from "./beasts";
 import {car, driver} from "./car";
+import {engine} from "./engine";
 import {garda} from "./garda";
 import {mini} from "./mini";
 import {taxi} from "./taxi";
@@ -16,6 +17,7 @@ import {spectator, stand} from "./stand";
 
 export {beast} from "./beasts";
 export {car, driver} from "./car";
+export {engine} from "./engine";
 export {garda} from "./garda";
 export {mini} from "./mini";
 export {taxi} from "./taxi";
@@ -92,6 +94,12 @@ export const MODELS: Array<ModelEntry> = [
     name: "Garda car",
     size: 22,
     make: () => garda(),
+  },
+  {
+    id: "car-engine",
+    name: "Tank engine",
+    size: 22,
+    make: () => engine(),
   },
   {
     id: "driver",
