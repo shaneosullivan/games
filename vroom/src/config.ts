@@ -1191,7 +1191,7 @@ export const SHAPES = [
   {id: "chicken", name: "Chicken", emoji: "🐔"},
   {id: "taxi", name: "Taxi", emoji: "🚕"},
   {id: "mini", name: "Mini", emoji: "🚗"},
-  {id: "vintage", name: "Old car", emoji: "🎩"},
+  {id: "vintage", name: "Capone car", emoji: "🎩"},
 ] as ReadonlyArray<{id: CarShape; name: string; emoji: string}>;
 
 /**

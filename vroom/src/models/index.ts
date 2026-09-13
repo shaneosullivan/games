@@ -81,7 +81,7 @@ export const MODELS: Array<ModelEntry> = [
   },
   {
     id: "car-vintage",
-    name: "Old car",
+    name: "Capone car",
     size: 22,
     make: () => vintage(),
   },
