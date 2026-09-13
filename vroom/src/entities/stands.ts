@@ -42,6 +42,9 @@ export class Stands {
    * additive paper is a glowing smear.
    */
   readonly confetti: ParticleBurst;
+  /** The car the desert's fire goes off round: the player's own position,
+   *  held rather than copied so the fire keeps up with it. */
+  private following: THREE.Vector3 | null = null;
   /** How much of the desert's fire is left to throw. */
   private burning = 0;
   private feed = 0;
@@ -52,9 +55,6 @@ export class Stands {
   private readonly one = new THREE.Vector3(1, 1, 1);
   private readonly tint = new THREE.Color();
   private readonly flare = new THREE.Vector3();
-  /** Where the two grandstands stand. The desert's fireworks go off beside
-   *  them rather than over the road — the shot comes down the road. */
-  private readonly beside: Array<{x: number; z: number}> = [];
 
   constructor(
     rng: Rng,
@@ -90,15 +90,6 @@ export class Stands {
       const turn = 0;
       void facing;
 
-      // Where the fireworks go off: beside the road, level with the stand and
-      // most of the way in from it. Level with the stand itself they are out
-      // of frame at the flag — the shot comes down in front of the car and the
-      // stands are wide of it — and a firework nobody sees is a firework that
-      // did not happen.
-      this.beside.push({
-        x: p.x + (x - p.x) * STAND.flameIn,
-        z: p.z + (z - p.z) * STAND.flameIn,
-      });
       const built = stand(palette).build();
       built.position.set(x, 0, z);
       built.rotation.y = turn;
@@ -153,6 +144,7 @@ export class Stands {
     this.cheering = STAND.jumpFor;
     if (this.environment === "desert") {
       this.over.copy(at);
+      this.following = at;
       this.burning = STAND.flameFor;
       this.feed = 0;
       return;
@@ -177,13 +169,15 @@ export class Stands {
   /**
    * The desert's fire, fed a little at a time.
    *
-   * Two columns, one either side of the road, thrown up from just above the
-   * ground so they climb through the shot rather than appearing at the top of
-   * it. A single burst is an explosion; a burst every sixth of a second for a
-   * second and a half is a fire.
+   * Round the winner's car: a burst over the roof and one either side of it,
+   * following the car as it rolls on past the line. They used to go off
+   * beside the grandstands, out of the way of the car — which, with the shot
+   * coming down in front of the car at the flag, was out of the way of the
+   * shot as well, and a child asked for them where they could see them.
+   * Screen left and right are world x, since the camera never turns.
    */
   private burn(dt: number): void {
-    if (this.burning <= 0) {
+    if (this.burning <= 0 || !this.following) {
       return;
     }
     this.burning -= dt;
@@ -192,13 +186,13 @@ export class Stands {
       return;
     }
     this.feed = STAND.flameEvery;
-    // Beside the grandstands, not over the road. Two columns of fire either
-    // side of the finish line put the biggest, brightest thing on the screen
-    // exactly where the car is, at the moment a child most wants to see the
-    // car — which is the wrong place for a firework and the right place for a
-    // blindfold.
-    for (const at of this.beside) {
-      this.confetti.burst(this.flare.set(at.x, STAND.flameFrom, at.z), {
+    const car = this.following;
+    for (const [across, up] of [
+      [0, STAND.flameOver],
+      [-STAND.flameBeside, STAND.flameLow],
+      [STAND.flameBeside, STAND.flameLow],
+    ]) {
+      this.confetti.burst(this.flare.set(car.x + across, up, car.z), {
         color: STAND.flame,
         count: STAND.flameCount,
         speed: STAND.flameSpeed,
@@ -206,22 +200,12 @@ export class Stands {
         gravity: STAND.flameRise,
         ttl: STAND.flameLasts,
         size: STAND.flameSize,
-        // A full sphere of sparks that arc and fall, rather than a jet: this
-        // is a firework going off at the side of a circuit, not a flamethrower
-        // in the fast lane.
+        // A full sphere of sparks that arc and fall, rather than a jet.
         spherical: 1,
       });
     }
   }
 
-  /**
-   * Bounces them, while there is anything to bounce about.
-   *
-   * Each person has their own phase, so the crowd is a crowd. Once the cheer
-   * runs out the matrices are written one last time and then left alone —
-   * there is no reason to push four hundred of them at the GPU every frame of
-   * a race nobody has won yet.
-   */
   update(dt: number): void {
     this.confetti.update(dt);
     this.burn(dt);

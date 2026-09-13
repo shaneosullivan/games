@@ -280,26 +280,24 @@ export const STAND = {
    * handful in a row is a fire.
    */
   flame: [0xfff3c4, 0xffd24a, 0xff9a2e, 0xf2542d],
-  flameCount: 110,
-  flameSpeed: 58,
-  flameLift: 34,
+  flameCount: 60,
+  flameSpeed: 34,
+  flameLift: 26,
   /** Sparks fall. They are thrown up and out hard and gravity brings them
    *  back, which is what makes an arc rather than a jet — a firework, in other
    *  words, which is what the desert throws at the flag. */
-  flameRise: 62,
-  flameLasts: 1.4,
-  flameSize: 1.1,
-  /** How long the fire burns, how often it is fed, and how far apart the two
-   *  columns of it stand either side of the line. */
-  flameFor: 2.2,
-  flameEvery: 0.28,
-  /** How high above the stands they go off. Well clear of the roof: a
-   *  firework that bursts level with a grandstand is a firework nobody in
-   *  front of the grandstand can see. */
-  flameFrom: 40,
-  /** How far out from the middle of the road they stand, as a fraction of the
-   *  way to the grandstand. Outside the barrier, inside the stand. */
-  flameIn: 0.62,
+  flameRise: 46,
+  flameLasts: 1.3,
+  flameSize: 1.7,
+  /** How long the fire burns, and how often it is fed. */
+  flameFor: 2.6,
+  flameEvery: 0.24,
+  /** Where round the car it goes off: how high over the roof, how far out
+   *  to either side, and how high those two are. Close enough to be in every
+   *  frame of the finish; high enough over the roof to leave the car in view. */
+  flameOver: 22,
+  flameBeside: 15,
+  flameLow: 8,
 } as const;
 
 /**
