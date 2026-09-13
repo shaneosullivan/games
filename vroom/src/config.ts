@@ -1174,7 +1174,7 @@ export const RIVALS = {
 
 /** What you race: the single-seater, or one of the two that are not cars. */
 export type CarShape =
-  "racer" | "cow" | "chicken" | "taxi" | "mini" | "vintage";
+  "racer" | "cow" | "chicken" | "taxi" | "mini" | "vintage" | "garda";
 
 /**
  * The shapes on offer, in the order they are shown.
@@ -1192,6 +1192,7 @@ export const SHAPES = [
   {id: "taxi", name: "Taxi", emoji: "🚕"},
   {id: "mini", name: "Mini", emoji: "🚗"},
   {id: "vintage", name: "Capone car", emoji: "🎩"},
+  {id: "garda", name: "Garda car", emoji: "🚓"},
 ] as ReadonlyArray<{id: CarShape; name: string; emoji: string}>;
 
 /**
@@ -1200,6 +1201,36 @@ export const SHAPES = [
  * is a paler, bluer grey — the colour of a window with the sky in it.
  */
 export const WINDOWS = {tint: 0x222a33, onDark: 0x7f93a6} as const;
+
+/**
+ * The Garda car: an Irish police car, a family-sized SUV in the hi-vis
+ * livery — fluorescent yellow, a band of blue and yellow squares down each
+ * side, GARDA on a blue panel under it, and a blue light bar on the roof.
+ *
+ * It keeps its livery whatever colour is chosen, the way the real ones do: a
+ * pink police car is not a police car. So the paint page is not offered for
+ * it.
+ */
+export const GARDA = {
+  yellow: 0xd9ee1f,
+  blue: 0x1f4fb4,
+  trim: 0x16181d,
+  /** A bigger wheel and more ground under it than a saloon: it is an SUV. */
+  wheel: 1.55,
+  track: 2.95,
+  arch: 1.78,
+  clearance: 0.8,
+  /** Underside of the upper body, the window line, the roof. */
+  floor: 3.35,
+  belt: 4.6,
+  roof: 6.85,
+  /** The squares down the side: how tall the band is, and where its middle
+   *  sits. Two rows. */
+  checks: 1.2,
+  checksAt: 3.95,
+  /** How fast the roof lights flash, in flashes a second. */
+  flash: 2.4,
+} as const;
 
 /**
  * The Mini: the little two-door box from the sixties, with a wheel at each

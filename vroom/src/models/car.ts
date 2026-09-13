@@ -10,6 +10,7 @@ import {
   Sticker,
 } from "../config";
 import {beast} from "./beasts";
+import {garda} from "./garda";
 import {mini} from "./mini";
 import {plates, taxi} from "./taxi";
 import {vintage} from "./vintage";
@@ -58,6 +59,9 @@ export function car(
   }
   if (shape === "vintage") {
     return vintage(colour);
+  }
+  if (shape === "garda") {
+    return garda();
   }
   if (shape !== "racer") {
     return beast(shape, colour, kit);

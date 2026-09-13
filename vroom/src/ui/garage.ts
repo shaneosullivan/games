@@ -533,12 +533,21 @@ export class Garage {
     // not disabled, it is not there. And if it was the one open when the cow
     // was chosen, the garage falls back to the paint rather than showing an
     // empty page.
+    //
+    // And a Garda car keeps its livery, so it has no paint page either, and
+    // the garage falls back to what you race.
     const ridden = this.shape === "racer";
+    const painted = this.shape !== "garda";
     if (!ridden && this.showing === "driver") {
-      this.showing = "car";
+      this.showing = painted ? "car" : "shape";
+    }
+    if (!painted && this.showing === "car") {
+      this.showing = "shape";
     }
     for (const tab of this.root.querySelectorAll<HTMLElement>(".garage-tab")) {
-      tab.hidden = tab.dataset.side === "driver" && !ridden;
+      tab.hidden =
+        (tab.dataset.side === "driver" && !ridden) ||
+        (tab.dataset.side === "car" && !painted);
       tab.classList.toggle("on", tab.dataset.side === this.showing);
     }
     for (const pick of this.root.querySelectorAll<HTMLElement>(".shape")) {
@@ -569,7 +578,9 @@ export class Garage {
     }
     this.says.textContent =
       this.showing === "shape"
-        ? "What you race. The paint and the rider come with you."
+        ? painted
+          ? "What you race. The paint and the rider come with you."
+          : "A Garda car, in its own yellow and blue."
         : this.showing === "driver"
           ? "Your rider. Pick a helmet and overalls."
           : plain
