@@ -128,6 +128,12 @@ export class Game {
   /** The two controls, held rather than made every step. */
   private readonly aimDrive: Drive = {kind: "aim", aim: this.want};
   private readonly keyDrive = {kind: "wheel" as const, steer: 0, throttle: 0};
+  private readonly heard: Array<{
+    speed: number;
+    slip: number;
+    dx: number;
+    dz: number;
+  }> = [];
   private readonly wheels = [new THREE.Vector2(), new THREE.Vector2()];
   private readonly corners = [
     new THREE.Vector2(),
@@ -242,7 +248,7 @@ export class Game {
       myKit(),
       myShape(),
     );
-    this.rivals = new Rivals(this.track);
+    this.rivals = new Rivals(this.track, spec.environment);
     this.skids = new Skids(palette);
     this.trails = new Skids(palette, TRAIL.max);
     this.patches = new Patches(this.track, spec.items);
@@ -422,12 +428,27 @@ export class Game {
     this.trails.update(dt);
     this.lapCount();
     this.engine.update(dt, this.car.speed, this.car.slip, CAR.top);
+    this.hearRivals(dt);
     this.hud.update(
       Math.max(0, Math.min(1, this.progress / this.laps)),
       this.place(),
     );
     this.drawMap();
   };
+
+  /** The other cars' engines and tyres, from where the player is. */
+  private hearRivals(dt: number): void {
+    this.heard.length = 0;
+    for (const them of this.rivals.cars) {
+      this.heard.push({
+        speed: them.speed,
+        slip: them.slip,
+        dx: them.position.x - this.car.position.x,
+        dz: them.position.z - this.car.position.z,
+      });
+    }
+    this.engine.hear(dt, this.heard, CAR.top);
+  }
 
   /**
    * Whichever control is actually being used.

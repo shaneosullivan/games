@@ -1,4 +1,5 @@
 import {ENVIRONMENTS, LAYOUT, Palette} from "../config";
+import chofterUrl from "../assets/chofter.png";
 import {deleteTrack, loadTracks} from "../track/store";
 import {BUILT_INS, TrackSpec} from "../track/spec";
 import {outline} from "../track/outline";
@@ -90,7 +91,7 @@ export class Menu {
     title.textContent = "Vroom";
     const blurb = document.createElement("p");
     blurb.textContent = "Pick a track, or draw one of your own.";
-    head.append(title, blurb);
+    head.append(homeLink(), title, blurb);
 
     const list = document.createElement("div");
     list.className = "menu-list";
@@ -140,15 +141,10 @@ export class Menu {
     models.textContent = "🧊 Models";
     models.addEventListener("click", () => this.handlers.onModels());
     foot.appendChild(models);
-    const home = document.createElement("a");
-    home.className = "chip";
-    home.href = "../../";
-    home.textContent = "🏠 Chofter Games";
     foot.append(build);
     if (!this.wide) {
       foot.appendChild(garage);
     }
-    foot.appendChild(home);
 
     if (!this.wide) {
       this.root.append(head, list, foot);
@@ -285,4 +281,25 @@ function section(text: string): HTMLElement {
 
 function hex(colour: number): string {
   return `#${colour.toString(16).padStart(6, "0")}`;
+}
+
+/**
+ * The Chofter mark in the top corner of the menu, and the way back to every
+ * other game — where it is in the bee game, and the same picture. It used to
+ * be a chip at the bottom of the menu under everything else, which is the last
+ * place anybody looks for the way out.
+ */
+function homeLink(): HTMLAnchorElement {
+  const link = document.createElement("a");
+  link.className = "home-link";
+  link.href = "../../";
+  link.title = "All the Chofter games";
+  link.setAttribute("aria-label", "All the Chofter games");
+  const img = document.createElement("img");
+  img.src = chofterUrl;
+  img.alt = "";
+  img.width = 40;
+  img.height = 40;
+  link.appendChild(img);
+  return link;
 }

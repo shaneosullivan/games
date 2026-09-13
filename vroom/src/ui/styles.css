@@ -313,8 +313,36 @@ canvas {
 /* ---------- The track list ---------- */
 
 .menu-head {
+  position: relative;
   padding: calc(var(--safe-t) + 20px) 20px 4px;
   text-align: center;
+}
+
+/* The way back to the gallery, cut like the bee game's. */
+.home-link {
+  position: absolute;
+  top: calc(var(--safe-t) + 12px);
+  left: calc(var(--safe-l) + 12px);
+  width: 56px;
+  height: 56px;
+  display: grid;
+  place-items: center;
+  border-radius: 16px;
+  opacity: 0.85;
+  transition: opacity 120ms ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.home-link:active {
+  transform: scale(0.94);
+  opacity: 1;
+}
+
+.home-link img {
+  width: 40px;
+  height: 40px;
+  border-radius: 11px;
+  display: block;
 }
 
 .menu-head h1 {

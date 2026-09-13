@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import {ConvexGeometry} from "three/examples/jsm/geometries/ConvexGeometry.js";
-import {CAR, TAXI} from "../config";
+import {CAR, Sticker, STICKER, TAXI} from "../config";
 import {Assembly, DETAIL, rounded} from "./assembly";
 
 /**
@@ -25,7 +25,10 @@ import {Assembly, DETAIL, rounded} from "./assembly";
  * line, with real openings cut for the wheels, and a narrower glasshouse on
  * top of it with the windows set into its faces.
  */
-export function taxi(colour: number = TAXI.body): THREE.Group {
+export function taxi(
+  colour: number = TAXI.body,
+  stickers: ReadonlyArray<Sticker> = [],
+): THREE.Group {
   const a = new Assembly();
   const L = CAR.length;
   const W = CAR.width;
@@ -44,7 +47,89 @@ export function taxi(colour: number = TAXI.body): THREE.Group {
   const group = a.build();
   group.name = "taxi";
   group.add(...livery(L, W), ...sign(L));
+  plates(group, stickers);
   return group;
+}
+
+/** The number plates, front and back, and where on the car they are. */
+const PLATE = {wide: CAR.width * 0.36, tall: 0.56, front: 1.7, back: 2.2};
+
+/**
+ * Whatever has been written on the car, on its number plates.
+ *
+ * A taxi's doors already carry its chequers and its badge, so the writing
+ * goes where a car's name actually goes: the plates. All of it, on one line,
+ * made as small as it has to be to fit — a short name fills the plate and a
+ * long one gets smaller letters rather than running off the edge.
+ *
+ * Rebuilt on its own, without the rest of the car, because it changes with
+ * every letter typed.
+ */
+export function plates(
+  group: THREE.Group,
+  stickers: ReadonlyArray<Sticker>,
+): void {
+  for (const old of [...group.children]) {
+    if (old.userData.plate) {
+      group.remove(old);
+      const mesh = old as THREE.Mesh;
+      mesh.geometry.dispose();
+      const material = mesh.material as THREE.MeshStandardMaterial;
+      material.map?.dispose();
+      material.dispose();
+    }
+  }
+  const written = stickers.find(s => s.kind === "text");
+  const words = (written?.text ?? "").trim().replace(/\s+/g, " ");
+  if (words === "") {
+    return;
+  }
+  const texture = plateWords(words, written?.font ?? STICKER.fonts[0].id);
+  const L = CAR.length;
+  for (const [y, z, facing] of [
+    [PLATE.front, L * 0.5 + 0.17, 1],
+    [PLATE.back, -L * 0.5 - 0.07, -1],
+  ]) {
+    const face = new THREE.PlaneGeometry(PLATE.wide * 0.94, PLATE.tall * 0.9);
+    if (facing < 0) {
+      face.rotateY(Math.PI);
+    }
+    face.translate(0, y, z);
+    const mesh = new THREE.Mesh(
+      face,
+      new THREE.MeshStandardMaterial({
+        map: texture,
+        transparent: true,
+        alphaTest: 0.3,
+        roughness: 0.6,
+      }),
+    );
+    mesh.userData.plate = true;
+    group.add(mesh);
+  }
+}
+
+/** The words, in black, as big as will fit on a plate on one line. */
+function plateWords(words: string, font: string): THREE.CanvasTexture {
+  const family =
+    STICKER.fonts.find(f => f.id === font)?.family ?? STICKER.fonts[0].family;
+  const canvas = document.createElement("canvas");
+  canvas.width = 512;
+  canvas.height = Math.round((512 * PLATE.tall) / PLATE.wide);
+  const g = canvas.getContext("2d")!;
+  const tallest = canvas.height * 0.86;
+  g.font = `700 ${tallest}px ${family}`;
+  const across = g.measureText(words).width;
+  const size = Math.min(tallest, (tallest * canvas.width * 0.92) / across);
+  g.font = `700 ${size}px ${family}`;
+  g.fillStyle = "#15161a";
+  g.textAlign = "center";
+  g.textBaseline = "middle";
+  g.fillText(words, canvas.width / 2, canvas.height / 2 + size * 0.04);
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.anisotropy = STICKER.anisotropy;
+  return texture;
 }
 
 /** Where the upper body's surface is, station by station down the car: z as a
@@ -379,8 +464,8 @@ function front(a: Assembly, L: number, W: number): void {
   intake.translate(0, 1.15, nose - 0.02);
   a.add(intake, "rubber", TAXI.trim);
 
-  const plate = rounded(W * 0.3, 0.45, 0.08, 0.04);
-  plate.translate(0, 1.7, nose + 0.12);
+  const plate = rounded(PLATE.wide, PLATE.tall, 0.08, 0.04);
+  plate.translate(0, PLATE.front, nose + 0.12);
   a.add(plate, "matte", 0xf4f4ef);
 
   for (const side of [-1, 1]) {
@@ -413,8 +498,8 @@ function back(a: Assembly, L: number, W: number): void {
     lamp.translate(side * W * 0.34, 3.35, tail + 0.5);
     a.add(lamp, "glass", 0xb5121f);
   }
-  const plate = rounded(W * 0.3, 0.5, 0.08, 0.04);
-  plate.translate(0, 2.2, tail - 0.02);
+  const plate = rounded(PLATE.wide, PLATE.tall, 0.08, 0.04);
+  plate.translate(0, PLATE.back, tail - 0.02);
   a.add(plate, "matte", 0xf4f4ef);
 
   const bumper = rounded(W * 0.9, 0.25, 0.2, 0.08);

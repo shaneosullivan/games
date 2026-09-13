@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import {CarShape, PHYSICS, PLAYER, RIVALS, TRACK} from "../config";
+import {CarShape, Environment, PHYSICS, PLAYER, RIVALS, TRACK} from "../config";
 import {myColour, neonised} from "../core/garage";
 import {Car, shortestAngle} from "./car";
 import {Patches} from "./patches";
@@ -52,7 +52,7 @@ export class Rivals {
     reverse: boolean;
   };
 
-  constructor(track: Track) {
+  constructor(track: Track, environment: Environment) {
     this.drive = {kind: "wheel", steer: 0, throttle: 0, reverse: false};
     // Every car in the race is a different colour, and none of them is the
     // player's. Two the same is a child watching the wrong one all the way
@@ -77,6 +77,10 @@ export class Rivals {
       [pool[i], pool[j]] = [pool[j], pool[i]];
     }
     const nextColour = (): number => pool.pop() ?? RIVALS.colours[0];
+    // A city has taxis in it. In the neon one, one of the three — a different
+    // one each race — always is.
+    const cab =
+      environment === "neon" ? Math.floor(Math.random() * RIVALS.count) : -1;
 
     for (let i = 0; i < RIVALS.count; i++) {
       const colour = nextColour();
@@ -91,11 +95,13 @@ export class Rivals {
       // — so this changes nothing about the race and everything about looking
       // in the mirror.
       const shape: CarShape =
-        Math.random() < RIVALS.beastly
-          ? Math.random() < 0.5
-            ? "cow"
-            : "chicken"
-          : "racer";
+        i === cab
+          ? "taxi"
+          : Math.random() < RIVALS.beastly
+            ? Math.random() < 0.5
+              ? "cow"
+              : "chicken"
+            : "racer";
       const car = new Car(colour, design, [], undefined, shape);
       // Left, right, left: a grid, not a queue.
       const off = (i % 2 === 0 ? 1 : -1) * RIVALS.offset;

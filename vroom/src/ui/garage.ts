@@ -349,7 +349,7 @@ export class Garage {
     for (const kind of PICTURE_KINDS) {
       const add = document.createElement("button");
       add.type = "button";
-      add.className = "sticker-add";
+      add.className = "sticker-add picture";
       add.textContent = EMOJI[kind] ?? "•";
       add.setAttribute("aria-label", `Add a ${kind}`);
       add.addEventListener("click", () => this.add(kind));
@@ -364,7 +364,15 @@ export class Garage {
     // its keyboard up: ask for it a moment later and the gesture is over and
     // the keyboard stays down.
     write.addEventListener("click", () => {
-      this.add("text");
+      // A taxi has one set of plates and so one thing written on them:
+      // tapping Writing again picks up what is already there.
+      const already = this.stickers.findIndex(s => s.kind === "text");
+      if (this.shape === "taxi" && already >= 0) {
+        this.chosen = already;
+        this.markChosen();
+      } else {
+        this.add("text");
+      }
       this.words.focus();
       this.words.select();
     });
@@ -427,6 +435,10 @@ export class Garage {
     const bigger = this.tool("+", "Bigger", () =>
       this.resizeChosen(STICKER.step),
     );
+    // On a plate the writing is always as big as fits, so there is nothing to
+    // make bigger or smaller.
+    smaller.classList.add("sizes");
+    bigger.classList.add("sizes");
 
     const remove = this.tool("🗑", "Take it off", () => {
       if (this.chosen === null) {
@@ -536,13 +548,24 @@ export class Garage {
     this.carSide.hidden = this.showing !== "car";
     this.driverSide.hidden = this.showing !== "driver";
     // A cow takes the paint and nothing else: the designs and the stickers go
-    // on the deck of a single-seater, and there is no deck on a chicken. Nor
-    // on a taxi, whose doors already carry its stripe and its badge.
-    const plain = !ridden;
+    // on the deck of a single-seater, and there is no deck on a chicken. A
+    // taxi takes the paint and writing, and the writing goes on its plates —
+    // its doors already carry its chequers and its badge.
+    const taxi = this.shape === "taxi";
+    const plain = !ridden && !taxi;
     for (const row of this.carSide.children) {
-      if (row.className !== "swatches") {
-        (row as HTMLElement).hidden = plain;
-      }
+      const el = row as HTMLElement;
+      el.hidden =
+        row.className === "swatches"
+          ? false
+          : row.className === "designs"
+            ? !ridden
+            : plain;
+    }
+    for (const b of this.carSide.querySelectorAll<HTMLElement>(
+      ".picture, .sizes",
+    )) {
+      b.hidden = taxi;
     }
     this.says.textContent =
       this.showing === "shape"
@@ -551,11 +574,17 @@ export class Garage {
           ? "Your rider. Pick a helmet and overalls."
           : plain
             ? "Pick a colour."
-            : this.embedded
-              ? "Your car. Drag a sticker to move it."
-              : "Tap something to add it, then drag it around the car.";
+            : taxi
+              ? "Pick a colour, and write on the number plates."
+              : this.embedded
+                ? "Your car. Drag a sticker to move it."
+                : "Tap something to add it, then drag it around the car.";
     for (const pick of this.root.querySelectorAll<HTMLElement>(".design")) {
       pick.classList.toggle("on", pick.dataset.design === this.design);
+    }
+    // A picture held on the racing car is not something a taxi has.
+    if (taxi && this.held()?.kind !== "text") {
+      this.chosen = null;
     }
     const one = this.held();
     this.chosenBar.classList.toggle("on", one !== null);

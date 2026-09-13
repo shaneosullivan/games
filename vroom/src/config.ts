@@ -1592,6 +1592,19 @@ export const SOUND = {
   /** The tyres, which come in only when the car is actually sliding. */
   skidLevel: 0.14,
   skidCutoff: 2600,
+  /** The player's engine is a little brighter than the rivals', which are
+   *  duller as well as quieter: the car that is yours should sound nearest. */
+  tone: 900,
+  rivalTone: 600,
+  /**
+   * The rivals: how loud they are right beside you, as a share of the
+   * player's own engine and tyres, and how far away — in world units, about
+   * four car lengths — they have fallen to half of that. Faint on purpose.
+   */
+  rivals: 0.35,
+  hearFrom: 70,
+  /** Each rival's engine a little off the others', so they do not beat. */
+  rivalPitch: [0.92, 1.06, 1.17] as ReadonlyArray<number>,
 } as const;
 
 /**

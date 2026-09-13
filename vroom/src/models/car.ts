@@ -10,7 +10,7 @@ import {
   Sticker,
 } from "../config";
 import {beast} from "./beasts";
-import {taxi} from "./taxi";
+import {plates, taxi} from "./taxi";
 import {COVER, NOSE, onDeck, STATIONS} from "./deck";
 import {stickerMesh} from "./stickers";
 import {Assembly, DETAIL, rounded} from "./assembly";
@@ -49,7 +49,7 @@ export function car(
   // stickers are laid on the deck of a single-seater, and a chequered flag
   // wrapped over a cow is not a livery.
   if (shape === "taxi") {
-    return taxi(colour);
+    return taxi(colour, stickers);
   }
   if (shape !== "racer") {
     return beast(shape, colour, kit);
@@ -158,6 +158,11 @@ export function stick(
   stickers: ReadonlyArray<Sticker>,
   colour: number,
 ): void {
+  // A taxi's writing is on its plates, and it has no stickers besides.
+  if (group.name === "taxi") {
+    plates(group, stickers);
+    return;
+  }
   for (const old of [...group.children]) {
     if (old.userData.sticker === undefined) {
       continue;

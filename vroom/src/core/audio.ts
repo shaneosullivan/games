@@ -1,7 +1,7 @@
 import {SOUND} from "../config";
 
 /**
- * The engine and the tyres.
+ * The engines and the tyres.
  *
  * Made rather than loaded, the same as the other games here: this one ships as
  * a single self-contained html file and a minute of engine as an mp3 would be
@@ -13,18 +13,21 @@ import {SOUND} from "../config";
  * readout of how you are driving: the pitch is how fast, and the hiss is how
  * sideways.
  *
+ * The rivals have the same two sounds, quieter, and quieter again the further
+ * away they are, and off to whichever side of you they are on. You hear a car
+ * coming up behind before you see it, which is what a car behind is for.
+ *
  * Nothing is created until the player has touched the screen. A browser will
  * not start an audio context before a gesture.
  */
 export class Engine {
   private ctx: AudioContext | null = null;
-  private osc: OscillatorNode | null = null;
-  private engineGain: GainNode | null = null;
-  private skidSource: AudioBufferSourceNode | null = null;
-  private skidGain: GainNode | null = null;
+  /** Everything goes through this, so the sound switch is one knob. */
+  private master: GainNode | null = null;
+  private noise: AudioBuffer | null = null;
+  private me: Voice | null = null;
+  private readonly others: Array<Voice> = [];
   private muted = false;
-  /** Follows the speed lazily, so a kerb is not a gear change. */
-  private revs = 0;
 
   /** Call from a real gesture — the button that starts the race. */
   start(): void {
@@ -39,23 +42,11 @@ export class Engine {
     }
     const ctx = new Ctor();
     this.ctx = ctx;
+    this.master = ctx.createGain();
+    this.master.connect(ctx.destination);
 
-    // The engine. A sawtooth through a gentle lowpass: raw, it is a wasp.
-    this.osc = ctx.createOscillator();
-    this.osc.type = "sawtooth";
-    this.osc.frequency.value = SOUND.idleHz;
-    const tame = ctx.createBiquadFilter();
-    tame.type = "lowpass";
-    tame.frequency.value = 900;
-    tame.Q.value = 0.6;
-    this.engineGain = ctx.createGain();
-    this.engineGain.gain.value = SOUND.level;
-    this.osc.connect(tame);
-    tame.connect(this.engineGain);
-    this.engineGain.connect(ctx.destination);
-    this.osc.start();
-
-    // The tyres: a loop of noise, held at silence until something slides.
+    // The tyres' noise, made once and shared: a loop of it per car costs a
+    // few bytes of node, and two seconds of samples per car would not.
     const frames = Math.floor(ctx.sampleRate * 2);
     const buffer = ctx.createBuffer(1, frames, ctx.sampleRate);
     const data = buffer.getChannelData(0);
@@ -69,45 +60,60 @@ export class Engine {
       const t = i / blend;
       data[i] = data[i] * t + data[frames - blend + i] * (1 - t);
     }
-    const band = ctx.createBiquadFilter();
-    band.type = "bandpass";
-    band.frequency.value = SOUND.skidCutoff;
-    band.Q.value = 0.8;
-    this.skidGain = ctx.createGain();
-    this.skidGain.gain.value = 0;
-    this.skidSource = ctx.createBufferSource();
-    this.skidSource.buffer = buffer;
-    this.skidSource.loop = true;
-    this.skidSource.connect(band);
-    band.connect(this.skidGain);
-    this.skidGain.connect(ctx.destination);
-    this.skidSource.start();
+    this.noise = buffer;
+    this.me = new Voice(ctx, this.master, buffer, 1, SOUND.tone);
   }
 
   /** `speed` in units a second, `slip` how fast it is going sideways. */
   update(dt: number, speed: number, slip: number, top: number): void {
-    const want = Math.min(1, Math.max(0, speed / top));
-    this.revs += (want - this.revs) * Math.min(1, SOUND.follow * dt);
-    if (this.muted) {
+    this.me?.update(dt, speed, slip, top, SOUND.level, SOUND.skidLevel, 0);
+  }
+
+  /**
+   * The other cars, heard from where the player is.
+   *
+   * `dx` and `dz` are how far each is from the player's car, in world units.
+   * The shot looks straight down and never turns, so world x *is* left and
+   * right on the screen, which is all the panning needs to know.
+   */
+  hear(
+    dt: number,
+    cars: ReadonlyArray<{speed: number; slip: number; dx: number; dz: number}>,
+    top: number,
+  ): void {
+    const ctx = this.ctx;
+    if (!ctx || !this.master || !this.noise) {
       return;
     }
-    if (this.osc) {
-      this.osc.frequency.value =
-        SOUND.idleHz + this.revs * (SOUND.fullHz - SOUND.idleHz);
-    }
-    if (this.skidGain) {
-      // Straight from the slip rather than eased: a skid starts and stops
-      // sharply and the noise should do the same, or it sounds like it is
-      // catching up with what the car did a moment ago.
-      const howSideways = Math.min(1, slip / 60);
-      this.skidGain.gain.value = SOUND.skidLevel * howSideways;
-    }
+    cars.forEach((car, i) => {
+      // A slightly different engine each, or three cars at the same speed are
+      // one loud car with a beat in it.
+      this.others[i] ??= new Voice(
+        ctx,
+        this.master!,
+        this.noise!,
+        SOUND.rivalPitch[i % SOUND.rivalPitch.length],
+        SOUND.rivalTone,
+      );
+      const far = Math.hypot(car.dx, car.dz) / SOUND.hearFrom;
+      const near = SOUND.rivals / (1 + far * far);
+      const pan = Math.max(-1, Math.min(1, car.dx / (SOUND.hearFrom * 2)));
+      this.others[i].update(
+        dt,
+        car.speed,
+        car.slip,
+        top,
+        SOUND.level * near,
+        SOUND.skidLevel * near,
+        pan,
+      );
+    });
   }
 
   /** A crunch off the barrier: a short burst of low noise. */
   bump(): void {
     const ctx = this.ctx;
-    if (!ctx || this.muted) {
+    if (!ctx || !this.master || this.muted) {
       return;
     }
     const now = ctx.currentTime;
@@ -129,7 +135,7 @@ export class Engine {
     g.gain.exponentialRampToValueAtTime(0.0001, now + 0.24);
     source.connect(low);
     low.connect(g);
-    g.connect(ctx.destination);
+    g.connect(this.master);
     source.start(now);
     source.stop(now + 0.26);
   }
@@ -140,6 +146,8 @@ export class Engine {
     if (!ctx || this.muted) {
       return;
     }
+    // Straight to the speakers rather than through the master, which is
+    // turned down for the finish the moment this has been played.
     [523.25, 659.25, 880].forEach((hz, i) => {
       const at = ctx.currentTime + i * 0.13;
       const osc = ctx.createOscillator();
@@ -158,11 +166,8 @@ export class Engine {
 
   setMuted(muted: boolean): void {
     this.muted = muted;
-    if (this.engineGain) {
-      this.engineGain.gain.value = muted ? 0 : SOUND.level;
-    }
-    if (muted && this.skidGain) {
-      this.skidGain.gain.value = 0;
+    if (this.master) {
+      this.master.gain.value = muted ? 0 : 1;
     }
   }
 
@@ -174,13 +179,101 @@ export class Engine {
    * caterpillar game had once already.
    */
   stop(): void {
-    this.osc?.stop();
-    this.skidSource?.stop();
-    this.osc = null;
-    this.skidSource = null;
+    this.me?.stop();
+    for (const voice of this.others) {
+      voice.stop();
+    }
+    this.me = null;
+    this.others.length = 0;
     void this.ctx?.close();
     this.ctx = null;
-    this.engineGain = null;
-    this.skidGain = null;
+    this.master = null;
+    this.noise = null;
+  }
+}
+
+/** One car's worth of sound: an engine, its tyres, and where it is. */
+class Voice {
+  private readonly osc: OscillatorNode;
+  private readonly engineGain: GainNode;
+  private readonly skid: AudioBufferSourceNode;
+  private readonly skidGain: GainNode;
+  private readonly panner: StereoPannerNode | null;
+  /** Follows the speed lazily, so a kerb is not a gear change. */
+  private revs = 0;
+
+  constructor(
+    ctx: AudioContext,
+    out: AudioNode,
+    noise: AudioBuffer,
+    private readonly pitch: number,
+    tone: number,
+  ) {
+    // Panned where the browser can; an older Safari without a stereo panner
+    // simply hears the rivals from the middle.
+    this.panner = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
+    const into = this.panner ?? out;
+    this.panner?.connect(out);
+
+    // The engine. A sawtooth through a gentle lowpass: raw, it is a wasp.
+    this.osc = ctx.createOscillator();
+    this.osc.type = "sawtooth";
+    this.osc.frequency.value = SOUND.idleHz * pitch;
+    const tame = ctx.createBiquadFilter();
+    tame.type = "lowpass";
+    tame.frequency.value = tone;
+    tame.Q.value = 0.6;
+    this.engineGain = ctx.createGain();
+    this.engineGain.gain.value = 0;
+    this.osc.connect(tame);
+    tame.connect(this.engineGain);
+    this.engineGain.connect(into);
+    this.osc.start();
+
+    // The tyres: noise, held at silence until something slides.
+    const band = ctx.createBiquadFilter();
+    band.type = "bandpass";
+    band.frequency.value = SOUND.skidCutoff;
+    band.Q.value = 0.8;
+    this.skidGain = ctx.createGain();
+    this.skidGain.gain.value = 0;
+    this.skid = ctx.createBufferSource();
+    this.skid.buffer = noise;
+    this.skid.loop = true;
+    // Each from a different point in the loop, so two cars sliding at once
+    // are two hisses and not one hiss twice as loud.
+    this.skid.connect(band);
+    band.connect(this.skidGain);
+    this.skidGain.connect(into);
+    this.skid.start(0, Math.random() * noise.duration);
+  }
+
+  update(
+    dt: number,
+    speed: number,
+    slip: number,
+    top: number,
+    level: number,
+    skidLevel: number,
+    pan: number,
+  ): void {
+    const want = Math.min(1, Math.max(0, speed / top));
+    this.revs += (want - this.revs) * Math.min(1, SOUND.follow * dt);
+    this.osc.frequency.value =
+      (SOUND.idleHz + this.revs * (SOUND.fullHz - SOUND.idleHz)) * this.pitch;
+    this.engineGain.gain.value = level;
+    // Straight from the slip rather than eased: a skid starts and stops
+    // sharply and the noise should do the same, or it sounds like it is
+    // catching up with what the car did a moment ago.
+    const howSideways = Math.min(1, slip / 60);
+    this.skidGain.gain.value = skidLevel * howSideways;
+    if (this.panner) {
+      this.panner.pan.value = pan;
+    }
+  }
+
+  stop(): void {
+    this.osc.stop();
+    this.skid.stop();
   }
 }
