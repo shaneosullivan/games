@@ -1,5 +1,13 @@
 import * as THREE from "three";
-import {CarShape, Environment, PHYSICS, PLAYER, RIVALS, TRACK} from "../config";
+import {
+  CarShape,
+  Environment,
+  GARDA,
+  PHYSICS,
+  PLAYER,
+  RIVALS,
+  TRACK,
+} from "../config";
 import {myColour, neonised} from "../core/garage";
 import {Car, shortestAngle} from "./car";
 import {Patches} from "./patches";
@@ -91,7 +99,7 @@ export class Rivals {
       const design =
         PLAYER.designs[Math.floor(Math.random() * PLAYER.designs.length)].id;
       // And now and again one of them is not a racing car at all: a cow or a
-      // chicken, or a Mini or an old car out of somebody's garage. They all
+      // chicken, a Mini or an old car out of somebody's garage, or the Gardaí. They all
       // drive exactly as a racing car does — same mass, wheels, tyres, engine
       // — so this changes nothing about the race and everything about looking
       // in the mirror.
@@ -105,7 +113,14 @@ export class Rivals {
             ? pick(["cow", "chicken"])
             : roll < RIVALS.beastly + RIVALS.classic
               ? pick(["mini", "vintage"])
-              : "racer";
+              : roll < RIVALS.beastly + RIVALS.classic + RIVALS.garda
+                ? "garda"
+                : "racer";
+      // A Garda car is yellow whatever it was dealt, so its dot on the map is
+      // too.
+      if (shape === "garda") {
+        this.colours[this.colours.length - 1] = GARDA.yellow;
+      }
       const car = new Car(colour, design, [], undefined, shape);
       // Left, right, left: a grid, not a queue.
       const off = (i % 2 === 0 ? 1 : -1) * RIVALS.offset;
