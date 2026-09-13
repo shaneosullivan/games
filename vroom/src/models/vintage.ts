@@ -53,6 +53,9 @@ function cabin(a: Assembly, colour: number, trim: number, L: number): void {
   const half = VINTAGE.body;
   const bottom = VINTAGE.board;
   const belt = VINTAGE.belt;
+  // Dark glass in a black car is no windows at all. On a dark car the glass
+  // is a paler, bluer grey, the colour of a window with the sky in it.
+  const glass = dark(colour) ? VINTAGE.glassOnDark : VINTAGE.glass;
 
   // Stations: z as a fraction of the length, half width, bottom and top. The
   // front is the scuttle, as narrow as the bonnet it meets; the back rounds
@@ -110,7 +113,7 @@ function cabin(a: Assembly, colour: number, trim: number, L: number): void {
     centre,
     frame,
     "glass",
-    VINTAGE.glass,
+    glass,
   );
   pane(
     a,
@@ -123,7 +126,7 @@ function cabin(a: Assembly, colour: number, trim: number, L: number): void {
     centre,
     0.5,
     "glass",
-    VINTAGE.glass,
+    glass,
   );
   const [b, c] = PILLARS.map(p => p * L);
   const gap = 0.22;
@@ -134,17 +137,17 @@ function cabin(a: Assembly, colour: number, trim: number, L: number): void {
       top(s, GLASS.roofBack),
       foot(s, GLASS.rear),
     ];
-    pane(a, clip(side, b + gap, 1), centre, frame, "glass", VINTAGE.glass);
+    pane(a, clip(side, b + gap, 1), centre, frame, "glass", glass);
     pane(
       a,
       clip(clip(side, b - gap, -1), c + gap, 1),
       centre,
       frame,
       "glass",
-      VINTAGE.glass,
+      glass,
     );
     // The little window at the back, set in from the corner.
-    pane(a, clip(side, c - gap, -1), centre, 0.35, "glass", VINTAGE.glass);
+    pane(a, clip(side, c - gap, -1), centre, 0.35, "glass", glass);
 
     // Doors: shut lines, handles, and the chrome along the waist.
     const x = s * (half + 0.01);

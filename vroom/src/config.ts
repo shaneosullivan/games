@@ -1247,6 +1247,8 @@ export const VINTAGE = {
   cream: 0xe9e2cf,
   chrome: 0xdfe3e8,
   glass: 0x222a33,
+  /** The glass on a dark car, which would otherwise vanish into it. */
+  glassOnDark: 0x7f93a6,
 } as const;
 
 /**
