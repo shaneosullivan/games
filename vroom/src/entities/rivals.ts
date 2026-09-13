@@ -104,25 +104,26 @@ export class Rivals {
       // drive exactly as a racing car does — same mass, wheels, tyres, engine
       // — so this changes nothing about the race and everything about looking
       // in the mirror.
-      const roll = Math.random();
-      const pick = (from: ReadonlyArray<CarShape>): CarShape =>
-        from[Math.floor(Math.random() * from.length)];
-      const shape: CarShape =
-        i === cab
-          ? "taxi"
-          : roll < RIVALS.beastly
-            ? pick(["cow", "chicken"])
-            : roll < RIVALS.beastly + RIVALS.classic
-              ? pick(["mini", "vintage"])
-              : roll < RIVALS.beastly + RIVALS.classic + RIVALS.garda
-                ? "garda"
-                : roll <
-                    RIVALS.beastly +
-                      RIVALS.classic +
-                      RIVALS.garda +
-                      RIVALS.engine
-                  ? "engine"
-                  : "racer";
+      // In the neon city, the others can be taxis as well: it is a city.
+      const odds: ReadonlyArray<[ReadonlyArray<CarShape>, number]> = [
+        [["cow", "chicken"], RIVALS.beastly],
+        [["mini", "vintage"], RIVALS.classic],
+        [["garda"], RIVALS.garda],
+        [["engine"], RIVALS.engine],
+        [["taxi"], environment === "neon" ? RIVALS.taxi : 0],
+      ];
+      let shape: CarShape = "racer";
+      let roll = Math.random();
+      for (const [shapes, chance] of odds) {
+        if (roll < chance) {
+          shape = shapes[Math.floor(Math.random() * shapes.length)];
+          break;
+        }
+        roll -= chance;
+      }
+      if (i === cab) {
+        shape = "taxi";
+      }
       // A Garda car is yellow whatever it was dealt, so its dot on the map is
       // too.
       if (shape === "garda") {
