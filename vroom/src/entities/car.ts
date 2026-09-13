@@ -31,10 +31,14 @@ const TAU = Math.PI * 2;
  * ends up pointing at, and back is a brake rather than a request to face the
  * other way. Feeding a keyboard through `aim` gave four fixed compass
  * directions, which is not driving.
+ *
+ * Neither of them reverses. Holding the brake at a standstill is standing
+ * still; the one thing that goes backwards is a rival backing out of a wall,
+ * which asks for it by name.
  */
 export type Drive =
   | {kind: "aim"; aim: THREE.Vector2}
-  | {kind: "wheel"; steer: number; throttle: number};
+  | {kind: "wheel"; steer: number; throttle: number; reverse?: boolean};
 
 export function shortestAngle(from: number, to: number): number {
   return ((((to - from) % TAU) + TAU + Math.PI) % TAU) - Math.PI;
@@ -96,6 +100,11 @@ export class Car {
   private fyFront = 0;
   private fyRear = 0;
   private prevHeading = 0;
+  /** Which way a U-turn is going round, once it has started: 1, -1, or 0 for
+   *  not in one. Held, because with the stick straight behind the car the
+   *  shorter way round flips from one side to the other with every wobble of
+   *  a thumb, and the wheels would saw between the two locks. */
+  private uTurn = 0;
 
   /** How fast it is going sideways. The skid marks and the tyre noise both
    *  read off this, and so does whether the player is being clever. */
@@ -247,6 +256,7 @@ export class Car {
     this.lastPush = 0;
     this.fyFront = 0;
     this.fyRear = 0;
+    this.uTurn = 0;
     this.slip = 0;
     this.hint = hint;
     this.lap = lap;
@@ -326,10 +336,17 @@ export class Car {
             : under === "ramp"
               ? SURFACE.tarmac
               : off;
+      // A tyre still laying a line of oil has oil on it, and oil on a tyre is
+      // oil between the tyre and the road. It wears off as the trail does.
+      const oily =
+        under === null && this.carrying[i] === "oil"
+          ? (1 - SURFACE.oilyTyre) * (this.carriedFor[i] / TRAIL.carries)
+          : 0;
+      const grip = on.grip * (1 - oily);
       if (i < 2) {
-        gripFront += on.grip / 2;
+        gripFront += grip / 2;
       } else {
-        gripRear += on.grip / 2;
+        gripRear += grip / 2;
       }
       rollMult = Math.max(rollMult, on.roll);
       if (under === "ramp" && i < 2) {
@@ -447,50 +464,111 @@ export class Car {
     const fast = Math.min(1, speed / (CAR.top / s));
     const lock = PHYSICS.steerMax * (1 - fast * (1 - PHYSICS.steerAtSpeed));
 
-    let wantSteer = 0;
-    let throttle = 0;
-    let braking = 0;
-    if (drive.kind === "wheel") {
-      wantSteer = drive.steer * lock;
-      throttle = Math.max(0, drive.throttle);
-      braking = Math.max(0, -drive.throttle);
-    } else {
-      const push = Math.min(1, drive.aim.length());
-      if (push > 1e-4) {
-        const target = Math.atan2(drive.aim.x, drive.aim.y);
-        const diff = shortestAngle(this.heading, target);
-        wantSteer = Math.max(-lock, Math.min(lock, diff));
-        // Pushing against the way the car is pointing is the brake. There is
-        // no separate brake button and there does not need to be one: asking
-        // to go the other way is asking to slow down, which is what a child
-        // does without being told.
-        const facing =
-          (this.dir.x * drive.aim.x + this.dir.y * drive.aim.y) / push;
-        if (facing < -0.2) {
-          braking = push;
-          // Pulling the stick back means stop, not turn round. It used to mean
-          // both — the stick was behind the car, so the steering was wound to
-          // full lock as well, and full lock plus full brakes at a hundred and
-          // twenty puts any car on its roof-side. What is left is enough to
-          // steer *while* stopping and nowhere near enough to spin.
-          wantSteer *= PHYSICS.steerWhileBraking;
-        } else {
-          throttle = push;
-        }
-      }
-    }
-    // The rack takes time to turn, which is most of why a car feels like it
-    // has weight. Instant lock is a mouse pointer.
-    const swing = PHYSICS.steerRate * dt * (flying ? ITEM.ramp.steer : 1);
-    this.steer += Math.max(-swing, Math.min(swing, wantSteer - this.steer));
-    this.steer = Math.max(-lock, Math.min(lock, this.steer));
-
-    // ---- the tyres ---------------------------------------------------------
     this.dir.set(Math.sin(this.heading), Math.cos(this.heading));
     this.side.set(this.dir.y, -this.dir.x);
     // Body axes, in metres a second: along the nose, and out of the door.
     let vx = this.velocity.dot(this.dir) / s;
     let vy = this.velocity.dot(this.side) / s;
+
+    // Which way the car is actually travelling, against where it points: the
+    // angle of the slide. Faded in from a crawl, where a car barely moving has
+    // a direction of travel that means nothing.
+    const drifting =
+      Math.atan2(vy, Math.max(Math.abs(vx), 0.5)) *
+      Math.min(1, speed / PHYSICS.crawl);
+
+    let wantSteer = 0;
+    let throttle = 0;
+    let braking = 0;
+    // How much lock this step may use, either side of straight along the
+    // slide. See PHYSICS.steerAtSpeed and PHYSICS.driftLock.
+    let reach = lock;
+    if (drive.kind === "wheel") {
+      wantSteer = drive.steer * lock;
+      throttle = Math.max(0, drive.throttle);
+      braking = Math.max(0, -drive.throttle);
+      this.uTurn = 0;
+    } else {
+      const push = Math.min(1, drive.aim.length());
+      if (push > 1e-4) {
+        const target = Math.atan2(drive.aim.x, drive.aim.y);
+        // Steered for where the nose is about to be, not where it is. A car
+        // swinging round at two radians a second will go on swinging for a
+        // moment after the wheels straighten, and steering until the nose
+        // is on target is steering until it is past it: the swing overshot,
+        // the back came round the other way, and the next correction made it
+        // worse. A driver unwinds the lock before they get there.
+        const diff = shortestAngle(
+          this.heading + this.yawRate * PHYSICS.anticipate,
+          target,
+        );
+        // Behind the car is a U-turn, driven forwards. Pulling back used to
+        // be the brake, which stopped the car and then drove it backwards the
+        // way the stick pointed — and a car going backwards is not what a
+        // child pointing the other way wants. They want it turned round.
+        if (Math.abs(diff) > PHYSICS.uTurn) {
+          if (this.uTurn === 0 || Math.abs(diff) < Math.PI - 0.4) {
+            this.uTurn = Math.sign(diff) || 1;
+          }
+          wantSteer = this.uTurn * PHYSICS.steerMax;
+          // Off the throttle and on the brakes until it is slow enough to go
+          // round, then round on the throttle. Nobody takes a hairpin flat.
+          const over = speed - PHYSICS.uTurnSpeed;
+          throttle = over > 0 ? 0 : push * PHYSICS.uTurnThrottle;
+          braking = over > 0 ? push * Math.min(1, over / 6) : 0;
+        } else {
+          this.uTurn = 0;
+          wantSteer = diff;
+          throttle = push;
+        }
+        // Yanking the stick well round at speed gets more lock than the rack
+        // would otherwise allow, which is how a drift is started: more angle
+        // than the tyres can hold, so the back steps out. A gentle push gets
+        // the rack as it is and simply goes round.
+        //
+        // Only until the car is sliding, though. Once the back is out as far
+        // as a drift should go, the extra lock is taken away again and the
+        // wheels are left to follow the slide — or a second yank the other
+        // way, mid-drift, winds a slide that is already big into a spin.
+        const held = clamp(
+          (PHYSICS.driftMost - Math.abs(drifting)) /
+            (PHYSICS.driftMost - PHYSICS.driftEnough),
+          0,
+          1,
+        );
+        // And less of it where there is less grip to catch it with. On oil
+        // that is almost none, which is fine: oil is supposed to be trouble.
+        const yank =
+          held *
+          Math.min(1, gripRear) *
+          clamp(
+            (Math.abs(diff) - PHYSICS.driftFrom) /
+              (PHYSICS.driftFull - PHYSICS.driftFrom),
+            0,
+            1,
+          );
+        reach = lock + (PHYSICS.steerMax - lock) * PHYSICS.driftLock * yank;
+      } else {
+        this.uTurn = 0;
+      }
+    }
+    // The lock is measured from the direction of travel, not from the nose.
+    // A car that is sliding needs its front wheels pointed down the slide to
+    // catch it — which is what opposite lock is — and a rack that only turns a
+    // few degrees either side of the nose cannot get them there: the slide
+    // got bigger than the lock, and the car went round with its wheels turned
+    // as far as they would go the wrong way. Every spin that was reported
+    // started like that, usually on the grass.
+    const low = Math.max(-PHYSICS.steerMax, drifting - reach);
+    const high = Math.min(PHYSICS.steerMax, drifting + reach);
+    wantSteer = clamp(wantSteer, low, high);
+    // The rack takes time to turn, which is most of why a car feels like it
+    // has weight. Instant lock is a mouse pointer.
+    const swing = PHYSICS.steerRate * dt * (flying ? ITEM.ramp.steer : 1);
+    this.steer += Math.max(-swing, Math.min(swing, wantSteer - this.steer));
+    this.steer = clamp(this.steer, low, high);
+
+    // ---- the tyres ---------------------------------------------------------
 
     const b = PHYSICS.toFront;
     const c = PHYSICS.toRear;
@@ -564,12 +642,17 @@ export class Car {
         PHYSICS.power / Math.max(2, Math.abs(vx)),
       );
       let fxRear = throttle * pull;
-      if (braking > 0) {
-        fxRear -=
-          braking * (vx > 0.5 ? PHYSICS.brake : PHYSICS.drive * 0.6) * 0.6;
+      let fxFront = 0;
+      const reverse = drive.kind === "wheel" && drive.reverse === true;
+      if (braking > 0 && Math.abs(vx) > 0.5 && !(reverse && vx < 0)) {
+        // Brakes, against whichever way it is rolling. They stop a car; they
+        // do not then drive it the other way.
+        const brake = -Math.sign(vx) * braking * PHYSICS.brake;
+        fxRear += brake * (1 - PHYSICS.brakeFront);
+        fxFront = brake * PHYSICS.brakeFront;
+      } else if (braking > 0 && reverse) {
+        fxRear -= braking * PHYSICS.drive * 0.36;
       }
-      let fxFront =
-        braking > 0 && vx > 0.5 ? -braking * PHYSICS.brake * 0.4 : 0;
 
       // The friction circle. An axle has one budget of grip and spends it on
       // whatever is asked of it first — so a rear tyre already at full
@@ -583,12 +666,21 @@ export class Car {
       // stable, because a rear axle that locks while the car is turning puts
       // the car round. Without it, full brakes and full lock at a hundred and
       // twenty spun it a hundred and eighty degrees every time.
+      //
+      // And the same under power, which is traction control, and which every
+      // road car has too. The engine has far more shove than a tyre on grass
+      // can use, and spending the whole budget on wheelspin left nothing to
+      // hold the back end: a car turning on the grass at walking pace went
+      // round. So the grip goes to holding the line first and the engine gets
+      // what is left — never less than `traction` of it, or a car in a slide
+      // could not drive out of one.
       const rearGrip = muRear * loadRear;
+      fyRear = clamp(fyRear, -rearGrip, rearGrip);
+      const spare = Math.sqrt(Math.max(0, rearGrip ** 2 - fyRear ** 2));
       if (fxRear < 0) {
-        fyRear = clamp(fyRear, -rearGrip, rearGrip);
-        const spare = Math.sqrt(Math.max(0, rearGrip ** 2 - fyRear ** 2));
         fxRear = Math.max(fxRear, -spare);
       } else {
+        fxRear = Math.min(fxRear, Math.max(spare, PHYSICS.traction * rearGrip));
         [fxRear, fyRear] = circle(fxRear, fyRear, rearGrip);
       }
       [fxFront, fyFront] = circle(fxFront, fyFront, muFront * loadFront);
@@ -616,6 +708,27 @@ export class Car {
       const kinematic = (vx * Math.tan(this.steer)) / L;
       this.yawRate =
         rolling * (this.yawRate + spin * dt) + (1 - rolling) * kinematic;
+
+      // Stability control, as every car sold in Europe since 2014 has it. A
+      // path can only bend as fast as the tyres can pull it round — grip over
+      // speed — and a nose turning much faster than that is a car starting to
+      // spin. It is caught by braking one wheel, which is a turning moment, and
+      // a braked wheel can only push as hard as its grip: so this is strong on
+      // tarmac, weaker on grass, and next to nothing on oil, where the car is
+      // meant to be in trouble.
+      //
+      // And it leaves a drift alone. It only steps in once the car is further
+      // sideways than a drift should go — until then a sliding car at full
+      // lock in a sharp bend is exactly what was asked for, and catching every
+      // one of them took the drifting out of the game along with the spins.
+      const grip = Math.min(gripFront, gripRear);
+      const bends = (PHYSICS.grip * grip * g) / Math.max(speed, 3);
+      const excess = Math.abs(this.yawRate) - PHYSICS.escMargin * bends;
+      if (excess > 0 && Math.abs(drifting) > PHYSICS.driftEnough) {
+        this.yawRate -=
+          Math.sign(this.yawRate) *
+          Math.min(excess, PHYSICS.escRate * grip * dt);
+      }
     }
 
     this.heading += this.yawRate * dt;

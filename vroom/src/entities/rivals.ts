@@ -45,10 +45,15 @@ export class Rivals {
   private readonly want = new THREE.Vector2();
   private readonly here = new THREE.Vector3();
   /** Held rather than made each step: three cars, sixty steps a second. */
-  private readonly drive: {kind: "wheel"; steer: number; throttle: number};
+  private readonly drive: {
+    kind: "wheel";
+    steer: number;
+    throttle: number;
+    reverse: boolean;
+  };
 
   constructor(track: Track) {
-    this.drive = {kind: "wheel", steer: 0, throttle: 0};
+    this.drive = {kind: "wheel", steer: 0, throttle: 0, reverse: false};
     // Every car in the race is a different colour, and none of them is the
     // player's. Two the same is a child watching the wrong one all the way
     // round — and that goes for two rivals as much as for a rival and you.
@@ -275,6 +280,7 @@ export class Rivals {
           -RIVALS.backSteer *
           Math.max(-1, Math.min(1, wheel / PHYSICS.steerMax));
         this.drive.throttle = -1;
+        this.drive.reverse = true;
         car.update(dt, this.drive, track, patches);
         car.keepIn(track, dt);
         continue;
@@ -288,6 +294,7 @@ export class Rivals {
 
       this.drive.steer = Math.max(-1, Math.min(1, wheel / PHYSICS.steerMax));
       this.drive.throttle = push;
+      this.drive.reverse = false;
       car.update(dt, this.drive, track, patches);
       car.keepIn(track, dt);
     }

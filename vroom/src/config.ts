@@ -906,9 +906,45 @@ export const PHYSICS = {
   steerMax: 0.62,
   steerRate: 4.2,
   steerAtSpeed: 0.1,
-  /** How much steering is left while the brakes are on hard. Enough to place
-   *  the car, not enough to swap ends with it. */
-  steerWhileBraking: 0.3,
+  /**
+   * A drift, started on purpose.
+   *
+   * With the stick pushed more than `driftFrom` radians round from the nose,
+   * the rack is allowed past its speed-sensitive lock, all the way to
+   * `driftLock` of the full lock by `driftFull`. More angle than the tyres
+   * can hold at speed is exactly how a drift starts — the back steps out —
+   * and because the lock is measured from the slide rather than from the
+   * nose, the same wheels then catch it.
+   */
+  driftFrom: 0.5,
+  driftFull: 1.3,
+  driftLock: 0.5,
+  /** And the slide, in radians, at which that extra lock starts to be taken
+   *  back, and by which it is all gone: twenty degrees and forty. */
+  driftEnough: 0.35,
+  driftMost: 0.7,
+  /**
+   * Past this many radians between the nose and the stick, the car does a
+   * U-turn — forwards, at full lock, braking first to `uTurnSpeed` metres a
+   * second and then going round on `uTurnThrottle` of the engine.
+   */
+  /** The least of the rear tyres' grip the engine is given in a slide; see
+   *  the friction circle in Car.update. */
+  traction: 0.3,
+  /** How far ahead, in seconds, the stick steers for: where the nose will be
+   *  at the rate it is turning, so the lock comes off before the car arrives
+   *  rather than after. */
+  anticipate: 0.3,
+  /**
+   * Stability control: how much faster than the tyres can bend its path the
+   * nose may turn before a wheel is braked to stop it, and how quickly that
+   * braking can take the turn out, in radians a second squared on dry tarmac.
+   */
+  escMargin: 1.5,
+  escRate: 5,
+  uTurn: 2.0,
+  uTurnSpeed: 11,
+  uTurnThrottle: 0.6,
   /** Below this speed, in m/s, the slip-angle model is nonsense — dividing by
    *  a forward speed of nothing — so the car steers geometrically instead, the
    *  way a shopping trolley does. */
@@ -945,6 +981,9 @@ export const SURFACE = {
   grass: {grip: 0.55, roll: 4},
   oil: {grip: 0.16, roll: 0.9},
   mud: {grip: 0.72, roll: 7},
+  /** What is left of a tyre's grip the moment it leaves a slick, still wet
+   *  with it, recovering to dry as the trail it lays runs out. */
+  oilyTyre: 0.45,
 } as const;
 
 /**
