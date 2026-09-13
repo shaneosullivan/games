@@ -11,8 +11,8 @@ import {rod} from "./coachwork";
  * door on the front, then the boiler in the chosen colour with a dome and two
  * brass safety valves on top, square water tanks down either side of it, a
  * cab with round windows in its front, and a coal bunker at the back. All of
- * that stands on a red-edged running board over three big spoked wheels a
- * side joined by coupling rods, with a red buffer beam and two buffers at each
+ * that stands on a running board over three big spoked wheels a
+ * side joined by coupling rods, with a buffer beam and two buffers at each
  * end.
  *
  * There is no face on it. The front of a real engine's boiler is a door, and
@@ -25,7 +25,7 @@ export function engine(colour: number = 0x2f7fd0): THREE.Group {
   const a = new Assembly();
   const L = CAR.length;
 
-  chassis(a, L);
+  chassis(a, colour, L);
   boiler(a, colour, L);
   tanks(a, colour, L);
   cab(a, colour, L);
@@ -57,18 +57,18 @@ export function engine(colour: number = 0x2f7fd0): THREE.Group {
 }
 
 /** The running board, the frames under it, and the buffer beams. */
-function chassis(a: Assembly, L: number): void {
+function chassis(a: Assembly, colour: number, L: number): void {
   const top = ENGINE.footplate;
   const W = CAR.width;
 
-  // The running board: black on top, with a red valance down its edge.
+  // The running board: black on top, with a painted valance down its edge.
   const deck = rounded(W, 0.18, L - 0.6, 0.06);
   deck.translate(0, top - 0.09, 0);
   a.add(deck, "matte", ENGINE.black);
   for (const side of [-1, 1]) {
     const valance = rounded(0.16, 0.55, L - 0.6, 0.05);
     valance.translate(side * (W / 2 - 0.08), top - 0.4, 0);
-    a.add(valance, "bodywork", ENGINE.red);
+    a.add(valance, "bodywork", colour);
   }
   // Frames, between the wheels.
   for (const side of [-1, 1]) {
@@ -81,7 +81,7 @@ function chassis(a: Assembly, L: number): void {
     const z = end * (L / 2 - 0.3);
     const beam = rounded(W, 1.1, 0.45, 0.08);
     beam.translate(0, top - 0.6, z);
-    a.add(beam, "bodywork", ENGINE.red);
+    a.add(beam, "bodywork", colour);
     for (const side of [-1, 1]) {
       const stock = new THREE.CylinderGeometry(0.24, 0.3, 0.7, DETAIL.coarse);
       stock.rotateX(Math.PI / 2);
@@ -217,7 +217,7 @@ function boiler(a: Assembly, colour: number, L: number): void {
   }
 }
 
-/** The water tanks, one each side of the boiler, with red lining. */
+/** The water tanks, one each side of the boiler, lined out. */
 function tanks(a: Assembly, colour: number, L: number): void {
   const from = 0.28 * L;
   const to = -0.07 * L;
@@ -229,7 +229,7 @@ function tanks(a: Assembly, colour: number, L: number): void {
     tank.translate(x, (high + low) / 2, (from + to) / 2);
     a.add(tank, "bodywork", colour);
 
-    // Red lining, a little in from the edges of the outside face.
+    // Lining, a little in from the edges of the outside face.
     const face = x + side * 0.9;
     const inset = 0.3;
     const corners = [
@@ -239,7 +239,7 @@ function tanks(a: Assembly, colour: number, L: number): void {
       new THREE.Vector3(face, low + inset, to + inset),
     ];
     for (let i = 0; i < 4; i++) {
-      rod(a, corners[i], corners[(i + 1) % 4], 0.05, "matte", ENGINE.red);
+      rod(a, corners[i], corners[(i + 1) % 4], 0.05, "matte", lining(colour));
     }
   }
 }
@@ -276,7 +276,7 @@ function cab(a: Assembly, colour: number, L: number): void {
       from - (from - to) * 0.45,
     );
     a.add(opening, "rubber", 0x14161b);
-    // Red lining round the cab side.
+    // Lining round the cab side.
     const face = side * ((W - 0.3) / 2 + 0.03);
     const inset = 0.3;
     const edge = [
@@ -286,7 +286,7 @@ function cab(a: Assembly, colour: number, L: number): void {
       new THREE.Vector3(face, low + inset, to + inset),
     ];
     for (let i = 0; i < 4; i++) {
-      rod(a, edge[i], edge[(i + 1) % 4], 0.05, "matte", ENGINE.red);
+      rod(a, edge[i], edge[(i + 1) % 4], 0.05, "matte", lining(colour));
     }
   }
 
@@ -372,4 +372,16 @@ function wheel(a: Assembly, colour: number, x: number, z: number): void {
   hub.rotateZ(Math.PI / 2);
   hub.translate(x + out * 0.05, r, z);
   a.add(hub, "matte", ENGINE.black);
+}
+
+/**
+ * The lining on the tanks and cab: the engine's own colour, darker.
+ *
+ * It was red, along with the running board and the buffer beams, and a child
+ * who painted their engine green wanted a green engine — not a green one with
+ * red bits. A darker line in the same colour still shows the panels without
+ * bringing a second colour into it.
+ */
+function lining(colour: number): number {
+  return new THREE.Color(colour).multiplyScalar(ENGINE.lining).getHex();
 }
