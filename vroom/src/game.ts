@@ -30,6 +30,7 @@ import {Engine} from "./core/audio";
 import {Stage} from "./render/stage";
 import {signed, Track, wrap} from "./entities/track";
 import {Car, Drive} from "./entities/car";
+import {collide} from "./entities/collide";
 import {Rivals} from "./entities/rivals";
 import {Skids} from "./entities/skids";
 import {Scenery} from "./entities/scenery";
@@ -495,13 +496,7 @@ export class Game {
   }
 
   /**
-   * Cars bouncing off each other.
-   *
-   * Equal discs, shoved apart and given back half of the speed they closed at.
-   * That is the whole model, deliberately: this wants to be a nudge that
-   * unsettles a car, not a crash that ends anybody's race. Some of the closing
-   * speed is thrown away as well, so four cars arriving at a hairpin together
-   * settle instead of pinging about.
+   * Cars hitting each other; see `collide`.
    *
    * Returns whether the player was one of the two, which is what decides
    * whether a child hears anything.
@@ -511,42 +506,8 @@ export class Game {
     let hitPlayer = false;
     for (let i = 0; i < cars.length; i++) {
       for (let j = i + 1; j < cars.length; j++) {
-        const a = cars[i];
-        const b = cars[j];
-        const dx = b.position.x - a.position.x;
-        const dz = b.position.z - a.position.z;
-        const d = Math.hypot(dx, dz);
-        if (d >= BUMP.radius * 2 || d < 1e-4) {
-          continue;
-        }
-        const nx = dx / d;
-        const nz = dz / d;
-        const overlap = BUMP.radius * 2 - d;
-        // Half each. Neither car is more important than the other, and a car
-        // that never gave ground would be a wall with wheels.
-        a.position.x -= nx * overlap * 0.5;
-        a.position.z -= nz * overlap * 0.5;
-        b.position.x += nx * overlap * 0.5;
-        b.position.z += nz * overlap * 0.5;
-
-        const closing =
-          (b.velocity.x - a.velocity.x) * nx +
-          (b.velocity.y - a.velocity.y) * nz;
-        if (closing < 0) {
-          // Equal cars, so each takes half of the change: the closing speed
-          // cancelled, and a share of it given back the other way.
-          const kick = Math.max(BUMP.nudge, (-closing * (1 + BUMP.bounce)) / 2);
-          a.velocity.x -= nx * kick;
-          a.velocity.y -= nz * kick;
-          b.velocity.x += nx * kick;
-          b.velocity.y += nz * kick;
-          a.velocity.multiplyScalar(BUMP.keep);
-          b.velocity.multiplyScalar(BUMP.keep);
-          twist(a, nx, nz, kick);
-          twist(b, -nx, -nz, kick);
-          if (i === 0) {
-            hitPlayer = true;
-          }
+        if (collide(cars[i], cars[j]) && i === 0) {
+          hitPlayer = true;
         }
       }
     }
@@ -853,23 +814,4 @@ export class Game {
 /** Hands the frame back to the browser, so the waiting card can paint. */
 function frame(): Promise<void> {
   return new Promise(done => requestAnimationFrame(() => done()));
-}
-
-/**
- * A push that lands off a car's middle turns it as well as moving it.
- *
- * `nx`, `nz` point from this car towards the one it met, and the push is
- * `kick` the other way. Hit at the nose from the side and the nose swings
- * away; hit at the tail and the tail does. Hit square in the middle, or
- * straight along the car, and it only moves.
- */
-function twist(car: Car, nx: number, nz: number, kick: number): void {
-  const dirX = Math.sin(car.heading);
-  const dirZ = Math.cos(car.heading);
-  // Where along the car it was touched, -1 at the tail and 1 at the nose, and
-  // how much of the push is across the car rather than along it. Across is
-  // the car's own "side" axis, which positive yaw turns the nose towards.
-  const along = nx * dirX + nz * dirZ;
-  const across = -nx * dirZ + nz * dirX;
-  car.yawRate += BUMP.spin * along * across * (kick / 10);
 }

@@ -1875,34 +1875,18 @@ export const TRAIL = {
 } as const;
 
 export const BUMP = {
-  /** How close two cars get before they touch, centre to centre. A little
-   *  under half a car length, so they can run side by side down a straight
-   *  without shoving each other the whole way. */
-  radius: 7.4,
   /**
-   * How much of the closing speed comes back as a bounce: 0 is two cars that
-   * stop closing and nothing else, 1 is two snooker balls.
-   *
-   * It used to be 0 in effect — the shove was worked out as half the closing
-   * speed each, which only cancels the closing — so a car that was hit simply
-   * went on at the speed of the one that hit it, and nothing about it felt
-   * like a push. A third back is a bump you can see.
+   * How much of the speed two cars close at comes back as a bounce: 0 is two
+   * cars that simply stop closing, 1 is two snooker balls. Car bodies crumple
+   * and spring back a little, which is about a third.
    */
-  bounce: 0.35,
-  /** The least push a touch gives, in units a second, so a gentle lean on a
-   *  car still moves it; and how much a hit off the middle turns a car, in
-   *  radians a second for a ten-unit shove at its very nose. */
-  nudge: 6,
-  spin: 0.5,
-  /**
-   * And how much speed survives each step of contact, so a pile-up settles.
-   *
-   * Applied every step the two are touching rather than once per impact, which
-   * is right — leaning on a car ahead should cost you — but it compounds, and
-   * it has to be gentle for that reason. At 0.88 a shunt lasting ten steps
-   * kept a quarter of the speed and stopped the player dead.
-   */
-  keep: 0.97,
+  bounce: 0.3,
+  /** Metal rubbing on metal along the faces that touched, as a share of the
+   *  push between them. */
+  rub: 0.35,
+  /** How far apart in height two cars can be and still hit — a car in the
+   *  air off a ramp goes over the top of one on the road. */
+  clears: 3,
   /** How long between bump noises. Ten frames of contact is one bump, not ten
    *  — without this a shunt is a machine gun. */
   quiet: 0.25,
