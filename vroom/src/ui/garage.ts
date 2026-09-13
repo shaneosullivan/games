@@ -658,7 +658,9 @@ export class Garage {
         return;
       }
       if (turning !== null) {
-        this.turn -= (e.clientX - turning) * 0.01;
+        // The side of the car nearest you follows the finger: swipe right
+        // and the front of it comes round to the right.
+        this.turn += (e.clientX - turning) * 0.01;
         turning = e.clientX;
       }
     });
