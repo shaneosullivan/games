@@ -822,7 +822,7 @@ export const PHYSICS = {
    * this one number and the weight on each axle, which is why it is the only
    * "handling" number worth tuning.
    */
-  grip: 1.85,
+  grip: 2.1,
   /**
    * And how much more of it the back has than the front.
    *
@@ -907,6 +907,23 @@ export const PHYSICS = {
   steerRate: 4.2,
   steerAtSpeed: 0.1,
   /**
+   * A sharp turn: past `turnFrom` radians between the nose and the stick, the
+   * throttle is eased, by as much as `turnLift` of it when the stick is all
+   * the way round and the car is flat out.
+   */
+  /** How many radians of steering the stick asks for per radian between the
+   *  nose and where it points. */
+  steerGain: 1.8,
+  turnFrom: 0.35,
+  turnFull: 1.4,
+  turnLift: 0.85,
+  /** And the speed, in m/s, below which it eases off less, so a car can still
+   *  pull away with the stick pushed to one side. */
+  turnLiftFrom: 6,
+  /** How hard it brakes for a sharp turn it is going too fast for, as a
+   *  share of full braking. */
+  turnBrake: 0.7,
+  /**
    * A drift, started on purpose.
    *
    * With the stick pushed more than `driftFrom` radians round from the nose,
@@ -934,7 +951,7 @@ export const PHYSICS = {
   /** How far ahead, in seconds, the stick steers for: where the nose will be
    *  at the rate it is turning, so the lock comes off before the car arrives
    *  rather than after. */
-  anticipate: 0.3,
+  anticipate: 0.22,
   /**
    * Stability control: how much faster than the tyres can bend its path the
    * nose may turn before a wheel is braked to stop it, and how quickly that

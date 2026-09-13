@@ -518,8 +518,46 @@ export class Car {
           braking = over > 0 ? push * Math.min(1, over / 6) : 0;
         } else {
           this.uTurn = 0;
-          wantSteer = diff;
-          throttle = push;
+          // More lock than the angle left to turn, so the last of a turn is
+          // steered into rather than crept up on.
+          wantSteer = diff * PHYSICS.steerGain;
+          // Off the throttle in proportion to how far round the stick is:
+          // a sharp corner is taken by lifting, the way anybody drives one.
+          // Flat out, the car gained speed all the way round the bend, the
+          // weight it threw on the back wheels took grip off the front ones,
+          // and a right-angle turn at walking pace swung thirty metres wide.
+          //
+          // Measured against the way the car is actually travelling, not the
+          // way its nose is about to point: steering for the nose, the turn
+          // looked finished the moment the nose began to swing, the brakes
+          // came off, and the car ran wide on the throttle.
+          const path =
+            speed > 1
+              ? Math.atan2(this.velocity.x, this.velocity.y)
+              : this.heading;
+          const sharp = clamp(
+            (Math.abs(shortestAngle(path, target)) - PHYSICS.turnFrom) /
+              (PHYSICS.turnFull - PHYSICS.turnFrom),
+            0,
+            1,
+          );
+          // Not at a crawl, though, or a car pulling away with the stick to one
+          // side would sit there.
+          const moving = Math.min(1, speed / PHYSICS.turnLiftFrom);
+          throttle = push * (1 - sharp * moving * PHYSICS.turnLift);
+          // And on the brakes, if it is going too fast to turn that sharply at
+          // all. A tyre can only pull a car round so hard — at sixteen metres
+          // a second the tightest circle this one can hold is four car lengths
+          // across — so the only way to turn sharply is slowly, and asking for
+          // a sharp turn is asking to slow down for it.
+          const corner =
+            PHYSICS.uTurnSpeed +
+            (CAR.top / s - PHYSICS.uTurnSpeed) * (1 - sharp) ** 2;
+          const over = speed - corner;
+          if (over > 1) {
+            throttle = 0;
+            braking = push * Math.min(1, over / 8) * PHYSICS.turnBrake;
+          }
         }
         // Yanking the stick well round at speed gets more lock than the rack
         // would otherwise allow, which is how a drift is started: more angle
