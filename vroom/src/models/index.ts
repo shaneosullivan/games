@@ -5,7 +5,9 @@ import {material as materialFor} from "../render/materials";
 import {Assembly} from "./assembly";
 import {beast} from "./beasts";
 import {car, driver} from "./car";
+import {mini} from "./mini";
 import {taxi} from "./taxi";
+import {vintage} from "./vintage";
 import {plant} from "./flora";
 import {neonSign} from "./neon";
 import {barrier, cone, gantry, ramp, tyreStack} from "./props";
@@ -13,7 +15,9 @@ import {spectator, stand} from "./stand";
 
 export {beast} from "./beasts";
 export {car, driver} from "./car";
+export {mini} from "./mini";
 export {taxi} from "./taxi";
+export {vintage} from "./vintage";
 export {plant} from "./flora";
 export {neonSign} from "./neon";
 export {barrier, cone, gantry, ramp, tyreStack} from "./props";
@@ -68,6 +72,18 @@ export const MODELS: Array<ModelEntry> = [
     name: "Taxi",
     size: 22,
     make: () => taxi(),
+  },
+  {
+    id: "car-mini",
+    name: "Mini",
+    size: 22,
+    make: () => mini(),
+  },
+  {
+    id: "car-vintage",
+    name: "Old car",
+    size: 22,
+    make: () => vintage(),
   },
   {
     id: "driver",

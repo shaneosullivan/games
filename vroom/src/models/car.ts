@@ -10,7 +10,9 @@ import {
   Sticker,
 } from "../config";
 import {beast} from "./beasts";
+import {mini} from "./mini";
 import {plates, taxi} from "./taxi";
+import {vintage} from "./vintage";
 import {COVER, NOSE, onDeck, STATIONS} from "./deck";
 import {stickerMesh} from "./stickers";
 import {Assembly, DETAIL, rounded} from "./assembly";
@@ -50,6 +52,12 @@ export function car(
   // wrapped over a cow is not a livery.
   if (shape === "taxi") {
     return taxi(colour, stickers);
+  }
+  if (shape === "mini") {
+    return mini(colour);
+  }
+  if (shape === "vintage") {
+    return vintage(colour);
   }
   if (shape !== "racer") {
     return beast(shape, colour, kit);

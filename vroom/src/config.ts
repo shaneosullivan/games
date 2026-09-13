@@ -1170,7 +1170,8 @@ export const RIVALS = {
 } as const;
 
 /** What you race: the single-seater, or one of the two that are not cars. */
-export type CarShape = "racer" | "cow" | "chicken" | "taxi";
+export type CarShape =
+  "racer" | "cow" | "chicken" | "taxi" | "mini" | "vintage";
 
 /**
  * The shapes on offer, in the order they are shown.
@@ -1186,7 +1187,64 @@ export const SHAPES = [
   {id: "cow", name: "Cow", emoji: "🐮"},
   {id: "chicken", name: "Chicken", emoji: "🐔"},
   {id: "taxi", name: "Taxi", emoji: "🚕"},
+  {id: "mini", name: "Mini", emoji: "🚗"},
+  {id: "vintage", name: "Old car", emoji: "🎩"},
 ] as ReadonlyArray<{id: CarShape; name: string; emoji: string}>;
+
+/**
+ * The Mini: the little two-door box from the sixties, with a wheel at each
+ * corner and a roof in a different colour from the rest of it.
+ *
+ * The same sixteen by seven as everything else, which at a real Mini's three
+ * metres long is a car drawn a little bigger than life. It keeps the thing
+ * that makes one a Mini — tiny wheels right out at the corners, and hardly
+ * any car in front of the front ones or behind the back ones.
+ */
+export const MINI = {
+  /** Tiny wheels. Ten inches on the real thing. */
+  wheel: 1.25,
+  track: 2.95,
+  arch: 1.45,
+  clearance: 0.55,
+  /** Underside of the upper body, the window line, the roof. */
+  floor: 2.6,
+  belt: 4.0,
+  roof: 6.2,
+  /** The roof: white on a car that is not pale, black on one that is. */
+  roofLight: 0xf2f0ea,
+  roofDark: 0x1b1d22,
+  chrome: 0xd3d8de,
+  glass: 0x222a33,
+  trim: 0x16181d,
+} as const;
+
+/**
+ * The old car: a grand saloon from the nineteen-thirties, the kind with a
+ * chauffeur.
+ *
+ * Built the way cars were built then, which is out of separate things: a
+ * chassis with running boards, wings that curve over each wheel on their own,
+ * a long bonnet in front of a tall upright radiator, and a cabin behind. The
+ * wings and the running boards are black, as they almost always were; the
+ * chosen colour is the rest.
+ */
+export const VINTAGE = {
+  /** Big wheels, as tall as the bonnet. */
+  wheel: 1.95,
+  track: 3.0,
+  /** Half the width of the cabin, which sits between the wheels. */
+  body: 2.35,
+  /** The running boards' top, the bonnet's top, the window line, the roof. */
+  board: 1.35,
+  bonnet: 4.45,
+  belt: 4.55,
+  roof: 6.9,
+  /** Wings and running boards, and what they turn to on a dark car. */
+  black: 0x17181c,
+  cream: 0xe9e2cf,
+  chrome: 0xdfe3e8,
+  glass: 0x222a33,
+} as const;
 
 /**
  * The taxi: a four-door saloon with a cab's sign on its roof.
@@ -1768,9 +1826,21 @@ export const BUMP = {
    *  under half a car length, so they can run side by side down a straight
    *  without shoving each other the whole way. */
   radius: 7.4,
-  /** How much of the closing speed comes back as a bounce. Half: enough to
-   *  feel like a hit and not enough to fling a child off the road. */
-  bounce: 0.5,
+  /**
+   * How much of the closing speed comes back as a bounce: 0 is two cars that
+   * stop closing and nothing else, 1 is two snooker balls.
+   *
+   * It used to be 0 in effect — the shove was worked out as half the closing
+   * speed each, which only cancels the closing — so a car that was hit simply
+   * went on at the speed of the one that hit it, and nothing about it felt
+   * like a push. A third back is a bump you can see.
+   */
+  bounce: 0.35,
+  /** The least push a touch gives, in units a second, so a gentle lean on a
+   *  car still moves it; and how much a hit off the middle turns a car, in
+   *  radians a second for a ten-unit shove at its very nose. */
+  nudge: 6,
+  spin: 0.5,
   /**
    * And how much speed survives each step of contact, so a pile-up settles.
    *

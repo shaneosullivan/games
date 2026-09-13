@@ -533,13 +533,17 @@ export class Game {
           (b.velocity.x - a.velocity.x) * nx +
           (b.velocity.y - a.velocity.y) * nz;
         if (closing < 0) {
-          const kick = -closing * BUMP.bounce;
+          // Equal cars, so each takes half of the change: the closing speed
+          // cancelled, and a share of it given back the other way.
+          const kick = Math.max(BUMP.nudge, (-closing * (1 + BUMP.bounce)) / 2);
           a.velocity.x -= nx * kick;
           a.velocity.y -= nz * kick;
           b.velocity.x += nx * kick;
           b.velocity.y += nz * kick;
           a.velocity.multiplyScalar(BUMP.keep);
           b.velocity.multiplyScalar(BUMP.keep);
+          twist(a, nx, nz, kick);
+          twist(b, -nx, -nz, kick);
           if (i === 0) {
             hitPlayer = true;
           }
@@ -849,4 +853,23 @@ export class Game {
 /** Hands the frame back to the browser, so the waiting card can paint. */
 function frame(): Promise<void> {
   return new Promise(done => requestAnimationFrame(() => done()));
+}
+
+/**
+ * A push that lands off a car's middle turns it as well as moving it.
+ *
+ * `nx`, `nz` point from this car towards the one it met, and the push is
+ * `kick` the other way. Hit at the nose from the side and the nose swings
+ * away; hit at the tail and the tail does. Hit square in the middle, or
+ * straight along the car, and it only moves.
+ */
+function twist(car: Car, nx: number, nz: number, kick: number): void {
+  const dirX = Math.sin(car.heading);
+  const dirZ = Math.cos(car.heading);
+  // Where along the car it was touched, -1 at the tail and 1 at the nose, and
+  // how much of the push is across the car rather than along it. Across is
+  // the car's own "side" axis, which positive yaw turns the nose towards.
+  const along = nx * dirX + nz * dirZ;
+  const across = -nx * dirZ + nz * dirX;
+  car.yawRate += BUMP.spin * along * across * (kick / 10);
 }
