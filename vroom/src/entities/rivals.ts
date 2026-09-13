@@ -90,18 +90,22 @@ export class Rivals {
       // wearing something a child had made.
       const design =
         PLAYER.designs[Math.floor(Math.random() * PLAYER.designs.length)].id;
-      // And now and again one of them is not a car at all. A cow and a chicken
+      // And now and again one of them is not a racing car at all: a cow or a
+      // chicken, or a Mini or an old car out of somebody's garage. They all
       // drive exactly as a racing car does — same mass, wheels, tyres, engine
       // — so this changes nothing about the race and everything about looking
       // in the mirror.
+      const roll = Math.random();
+      const pick = (from: ReadonlyArray<CarShape>): CarShape =>
+        from[Math.floor(Math.random() * from.length)];
       const shape: CarShape =
         i === cab
           ? "taxi"
-          : Math.random() < RIVALS.beastly
-            ? Math.random() < 0.5
-              ? "cow"
-              : "chicken"
-            : "racer";
+          : roll < RIVALS.beastly
+            ? pick(["cow", "chicken"])
+            : roll < RIVALS.beastly + RIVALS.classic
+              ? pick(["mini", "vintage"])
+              : "racer";
       const car = new Car(colour, design, [], undefined, shape);
       // Left, right, left: a grid, not a queue.
       const off = (i % 2 === 0 ? 1 : -1) * RIVALS.offset;

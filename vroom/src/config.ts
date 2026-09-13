@@ -1165,6 +1165,9 @@ export const RIVALS = {
    *  racing car. A field of livestock every race is a farm; one every few
    *  races is a surprise, which is what it is for. */
   beastly: 0.25,
+  /** And how often one is a Mini or an old car. Together with the animals,
+   *  a bit under half the field is something other than a racing car. */
+  classic: 0.2,
   /** The colours, in the order they are handed out. */
   colours: [0x3f7fd6, 0x49b45a, 0xe0b13c] as const,
 } as const;
