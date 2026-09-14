@@ -1228,7 +1228,7 @@ export const SHAPES = [
 /**
  * The tank engine: a little six-wheeled steam locomotive that carries its
  * water in tanks either side of the boiler, painted all over in the chosen
- * colour, running board and buffer beams included.
+ * colour, running board and buffer beams included, with dark red lining.
  *
  * No face. It is an engine, and the front of the boiler is the smokebox door.
  */
@@ -1243,8 +1243,10 @@ export const ENGINE = {
   radius: 1.8,
   /** The cab roof. */
   roof: 7.9,
-  /** How dark the lining on the panels is, against the paint. */
-  lining: 0.55,
+  /** The lining round the panels on the tanks and cab: red, whatever the
+   *  paint — the one red thing left on the engine — and a deep red rather
+   *  than a bright one, so it outlines the panels without shouting. */
+  lining: 0x9a1b21,
   black: 0x1a1b1f,
   brass: 0xc9a23a,
 } as const;

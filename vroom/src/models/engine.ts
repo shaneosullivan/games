@@ -217,7 +217,7 @@ function boiler(a: Assembly, colour: number, L: number): void {
   }
 }
 
-/** The water tanks, one each side of the boiler, lined out. */
+/** The water tanks, one each side of the boiler, lined out in red. */
 function tanks(a: Assembly, colour: number, L: number): void {
   const from = 0.28 * L;
   const to = -0.07 * L;
@@ -229,7 +229,7 @@ function tanks(a: Assembly, colour: number, L: number): void {
     tank.translate(x, (high + low) / 2, (from + to) / 2);
     a.add(tank, "bodywork", colour);
 
-    // Lining, a little in from the edges of the outside face.
+    // Red lining, a little in from the edges of the outside face.
     const face = x + side * 0.9;
     const inset = 0.3;
     const corners = [
@@ -239,7 +239,7 @@ function tanks(a: Assembly, colour: number, L: number): void {
       new THREE.Vector3(face, low + inset, to + inset),
     ];
     for (let i = 0; i < 4; i++) {
-      rod(a, corners[i], corners[(i + 1) % 4], 0.05, "matte", lining(colour));
+      rod(a, corners[i], corners[(i + 1) % 4], 0.05, "matte", ENGINE.lining);
     }
   }
 }
@@ -276,7 +276,7 @@ function cab(a: Assembly, colour: number, L: number): void {
       from - (from - to) * 0.45,
     );
     a.add(opening, "glass", WINDOWS.glass);
-    // Lining round the cab side.
+    // Red lining round the cab side.
     const face = side * ((W - 0.3) / 2 + 0.03);
     const inset = 0.3;
     const edge = [
@@ -286,7 +286,7 @@ function cab(a: Assembly, colour: number, L: number): void {
       new THREE.Vector3(face, low + inset, to + inset),
     ];
     for (let i = 0; i < 4; i++) {
-      rod(a, edge[i], edge[(i + 1) % 4], 0.05, "matte", lining(colour));
+      rod(a, edge[i], edge[(i + 1) % 4], 0.05, "matte", ENGINE.lining);
     }
   }
 
@@ -372,16 +372,4 @@ function wheel(a: Assembly, colour: number, x: number, z: number): void {
   hub.rotateZ(Math.PI / 2);
   hub.translate(x + out * 0.05, r, z);
   a.add(hub, "matte", ENGINE.black);
-}
-
-/**
- * The lining on the tanks and cab: the engine's own colour, darker.
- *
- * It was red, along with the running board and the buffer beams, and a child
- * who painted their engine green wanted a green engine — not a green one with
- * red bits. A darker line in the same colour still shows the panels without
- * bringing a second colour into it.
- */
-function lining(colour: number): number {
-  return new THREE.Color(colour).multiplyScalar(ENGINE.lining).getHex();
 }
