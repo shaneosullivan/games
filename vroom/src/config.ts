@@ -1265,6 +1265,14 @@ export const ENGINE = {
   reddish: 0.05,
   black: 0x1a1b1f,
   brass: 0xc9a23a,
+  /** The steam from the chimney: how many puffs at once, how long each one
+   *  lasts, how far it rises, how big it starts, and how see-through it is at
+   *  its thickest. A tiny bit, on purpose. */
+  puffs: 4,
+  puffEvery: 1.8,
+  puffRise: 2.4,
+  puffSize: 0.55,
+  puffOpacity: 0.5,
 } as const;
 
 /**

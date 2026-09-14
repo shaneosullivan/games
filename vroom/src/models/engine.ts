@@ -53,7 +53,49 @@ export function engine(colour: number = 0x2f7fd0): THREE.Group {
 
   const group = a.build();
   group.name = "engine";
+  group.add(...steam(L));
   return group;
+}
+
+/**
+ * A little steam out of the chimney: a few soft puffs, each rising, swelling
+ * and fading, one after another.
+ *
+ * Moved as they are drawn rather than by anything ticking them, like the
+ * Garda car's lights, so the engine steams in the garage and the model room
+ * as well as in a race. They are children of the engine, so they travel with
+ * it: a wisp, not a trail.
+ */
+function steam(L: number): Array<THREE.Object3D> {
+  const top = ENGINE.boiler + ENGINE.radius + 2.0;
+  const z = 0.385 * L;
+  const out: Array<THREE.Object3D> = [];
+  for (let i = 0; i < ENGINE.puffs; i++) {
+    const material = new THREE.MeshStandardMaterial({
+      color: 0xf4f6f8,
+      roughness: 1,
+      transparent: true,
+      opacity: 0,
+      depthWrite: false,
+    });
+    const puff = new THREE.Mesh(
+      new THREE.SphereGeometry(ENGINE.puffSize, DETAIL.coarse, 8),
+      material,
+    );
+    const phase = i / ENGINE.puffs;
+    puff.onBeforeRender = () => {
+      const t = (performance.now() / 1000 / ENGINE.puffEvery + phase) % 1;
+      // Up, back a little as if the engine were leaving it behind, bigger,
+      // and gone.
+      puff.position.set(0, top + t * ENGINE.puffRise, z - t * 0.9);
+      puff.scale.setScalar(0.45 + t * 1.3);
+      material.opacity =
+        ENGINE.puffOpacity * Math.sin(Math.PI * Math.min(1, t * 1.4));
+      puff.updateMatrixWorld();
+    };
+    out.push(puff);
+  }
+  return out;
 }
 
 /** The running board, the frames under it, and the buffer beams. */
