@@ -121,7 +121,7 @@ export class Car {
    * Seen from straight above there is no such thing as height, so a jump is
    * told entirely by the sprite growing and its shadow staying where it is.
    * While this is running the car keeps whatever it was doing: no grip, no
-   * throttle, almost no steering. A jump is committed to.
+   * throttle, no steering. A jump is committed to.
    */
   air = 0;
 
@@ -211,6 +211,7 @@ export class Car {
    */
   private launch(lean: number): void {
     this.onSlope = false;
+    this.yawRate = 0;
 
     // The launch is arithmetic, not a number: a car leaving a slope of angle
     // θ at speed v leaves with v·sinθ going up and v·cosθ going on. Nothing
@@ -602,9 +603,14 @@ export class Car {
     wantSteer = clamp(wantSteer, low, high);
     // The rack takes time to turn, which is most of why a car feels like it
     // has weight. Instant lock is a mouse pointer.
-    const swing = PHYSICS.steerRate * dt * (flying ? ITEM.ramp.steer : 1);
-    this.steer += Math.max(-swing, Math.min(swing, wantSteer - this.steer));
-    this.steer = clamp(this.steer, low, high);
+    // In the air the wheels stay where they were: nothing touches the road,
+    // and a wheel wound round up there would snap the car round the moment it
+    // landed.
+    if (!flying) {
+      const swing = PHYSICS.steerRate * dt;
+      this.steer += Math.max(-swing, Math.min(swing, wantSteer - this.steer));
+      this.steer = clamp(this.steer, low, high);
+    }
 
     // ---- the tyres ---------------------------------------------------------
 
@@ -620,7 +626,11 @@ export class Car {
       const air = Math.exp((-PHYSICS.drag / M) * Math.abs(vx) * dt);
       vx *= air;
       vy *= air;
-      this.yawRate *= Math.exp(-dt);
+      // And no turning. Whatever the car was doing when it left the ramp, it
+      // flies straight and lands pointing where it took off: a car that went
+      // on swinging round in mid-air looked, to anybody holding the stick, as
+      // though it was being steered up there.
+      this.yawRate = 0;
     } else {
       // Weight on each axle: the static split, plus what the last step's
       // acceleration threw forward or back. This is why braking gives the

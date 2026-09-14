@@ -1838,10 +1838,6 @@ export const ITEM = {
     /** How slow you can be and still take off. Roll onto it and nothing
      *  happens, which is the right lesson. */
     minSpeed: 40,
-    /** What is left of the steering in mid-air. Almost nothing: a jump is
-     *  committed to, and being able to fly a corner would make the ramps a
-     *  short cut rather than a risk. */
-    steer: 0.15,
     /**
      * The shove a ramp gives, and how long the car is allowed to keep it.
      *
