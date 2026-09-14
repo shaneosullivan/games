@@ -217,8 +217,9 @@ function boiler(a: Assembly, colour: number, L: number): void {
   }
 }
 
-/** The water tanks, one each side of the boiler, lined out in red. */
+/** The water tanks, one each side of the boiler, lined out. */
 function tanks(a: Assembly, colour: number, L: number): void {
+  const lining = liningFor(colour);
   const from = 0.28 * L;
   const to = -0.07 * L;
   const low = ENGINE.footplate;
@@ -229,7 +230,7 @@ function tanks(a: Assembly, colour: number, L: number): void {
     tank.translate(x, (high + low) / 2, (from + to) / 2);
     a.add(tank, "bodywork", colour);
 
-    // Red lining, a little in from the edges of the outside face.
+    // Lining, a little in from the edges of the outside face.
     const face = x + side * 0.9;
     const inset = 0.3;
     const corners = [
@@ -239,7 +240,7 @@ function tanks(a: Assembly, colour: number, L: number): void {
       new THREE.Vector3(face, low + inset, to + inset),
     ];
     for (let i = 0; i < 4; i++) {
-      rod(a, corners[i], corners[(i + 1) % 4], 0.05, "matte", ENGINE.lining);
+      rod(a, corners[i], corners[(i + 1) % 4], 0.05, "matte", lining);
     }
   }
 }
@@ -247,6 +248,7 @@ function tanks(a: Assembly, colour: number, L: number): void {
 /** The cab, its round front windows and side openings, its roof, and the
  *  coal bunker behind. */
 function cab(a: Assembly, colour: number, L: number): void {
+  const lining = liningFor(colour);
   const W = CAR.width;
   const from = -0.07 * L;
   const to = -0.31 * L;
@@ -276,7 +278,7 @@ function cab(a: Assembly, colour: number, L: number): void {
       from - (from - to) * 0.45,
     );
     a.add(opening, "glass", WINDOWS.glass);
-    // Red lining round the cab side.
+    // Lining round the cab side.
     const face = side * ((W - 0.3) / 2 + 0.03);
     const inset = 0.3;
     const edge = [
@@ -286,7 +288,7 @@ function cab(a: Assembly, colour: number, L: number): void {
       new THREE.Vector3(face, low + inset, to + inset),
     ];
     for (let i = 0; i < 4; i++) {
-      rod(a, edge[i], edge[(i + 1) % 4], 0.05, "matte", ENGINE.lining);
+      rod(a, edge[i], edge[(i + 1) % 4], 0.05, "matte", lining);
     }
   }
 
@@ -372,4 +374,18 @@ function wheel(a: Assembly, colour: number, x: number, z: number): void {
   hub.rotateZ(Math.PI / 2);
   hub.translate(x + out * 0.05, r, z);
   a.add(hub, "matte", ENGINE.black);
+}
+
+/**
+ * The colour of the lining round the panels: dark red, unless the engine is
+ * red itself, when red lines on red paint are no lines at all and it is lined
+ * out in yellow instead.
+ */
+function liningFor(colour: number): number {
+  const hsl = {h: 0, s: 0, l: 0};
+  new THREE.Color(colour).getHSL(hsl, THREE.SRGBColorSpace);
+  const redness = Math.min(hsl.h, 1 - hsl.h);
+  return hsl.s > 0.35 && redness < ENGINE.reddish
+    ? ENGINE.liningOnRed
+    : ENGINE.lining;
 }

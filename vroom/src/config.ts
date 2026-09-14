@@ -1247,6 +1247,10 @@ export const ENGINE = {
    *  paint — the one red thing left on the engine — and a deep red rather
    *  than a bright one, so it outlines the panels without shouting. */
   lining: 0x9a1b21,
+  /** And on a red engine, yellow — with how close to red, as a share of the
+   *  way round the colour wheel, counts as red. */
+  liningOnRed: 0xf2c230,
+  reddish: 0.05,
   black: 0x1a1b1f,
   brass: 0xc9a23a,
 } as const;
