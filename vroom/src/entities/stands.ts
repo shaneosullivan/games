@@ -169,8 +169,9 @@ export class Stands {
   /**
    * The desert's fire, fed a little at a time.
    *
-   * Round the winner's car: a burst over the roof and one either side of it,
-   * following the car as it rolls on past the line. They used to go off
+   * Round the winner's car: a burst either side of it, following the car as
+   * it rolls on past the line, and thrown small enough that none of it lands
+   * on the car. They used to go off
    * beside the grandstands, out of the way of the car — which, with the shot
    * coming down in front of the car at the flag, was out of the way of the
    * shot as well, and a child asked for them where they could see them.
@@ -187,11 +188,10 @@ export class Stands {
     }
     this.feed = STAND.flameEvery;
     const car = this.following;
-    for (const [across, up] of [
-      [0, STAND.flameOver],
-      [-STAND.flameBeside, STAND.flameLow],
-      [STAND.flameBeside, STAND.flameLow],
-    ]) {
+    // Either side of it, never over it: sparks over the roof are between the
+    // camera and the car, and a child wants to see their car cross the line.
+    for (const across of [-STAND.flameBeside, STAND.flameBeside]) {
+      const up = STAND.flameLow;
       this.confetti.burst(this.flare.set(car.x + across, up, car.z), {
         color: STAND.flame,
         count: STAND.flameCount,
