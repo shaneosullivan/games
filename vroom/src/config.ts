@@ -1252,8 +1252,11 @@ export const ENGINE = {
   /** And on a red engine, yellow — with how close to red, as a share of the
    *  way round the colour wheel, counts as red. */
   liningOnRed: 0xf2c230,
-  /** And on a black one, gold. */
+  /** And on a black one, gold; and on a yellow one — a hue about a eighth of
+   *  the way round the wheel — black. */
   liningOnDark: 0xc9a23a,
+  liningOnYellow: 0x17181c,
+  yellowHue: 0.12,
   /** The red a rival tank engine is painted: the garage's own red, so it is
    *  the same red a child can choose. */
   red: 0xd6473c,
