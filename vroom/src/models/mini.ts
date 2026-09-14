@@ -1,17 +1,8 @@
 import * as THREE from "three";
 import {ConvexGeometry} from "three/examples/jsm/geometries/ConvexGeometry.js";
-import {CAR, MINI, Sticker} from "../config";
+import {CAR, MINI, Sticker, WINDOWS} from "../config";
 import {Assembly, DETAIL, rounded} from "./assembly";
-import {
-  AXLES,
-  clip,
-  glassFor,
-  pale,
-  pane,
-  plates,
-  rod,
-  underbody,
-} from "./coachwork";
+import {AXLES, clip, pale, pane, plates, rod, underbody} from "./coachwork";
 
 /**
  * A Mini: a small two-door box with a wheel at each corner.
@@ -94,7 +85,7 @@ function body(a: Assembly, colour: number, L: number, W: number): void {
  */
 function glasshouse(a: Assembly, colour: number, L: number): void {
   const base = MINI.belt;
-  const glass = glassFor(colour);
+  const glass = WINDOWS.glass;
   const low = (CAR.width / 2) * 0.86;
   const high = (CAR.width / 2) * 0.76;
   const foot = (s: number, z: number): THREE.Vector3 =>

@@ -1,17 +1,8 @@
 import * as THREE from "three";
 import {ConvexGeometry} from "three/examples/jsm/geometries/ConvexGeometry.js";
-import {CAR, GARDA, Sticker} from "../config";
+import {CAR, GARDA, Sticker, WINDOWS} from "../config";
 import {Assembly, DETAIL, rounded} from "./assembly";
-import {
-  across,
-  AXLES,
-  clip,
-  glassFor,
-  pane,
-  plates,
-  rod,
-  underbody,
-} from "./coachwork";
+import {across, AXLES, clip, pane, plates, rod, underbody} from "./coachwork";
 
 /**
  * A Garda car: an Irish police car.
@@ -118,7 +109,7 @@ function glasshouse(a: Assembly, L: number): void {
   const base = GARDA.belt;
   const low = (CAR.width / 2) * 0.9;
   const high = (CAR.width / 2) * 0.8;
-  const glass = glassFor(GARDA.yellow);
+  const glass = WINDOWS.glass;
   const foot = (s: number, z: number): THREE.Vector3 =>
     new THREE.Vector3(s * low, base, z * L);
   const top = (s: number, z: number): THREE.Vector3 =>

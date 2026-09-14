@@ -1,8 +1,8 @@
 import * as THREE from "three";
 import {ConvexGeometry} from "three/examples/jsm/geometries/ConvexGeometry.js";
-import {CAR, Sticker, TAXI} from "../config";
+import {CAR, Sticker, TAXI, WINDOWS} from "../config";
 import {Assembly, DETAIL, rounded} from "./assembly";
-import {clip, glassFor, pane, plates, underbody} from "./coachwork";
+import {clip, pane, plates, underbody} from "./coachwork";
 
 /**
  * A taxi: an ordinary four-door saloon, with a sign on its roof and a band of
@@ -128,7 +128,7 @@ function body(a: Assembly, L: number, W: number, colour: number): void {
  */
 function glasshouse(a: Assembly, L: number, colour: number): void {
   const base = TAXI.belt;
-  const glass = glassFor(colour);
+  const glass = WINDOWS.glass;
   const low = (CAR.width / 2) * 0.88;
   const high = (CAR.width / 2) * 0.7;
   const foot = (s: number, z: number): THREE.Vector3 =>

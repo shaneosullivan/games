@@ -1250,11 +1250,14 @@ export const ENGINE = {
 } as const;
 
 /**
- * Window glass on the road cars: dark, as tinted glass is, except on a car that
- * is dark itself. Dark glass in a black car is no windows at all, so there it
- * is a paler, bluer grey — the colour of a window with the sky in it.
+ * Window glass, on every car that has windows: a pale, bluish grey — the
+ * colour of a window with the sky in it.
+ *
+ * It was dark tinted glass on most cars and this only on dark ones, where
+ * tinted glass disappeared into the paint. Once it was seen on a black car it
+ * was the window every car was wanted to have.
  */
-export const WINDOWS = {tint: 0x222a33, onDark: 0x7f93a6} as const;
+export const WINDOWS = {glass: 0x7f93a6} as const;
 
 /**
  * The Garda car: an Irish police car, a family-sized SUV in the hi-vis

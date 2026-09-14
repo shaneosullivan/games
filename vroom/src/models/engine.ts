@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import {CAR, ENGINE} from "../config";
+import {CAR, ENGINE, WINDOWS} from "../config";
 import {Assembly, DETAIL, rounded} from "./assembly";
 import {rod} from "./coachwork";
 
@@ -263,19 +263,19 @@ function cab(a: Assembly, colour: number, L: number): void {
     const glass = new THREE.CylinderGeometry(0.62, 0.62, 0.08, DETAIL.round);
     glass.rotateX(Math.PI / 2);
     glass.translate(x, y, from + 0.03);
-    a.add(glass, "glass", 0x1d232b);
+    a.add(glass, "glass", WINDOWS.glass);
     const rim = new THREE.TorusGeometry(0.66, 0.1, 8, DETAIL.round);
     rim.translate(x, y, from + 0.06);
     a.add(rim, "chrome", ENGINE.brass);
 
-    // The opening in each side, where the crew climb in.
+    // The window in each side of the cab.
     const opening = rounded(0.08, high - low - 1.6, (from - to) * 0.45, 0.06);
     opening.translate(
       side * ((W - 0.3) / 2 + 0.02),
       low + (high - low) / 2 + 0.35,
       from - (from - to) * 0.45,
     );
-    a.add(opening, "rubber", 0x14161b);
+    a.add(opening, "glass", WINDOWS.glass);
     // Lining round the cab side.
     const face = side * ((W - 0.3) / 2 + 0.03);
     const inset = 0.3;

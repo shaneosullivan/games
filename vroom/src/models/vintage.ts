@@ -1,17 +1,8 @@
 import * as THREE from "three";
 import {ConvexGeometry} from "three/examples/jsm/geometries/ConvexGeometry.js";
-import {CAR, Sticker, VINTAGE} from "../config";
+import {CAR, Sticker, VINTAGE, WINDOWS} from "../config";
 import {Assembly, DETAIL, rounded} from "./assembly";
-import {
-  across,
-  AXLES,
-  clip,
-  dark,
-  glassFor,
-  pane,
-  plates,
-  rod,
-} from "./coachwork";
+import {across, AXLES, clip, dark, pane, plates, rod} from "./coachwork";
 
 /**
  * An old car: a grand saloon from the nineteen-thirties.
@@ -70,7 +61,7 @@ function cabin(a: Assembly, colour: number, trim: number, L: number): void {
   const half = VINTAGE.body;
   const bottom = VINTAGE.board;
   const belt = VINTAGE.belt;
-  const glass = glassFor(colour);
+  const glass = WINDOWS.glass;
 
   // Stations: z as a fraction of the length, half width, bottom and top. The
   // front is the scuttle, as narrow as the bonnet it meets; the back rounds
