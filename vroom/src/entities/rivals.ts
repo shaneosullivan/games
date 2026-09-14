@@ -132,20 +132,28 @@ export class Rivals {
       if (shape === "garda") {
         this.colours[this.colours.length - 1] = GARDA.yellow;
       }
-      // A tank engine is often red, the way so many engines are — unless red
-      // is the player's, or another rival's already.
-      if (
-        shape === "engine" &&
-        Math.random() < RIVALS.redEngine &&
-        !used.has(ENGINE.red) &&
-        !this.colours.includes(ENGINE.red)
-      ) {
-        colour = ENGINE.red;
-        this.colours[this.colours.length - 1] = colour;
-        // And nobody after it gets red as well.
-        const taken = pool.indexOf(ENGINE.red);
-        if (taken >= 0) {
-          pool.splice(taken, 1);
+      // A tank engine is often red or yellow, the way so many engines are —
+      // unless that colour is the player's, or another rival's already.
+      if (shape === "engine") {
+        let roll = Math.random();
+        for (const [paint, chance] of [
+          [ENGINE.red, RIVALS.redEngine],
+          [ENGINE.yellow, RIVALS.yellowEngine],
+        ]) {
+          if (roll >= chance) {
+            roll -= chance;
+            continue;
+          }
+          if (!used.has(paint) && !this.colours.includes(paint)) {
+            colour = paint;
+            this.colours[this.colours.length - 1] = colour;
+            // And nobody after it gets the same.
+            const taken = pool.indexOf(paint);
+            if (taken >= 0) {
+              pool.splice(taken, 1);
+            }
+          }
+          break;
         }
       }
       const car = new Car(colour, design, [], undefined, shape);

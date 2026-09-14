@@ -1187,8 +1187,9 @@ export const RIVALS = {
   garda: 0.12,
   /** And, less often than any of those, a tank engine. */
   engine: 0.05,
-  /** How often a rival tank engine is painted red. */
-  redEngine: 0.5,
+  /** How often a rival tank engine is painted red, and how often yellow. */
+  redEngine: 0.35,
+  yellowEngine: 0.3,
   /** And, in the neon city only, a taxi — on top of the one that is always
    *  there. */
   taxi: 0.2,
@@ -1257,9 +1258,10 @@ export const ENGINE = {
   liningOnDark: 0xc9a23a,
   liningOnYellow: 0x17181c,
   yellowHue: 0.12,
-  /** The red a rival tank engine is painted: the garage's own red, so it is
-   *  the same red a child can choose. */
+  /** The red and the yellow a rival tank engine is painted: the garage's own,
+   *  so they are the same red and yellow a child can choose. */
   red: 0xd6473c,
+  yellow: 0xe0b13c,
   reddish: 0.05,
   black: 0x1a1b1f,
   brass: 0xc9a23a,
