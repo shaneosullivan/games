@@ -379,12 +379,15 @@ function wheel(a: Assembly, colour: number, x: number, z: number): void {
 /**
  * The colour of the lining round the panels: dark red, unless the engine is
  * red itself, when red lines on red paint are no lines at all and it is lined
- * out in yellow instead.
+ * out in yellow instead — or black, when it is lined out in gold.
  */
 function liningFor(colour: number): number {
   const hsl = {h: 0, s: 0, l: 0};
   new THREE.Color(colour).getHSL(hsl, THREE.SRGBColorSpace);
   const redness = Math.min(hsl.h, 1 - hsl.h);
+  if (hsl.l < 0.25) {
+    return ENGINE.liningOnDark;
+  }
   return hsl.s > 0.35 && redness < ENGINE.reddish
     ? ENGINE.liningOnRed
     : ENGINE.lining;

@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import {
   CarShape,
+  ENGINE,
   Environment,
   GARDA,
   PHYSICS,
@@ -77,7 +78,9 @@ export class Rivals {
     // cars every race. A child who has raced the same blue, green and yellow
     // car forty times is racing a screensaver.
     const used = new Set<number>([myColour(), neonised(myColour())]);
-    const pool = [...RIVALS.colours, ...PLAYER.choices].filter(
+    // Each colour once: the rivals' own three are in the garage's list as
+    // well, and counting them twice dealt two rivals the same green.
+    const pool = [...new Set([...RIVALS.colours, ...PLAYER.choices])].filter(
       c => !used.has(c),
     );
     for (let i = pool.length - 1; i > 0; i--) {
@@ -91,7 +94,7 @@ export class Rivals {
       environment === "neon" ? Math.floor(Math.random() * RIVALS.count) : -1;
 
     for (let i = 0; i < RIVALS.count; i++) {
-      const colour = nextColour();
+      let colour = nextColour();
       this.colours.push(colour);
       // And something painted on it, chosen the same way. The player's own
       // stickers stay the player's: a rival with a crown on its nose would be
@@ -128,6 +131,22 @@ export class Rivals {
       // too.
       if (shape === "garda") {
         this.colours[this.colours.length - 1] = GARDA.yellow;
+      }
+      // A tank engine is often red, the way so many engines are — unless red
+      // is the player's, or another rival's already.
+      if (
+        shape === "engine" &&
+        Math.random() < RIVALS.redEngine &&
+        !used.has(ENGINE.red) &&
+        !this.colours.includes(ENGINE.red)
+      ) {
+        colour = ENGINE.red;
+        this.colours[this.colours.length - 1] = colour;
+        // And nobody after it gets red as well.
+        const taken = pool.indexOf(ENGINE.red);
+        if (taken >= 0) {
+          pool.splice(taken, 1);
+        }
       }
       const car = new Car(colour, design, [], undefined, shape);
       // Left, right, left: a grid, not a queue.
