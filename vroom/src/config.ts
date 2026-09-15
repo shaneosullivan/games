@@ -308,6 +308,10 @@ export const STAND = {
  */
 export const LAYOUT = {
   wide: 700,
+  /** And tall enough. A phone on its side is wide enough for both and a
+   *  third as tall as it needs to be: side by side, the car was a thumbnail
+   *  and the track list had room for half of one track. */
+  tall: 560,
 } as const;
 
 /**

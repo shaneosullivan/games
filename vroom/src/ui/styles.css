@@ -165,9 +165,13 @@ canvas {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  /* Safe: when there is not room for everything, start at the top rather than
+     spilling off both ends — plain centring pushes the heading off the top and
+     the button off the bottom, where nothing can scroll to them. */
+  justify-content: safe center;
   gap: 18px;
-  padding: 24px;
+  padding: calc(var(--safe-t) + 24px) calc(var(--safe-r) + 24px)
+    calc(var(--safe-b) + 24px) calc(var(--safe-l) + 24px);
   text-align: center;
   /* Pale, not dark: the card is read before the race and after it, and a dark
      sheet over a bright green field is a jolt in a game for a child. */
@@ -200,6 +204,45 @@ canvas {
   max-width: 22em;
   font-size: clamp(17px, 2.6vw, 24px);
   line-height: 1.45;
+}
+
+/* The words give way before the button does: the heading and the button keep
+   their size, and if the words still do not fit between them they scroll in
+   place. The button is the one thing on this card that must always be there. */
+.overlay h1,
+.overlay .big-button {
+  flex: 0 0 auto;
+}
+
+.overlay p {
+  flex: 0 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* A phone on its side: well under four hundred pixels tall. Everything on the
+   card comes down a size, so all of it fits without anything scrolling. */
+@media (max-height: 520px) {
+  .overlay {
+    gap: 10px;
+    padding-top: calc(var(--safe-t) + 12px);
+    padding-bottom: calc(var(--safe-b) + 12px);
+  }
+
+  .overlay h1 {
+    font-size: 30px;
+  }
+
+  .overlay p {
+    font-size: 16px;
+    line-height: 1.35;
+    max-width: 30em;
+  }
+
+  .overlay .big-button {
+    padding: 12px 36px;
+    font-size: 20px;
+  }
 }
 
 .big-button {
@@ -430,6 +473,60 @@ canvas {
   border-top: 1px solid var(--stroke);
 }
 
+/* A phone on its side. The heading and the buttons under the list were most of
+   the screen, and the list of tracks — the thing you came for — was left a
+   strip too thin to show one Race button. So the heading comes down to one
+   line and the buttons stand in a row instead of a pile. The smallest phones
+   held upright get the same, for the same reason. */
+@media (max-height: 640px) {
+  .menu-head {
+    padding: calc(var(--safe-t) + 10px) 20px 0;
+  }
+
+  .menu-head h1 {
+    font-size: 28px;
+  }
+
+  .menu-head p {
+    display: none;
+  }
+
+  .home-link {
+    top: calc(var(--safe-t) + 2px);
+    width: 44px;
+    height: 44px;
+  }
+
+  .home-link img {
+    width: 32px;
+    height: 32px;
+  }
+
+  .menu-list {
+    padding-top: 0;
+  }
+
+  .menu-section {
+    margin: 8px 4px 6px;
+  }
+
+  .menu-foot {
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 10px;
+    padding: 8px calc(var(--safe-r) + 16px) calc(var(--safe-b) + 8px)
+      calc(var(--safe-l) + 16px);
+  }
+
+  .menu-foot .big-button {
+    padding: 10px 20px;
+    font-size: 18px;
+    white-space: nowrap;
+    box-shadow: 0 4px 0 #a3332a;
+  }
+}
+
 /* How hard a track is. Three colours a child can read across the room, and the
    word as well as the colour — a badge that only differs by hue is a badge
    half the people looking at it cannot use. */
@@ -502,6 +599,96 @@ canvas {
   flex: 1;
   min-height: 0;
   margin: 0 12px;
+}
+
+/* A phone on its side. Stacked, the tools and the buttons under the drawing
+   took all but a thumb's width of the height and left a green strip to draw a
+   circuit in. So the drawing takes the left of the screen and its whole
+   height, and everything else stands in a column on the right. */
+@media (max-height: 520px) and (orientation: landscape) {
+  .screen.editor {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(250px, 36%);
+    grid-template-rows: auto auto auto auto minmax(0, 1fr);
+    /* The buttons that were along the bottom go up beside the name, so the
+       column under them has room for the tools even on the smallest phone. */
+    grid-template-areas:
+      "top bottom"
+      "stage tools"
+      "stage settings"
+      "stage env"
+      "stage .";
+  }
+
+  .screen.editor > .editor-bar:first-child {
+    grid-area: top;
+    padding-top: calc(var(--safe-t) + 4px);
+    padding-bottom: 4px;
+  }
+
+  .screen.editor > .editor-stage {
+    grid-area: stage;
+    margin: 0 0 calc(var(--safe-b) + 8px) calc(var(--safe-l) + 12px);
+  }
+
+  .screen.editor > .tool-row {
+    grid-area: tools;
+    flex-wrap: wrap;
+    padding-top: 0;
+  }
+
+  .screen.editor > .settings-row {
+    grid-area: settings;
+  }
+
+  .screen.editor > .env-row {
+    grid-area: env;
+    flex-wrap: wrap;
+  }
+
+  .screen.editor > .editor-bar:last-child {
+    grid-area: bottom;
+    align-self: center;
+    justify-content: flex-end;
+  }
+
+  .screen.editor > .tool-row,
+  .screen.editor > .env-row {
+    gap: 6px;
+    padding-left: 10px;
+    padding-right: calc(var(--safe-r) + 10px);
+  }
+
+  .screen.editor > .settings-row {
+    padding: 8px calc(var(--safe-r) + 10px) 0 10px;
+  }
+
+  .screen.editor > .editor-bar:last-child {
+    gap: 6px;
+    padding: calc(var(--safe-t) + 4px) calc(var(--safe-r) + 10px) 4px 4px;
+    border-top: none;
+  }
+
+  .screen.editor > .editor-bar .chip {
+    padding: 8px 12px;
+    font-size: 15px;
+  }
+
+  .screen.editor > .editor-bar:first-child {
+    padding-right: 6px;
+  }
+
+  .screen.editor .tool {
+    flex: 1 1 0;
+    min-width: 0;
+    padding: 4px 2px;
+    font-size: 11px;
+  }
+
+  .screen.editor .env {
+    padding: 6px 10px;
+    font-size: 13px;
+  }
 }
 
 .editor-canvas {
@@ -901,6 +1088,13 @@ canvas {
   pointer-events: none;
 }
 
+/* Out of the way while the start or finish card is up. On a small phone the
+   map sat on top of the card's heading, and there is nothing on it to see
+   before the race starts or after it ends. */
+:has(> .overlay:not(.hidden)) > .minimap {
+  opacity: 0;
+}
+
 .minimap.hidden {
   display: none;
 }
@@ -1126,6 +1320,51 @@ canvas {
   overflow-y: auto;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
+}
+
+/* A phone on its side. Car above and controls below left the car a sliver and
+   the controls a strip you had to scroll through a row at a time. Side by
+   side instead: the car on the left, the controls beside it with the whole
+   height to scroll in, and the bar and the tabs made thinner across the top. */
+@media (max-height: 520px) and (orientation: landscape) {
+  .screen.garage {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
+    grid-template-rows: auto auto minmax(0, 1fr);
+  }
+
+  .screen.garage > .editor-bar,
+  .screen.garage > .garage-tabs {
+    grid-column: 1 / -1;
+  }
+
+  .screen.garage .editor-bar {
+    padding-top: calc(var(--safe-t) + 4px);
+    padding-bottom: 4px;
+  }
+
+  .screen.garage .garage-tab {
+    padding: 6px 4px;
+    font-size: 14px;
+  }
+
+  .screen.garage .garage-view {
+    min-height: 0;
+  }
+
+  .screen.garage .garage-controls {
+    padding-right: var(--safe-r);
+  }
+
+  .screen.garage .swatch {
+    width: 46px;
+    height: 46px;
+  }
+
+  .screen.garage .swatches {
+    gap: 8px;
+    padding-top: 8px;
+  }
 }
 
 .garage-view:active {

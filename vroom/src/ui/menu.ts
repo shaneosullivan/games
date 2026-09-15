@@ -53,7 +53,9 @@ export class Menu {
 
   /** Is there room for the track list and the car side by side? */
   private static roomForBoth(): boolean {
-    return window.innerWidth >= LAYOUT.wide;
+    return (
+      window.innerWidth >= LAYOUT.wide && window.innerHeight >= LAYOUT.tall
+    );
   }
 
   /**

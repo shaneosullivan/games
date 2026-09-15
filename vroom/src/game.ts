@@ -171,7 +171,7 @@ export class Game {
     this.intro = new Overlay(
       ui,
       spec.name,
-      "You are the red car, and you are starting at the back. Touch anywhere on the screen and the car drives to your finger — the further away you point, the faster it goes, and touching the car itself lets it coast. On a computer the arrow keys steer left and right, and up and down are the pedals. Take a corner too fast and the back end will step out and leave black marks all over the road — that is the whole fun of it, and it is quicker than it looks if you can catch it. The grass will slow you down and the wall at the edge will not let you past. One lap.",
+      introWords(spec.laps),
       "Lights out",
       () => this.begin(),
     );
@@ -814,4 +814,21 @@ export class Game {
 /** Hands the frame back to the browser, so the waiting card can paint. */
 function frame(): Promise<void> {
   return new Promise(done => requestAnimationFrame(() => done()));
+}
+
+/**
+ * What the start card says: how to drive, in a few short lines.
+ *
+ * It was a paragraph, and one written for a control the game no longer has —
+ * the car drove to your finger then — and on a phone turned sideways it was
+ * so long that the button to start the race was pushed off the bottom of the
+ * screen. Short enough now to sit above the button on any screen.
+ */
+function introWords(laps: number): string {
+  const race = laps === 1 ? "One lap." : `${laps} laps.`;
+  return (
+    "Put your finger down anywhere and push the way you want to go. " +
+    "On a computer, use the arrow keys. " +
+    `Watch out for the corners! ${race}`
+  );
 }
