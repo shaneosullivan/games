@@ -35,6 +35,8 @@ const TOOLS: Array<{tool: Tool; label: string; icon: string; hint: string}> = [
 
 export interface EditorHandlers {
   onSave: (spec: TrackSpec) => void;
+  /** Every change, as it is made: the track is kept without anyone asking. */
+  onChange: (spec: TrackSpec) => void;
   onCancel: () => void;
   onTest: (spec: TrackSpec) => void;
 }
@@ -65,6 +67,7 @@ export class Editor {
   private readonly ratingChip = document.createElement("span");
 
   private readonly id: string;
+  private readonly startName: string;
   private shape: Array<{x: number; z: number}> = [];
   private items: Array<TrackItem> = [];
   private startAt = 0;
@@ -89,6 +92,7 @@ export class Editor {
   ) {
     this.root.className = "screen editor";
     this.id = existing?.id ?? newId();
+    this.startName = existing?.name ?? "My Track";
     if (existing) {
       this.shape = existing.shape.map(p => ({...p}));
       this.items = existing.items.map(i => ({...i}));
@@ -131,7 +135,11 @@ export class Editor {
     this.nameField.className = "name-field";
     this.nameField.type = "text";
     this.nameField.maxLength = 24;
-    this.nameField.value = "My Track";
+    // Its own name, if it has one. It was always "My Track", which nobody
+    // noticed while saving was a button — and would have renamed every track
+    // the moment it was opened once saving happened by itself.
+    this.nameField.value = this.startName;
+    this.nameField.addEventListener("input", () => this.keep());
     this.nameField.setAttribute("aria-label", "Track name");
 
     const redraw = chip("Draw again", "ghost");
@@ -223,6 +231,7 @@ export class Editor {
         this.environment = key;
         this.markEnvs();
         this.paint();
+        this.keep();
       });
       envs.appendChild(b);
     }
@@ -236,7 +245,9 @@ export class Editor {
         this.handlers.onTest(spec);
       }
     });
-    const save = chip("Save", "strong");
+    // Everything is kept as it is made, so this is not a save any more — it
+    // is the way back to the list with the track on it.
+    const save = chip("Done", "strong");
     save.addEventListener("click", () => {
       const spec = this.finish();
       if (spec) {
@@ -301,6 +312,7 @@ export class Editor {
     this.lapsField.textContent =
       this.laps === 1 ? "1 lap" : `${this.laps} laps`;
     this.showRating();
+    this.keep();
   }
 
   /**
@@ -378,6 +390,7 @@ export class Editor {
     this.showRating();
     this.tell("Now drag the start line and anything else onto the track.");
     this.markTools();
+    this.keep();
   };
 
   /** The smoothed circuit, and the samples every hit test uses. */
@@ -448,6 +461,7 @@ export class Editor {
         this.items.splice(near, 1);
         this.tell("Gone.");
         this.showRating();
+        this.keep();
       } else {
         this.tell("Nothing there to rub out.");
       }
@@ -461,6 +475,7 @@ export class Editor {
       this.startAt = found.t;
       this.tell("That is the start and the finish.");
       this.paint();
+      this.keep();
       return;
     }
 
@@ -476,6 +491,7 @@ export class Editor {
 
     this.items.push({kind: tool, t: found.t, across});
     this.showRating();
+    this.keep();
     this.tell(`${ITEM_NAMES[tool]} down. Put on as many as you like.`);
     this.paint();
   }
@@ -678,6 +694,22 @@ export class Editor {
         across: Math.round(i.across),
       })),
     };
+  }
+
+  /**
+   * Saves the track as it stands, if there is one to save.
+   *
+   * Called after every change rather than from a button. A child who draws a
+   * track and then taps the gallery, or closes the tab, or just forgets, still
+   * has it next time — and a Save button is one more thing to know about.
+   * Nothing is kept until a loop has been drawn, so opening the builder and
+   * leaving does not litter the list with empty tracks.
+   */
+  private keep(): void {
+    const spec = this.compose();
+    if (spec) {
+      this.handlers.onChange(spec);
+    }
   }
 
   /** The same, for a button that needs one — and a word if there is none. */

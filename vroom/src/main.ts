@@ -100,6 +100,7 @@ function showEditor(existing?: TrackSpec): void {
         saveTrack(spec);
         showMenu();
       },
+      onChange: saveTrack,
       onCancel: showMenu,
       // A test drive saves first, so a child who races off to try their track
       // and then taps the gallery button still has it tomorrow.
