@@ -1,3 +1,7 @@
 node_modules
 dist
 .DS_Store
+
+# Source models as they arrive, before baking — too big for git. The baked
+# ones the game uses live in src/assets.
+/models/

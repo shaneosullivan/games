@@ -26,6 +26,7 @@ import {
 } from "../core/garage";
 import {keepStickers, myStickers} from "../core/stickers";
 import {car, stick} from "../models/car";
+import {loadCows} from "../models/cowModel";
 import {deck, DECK_INSET, nearestDeck} from "../models/deck";
 import {alongFlank, PICTURE_KINDS} from "../models/stickers";
 import {setEnvironment} from "../render/materials";
@@ -100,6 +101,7 @@ export class Garage {
   private turn = 0.7;
   private spinning = true;
   private frame = 0;
+  private gone = false;
 
   /**
    * @param onDone  back to the track list; only used when this is a screen of
@@ -147,12 +149,19 @@ export class Garage {
 
     this.build();
     this.paint();
+    // The cow's model may still be on its way; when it lands, show it.
+    void loadCows().then(() => {
+      if (this.shape === "cow" && !this.gone) {
+        this.paint();
+      }
+    });
     window.addEventListener("resize", this.resize);
     this.resize();
     this.tick();
   }
 
   dispose(): void {
+    this.gone = true;
     cancelAnimationFrame(this.frame);
     window.removeEventListener("resize", this.resize);
     this.environment.dispose();
@@ -611,6 +620,7 @@ export class Garage {
       this.stickers,
       this.kit,
       this.shape,
+      "garage",
     );
     this.stage.add(this.model);
     this.glow();

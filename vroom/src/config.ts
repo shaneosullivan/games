@@ -1373,6 +1373,22 @@ export const VINTAGE = {
 } as const;
 
 /**
+ * The cow model: how much of the chosen colour goes on it.
+ *
+ * Only on the white. A vertex brighter than `whiteFrom`, over the next
+ * `whiteOver`, and greyer than `greyFrom` over `greyOver` takes the colour.
+ * The cow's white is a warm cream rather than pure white, so the grey test is
+ * loose — just tight enough to leave the pink of its nose and udder alone. The
+ * black patches and everything coloured keep their own.
+ */
+export const COW = {
+  whiteFrom: 0.3,
+  whiteOver: 0.25,
+  greyFrom: 0.45,
+  greyOver: 0.2,
+} as const;
+
+/**
  * The taxi: a four-door saloon with a cab's sign on its roof.
  *
  * Sized in the game's own units — sixteen long, seven wide, four to the metre

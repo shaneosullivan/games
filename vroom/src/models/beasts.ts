@@ -2,6 +2,7 @@ import * as THREE from "three";
 import {CAR, DriverKit} from "../config";
 import {Assembly, DETAIL, rounded} from "./assembly";
 import {wheel} from "./car";
+import {CowDetail, cowModel} from "./cowModel";
 
 /**
  * The two that are not cars: a cow and a chicken, on wheels.
@@ -36,7 +37,16 @@ export function beast(
   kind: Beast,
   colour: number,
   kit?: DriverKit,
+  detail: CowDetail = "race",
 ): THREE.Group {
+  // The cow has a proper model now; this one is what stands in until it has
+  // loaded. See cowModel.ts.
+  if (kind === "cow") {
+    const model = cowModel(detail, colour);
+    if (model) {
+      return model;
+    }
+  }
   const a = new Assembly();
   const L = CAR.length;
   const W = CAR.width;

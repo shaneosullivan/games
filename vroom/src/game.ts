@@ -31,6 +31,7 @@ import {Stage} from "./render/stage";
 import {signed, Track, wrap} from "./entities/track";
 import {Car, Drive} from "./entities/car";
 import {collide} from "./entities/collide";
+import {loadCows} from "./models/cowModel";
 import {Rivals} from "./entities/rivals";
 import {Skids} from "./entities/skids";
 import {Scenery} from "./entities/scenery";
@@ -241,6 +242,10 @@ export class Game {
     this.stage = new Stage(this.host, palette);
 
     report(0.25, "Rolling out the cars\u2026");
+    // The cow's model, if anybody in the race could be a cow — which is
+    // anybody, since the rivals are dealt at random. It started loading when
+    // the game did, so this is usually already done.
+    await loadCows();
     await frame();
     this.car = new Car(
       carColour(spec.environment),

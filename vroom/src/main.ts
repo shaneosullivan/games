@@ -1,6 +1,7 @@
 import "./ui/styles.css";
 import {Game} from "./game";
 import {lockZoom} from "./core/lockZoom";
+import {loadCows} from "./models/cowModel";
 import {Editor} from "./ui/editor";
 import {Menu} from "./ui/menu";
 import {ModelViewer, MODELS_HASH} from "./ui/models";
@@ -17,6 +18,10 @@ import {givenUp, setQuality} from "./core/quality";
 // nothing to grab. iOS has ignored `user-scalable=no` since iOS 10, so the
 // viewport meta tag on its own does nothing about it.
 lockZoom();
+
+// Straight away, so the cow is here by the time anybody opens the garage or
+// starts a race.
+void loadCows();
 
 const app = document.getElementById("app");
 if (!app) {
