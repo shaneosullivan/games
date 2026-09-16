@@ -110,7 +110,8 @@ export class Rivals {
       // In the neon city, the others can be taxis as well: it is a city.
       const odds: ReadonlyArray<[ReadonlyArray<CarShape>, number]> = [
         [["cow", "chicken"], RIVALS.beastly],
-        [["mini", "vintage"], RIVALS.classic],
+        [["mini"], RIVALS.mini],
+        [["vintage"], RIVALS.vintage],
         [["garda"], RIVALS.garda],
         [["engine"], RIVALS.engine],
         [["taxi"], environment === "neon" ? RIVALS.taxi : 0],
