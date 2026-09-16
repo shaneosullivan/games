@@ -1184,10 +1184,9 @@ export const RIVALS = {
   beastly: 0.25,
   /** And how often one is a Mini, and how often an old car. Together with the
    *  animals, a bit under half the field is something other than a racing
-   *  car. The Mini is the commoner of the two: it is a small car among small
-   *  cars, where the old one is a special occasion. */
+   *  car. */
   mini: 0.16,
-  vintage: 0.1,
+  vintage: 0.15,
   /** And how often one is a Garda car. */
   garda: 0.12,
   /** And, less often than any of those, a tank engine. */
