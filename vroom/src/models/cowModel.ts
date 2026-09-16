@@ -107,13 +107,22 @@ function prepare(scene: THREE.Object3D): THREE.BufferGeometry {
  *
  * Only the white: the black patches, the pink nose and the dark tyres keep
  * their own colours — the pale hubs take a little of it too, which only helps
- * them match — so a blue cow is still a cow with patches rather than a
- * blue lump. How white a vertex is decides how much of the colour it takes,
- * which keeps the shading the bake put in. Picking the garage's white gives
- * back the cow exactly as it was made.
+ * them match — so a blue cow is still a cow with patches rather than a blue
+ * lump. How white a vertex is decides how much of the colour it takes, which
+ * keeps the shading the bake put in. Picking the garage's white gives back the
+ * cow exactly as it was made.
+ *
+ * A dark colour turns the cow round instead, the way a black cow is: black all
+ * over with white patches, where the black was. Painting the white black and
+ * leaving the patches alone was a black cow with no patches at all. The tyres
+ * are below `COW.wheelsBelow` and stay black either way.
+ *
+ * And never the eyes. They are white with black pupils whatever the cow is,
+ * and a blue eye or a black one reads as something wrong with the cow.
  */
 function paint(geometry: THREE.BufferGeometry, colour: number): void {
   const attribute = geometry.getAttribute("color") as THREE.BufferAttribute;
+  const position = geometry.getAttribute("position");
   if (!attribute) {
     return;
   }
@@ -122,22 +131,65 @@ function paint(geometry: THREE.BufferGeometry, colour: number): void {
     3,
   );
   const tint = new THREE.Color(colour);
+  const black = dark(colour);
+  const patch = new THREE.Color(COW.patch);
   for (let i = 0; i < attribute.count; i++) {
     const r = attribute.getX(i);
     const g = attribute.getY(i);
     const b = attribute.getZ(i);
+    const x = Math.abs(position.getX(i)) - COW.eye.x;
+    const y = position.getY(i) - COW.eye.y;
+    const z = position.getZ(i) - COW.eye.z;
+    if (x * x + y * y + z * z < COW.eye.radius ** 2) {
+      colours.setXYZ(i, r, g, b);
+      continue;
+    }
     const most = Math.max(r, g, b);
     const least = Math.min(r, g, b);
     const grey = most > 0 ? 1 - (most - least) / most : 1;
+    const greyness = THREE.MathUtils.clamp(
+      (grey - COW.greyFrom) / COW.greyOver,
+      0,
+      1,
+    );
     const white =
       THREE.MathUtils.clamp((most - COW.whiteFrom) / COW.whiteOver, 0, 1) *
-      THREE.MathUtils.clamp((grey - COW.greyFrom) / COW.greyOver, 0, 1);
+      greyness;
+    // The colour it becomes, weighted by how much it becomes it.
+    let [tr, tg, tb, amount] = [
+      tint.r * most,
+      tint.g * most,
+      tint.b * most,
+      white,
+    ];
+    if (black) {
+      const patched =
+        position.getY(i) > COW.wheelsBelow
+          ? THREE.MathUtils.clamp(
+              (COW.blackBelow - most) / COW.blackBelow,
+              0,
+              1,
+            )
+          : 0;
+      if (patched > white) {
+        [tr, tg, tb, amount] = [patch.r, patch.g, patch.b, patched];
+      } else {
+        [tr, tg, tb] = [tint.r, tint.g, tint.b];
+      }
+    }
     colours.setXYZ(
       i,
-      r + (tint.r * most - r) * white,
-      g + (tint.g * most - g) * white,
-      b + (tint.b * most - b) * white,
+      r + (tr - r) * amount,
+      g + (tg - g) * amount,
+      b + (tb - b) * amount,
     );
   }
   geometry.setAttribute("color", colours);
+}
+
+/** Whether a colour is dark enough to paint the cow black with white patches. */
+function dark(colour: number): boolean {
+  const hsl = {h: 0, s: 0, l: 0};
+  new THREE.Color(colour).getHSL(hsl, THREE.SRGBColorSpace);
+  return hsl.l < 0.25;
 }

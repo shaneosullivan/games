@@ -1386,6 +1386,16 @@ export const COW = {
   whiteOver: 0.25,
   greyFrom: 0.45,
   greyOver: 0.2,
+  /** Where the eyes are, in game units on the model as loaded — one each
+   *  side, mirrored — and how far round them is left unpainted. Found by
+   *  painting a ball green and moving it until it sat on both eyes. */
+  eye: {x: 1.1, y: 8.0, z: 6.3, radius: 0.55},
+  /** For a black cow: how dark counts as a patch, the white the patches
+   *  become, and the height below which everything is wheels and stays as it
+   *  is. */
+  blackBelow: 0.12,
+  patch: 0xeceae4,
+  wheelsBelow: 3.2,
 } as const;
 
 /**
