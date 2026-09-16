@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import {
   CarShape,
+  COW,
   ENGINE,
   Environment,
   GARDA,
@@ -27,6 +28,17 @@ import {signed, Track, wrap} from "./track";
  * should beat them and a child who spins should not, and both of those want
  * the rivals to simply be going a certain speed.
  */
+/** The colours a rival of a given shape is often painted, with how often. */
+const FAVOURITES: Partial<
+  Record<CarShape, ReadonlyArray<readonly [number, number]>>
+> = {
+  engine: [
+    [ENGINE.red, RIVALS.redEngine],
+    [ENGINE.yellow, RIVALS.yellowEngine],
+  ],
+  cow: [[COW.black, RIVALS.blackCow]],
+};
+
 export class Rivals {
   readonly group = new THREE.Group();
   readonly cars: Array<Car> = [];
@@ -133,14 +145,14 @@ export class Rivals {
       if (shape === "garda") {
         this.colours[this.colours.length - 1] = GARDA.yellow;
       }
-      // A tank engine is often red or yellow, the way so many engines are —
-      // unless that colour is the player's, or another rival's already.
-      if (shape === "engine") {
+      // Some shapes have colours they are often seen in: a tank engine red or
+      // yellow, the way so many engines are, and a cow black with white
+      // patches — unless that colour is the player's, or another rival's
+      // already.
+      const favourites = FAVOURITES[shape];
+      if (favourites) {
         let roll = Math.random();
-        for (const [paint, chance] of [
-          [ENGINE.red, RIVALS.redEngine],
-          [ENGINE.yellow, RIVALS.yellowEngine],
-        ]) {
+        for (const [paint, chance] of favourites) {
           if (roll >= chance) {
             roll -= chance;
             continue;

@@ -1194,6 +1194,8 @@ export const RIVALS = {
   /** How often a rival tank engine is painted red, and how often yellow. */
   redEngine: 0.35,
   yellowEngine: 0.3,
+  /** How often a rival cow is a black one, with white patches. */
+  blackCow: 0.4,
   /** And, in the neon city only, a taxi — on top of the one that is always
    *  there. */
   taxi: 0.2,
@@ -1395,6 +1397,8 @@ export const COW = {
    *  is. */
   blackBelow: 0.12,
   patch: 0xeceae4,
+  /** The black a rival black cow is painted: the garage's own. */
+  black: 0x21242b,
   wheelsBelow: 3.2,
 } as const;
 
