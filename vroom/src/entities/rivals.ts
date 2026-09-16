@@ -36,7 +36,10 @@ const FAVOURITES: Partial<
     [ENGINE.red, RIVALS.redEngine],
     [ENGINE.yellow, RIVALS.yellowEngine],
   ],
-  cow: [[COW.black, RIVALS.blackCow]],
+  cow: [
+    [COW.black, RIVALS.blackCow],
+    [COW.pink, RIVALS.pinkCow],
+  ],
 };
 
 export class Rivals {
@@ -147,7 +150,8 @@ export class Rivals {
       }
       // Some shapes have colours they are often seen in: a tank engine red or
       // yellow, the way so many engines are, and a cow black with white
-      // patches — unless that colour is the player's, or another rival's
+      // patches or pink. The rest of the time they take whatever colour they
+      // are dealt, like any other car — unless that colour is the player's, or another rival's
       // already.
       const favourites = FAVOURITES[shape];
       if (favourites) {
