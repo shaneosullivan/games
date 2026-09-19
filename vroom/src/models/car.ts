@@ -11,7 +11,7 @@ import {
 } from "../config";
 import {beast} from "./beasts";
 import {plates} from "./coachwork";
-import type {CowDetail} from "./cowModel";
+import type {Detail} from "./beastModels";
 import {engine} from "./engine";
 import {garda} from "./garda";
 import {mini} from "./mini";
@@ -49,7 +49,7 @@ export function car(
   stickers: ReadonlyArray<Sticker> = [],
   kit?: DriverKit,
   shape: CarShape = "racer",
-  detail: CowDetail = "race",
+  detail: Detail = "race",
 ): THREE.Group {
   // The two that are not cars are their own model from the ground up. They
   // take the paint and the rider's kit and nothing else: a design and a set of

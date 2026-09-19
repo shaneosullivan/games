@@ -69,7 +69,7 @@ export const MODELS: Array<ModelEntry> = [
     id: "car-chicken",
     name: "Chicken car",
     size: 26,
-    make: () => beast("chicken", 0xe0b13c),
+    make: () => beast("chicken", 0xf2f0ea, undefined, "garage"),
   },
   {
     id: "car-taxi",

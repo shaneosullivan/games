@@ -1,7 +1,7 @@
 import "./ui/styles.css";
 import {Game} from "./game";
 import {lockZoom} from "./core/lockZoom";
-import {loadCows} from "./models/cowModel";
+import {loadBeasts} from "./models/beastModels";
 import {Editor} from "./ui/editor";
 import {Menu} from "./ui/menu";
 import {ModelViewer, MODELS_HASH} from "./ui/models";
@@ -21,7 +21,7 @@ lockZoom();
 
 // Straight away, so the cow is here by the time anybody opens the garage or
 // starts a race.
-void loadCows();
+void loadBeasts();
 
 const app = document.getElementById("app");
 if (!app) {

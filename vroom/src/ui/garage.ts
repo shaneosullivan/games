@@ -26,7 +26,7 @@ import {
 } from "../core/garage";
 import {keepStickers, myStickers} from "../core/stickers";
 import {car, stick} from "../models/car";
-import {loadCows} from "../models/cowModel";
+import {loadBeasts} from "../models/beastModels";
 import {deck, DECK_INSET, nearestDeck} from "../models/deck";
 import {alongFlank, PICTURE_KINDS} from "../models/stickers";
 import {setEnvironment} from "../render/materials";
@@ -149,9 +149,10 @@ export class Garage {
 
     this.build();
     this.paint();
-    // The cow's model may still be on its way; when it lands, show it.
-    void loadCows().then(() => {
-      if (this.shape === "cow" && !this.gone) {
+    // The animals' models may still be on their way; when they land, show
+    // them.
+    void loadBeasts().then(() => {
+      if ((this.shape === "cow" || this.shape === "chicken") && !this.gone) {
         this.paint();
       }
     });

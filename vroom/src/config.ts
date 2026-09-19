@@ -1403,6 +1403,10 @@ export const COW = {
   black: 0x21242b,
   pink: 0xef62a8,
   wheelsBelow: 3.2,
+  /** The widest an animal model is allowed to be, as a share of a car's
+   *  width — a little over, because a round animal fitted exactly to a car's
+   *  width comes out small. */
+  widest: 1.15,
 } as const;
 
 /**
