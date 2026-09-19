@@ -1237,6 +1237,31 @@ export const SHAPES = [
 ] as ReadonlyArray<{id: CarShape; name: string; emoji: string}>;
 
 /**
+ * Steam, from the tank engine's chimney and the chicken's exhaust: how many
+ * puffs at once, how long each one lasts, how far it drifts back, and how
+ * see-through it is at its thickest. A tiny bit, on purpose.
+ */
+export const STEAM = {
+  puffs: 4,
+  every: 1.8,
+  drift: 0.9,
+  opacity: 0.5,
+} as const;
+
+/**
+ * The chicken model: where its eyes are, in game units on the model as
+ * loaded — mirrored either side — and how far round them is left unpainted,
+ * so the shine in them survives a black chicken; and where the end of the
+ * exhaust on its back is, for the steam, with the steam's size and rise.
+ */
+export const CHICKEN = {
+  eye: {x: 1.35, y: 5.95, z: 2.89, radius: 0.5},
+  exhaust: {x: 0, y: 5.3, z: -3.3},
+  puffSize: 0.4,
+  puffRise: 2.0,
+} as const;
+
+/**
  * The tank engine: a little six-wheeled steam locomotive that carries its
  * water in tanks either side of the boiler, painted all over in the chosen
  * colour, running board and buffer beams included, with dark red lining.
@@ -1273,14 +1298,10 @@ export const ENGINE = {
   reddish: 0.05,
   black: 0x1a1b1f,
   brass: 0xc9a23a,
-  /** The steam from the chimney: how many puffs at once, how long each one
-   *  lasts, how far it rises, how big it starts, and how see-through it is at
-   *  its thickest. A tiny bit, on purpose. */
-  puffs: 4,
-  puffEvery: 1.8,
+  /** The steam from the chimney: how far it rises and how big it starts. The
+   *  rest of it is `STEAM`'s. */
   puffRise: 2.4,
   puffSize: 0.55,
-  puffOpacity: 0.5,
 } as const;
 
 /**

@@ -1,12 +1,13 @@
 import * as THREE from "three";
 import {GLTFLoader} from "three/examples/jsm/loaders/GLTFLoader.js";
-import {CAR, COW} from "../config";
+import {CAR, CHICKEN, COW} from "../config";
 import {material} from "../render/materials";
 import chickenGarageUrl from "../assets/chicken-garage.glb";
 import chickenRaceUrl from "../assets/chicken-race.glb";
 import cowGarageUrl from "../assets/cow-garage.glb";
 import cowRaceUrl from "../assets/cow-race.glb";
 import type {Beast} from "./beasts";
+import {steam} from "./steam";
 
 /**
  * The cow and the chicken, as model files rather than piles of shapes.
@@ -87,6 +88,12 @@ export function beastModel(
   const group = new THREE.Group();
   group.name = kind;
   group.add(mesh);
+  if (kind === "chicken") {
+    const {x, y, z} = CHICKEN.exhaust;
+    group.add(
+      ...steam(new THREE.Vector3(x, y, z), CHICKEN.puffSize, CHICKEN.puffRise),
+    );
+  }
   return group;
 }
 
@@ -223,8 +230,9 @@ function dark(colour: number): boolean {
  *
  * The same test for white as the cow's, and no more than that: the comb, the
  * beak, the feet, the red of the tail and the black of the eyes and tyres are
- * not white and keep their colours. A black chicken is simply black, with its
- * red comb — there are no patches to turn round.
+ * not white and keep their colours, and nor does anything in its eyes. A black
+ * chicken is simply black, with its red comb — there are no patches to turn
+ * round.
  */
 function paintChicken(geometry: THREE.BufferGeometry, colour: number): void {
   const attribute = geometry.getAttribute("color") as THREE.BufferAttribute;
@@ -235,11 +243,22 @@ function paintChicken(geometry: THREE.BufferGeometry, colour: number): void {
     new Float32Array(attribute.count * 3),
     3,
   );
+  const position = geometry.getAttribute("position");
   const tint = new THREE.Color(colour);
+  const {eye} = CHICKEN;
   for (let i = 0; i < attribute.count; i++) {
     const r = attribute.getX(i);
     const g = attribute.getY(i);
     const b = attribute.getZ(i);
+    // The shine in its eyes is white, and a black chicken with black shine is
+    // a chicken with no eyes.
+    const ex = Math.abs(position.getX(i)) - eye.x;
+    const ey = position.getY(i) - eye.y;
+    const ez = position.getZ(i) - eye.z;
+    if (ex * ex + ey * ey + ez * ez < eye.radius ** 2) {
+      colours.setXYZ(i, r, g, b);
+      continue;
+    }
     const most = Math.max(r, g, b);
     const least = Math.min(r, g, b);
     const grey = most > 0 ? 1 - (most - least) / most : 1;
