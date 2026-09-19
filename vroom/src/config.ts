@@ -1058,6 +1058,27 @@ export const SKID = {
 } as const;
 
 /**
+ * How much the rivals' driving varies from race to race: the range each part
+ * of a rival's style is rolled from at the start of every race. See `Style` in
+ * rivals.ts. Wide enough that the same track is a different race each time,
+ * and narrow enough that nobody drives off it.
+ */
+export const DRIVING = {
+  /** Braver or more careful, in steps of `RIVALS.nerve`. */
+  nerve: [-1.5, 1.5] as const,
+  /** Their own line, in units either side of the racing line. */
+  lane: [-12, 12] as const,
+  /** How far they drift about it, and how fast, in radians a second. */
+  wander: [0, 8] as const,
+  wanderRate: [0.2, 0.6] as const,
+  /** Multipliers on how far up the road they steer at, how hard they brake,
+   *  and how gently they feed in the throttle. */
+  eyes: [0.85, 1.15] as const,
+  brakes: [0.85, 1.1] as const,
+  eases: [0.7, 1.4] as const,
+} as const;
+
+/**
  * The other cars.
  *
  * A race wants somebody to race. They drive the racing line at a pace a child

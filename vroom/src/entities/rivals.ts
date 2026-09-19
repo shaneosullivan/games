@@ -2,6 +2,7 @@ import * as THREE from "three";
 import {
   CarShape,
   COW,
+  DRIVING,
   ENGINE,
   Environment,
   GARDA,
@@ -64,6 +65,10 @@ export class Rivals {
   private readonly stuck: Array<number> = [];
   private readonly reversing: Array<number> = [];
   private readonly offset: Array<number> = [];
+  /** How each one drives, rolled fresh every race; see `DRIVING`. */
+  private readonly style: Array<Style> = [];
+  /** Seconds into the race, for the drift of each one's line. */
+  private clock = 0;
 
   private readonly aim = new THREE.Vector3();
   private readonly want = new THREE.Vector2();
@@ -189,10 +194,15 @@ export class Rivals {
       this.at.push(t);
       this.travelled.push(0);
       this.began.push(signed(t - track.startAt));
-      this.offset.push(off);
-      // Each a little braver or more cautious than the next, so they string
-      // out over a lap instead of driving round nose to tail.
-      this.nerve.push(RIVALS.pace + (i - 1) * RIVALS.nerve);
+      // Where they line up is a grid, left and right. Where they drive once
+      // the lights go out is their own — see `Style`.
+      const style = rollStyle();
+      this.style.push(style);
+      this.offset.push(style.lane);
+      // Each braver or more cautious than the next, so they string out over a
+      // lap instead of driving round nose to tail — and by a different amount
+      // every race, so it is not always the car on the left that wins.
+      this.nerve.push(RIVALS.pace + style.nerve * RIVALS.nerve);
       this.stuck.push(0);
       this.reversing.push(0);
     }
@@ -219,8 +229,10 @@ export class Rivals {
    * scenery on almost every corner.
    */
   update(dt: number, track: Track, patches?: Patches): void {
+    this.clock += dt;
     for (let i = 0; i < this.cars.length; i++) {
       const car = this.cars[i];
+      const style = this.style[i];
       const where = track.nearest(car.position.x, car.position.z, car.hint);
 
       // Where they are, and how much lap that added. Accumulated the same way
@@ -247,7 +259,7 @@ export class Rivals {
       const here = Math.round(where.t * TRACK.segments);
       const radius = track.paceAt(here) ** 2 / RIVALS.bite;
       const look = Math.min(
-        Math.max(RIVALS.eyesLeast, speed * RIVALS.eyes),
+        Math.max(RIVALS.eyesLeast, speed * RIVALS.eyes * style.eyes),
         radius * RIVALS.corners,
       );
       const lead = wrap(where.t + look / track.length);
@@ -257,7 +269,13 @@ export class Rivals {
       const room = TRACK.half - RIVALS.margin;
       let across = Math.max(
         -room,
-        Math.min(room, track.lineAt(sample) + this.offset[i]),
+        Math.min(
+          room,
+          track.lineAt(sample) +
+            this.offset[i] +
+            style.wander *
+              Math.sin(this.clock * style.wanderRate + style.wanderAt),
+        ),
       );
 
       // And if they are already wide of that — a corner taken a shade too fast
@@ -339,7 +357,7 @@ export class Rivals {
       const over = speed - want;
       const push =
         over < 0
-          ? Math.min(1, -over / RIVALS.eases)
+          ? Math.min(1, -over / (RIVALS.eases * style.eases))
           : over < RIVALS.slack
             ? 0
             : -Math.min(1, over / RIVALS.hard);
@@ -392,7 +410,8 @@ export class Rivals {
     // A fixed distance cannot work — it is either miles too far at walking
     // pace or nowhere near enough at a hundred, and at a hundred what happens
     // is a car arriving at a hairpin still doing ninety.
-    const stopping = (speed * speed) / (2 * RIVALS.slows) + RIVALS.sees;
+    const slows = RIVALS.slows * this.style[i].brakes;
+    const stopping = (speed * speed) / (2 * slows) + RIVALS.sees;
     const ahead = Math.max(1, Math.round(stopping / step));
     const here = Math.round(at * TRACK.segments);
     let slowest = Infinity;
@@ -428,4 +447,46 @@ export class Rivals {
   progress(i: number): number {
     return this.travelled[i] + this.began[i];
   }
+}
+
+/**
+ * How one rival drives in one race.
+ *
+ * They used to drive the same way every time: the same car the bravest, the
+ * same one on the inside, braking at the same board for every corner. So every
+ * race against them was the same race. Now each is rolled up fresh at the
+ * start — a little braver or more careful, looking further up the road or
+ * nearer, braking later or earlier, sitting to one side of the line and
+ * drifting about it over the lap, easy or heavy on the throttle — and within
+ * limits that keep all of them on the road.
+ */
+interface Style {
+  /** How brave, from -1 (careful) to 1 (brave); scaled by `RIVALS.nerve`. */
+  nerve: number;
+  /** Where on the road they like to be, off the racing line. */
+  lane: number;
+  /** How far, how fast and from where they drift about that. */
+  wander: number;
+  wanderRate: number;
+  wanderAt: number;
+  /** Multipliers on how far ahead they steer, how hard they brake, and how
+   *  gently they come on the throttle. */
+  eyes: number;
+  brakes: number;
+  eases: number;
+}
+
+function rollStyle(): Style {
+  const between = ([low, high]: readonly [number, number]): number =>
+    low + Math.random() * (high - low);
+  return {
+    nerve: between(DRIVING.nerve),
+    lane: between(DRIVING.lane),
+    wander: between(DRIVING.wander),
+    wanderRate: between(DRIVING.wanderRate),
+    wanderAt: Math.random() * Math.PI * 2,
+    eyes: between(DRIVING.eyes),
+    brakes: between(DRIVING.brakes),
+    eases: between(DRIVING.eases),
+  };
 }
