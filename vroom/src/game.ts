@@ -265,7 +265,11 @@ export class Game {
     report(0.45, "Building the scenery\u2026");
     await frame();
     this.scenery = new Scenery(rng, this.track, palette);
-    this.fades = [...this.track.fades, ...this.scenery.fades];
+    this.fades = [
+      ...this.track.fades,
+      ...this.scenery.fades,
+      ...this.stands.fades,
+    ];
 
     report(0.65, "Putting it all together\u2026");
     await frame();

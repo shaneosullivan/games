@@ -215,11 +215,14 @@ export const ENVIRONMENT_IDS = Object.keys(ENVIRONMENTS) as Array<Environment>;
 export function instance(
   built: Assembly,
   count: number,
+  /** What to paint them with, if the game's own material for the substance is
+   *  not what is wanted — the crowd needs one that can fade. */
+  paint?: () => THREE.Material,
 ): Array<THREE.InstancedMesh> {
   return built.parts().map(({substance, geometry}) => {
     const mesh = new THREE.InstancedMesh(
       geometry,
-      materialFor(substance),
+      paint ? paint() : materialFor(substance),
       count,
     );
     mesh.castShadow = true;

@@ -1,9 +1,12 @@
 import * as THREE from "three";
+import {mergeGeometries} from "three/examples/jsm/utils/BufferGeometryUtils.js";
+import type {NearFade} from "../../../shared/fadeInFront";
 import {ParticleBurst} from "../../../shared/particles";
 import {Environment, Palette, STAND} from "../config";
 import {Rng} from "../core/rng";
 import {instance} from "../models";
 import {spectator, stand} from "../models/stand";
+import {fadingVertex} from "../render/sprites";
 import {Track} from "./track";
 
 const UP = new THREE.Vector3(0, 1, 0);
@@ -34,6 +37,9 @@ export class Stands {
     phase: number;
   }> = [];
   private cheering = 0;
+  /** The stand and its crowd get out of the way of the car, the way the trees
+   *  and the city do; see `fadeInFront`. */
+  readonly fades: Array<NearFade> = [];
   /**
    * What goes off over the line. Its own pool, because it is the one thing in
    * this game that wants to be a shower of coloured paper — or, in the desert,
@@ -90,10 +96,23 @@ export class Stands {
       const turn = 0;
       void facing;
 
-      const built = stand(palette).build();
+      // The stand itself, as one fading mesh rather than one mesh per
+      // substance: a grandstand sits right beside the line, and at the flag
+      // the shot comes down in front of the car with the stand between the
+      // two. Everything else that can come between them — trees, tyre
+      // stacks, city blocks — dissolves; this did not, and a child crossing
+      // the line watched a grey slab.
+      const {material, fade} = fadingVertex("stand");
+      const parts = stand(palette)
+        .parts()
+        .map(({geometry}) => geometry);
+      const built = new THREE.Mesh(mergeGeometries(parts, false), material);
+      built.castShadow = true;
+      built.receiveShadow = true;
       built.position.set(x, 0, z);
       built.rotation.y = turn;
       this.group.add(built);
+      this.fades.push(fade);
 
       // Fill the tiers. Rows step up and back exactly as the model does, so
       // the people sit on the seats rather than through them.
@@ -119,7 +138,13 @@ export class Stands {
     }
 
     const shirts = palette.crowd;
-    for (const mesh of instance(spectator(), this.seats.length)) {
+    for (const mesh of instance(spectator(), this.seats.length, () => {
+      // The crowd goes with the stand it sits in, or the seats empty and the
+      // people are left hanging in the air.
+      const {material, fade} = fadingVertex("crowd");
+      this.fades.push(fade);
+      return material;
+    })) {
       for (let i = 0; i < this.seats.length; i++) {
         mesh.setColorAt(i, this.tint.set(rng.pick(shirts)));
       }
