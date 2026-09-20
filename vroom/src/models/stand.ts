@@ -141,6 +141,28 @@ export function spectatorBun(): Assembly {
   return a;
 }
 
+/** A hat: a crown and a brim, for whoever is wearing one. */
+export function spectatorHat(): Assembly {
+  const a = new Assembly();
+  const crown = new THREE.CylinderGeometry(
+    HEAD * 0.78,
+    HEAD * 0.86,
+    HEAD * 0.7,
+    8,
+  );
+  crown.translate(0, TOP + HEAD * 0.95, 0);
+  a.add(crown, "matte", 0xffffff);
+  const brim = new THREE.CylinderGeometry(
+    HEAD * 1.35,
+    HEAD * 1.35,
+    HEAD * 0.12,
+    8,
+  );
+  brim.translate(0, TOP + HEAD * 0.62, 0);
+  a.add(brim, "matte", 0xffffff);
+  return a;
+}
+
 /** How big a head is, and how high it sits. */
 const HEAD = STAND.person * 0.34;
 const TOP = STAND.person * 1.5;

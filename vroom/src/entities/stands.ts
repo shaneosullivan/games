@@ -10,6 +10,7 @@ import {
   spectatorBody,
   spectatorBun,
   spectatorHair,
+  spectatorHat,
   spectatorHead,
   spectatorLong,
   spectatorTail,
@@ -99,16 +100,15 @@ export class Stands {
     for (const side of [-1, 1]) {
       const x = p.x + s.x * STAND.from * side;
       const z = p.z + s.z * STAND.from * side;
-      // Square to the camera, always — not to the road.
+      // Both stands face the road, so the crowd is watching the race.
       //
-      // This looks wrong written down and is right: the camera in this game
-      // never turns. It sits behind the car and looks along world −Z from one
-      // end of a race to the other, whatever direction the track happens to
-      // run. So "facing the player" is a fixed direction, and a stand turned
-      // to face the *road* would present its side to the shot on any circuit
-      // whose start line does not happen to run east-west — which is what it
-      // was doing: a grey slab with a few heads peeking over the top of it.
-      const turn = 0;
+      // The camera in this game never turns: it sits behind the car and looks
+      // along world −Z whatever direction the track runs. So the stand on the
+      // far side of the road, which is the one the camera looks at, faces the
+      // camera and the road at once — and it is left as it was. The near one
+      // faced the camera as well, which put its back to the race and its
+      // crowd watching the trees. It is turned round.
+      const turn = z > p.z ? Math.PI : 0;
       void facing;
 
       // The stand itself, as one fading mesh rather than one mesh per
@@ -160,6 +160,7 @@ export class Stands {
       skin: rng.pick(STAND.skins),
       shirt: rng.pick(palette.crowd),
       style: rng.pick(STAND.styles),
+      hat: rng.range(0, 1) < STAND.hats ? rng.pick(palette.crowd) : null,
     }));
 
     // Each piece is its own instanced mesh in the same seats, because an
@@ -199,6 +200,11 @@ export class Stands {
         built: spectatorBun(),
         colour: look => look.hair,
         worn: look => look.style === "bun",
+      },
+      {
+        built: spectatorHat(),
+        colour: look => look.hat ?? 0xffffff,
+        worn: look => look.hat !== null,
       },
     ];
     for (const {built, colour, worn} of parts) {
