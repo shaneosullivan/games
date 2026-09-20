@@ -1219,6 +1219,9 @@ export const RIVALS = {
    *  Otherwise it is any colour at all, the same as every other rival. */
   blackCow: 0.3,
   pinkCow: 0.25,
+  /** And how often a rival chicken is pink. Otherwise it is any colour at
+   *  all, the same as every other rival. */
+  pinkChicken: 0.3,
   /** And, in the neon city only, a taxi — on top of the one that is always
    *  there. */
   taxi: 0.2,
@@ -1278,6 +1281,8 @@ export const STEAM = {
 export const CHICKEN = {
   eye: {x: 1.35, y: 5.95, z: 2.89, radius: 0.5},
   exhaust: {x: 0, y: 5.3, z: -3.3},
+  /** The pink a rival chicken is often painted: the garage's own. */
+  pink: 0xef62a8,
   puffSize: 0.4,
   puffRise: 2.0,
 } as const;

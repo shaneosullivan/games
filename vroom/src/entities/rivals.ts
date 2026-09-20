@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import {
   CarShape,
+  CHICKEN,
   COW,
   DRIVING,
   ENGINE,
@@ -41,6 +42,7 @@ const FAVOURITES: Partial<
     [COW.black, RIVALS.blackCow],
     [COW.pink, RIVALS.pinkCow],
   ],
+  chicken: [[CHICKEN.pink, RIVALS.pinkChicken]],
 };
 
 export class Rivals {
@@ -155,7 +157,7 @@ export class Rivals {
       }
       // Some shapes have colours they are often seen in: a tank engine red or
       // yellow, the way so many engines are, and a cow black with white
-      // patches or pink. The rest of the time they take whatever colour they
+      // patches or pink, and a chicken pink. The rest of the time they take whatever colour they
       // are dealt, like any other car — unless that colour is the player's, or another rival's
       // already.
       const favourites = FAVOURITES[shape];
