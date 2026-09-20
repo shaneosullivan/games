@@ -5,7 +5,16 @@ import {ParticleBurst} from "../../../shared/particles";
 import {Environment, Palette, STAND} from "../config";
 import {Rng} from "../core/rng";
 import {instance} from "../models";
-import {spectator, stand} from "../models/stand";
+import type {Assembly} from "../models/assembly";
+import {
+  spectatorBody,
+  spectatorBun,
+  spectatorHair,
+  spectatorHead,
+  spectatorLong,
+  spectatorTail,
+  stand,
+} from "../models/stand";
 import {fadingVertex} from "../render/sprites";
 import {Track} from "./track";
 
@@ -28,6 +37,9 @@ export class Stands {
   readonly group = new THREE.Group();
 
   private readonly people: Array<THREE.InstancedMesh> = [];
+  /** For the pieces only some of them wear — a ponytail, a bun, a beard —
+   *  who is wearing one. */
+  private readonly wears = new Map<THREE.InstancedMesh, Array<boolean>>();
   /** Where each person sits, and where in the bounce they are. */
   private readonly seats: Array<{
     x: number;
@@ -59,6 +71,9 @@ export class Stands {
   private readonly q = new THREE.Quaternion();
   private readonly pos = new THREE.Vector3();
   private readonly one = new THREE.Vector3(1, 1, 1);
+  /** An instanced mesh cannot skip a copy; a copy of no size is how one is
+   *  left out. */
+  private readonly none = new THREE.Vector3(0, 0, 0);
   private readonly tint = new THREE.Color();
   private readonly flare = new THREE.Vector3();
 
@@ -137,22 +152,72 @@ export class Stands {
       }
     }
 
-    const shirts = palette.crowd;
-    for (const mesh of instance(spectator(), this.seats.length, () => {
+    // What everybody looks like, decided once and kept. A crowd of one
+    // haircut is a crowd of clones, and at this size the head is most of what
+    // there is to tell one from another.
+    const looks = this.seats.map(() => ({
+      hair: rng.pick(STAND.hair),
+      skin: rng.pick(STAND.skins),
+      shirt: rng.pick(palette.crowd),
+      style: rng.pick(STAND.styles),
+    }));
+
+    // Each piece is its own instanced mesh in the same seats, because an
+    // instance takes one colour and a person is not one colour — and because
+    // the hair somebody is not wearing has to be left out, which is done by
+    // scaling it to nothing.
+    const paint = (): THREE.Material => {
       // The crowd goes with the stand it sits in, or the seats empty and the
       // people are left hanging in the air.
       const {material, fade} = fadingVertex("crowd");
       this.fades.push(fade);
       return material;
-    })) {
-      for (let i = 0; i < this.seats.length; i++) {
-        mesh.setColorAt(i, this.tint.set(rng.pick(shirts)));
+    };
+    const parts: Array<{
+      built: Assembly;
+      colour: (look: (typeof looks)[number]) => number;
+      worn?: (look: (typeof looks)[number]) => boolean;
+    }> = [
+      {built: spectatorBody(), colour: look => look.shirt},
+      {built: spectatorHead(), colour: look => look.skin},
+      {
+        built: spectatorHair(),
+        colour: look => look.hair,
+        worn: look => look.style !== "bald",
+      },
+      {
+        built: spectatorTail(),
+        colour: look => look.hair,
+        worn: look => look.style === "tail",
+      },
+      {
+        built: spectatorLong(),
+        colour: look => look.hair,
+        worn: look => look.style === "long",
+      },
+      {
+        built: spectatorBun(),
+        colour: look => look.hair,
+        worn: look => look.style === "bun",
+      },
+    ];
+    for (const {built, colour, worn} of parts) {
+      for (const mesh of instance(built, this.seats.length, paint)) {
+        for (let i = 0; i < this.seats.length; i++) {
+          mesh.setColorAt(i, this.tint.set(colour(looks[i])));
+        }
+        if (mesh.instanceColor) {
+          mesh.instanceColor.needsUpdate = true;
+        }
+        if (worn) {
+          this.wears.set(
+            mesh,
+            looks.map(look => worn(look)),
+          );
+        }
+        this.people.push(mesh);
+        this.group.add(mesh);
       }
-      if (mesh.instanceColor) {
-        mesh.instanceColor.needsUpdate = true;
-      }
-      this.people.push(mesh);
-      this.group.add(mesh);
     }
     this.group.add(this.confetti.mesh);
     this.confetti.mesh.frustumCulled = false;
@@ -241,6 +306,7 @@ export class Stands {
     const fading = Math.max(0, Math.min(1, this.cheering));
     const t = STAND.jumpFor - this.cheering;
     for (const mesh of this.people) {
+      const worn = this.wears.get(mesh);
       this.seats.forEach((seat, i) => {
         // Absolute sine, so they land and push off again rather than sinking
         // into the seat on the way down.
@@ -252,7 +318,7 @@ export class Stands {
         this.m.compose(
           this.pos.set(seat.x, seat.y + hop, seat.z),
           this.q,
-          this.one,
+          worn && !worn[i] ? this.none : this.one,
         );
         mesh.setMatrixAt(i, this.m);
       });
@@ -263,9 +329,14 @@ export class Stands {
   /** Sits everybody down where they belong. */
   private settle(): void {
     for (const mesh of this.people) {
+      const worn = this.wears.get(mesh);
       this.seats.forEach((seat, i) => {
         this.q.setFromAxisAngle(UP, seat.turn);
-        this.m.compose(this.pos.set(seat.x, seat.y, seat.z), this.q, this.one);
+        this.m.compose(
+          this.pos.set(seat.x, seat.y, seat.z),
+          this.q,
+          worn && !worn[i] ? this.none : this.one,
+        );
         mesh.setMatrixAt(i, this.m);
       });
       mesh.instanceMatrix.needsUpdate = true;

@@ -65,15 +65,22 @@ export function stand(palette: Palette): Assembly {
 }
 
 /**
- * One person in the crowd: a body, a head, and that is all.
+ * One person in the crowd, in pieces: body, head, and a choice of hair.
  *
- * They are two hundred to a stand and about six pixels tall, so anything more
- * than a shape and a colour is geometry nobody will ever resolve. What they do
- * have to do is read as *people* rather than as texture, which comes from
- * being the right proportion and from every one of them being a different
- * colour — both of which this gets for nothing.
+ * They are three hundred to a stand and about six pixels tall, so anything
+ * more than a shape and a colour is geometry nobody will ever resolve. What
+ * they do have to do is read as *people* rather than as texture, which comes
+ * from being the right proportion, from every one of them being a different
+ * colour, and from their heads not all being the same.
+ *
+ * Pieces rather than one shape because an instanced mesh takes one colour per
+ * copy, and a person is not one colour: the shirt, the face and the hair are
+ * three. So the crowd is several instanced meshes standing in the same seats,
+ * each tinted its own way — and the hair a person is not wearing is scaled to
+ * nothing, which is how a copy is left out of an instanced mesh. Every piece
+ * is white, since the instance colour multiplies.
  */
-export function spectator(): Assembly {
+export function spectatorBody(): Assembly {
   const a = new Assembly();
   const body = new THREE.CapsuleGeometry(
     STAND.person * 0.42,
@@ -82,11 +89,58 @@ export function spectator(): Assembly {
     8,
   );
   body.translate(0, STAND.person * 0.72, 0);
-  // White, because the instance colour is what tints them and it multiplies.
   a.add(body, "matte", 0xffffff);
-
-  const head = new THREE.SphereGeometry(STAND.person * 0.34, 8, 6);
-  head.translate(0, STAND.person * 1.5, 0);
-  a.add(head, "matte", 0xd9ab8a);
   return a;
 }
+
+export function spectatorHead(): Assembly {
+  const a = new Assembly();
+  const head = new THREE.SphereGeometry(HEAD, 8, 6);
+  head.translate(0, TOP, 0);
+  a.add(head, "matte", 0xffffff);
+  return a;
+}
+
+/** A cap of hair over the back and top of the head: one shape, since at six
+ *  pixels tall a hairstyle is a silhouette and nothing more. */
+export function spectatorHair(): Assembly {
+  const a = new Assembly();
+  const cap = new THREE.SphereGeometry(HEAD * 1.08, 8, 6);
+  cap.scale(1, 1.02, 1);
+  cap.translate(0, TOP + HEAD * 0.12, -HEAD * 0.1);
+  a.add(cap, "matte", 0xffffff);
+  return a;
+}
+
+/** A ponytail down the back of the head. */
+export function spectatorTail(): Assembly {
+  const a = new Assembly();
+  const tail = new THREE.CapsuleGeometry(HEAD * 0.34, HEAD * 0.9, 2, 6);
+  tail.rotateX(0.45);
+  tail.translate(0, TOP - HEAD * 0.5, -HEAD * 1.1);
+  a.add(tail, "matte", 0xffffff);
+  return a;
+}
+
+/** Hair to the shoulders, round the back and sides of the head. */
+export function spectatorLong(): Assembly {
+  const a = new Assembly();
+  const fall = new THREE.CapsuleGeometry(HEAD * 0.92, HEAD * 0.7, 2, 8);
+  fall.scale(1, 1, 0.75);
+  fall.translate(0, TOP - HEAD * 0.55, -HEAD * 0.22);
+  a.add(fall, "matte", 0xffffff);
+  return a;
+}
+
+/** A bun on top. */
+export function spectatorBun(): Assembly {
+  const a = new Assembly();
+  const bun = new THREE.SphereGeometry(HEAD * 0.45, 6, 5);
+  bun.translate(0, TOP + HEAD * 1.05, -HEAD * 0.2);
+  a.add(bun, "matte", 0xffffff);
+  return a;
+}
+
+/** How big a head is, and how high it sits. */
+const HEAD = STAND.person * 0.34;
+const TOP = STAND.person * 1.5;

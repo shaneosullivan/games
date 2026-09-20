@@ -13,7 +13,13 @@ import {vintage} from "./vintage";
 import {plant} from "./flora";
 import {neonSign} from "./neon";
 import {barrier, cone, gantry, ramp, tyreStack} from "./props";
-import {spectator, stand} from "./stand";
+import {
+  spectatorBody,
+  spectatorHair,
+  spectatorHead,
+  spectatorTail,
+  stand,
+} from "./stand";
 
 export {beast} from "./beasts";
 export {car, driver} from "./car";
@@ -25,7 +31,15 @@ export {vintage} from "./vintage";
 export {plant} from "./flora";
 export {neonSign} from "./neon";
 export {barrier, cone, gantry, ramp, tyreStack} from "./props";
-export {spectator, stand} from "./stand";
+export {
+  spectatorBody,
+  spectatorBun,
+  spectatorHair,
+  spectatorHead,
+  spectatorLong,
+  spectatorTail,
+  stand,
+} from "./stand";
 export {Assembly, DETAIL, rounded} from "./assembly";
 
 /**
@@ -158,7 +172,20 @@ export const MODELS: Array<ModelEntry> = [
     name: "Spectator",
     size: 11,
     make: () => {
-      const built = spectator().build();
+      // The pieces together, in the colours a person in the crowd actually
+      // gets — in a race each piece is its own instanced mesh in the seat.
+      const one = new Assembly();
+      for (const [piece, colour] of [
+        [spectatorBody(), 0x3f7fd6],
+        [spectatorHead(), 0xf2c9a0],
+        [spectatorHair(), 0x5a3821],
+        [spectatorTail(), 0x5a3821],
+      ] as Array<[Assembly, number]>) {
+        for (const {substance, geometry} of piece.parts()) {
+          one.add(geometry, substance, colour);
+        }
+      }
+      const built = one.build();
       built.position.y = -5;
       const holder = new THREE.Group();
       holder.add(built);

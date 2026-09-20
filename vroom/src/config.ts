@@ -239,6 +239,22 @@ export const STAND = {
    */
   person: 4,
   perStand: 280,
+  /** The crowd's hair and faces. The shirts are the environment's own
+   *  `crowd` colours; these are the same wherever the race is. */
+  hair: [0x2b1d16, 0x5a3821, 0x8c5a2b, 0xc98f3f, 0xe8d9a0, 0x9a9a9a] as const,
+  skins: [0xf2c9a0, 0xe0ab7d, 0xc78c5c, 0x9a6438, 0x6d4326] as const,
+  /** The heads in the crowd: long hair, a ponytail, a bun, a plain cap of
+   *  hair, or none at all. Weighted by how often each appears in the list. */
+  styles: [
+    "cap",
+    "cap",
+    "long",
+    "long",
+    "tail",
+    "tail",
+    "bun",
+    "bald",
+  ] as const,
   /**
    * The celebration.
    *
