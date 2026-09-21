@@ -756,6 +756,58 @@ export const CIRCUITS = {
       {x: -260, z: -430},
     ] as ReadonlyArray<{x: number; z: number}>,
   },
+  /**
+   * Drawn with a finger rather than written here.
+   *
+   * It came out of the builder and was exported from the browser it was drawn
+   * in — which is what the Export button is for. A track a child made and
+   * wanted to keep should not live only in the one browser that happens to
+   * have it, so it ships with the game like the other three, items and all.
+   */
+  peanut: {
+    name: "Peanut",
+    startAt: 0,
+    shape: [
+      {x: -812, z: -70},
+      {x: -809, z: -206},
+      {x: -730, z: -279},
+      {x: -583, z: -349},
+      {x: -455, z: -342},
+      {x: -343, z: -254},
+      {x: -285, z: -156},
+      {x: -192, z: -204},
+      {x: -84, z: -321},
+      {x: 37, z: -368},
+      {x: 212, z: -395},
+      {x: 386, z: -396},
+      {x: 522, z: -345},
+      {x: 610, z: -255},
+      {x: 623, z: -145},
+      {x: 550, z: -14},
+      {x: 447, z: 39},
+      {x: 272, z: 59},
+      {x: 124, z: 50},
+      {x: -55, z: 48},
+      {x: -181, z: 120},
+      {x: -283, z: 210},
+      {x: -482, z: 291},
+      {x: -614, z: 264},
+      {x: -723, z: 161},
+      {x: -760, z: 46},
+    ] as ReadonlyArray<{x: number; z: number}>,
+    /** What was dropped on it, where it was dropped. */
+    items: [
+      {kind: "mud", t: 0.8833, across: -7},
+      {kind: "ramp", t: 0.8033, across: 7},
+      {kind: "mud", t: 0.32, across: 9},
+      {kind: "oil", t: 0.58, across: 10},
+      {kind: "ramp", t: 0.0633, across: 6},
+    ] as ReadonlyArray<{
+      kind: "ramp" | "oil" | "mud";
+      t: number;
+      across: number;
+    }>,
+  },
   neon: {
     name: "Neon Mile",
     startAt: 0.02,

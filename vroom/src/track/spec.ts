@@ -64,11 +64,15 @@ export const BUILT_IN: TrackSpec = {
 };
 
 /**
- * The three the game ships with: one for each place there is.
+ * The ones the game ships with: one for each place there is, and one that was
+ * drawn.
  *
- * Three rather than one because two of the three environments were only ever
- * seen by a child who drew a track and remembered to change the setting — a
- * whole desert and a whole city, built and lit and never opened.
+ * More than one because two of the three environments were only ever seen by a
+ * child who drew a track and remembered to change the setting — a whole desert
+ * and a whole city, built and lit and never opened. Peanut is the odd one out
+ * and deliberately so: it was drawn with a finger in the builder rather than
+ * written down here, and it has things dropped on it, which none of the other
+ * three do.
  */
 export const BUILT_INS: ReadonlyArray<TrackSpec> = [
   BUILT_IN,
@@ -91,6 +95,16 @@ export const BUILT_INS: ReadonlyArray<TrackSpec> = [
     shape: CIRCUITS.neon.shape.map(p => ({x: p.x, z: p.z})),
     startAt: CIRCUITS.neon.startAt,
     items: [],
+  },
+  {
+    version: SPEC_VERSION,
+    id: "built-in-peanut",
+    name: CIRCUITS.peanut.name,
+    environment: "neon",
+    laps: 1,
+    shape: CIRCUITS.peanut.shape.map(p => ({x: p.x, z: p.z})),
+    startAt: CIRCUITS.peanut.startAt,
+    items: CIRCUITS.peanut.items.map(i => ({...i})),
   },
 ];
 
