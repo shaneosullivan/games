@@ -255,8 +255,10 @@ export const STAND = {
     "bun",
     "bald",
   ] as const,
-  /** How many of them are wearing a hat, in one of the crowd's colours. */
+  /** How many of them are wearing a hat, and how many are waving a flag,
+   *  both in one of the crowd's colours. */
   hats: 0.22,
+  flags: 0.16,
   /**
    * The celebration.
    *

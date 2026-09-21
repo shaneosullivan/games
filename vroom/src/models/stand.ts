@@ -163,6 +163,31 @@ export function spectatorHat(): Assembly {
   return a;
 }
 
+/**
+ * A little flag on a stick, held up beside the head.
+ *
+ * Pole and cloth in the one colour, because an instance takes one colour and
+ * at this size a flag is a bright rectangle above the crowd — which is all it
+ * needs to be.
+ */
+export function spectatorFlag(): Assembly {
+  const a = new Assembly();
+  const pole = new THREE.CylinderGeometry(
+    HEAD * 0.08,
+    HEAD * 0.08,
+    HEAD * 2.6,
+    4,
+  );
+  pole.rotateZ(-0.25);
+  pole.translate(HEAD * 1.1, TOP + HEAD * 0.8, 0);
+  a.add(pole, "matte", 0xffffff);
+  const cloth = new THREE.BoxGeometry(HEAD * 1.5, HEAD * 0.95, HEAD * 0.08);
+  cloth.rotateZ(-0.25);
+  cloth.translate(HEAD * 2, TOP + HEAD * 1.75, 0);
+  a.add(cloth, "matte", 0xffffff);
+  return a;
+}
+
 /** How big a head is, and how high it sits. */
 const HEAD = STAND.person * 0.34;
 const TOP = STAND.person * 1.5;

@@ -10,6 +10,7 @@ import {
   spectatorBody,
   spectatorBun,
   spectatorHair,
+  spectatorFlag,
   spectatorHat,
   spectatorHead,
   spectatorLong,
@@ -161,6 +162,7 @@ export class Stands {
       shirt: rng.pick(palette.crowd),
       style: rng.pick(STAND.styles),
       hat: rng.range(0, 1) < STAND.hats ? rng.pick(palette.crowd) : null,
+      flag: rng.range(0, 1) < STAND.flags ? rng.pick(palette.crowd) : null,
     }));
 
     // Each piece is its own instanced mesh in the same seats, because an
@@ -205,6 +207,11 @@ export class Stands {
         built: spectatorHat(),
         colour: look => look.hat ?? 0xffffff,
         worn: look => look.hat !== null,
+      },
+      {
+        built: spectatorFlag(),
+        colour: look => look.flag ?? 0xffffff,
+        worn: look => look.flag !== null,
       },
     ];
     for (const {built, colour, worn} of parts) {
