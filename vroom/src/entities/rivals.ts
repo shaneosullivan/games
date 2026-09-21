@@ -13,6 +13,7 @@ import {
   TRACK,
 } from "../config";
 import {myColour, neonised} from "../core/garage";
+import type {Look} from "../net/protocol";
 import {Car, shortestAngle} from "./car";
 import {Patches} from "./patches";
 import {signed, Track, wrap} from "./track";
@@ -44,6 +45,112 @@ const FAVOURITES: Partial<
   ],
   chicken: [[CHICKEN.pink, RIVALS.pinkChicken]],
 };
+
+/**
+ * What the computer cars look like, dealt fresh for one race.
+ *
+ * Pulled out of the class it used to live in because a race against another
+ * child needs the answer *before* there is anything to build: the host deals
+ * for the whole race and sends the list, so that a cow on one screen is a cow
+ * on the other. On your own, `Rivals` calls it itself and nothing has changed.
+ *
+ * `taken` is every colour already spoken for — this screen's car, and the other
+ * children's. Two cars the same colour is a child watching the wrong one all
+ * the way round.
+ */
+export function dealRivals(
+  count: number,
+  environment: Environment,
+  taken: ReadonlyArray<number>,
+): Array<Look> {
+  const used = new Set<number>(taken);
+  for (const colour of taken) {
+    used.add(neonised(colour));
+  }
+  // Each colour once — the rivals' own three are in the garage's list as well,
+  // and counting them twice dealt two rivals the same green. Shuffled rather
+  // than taken in order, so the field is a different three cars every race: a
+  // child who has raced the same blue, green and yellow car forty times is
+  // racing a screensaver.
+  const pool = [...new Set([...RIVALS.colours, ...PLAYER.choices])].filter(
+    c => !used.has(c),
+  );
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
+  // A city has taxis in it. In the neon one, one of them — a different one each
+  // race — always is.
+  const cab = environment === "neon" ? Math.floor(Math.random() * count) : -1;
+
+  const dealt: Array<Look> = [];
+  for (let i = 0; i < count; i++) {
+    let colour = pool.pop() ?? RIVALS.colours[0];
+    // And something painted on it, chosen the same way. The player's own
+    // stickers stay the player's: a rival with a crown on its nose would be
+    // wearing something a child had made.
+    const design =
+      PLAYER.designs[Math.floor(Math.random() * PLAYER.designs.length)].id;
+    // And now and again one of them is not a racing car at all: a cow or a
+    // chicken, a Mini or an old car out of somebody's garage, the Gardaí, or
+    // once in a while a tank engine. They all drive exactly as a racing car
+    // does — same mass, wheels, tyres, engine — so this changes nothing about
+    // the race and everything about looking in the mirror.
+    const odds: ReadonlyArray<[ReadonlyArray<CarShape>, number]> = [
+      [["cow", "chicken"], RIVALS.beastly],
+      [["mini"], RIVALS.mini],
+      [["vintage"], RIVALS.vintage],
+      [["garda"], RIVALS.garda],
+      [["engine"], RIVALS.engine],
+      [["taxi"], environment === "neon" ? RIVALS.taxi : 0],
+    ];
+    let shape: CarShape = "racer";
+    let roll = Math.random();
+    for (const [shapes, chance] of odds) {
+      if (roll < chance) {
+        shape = shapes[Math.floor(Math.random() * shapes.length)];
+        break;
+      }
+      roll -= chance;
+    }
+    if (i === cab) {
+      shape = "taxi";
+    }
+    // A Garda car is yellow whatever it was dealt, so its dot on the map is
+    // too.
+    if (shape === "garda") {
+      colour = GARDA.yellow;
+    }
+    // Some shapes have colours they are often seen in: a tank engine red or
+    // yellow, the way so many engines are, and a cow black with white patches
+    // or pink, and a chicken pink. The rest of the time they take whatever
+    // colour they are dealt, like any other car — unless that colour is
+    // already somebody's.
+    const favourites = FAVOURITES[shape];
+    if (favourites) {
+      let pick = Math.random();
+      for (const [paint, chance] of favourites) {
+        if (pick >= chance) {
+          pick -= chance;
+          continue;
+        }
+        if (!used.has(paint) && !dealt.some(d => d.colour === paint)) {
+          colour = paint;
+          // And nobody after it gets the same.
+          const already = pool.indexOf(paint);
+          if (already >= 0) {
+            pool.splice(already, 1);
+          }
+        }
+        break;
+      }
+    }
+    // No kit: a computer car's driver wears a suit the colour of the car, the
+    // way every driver in the game did before there was anything to choose.
+    dealt.push({colour, design, shape, stickers: []});
+  }
+  return dealt;
+}
 
 export class Rivals {
   readonly group = new THREE.Group();
@@ -83,113 +190,51 @@ export class Rivals {
     reverse: boolean;
   };
 
-  constructor(track: Track, environment: Environment) {
+  constructor(
+    track: Track,
+    environment: Environment,
+    /**
+     * What they look like.
+     *
+     * Dealt here for a race on your own. Handed in for a race against another
+     * child, because then the host deals for everybody: two screens each
+     * dealing their own would put a different set of cars on each, and the
+     * cars are the one thing in the race everybody has to agree about.
+     */
+    looks: ReadonlyArray<Look> = dealRivals(RIVALS.count, environment, [
+      myColour(),
+      neonised(myColour()),
+    ]),
+    /** Where each one lines up, when the caller has its own idea of the grid:
+     *  a race with other children in it puts the children in the front rows. */
+    slot?: (index: number, out: THREE.Vector3) => number,
+  ) {
     this.drive = {kind: "wheel", steer: 0, throttle: 0, reverse: false};
-    // Every car in the race is a different colour, and none of them is the
-    // player's. Two the same is a child watching the wrong one all the way
-    // round — and that goes for two rivals as much as for a rival and you.
-    //
-    // Taken in order and skipping whatever is spoken for: the rivals' own
-    // three first, then the rest of the garage to fill any gap. Filtering the
-    // rivals' list and falling back by index was not enough — take blue and
-    // the third rival fell through to a colour the second already had.
-    // Both versions of the player's colour are spoken for, whichever track
-    // this is: under the neon they drive the turned-up one, and a rival in the
-    // daylight version of it is the same car from the height the camera sits.
-    // Shuffled rather than taken in order, so the field is a different three
-    // cars every race. A child who has raced the same blue, green and yellow
-    // car forty times is racing a screensaver.
-    const used = new Set<number>([myColour(), neonised(myColour())]);
-    // Each colour once: the rivals' own three are in the garage's list as
-    // well, and counting them twice dealt two rivals the same green.
-    const pool = [...new Set([...RIVALS.colours, ...PLAYER.choices])].filter(
-      c => !used.has(c),
-    );
-    for (let i = pool.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [pool[i], pool[j]] = [pool[j], pool[i]];
-    }
-    const nextColour = (): number => pool.pop() ?? RIVALS.colours[0];
-    // A city has taxis in it. In the neon one, one of the three — a different
-    // one each race — always is.
-    const cab =
-      environment === "neon" ? Math.floor(Math.random() * RIVALS.count) : -1;
 
-    for (let i = 0; i < RIVALS.count; i++) {
-      let colour = nextColour();
-      this.colours.push(colour);
-      // And something painted on it, chosen the same way. The player's own
-      // stickers stay the player's: a rival with a crown on its nose would be
-      // wearing something a child had made.
-      const design =
-        PLAYER.designs[Math.floor(Math.random() * PLAYER.designs.length)].id;
-      // And now and again one of them is not a racing car at all: a cow or a
-      // chicken, a Mini or an old car out of somebody's garage, the Gardaí, or
-      // once in a while a tank engine. They all
-      // drive exactly as a racing car does — same mass, wheels, tyres, engine
-      // — so this changes nothing about the race and everything about looking
-      // in the mirror.
-      // In the neon city, the others can be taxis as well: it is a city.
-      const odds: ReadonlyArray<[ReadonlyArray<CarShape>, number]> = [
-        [["cow", "chicken"], RIVALS.beastly],
-        [["mini"], RIVALS.mini],
-        [["vintage"], RIVALS.vintage],
-        [["garda"], RIVALS.garda],
-        [["engine"], RIVALS.engine],
-        [["taxi"], environment === "neon" ? RIVALS.taxi : 0],
-      ];
-      let shape: CarShape = "racer";
-      let roll = Math.random();
-      for (const [shapes, chance] of odds) {
-        if (roll < chance) {
-          shape = shapes[Math.floor(Math.random() * shapes.length)];
-          break;
-        }
-        roll -= chance;
+    for (let i = 0; i < looks.length; i++) {
+      const look = looks[i];
+      this.colours.push(look.colour);
+      const car = new Car(
+        look.colour,
+        look.design,
+        look.stickers,
+        look.kit,
+        look.shape,
+      );
+      let t: number;
+      if (slot) {
+        t = slot(i, this.here);
+      } else {
+        // Left, right, left: a grid, not a queue.
+        const off = (i % 2 === 0 ? 1 : -1) * RIVALS.offset;
+        t = wrap(track.startAt - 0.006 - i * RIVALS.gridGap);
+        track.pointAt(t, this.here);
+        track.sideAt(t, this.aim);
+        this.here.x += this.aim.x * off;
+        this.here.z += this.aim.z * off;
       }
-      if (i === cab) {
-        shape = "taxi";
-      }
-      // A Garda car is yellow whatever it was dealt, so its dot on the map is
-      // too.
-      if (shape === "garda") {
-        this.colours[this.colours.length - 1] = GARDA.yellow;
-      }
-      // Some shapes have colours they are often seen in: a tank engine red or
-      // yellow, the way so many engines are, and a cow black with white
-      // patches or pink, and a chicken pink. The rest of the time they take whatever colour they
-      // are dealt, like any other car — unless that colour is the player's, or another rival's
-      // already.
-      const favourites = FAVOURITES[shape];
-      if (favourites) {
-        let roll = Math.random();
-        for (const [paint, chance] of favourites) {
-          if (roll >= chance) {
-            roll -= chance;
-            continue;
-          }
-          if (!used.has(paint) && !this.colours.includes(paint)) {
-            colour = paint;
-            this.colours[this.colours.length - 1] = colour;
-            // And nobody after it gets the same.
-            const taken = pool.indexOf(paint);
-            if (taken >= 0) {
-              pool.splice(taken, 1);
-            }
-          }
-          break;
-        }
-      }
-      const car = new Car(colour, design, [], undefined, shape);
-      // Left, right, left: a grid, not a queue.
-      const off = (i % 2 === 0 ? 1 : -1) * RIVALS.offset;
-      const t = wrap(track.startAt - 0.006 - i * RIVALS.gridGap);
-      track.pointAt(t, this.here);
-      track.sideAt(t, this.aim);
-      const x = this.here.x + this.aim.x * off;
-      const z = this.here.z + this.aim.z * off;
       const d = track.tangentAt(t, this.aim);
-      car.place(x, z, Math.atan2(d.x, d.z), 0, t);
+      car.place(this.here.x, this.here.z, Math.atan2(d.x, d.z), 0, t);
 
       this.cars.push(car);
       this.group.add(car.group);

@@ -2,7 +2,11 @@ import "./ui/styles.css";
 import {Game} from "./game";
 import {lockZoom} from "./core/lockZoom";
 import {loadBeasts} from "./models/beastModels";
+import {dealRivals} from "./entities/rivals";
+import {Party} from "./net/party";
+import {tidyCode} from "./net/room";
 import {Editor} from "./ui/editor";
+import {Lobby} from "./ui/lobby";
 import {Menu} from "./ui/menu";
 import {ModelViewer, MODELS_HASH} from "./ui/models";
 import {Loading} from "./ui/loading";
@@ -42,6 +46,16 @@ let editor: Editor | null = null;
 let models: ModelViewer | null = null;
 let garage: Garage | null = null;
 let menu: Menu | null = null;
+let lobby: Lobby | null = null;
+/**
+ * The other children, while there are any.
+ *
+ * Deliberately outside `clear()`: every other screen here is torn all the way
+ * down when it is left, and the people you are racing are the one thing that
+ * must survive that. The lobby, the race, the finish card and the next race are
+ * four screens, and walking between them cannot mean joining again.
+ */
+let party: Party | null = null;
 
 function clear(): void {
   game?.dispose();
@@ -55,10 +69,18 @@ function clear(): void {
   window.garage = null;
   menu?.dispose();
   menu = null;
+  lobby?.dispose();
+  lobby = null;
   app!.replaceChildren();
 }
 
-function showMenu(): void {
+/** Leaves the race everybody is in, if any. */
+function leaveParty(): void {
+  party?.close();
+  party = null;
+}
+
+function showMenu(note?: string): void {
   clear();
   if (window.location.hash.startsWith(MODELS_HASH)) {
     window.history.replaceState(null, "", window.location.pathname);
@@ -68,9 +90,103 @@ function showMenu(): void {
     onBuild: () => showEditor(),
     onEdit: spec => showEditor(spec),
     onModels: showModels,
-    onGarage: showGarage,
+    onGarage: () => showGarage(showMenu),
+    onTogether: () => void hostRace(),
   });
   app!.appendChild(menu.root);
+  if (note) {
+    // Why the last screen went away — a race that ended because somebody left,
+    // or a code that led nowhere. Said on the screen it happened *to*, rather
+    // than in a dialog a child has to dismiss before they can play again.
+    const says = document.createElement("p");
+    says.className = "menu-note";
+    says.textContent = note;
+    menu.root.appendChild(says);
+  }
+}
+
+/**
+ * Opening a race for somebody else to join.
+ *
+ * The broker is on the internet and can take a moment, so this waits behind a
+ * card like everything else that takes a moment — and if it cannot be reached,
+ * says so in words a child can act on rather than leaving a dead screen.
+ */
+async function hostRace(): Promise<void> {
+  clear();
+  const card = new Loading("Race a friend");
+  card.mount(app!);
+  card.set(0.4, "Opening the race\u2026");
+  try {
+    party = await Party.open();
+  } catch {
+    await card.close();
+    showMenu("Could not open a race. Is this iPad on the wi-fi?");
+    return;
+  }
+  await card.close();
+  listen(party);
+  showLobby();
+}
+
+/** Joining one, from a scanned code. */
+async function joinRace(code: string): Promise<void> {
+  clear();
+  // Out of the address bar straight away: a reload half an hour later must not
+  // try to join a race that finished long ago.
+  window.history.replaceState(null, "", window.location.pathname);
+  const card = new Loading("Joining the race");
+  card.mount(app!);
+  card.set(0.4, "Looking for the other iPad\u2026");
+  try {
+    party = await Party.join(code);
+  } catch {
+    await card.close();
+    showMenu("Could not find that race. Ask for a new code.");
+    return;
+  }
+  await card.close();
+  listen(party);
+  showLobby();
+}
+
+/**
+ * What the shell does about the things a race decides for itself.
+ *
+ * Set once, when the party is made, rather than by each screen: the host can
+ * start a race while a guest is in the garage, and a guest that only listened
+ * while it happened to be in the lobby would sit there and miss it.
+ */
+function listen(joined: Party): void {
+  joined.onRace = spec => void showRace(spec, joined);
+  joined.onEnd = why => {
+    leaveParty();
+    showMenu(why);
+  };
+}
+
+function showLobby(back = false): void {
+  clear();
+  const joined = party;
+  if (!joined) {
+    showMenu();
+    return;
+  }
+  lobby = new Lobby(joined, {
+    onExit: () => {
+      leaveParty();
+      showMenu();
+    },
+    onStart: spec =>
+      joined.start(spec, (count, taken) =>
+        dealRivals(count, spec.environment, taken),
+      ),
+    onGarage: () => showGarage(() => showLobby(true)),
+  });
+  app!.appendChild(lobby.root);
+  if (back) {
+    lobby.cameBack();
+  }
 }
 
 /**
@@ -89,10 +205,11 @@ function showModels(hash = ""): void {
   }
 }
 
-/** The garage: which car is yours. */
-function showGarage(): void {
+/** The garage: which car is yours. Where it goes back to depends on where it
+ *  was opened from — the track list, or a lobby with a race waiting. */
+function showGarage(onDone: () => void): void {
   clear();
-  garage = new Garage(showMenu);
+  garage = new Garage(onDone);
   window.garage = garage;
   app!.appendChild(garage.root);
 }
@@ -129,7 +246,10 @@ function showEditor(existing?: TrackSpec): void {
  * down. Before this, all of that happened with the countdown already running,
  * which is exactly the wrong moment for a game to be at its slowest.
  */
-async function showRace(spec: TrackSpec): Promise<void> {
+async function showRace(
+  spec: TrackSpec,
+  joined: Party | null = null,
+): Promise<void> {
   clear();
   const card = new Loading(spec.name);
   card.mount(app!);
@@ -140,7 +260,29 @@ async function showRace(spec: TrackSpec): Promise<void> {
   ui.className = "ui";
   app!.appendChild(ui);
 
-  const mine = new Game(app!, ui, spec, showMenu, () => void showRace(spec));
+  const mine = new Game(
+    app!,
+    ui,
+    spec,
+    () => {
+      leaveParty();
+      showMenu();
+    },
+    () => {
+      // Another go. On your own that is simply another race; with other
+      // children it is the host putting everybody back on the grid, and
+      // everybody's screen hears about it the same way it heard about the
+      // first one.
+      if (!joined) {
+        void showRace(spec);
+      } else if (joined.isHost) {
+        joined.start(spec, (count, taken) =>
+          dealRivals(count, spec.environment, taken),
+        );
+      }
+    },
+    joined,
+  );
   game = mine;
   window.game = mine;
 
@@ -163,10 +305,37 @@ async function showRace(spec: TrackSpec): Promise<void> {
   }
 }
 
+/** What a scanned code looks like in the address: see `ui/qr.ts`. */
+const JOIN_HASH = "#join=";
+
 // Straight into the list rather than into a race — unless the URL says the
 // model viewer was open, in which case a reload goes back to it.
+/** The code in the address, if there is one. */
+function scannedCode(): string {
+  return window.location.hash.startsWith(JOIN_HASH)
+    ? tidyCode(window.location.hash.slice(JOIN_HASH.length))
+    : "";
+}
+
+// A code can also arrive at a page that is *already* open — a browser given a
+// link to the address it is already at changes the hash and loads nothing. That
+// is exactly what happens when a child scans a second code without closing the
+// first race, and without this it looks like the camera did not work.
+window.addEventListener("hashchange", () => {
+  const code = scannedCode();
+  if (code) {
+    leaveParty();
+    void joinRace(code);
+  }
+});
+
+const scanned = scannedCode();
 if (window.location.hash.startsWith(MODELS_HASH)) {
   showModels(window.location.hash);
+} else if (scanned) {
+  // A scanned code opens the game straight into the race it belongs to. This is
+  // the whole of joining: one camera, one tap on whatever the camera offers.
+  void joinRace(scanned);
 } else {
   showMenu();
 }

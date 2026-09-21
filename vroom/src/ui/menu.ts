@@ -22,6 +22,8 @@ export interface MenuHandlers {
   onModels: () => void;
   /** The garage: which car is yours. */
   onGarage: () => void;
+  /** Racing somebody else in the same house. */
+  onTogether: () => void;
 }
 
 /** SVG lives in its own namespace, and an element made without it is an
@@ -115,6 +117,16 @@ export class Menu {
       list.appendChild(this.card(spec, true));
     }
 
+    // Above the track list's own buttons, because it is the thing a child asks
+    // for by name once they know it is there — and because what happens next is
+    // a code on the screen rather than a race, which wants to be clearly its
+    // own kind of button.
+    const together = document.createElement("button");
+    together.type = "button";
+    together.className = "big-button together";
+    together.textContent = "🏁 Race a friend";
+    together.addEventListener("click", () => this.handlers.onTogether());
+
     const build = document.createElement("button");
     build.type = "button";
     build.className = "big-button";
@@ -143,7 +155,7 @@ export class Menu {
     models.textContent = "🧊 Models";
     models.addEventListener("click", () => this.handlers.onModels());
     foot.appendChild(models);
-    foot.append(build);
+    foot.append(together, build);
     if (!this.wide) {
       foot.appendChild(garage);
     }

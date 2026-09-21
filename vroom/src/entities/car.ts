@@ -174,6 +174,9 @@ export class Car {
     new THREE.Vector2(),
   ];
   private readonly shadow: THREE.Mesh;
+  /** What it is painted, kept because the minimap draws a dot per car and the
+   *  dot has to be the colour of the car it stands for — whoever built it. */
+  readonly paint: number;
 
   constructor(
     colour: number,
@@ -182,6 +185,7 @@ export class Car {
     kit?: DriverKit,
     shape: CarShape = "racer",
   ) {
+    this.paint = colour;
     this.sprite = carModel(colour, design, stickers, kit, shape);
     // Under the car and only ever seen in mid-air. It stays the size the car
     // was on the ground, which is what makes the car look as though it has
@@ -869,6 +873,45 @@ export class Car {
     }
     this.velocity.multiplyScalar(Math.exp(-CAR.wallDrag * dt));
     return true;
+  }
+
+  /**
+   * Puts the car where another screen says it is.
+   *
+   * This is how somebody else's car moves: not driven, placed. None of the
+   * physics above runs for it — that already ran, on the iPad of the child
+   * holding the stick, and running it again here on a stale idea of what they
+   * asked for would only produce a second, different car.
+   *
+   * `prevPosition` and `prevHeading` are kept honestly, which is what lets the
+   * render interpolate between steps exactly as it does for a car that is
+   * being driven. The velocity is not ornamental either: the collisions read
+   * it, so a bump from a car that arrived over the network shoves as hard as
+   * one from a rival beside you.
+   */
+  follow(
+    x: number,
+    z: number,
+    heading: number,
+    vx: number,
+    vz: number,
+    height: number,
+    roll: number,
+    pitch: number,
+    slip: number,
+  ): void {
+    this.prevPosition.copy(this.position);
+    this.prevHeading = this.heading;
+    this.position.x = x;
+    this.position.z = z;
+    this.heading = heading;
+    this.velocity.set(vx, vz);
+    this.height = height;
+    this.roll = roll;
+    this.pitch = pitch;
+    this.slip = slip;
+    this.dir.set(Math.sin(heading), Math.cos(heading));
+    this.side.set(this.dir.y, -this.dir.x);
   }
 
   /**

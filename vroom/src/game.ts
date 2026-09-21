@@ -33,6 +33,9 @@ import {Car, Drive} from "./entities/car";
 import {collide} from "./entities/collide";
 import {loadBeasts} from "./models/beastModels";
 import {Rivals} from "./entities/rivals";
+import {Ghost} from "./net/ghost";
+import {gridSlot, Party} from "./net/party";
+import {AI, CarState} from "./net/protocol";
 import {Skids} from "./entities/skids";
 import {Scenery} from "./entities/scenery";
 import {Hud, ordinal} from "./ui/hud";
@@ -71,6 +74,20 @@ export class Game {
   tyres!: Tyres;
   stands!: Stands;
   private scenery!: Scenery;
+  /**
+   * Everybody else in the race: computer cars this screen is driving, and cars
+   * another child is driving.
+   *
+   * One list, because everything downstream of it — the placings, the map, the
+   * bumps, the noise of the cars around you — wants every car in the race and
+   * has no business knowing which kind each one is.
+   */
+  private readonly rest: Array<{car: Car; progress: () => number}> = [];
+  /** The cars another screen owns. Held separately from `rest` as well, since
+   *  these are the ones that have to be told what time it is. */
+  private ghosts: Array<Ghost> = [];
+  /** How many cars are in the race, this one included. */
+  private cars = RIVALS.count + 1;
   /** Everything that dissolves when it stands between the camera and the car. */
   private fades: Array<NearFade> = [];
   readonly engine: Engine;
@@ -143,6 +160,12 @@ export class Game {
     new THREE.Vector2(),
     new THREE.Vector2(),
   ];
+  /** What this screen says about its own car, and about the computer cars if it
+   *  is the host. Filled in place: at twenty packets a second, made fresh, this
+   *  would be a steady drizzle of little objects for the collector. */
+  private readonly mine: CarState = blankState();
+  private readonly told: Array<CarState> = [];
+  private readonly pool: Array<CarState> = [];
   private readonly eye = new THREE.Vector3();
   private readonly wantEye = new THREE.Vector3();
   private readonly here = new THREE.Vector3();
@@ -158,6 +181,9 @@ export class Game {
      *  builds a fresh one, which is much less to get wrong than unwinding a
      *  finished race in place. */
     private readonly onAgain: () => void,
+    /** The other children, if this is a race against them. Null for a race on
+     *  your own, which is every race the game had until now. */
+    private readonly party: Party | null = null,
   ) {
     this.spec = spec;
     this.host = host;
@@ -180,6 +206,11 @@ export class Game {
       this.onAgain(),
     );
     this.done.hide();
+    // Racing another child, the lobby *was* the start card: the flag is the
+    // host's to drop and a card here would be one child holding up three.
+    if (this.party) {
+      this.intro.hide();
+    }
 
     this.countdown.className = "countdown hidden";
     ui.appendChild(this.countdown);
@@ -254,7 +285,34 @@ export class Game {
       myKit(),
       myShape(),
     );
-    this.rivals = new Rivals(this.track, spec.environment);
+    // Who else is on the track, and who is driving them.
+    //
+    // On your own, three computer cars. Against other children, the field is
+    // still four cars — every child takes a slot a computer would have had —
+    // and the host drives the computer ones for everybody, so a guest builds
+    // them as cars it is *shown* rather than cars it is running.
+    const party = this.party;
+    if (party) {
+      this.rivals = new Rivals(
+        this.track,
+        spec.environment,
+        party.isHost ? party.rivals : [],
+        (i, out) => gridSlot(this.track, party.seats.size + i, out),
+      );
+      this.ghosts = party.buildGhosts(this.track);
+      this.cars = party.seats.size + party.rivals.length;
+    } else {
+      this.rivals = new Rivals(this.track, spec.environment);
+      this.ghosts = [];
+      this.cars = RIVALS.count + 1;
+    }
+    this.rest.length = 0;
+    this.rivals.cars.forEach((car, i) =>
+      this.rest.push({car, progress: () => this.rivals.progress(i)}),
+    );
+    for (const ghost of this.ghosts) {
+      this.rest.push({car: ghost.car, progress: () => ghost.progress});
+    }
     this.skids = new Skids(palette);
     this.trails = new Skids(palette, TRAIL.max);
     this.patches = new Patches(this.track, spec.items);
@@ -281,6 +339,9 @@ export class Game {
     this.stage.scene.add(this.skids.mesh);
     this.stage.scene.add(this.trails.mesh);
     this.stage.scene.add(this.rivals.group);
+    for (const ghost of this.ghosts) {
+      this.stage.scene.add(ghost.car.group);
+    }
     this.stage.scene.add(this.car.group);
     // Last, and drawn over everything: where the circuit runs over itself, the
     // later part of the lap is on top of the earlier one.
@@ -289,7 +350,7 @@ export class Game {
     this.hud.setLaps(this.laps);
     this.map = new MiniMap(this.track, [
       carColour(spec.environment),
-      ...this.rivals.colours,
+      ...this.rest.map(other => other.car.paint),
     ]);
     this.map.mount(this.ui);
     this.gridUp();
@@ -314,11 +375,18 @@ export class Game {
     report(1, "Ready");
     this.loop = new GameLoop(this.update, this.render);
     this.loop.start();
+    if (this.party) {
+      this.together(this.party);
+    }
   }
 
   /** Everybody on the grid: the rivals in front, the player at the back. */
   private gridUp(): void {
-    const t = this.track.gridAt(RIVALS.count, PLAYER.offset, this.here);
+    // Against other children the grid is two abreast with the children at the
+    // front; on your own it is the old one, three computer cars ahead of you.
+    const t = this.party
+      ? gridSlot(this.track, this.party.seat, this.here)
+      : this.track.gridAt(RIVALS.count, PLAYER.offset, this.here);
     // Where the player's grid slot is, relative to the line. Kept because
     // placing is decided on how far past the line each car is, and the player
     // starts the furthest back of the four.
@@ -334,6 +402,34 @@ export class Game {
     this.lastT = t;
     this.progress = 0;
   }
+
+  /**
+   * A race against other children, starting itself.
+   *
+   * There is no button: this screen says it is on the grid and then waits for
+   * the host to say when, which is the only way three screens drop the flag at
+   * the same moment. Everything else here is what `begin` does for a race on
+   * your own — the audio needs a gesture to start, and the tap that opened the
+   * lobby was one.
+   */
+  private together(party: Party): void {
+    this.counting = 0;
+    this.shownBeat = -1;
+    beginWatching();
+    this.countdown.classList.remove("hidden");
+    this.engine.start();
+    // A guest pressed nothing to get here — the code was scanned and the race
+    // started itself — and a browser will not make a sound until somebody has
+    // touched the screen. So the first touch, whatever it is for, is also the
+    // one that wakes the engines up.
+    window.addEventListener("pointerdown", this.wakeSound, {once: true});
+    party.onResults = () => this.tellPlaces();
+    party.ready();
+  }
+
+  /** An arrow property: it is handed to addEventListener and would otherwise
+   *  lose its `this`. */
+  private readonly wakeSound = (): void => this.engine.start();
 
   private begin(): void {
     this.intro.hide();
@@ -357,11 +453,32 @@ export class Game {
    * over by the time it is.
    */
   private tickStart(dt: number): void {
-    this.counting += dt;
+    if (this.party) {
+      const at = this.party.startsAt;
+      if (at === null) {
+        // Still waiting for somebody's iPad to finish loading. The host is the
+        // one counting its patience, so it is the one told about the wait.
+        this.party.waiting(dt);
+        this.countdown.textContent = "Ready\u2026";
+        this.countdown.classList.remove("go");
+        return;
+      }
+      // Read off the shared clock rather than accumulated here, which is the
+      // whole of what makes the flag drop in two rooms at once: a screen that
+      // was told about the start late is already that much into the countdown
+      // instead of starting its own three seconds when the message arrived.
+      this.counting = Math.max(0, this.party.now() - at);
+    } else {
+      this.counting += dt;
+    }
 
     const beat = Math.floor(this.counting / START.beat);
     if (beat !== this.shownBeat) {
       this.shownBeat = beat;
+      // Heard as well as seen: three beeps and then one that is higher and
+      // longer, so a child watching the road rather than the number still
+      // knows exactly when to push.
+      this.engine.light(beat);
       const word = beat >= 3 ? "Go!" : `${3 - beat}`;
       this.countdown.textContent = word;
       this.countdown.classList.toggle("go", beat >= 3);
@@ -396,6 +513,9 @@ export class Game {
 
     this.car.update(dt, this.controls(), this.track, this.patches);
     this.rivals.update(dt, this.track, this.patches);
+    // Where everybody is, said and heard. After our own car has moved, so the
+    // packet that goes out this step is this step's news and not last step's.
+    this.talk(dt);
 
     // Cars off each other before cars off the wall: a shove is what can put
     // you into the barrier, and it should be corrected in the same step rather
@@ -410,6 +530,9 @@ export class Game {
     for (const rival of this.rivals.cars) {
       this.tyres.bounce(rival);
     }
+    // Not the cars another screen is driving: those bounce off their own
+    // screen's tyre stacks, on the iPad that is actually driving them. Doing it
+    // here as well would be two screens shoving the same car.
     this.nudgeIn -= dt;
     if (knocked && this.nudgeIn <= 0) {
       this.nudgeIn = BUMP.quiet;
@@ -423,6 +546,9 @@ export class Game {
     // Who is over a flyover and who is under one, before anything is drawn.
     this.car.setAbove(this.bridges.above(this.car.hint));
     this.rivals.setAbove(i => this.bridges.above(i));
+    for (const ghost of this.ghosts) {
+      ghost.car.setAbove(this.bridges.above(ghost.car.hint));
+    }
     this.bridges.update(dt, this.car.hint);
     // The city's faulty signs, which stutter on their own clock.
     this.scenery.update(
@@ -446,10 +572,43 @@ export class Game {
     this.drawMap();
   };
 
+  /**
+   * Where the cars are, said and heard.
+   *
+   * What goes out is this screen's own car, and the computer cars as well if
+   * this is the host — it is driving those, so it is the only screen that can
+   * say anything true about them. What comes back is everybody else, which the
+   * ghosts have already taken care of; all this does is hand the clock on.
+   */
+  private talk(dt: number): void {
+    const party = this.party;
+    if (!party) {
+      return;
+    }
+    fillState(this.mine, party.seat, this.car, this.progress + this.began);
+    this.told.length = 0;
+    if (party.isHost) {
+      for (let i = 0; i < this.rivals.cars.length; i++) {
+        const state = (this.told[i] = this.aiPool(i));
+        fillState(state, AI + i, this.rivals.cars[i], this.rivals.progress(i));
+      }
+    }
+    party.step(dt, this.track, this.mine, this.told);
+  }
+
+  /** One held packet slot per computer car, made once. */
+  private aiPool(i: number): CarState {
+    const pool = this.pool;
+    while (pool.length <= i) {
+      pool.push(blankState());
+    }
+    return pool[i];
+  }
+
   /** The other cars' engines and tyres, from where the player is. */
   private hearRivals(dt: number): void {
     this.heard.length = 0;
-    for (const them of this.rivals.cars) {
+    for (const {car: them} of this.rest) {
       this.heard.push({
         speed: them.speed,
         slip: them.slip,
@@ -496,8 +655,8 @@ export class Game {
     // from wherever they each happened to begin.
     const me = this.progress + this.began;
     let ahead = 0;
-    for (let i = 0; i < RIVALS.count; i++) {
-      if (this.rivals.progress(i) > me) {
+    for (const other of this.rest) {
+      if (other.progress() > me) {
         ahead++;
       }
     }
@@ -511,7 +670,7 @@ export class Game {
    * whether a child hears anything.
    */
   private jostle(): boolean {
-    const cars = [this.car, ...this.rivals.cars];
+    const cars = [this.car, ...this.rest.map(other => other.car)];
     let hitPlayer = false;
     for (let i = 0; i < cars.length; i++) {
       for (let j = i + 1; j < cars.length; j++) {
@@ -550,7 +709,7 @@ export class Game {
   /** The player first, then the rivals, which is the order their colours are
    *  in. */
   private drawMap(): void {
-    const cars = [this.car, ...this.rivals.cars];
+    const cars = [this.car, ...this.rest.map(other => other.car)];
     for (let i = 0; i < cars.length; i++) {
       const at = this.onMap[i] ?? {x: 0, z: 0};
       at.x = cars[i].position.x;
@@ -654,23 +813,61 @@ export class Game {
     // start. The card waits for it — see `endFilm`.
     this.finishing = 0;
 
+    // The others are told before the card is written, so a screen that
+    // finishes first has somewhere to put everybody else's time as it lands.
+    this.party?.finish(this.time);
+
     const place = this.place();
     const clean = this.knocks === 0;
     // Everybody up — unless the player came last, in which case they stay
     // sitting down. Being cheered for finishing fourth of four is how a game
     // starts feeling like it is humouring you, and a child can tell.
-    if (place < RIVALS.count + 1) {
+    if (place < this.cars) {
       this.stands.cheer(this.car.position, this.track.palette);
     }
 
     const round = this.laps === 1 ? "" : ` over ${this.laps} laps`;
     this.done.setTitle(place === 1 ? "You won!" : "Chequered flag!");
     this.done.setBody(
-      `${ordinal(place)} of ${RIVALS.count + 1}${round}, in ${this.time.toFixed(1)} seconds.` +
+      `${ordinal(place)} of ${this.cars}${round}, in ${this.time.toFixed(1)} seconds.` +
         (clean
           ? " And you never once touched the wall."
           : ` You hit the wall ${this.knocks === 1 ? "once" : `${this.knocks} times`} — the long way round the outside is usually the quick way.`),
     );
+    if (this.party) {
+      // Only the host can put everybody back on the grid, so nobody else is
+      // offered a button that would do nothing.
+      this.done.setButton(
+        this.party.isHost ? "Race again" : "Waiting for the host\u2026",
+        this.party.isHost,
+      );
+      this.tellPlaces();
+    }
+  }
+
+  /**
+   * Everybody's time on the finish card, as each one lands.
+   *
+   * Written again every time somebody finishes rather than waiting for the last
+   * car, so a child who won sees their own time straight away and watches the
+   * others arrive under it.
+   */
+  private tellPlaces(): void {
+    const party = this.party;
+    if (!party) {
+      return;
+    }
+    const lines = party.places.map(
+      (place, i) =>
+        `${i + 1}. ${party.name(place.seat)} ${place.time.toFixed(1)}s`,
+    );
+    const waiting = party.size - party.places.length;
+    if (waiting > 0) {
+      lines.push(
+        waiting === 1 ? "one still out there" : `${waiting} still out there`,
+      );
+    }
+    this.done.setBody(lines.join("  \u00b7  "));
   }
 
   /**
@@ -705,6 +902,9 @@ export class Game {
     this.stands.update(dt);
     this.car.render(alpha);
     this.rivals.render(alpha);
+    for (const ghost of this.ghosts) {
+      ghost.car.render(alpha);
+    }
     this.followCamera(dt);
     this.stage.render();
   };
@@ -760,6 +960,12 @@ export class Game {
    */
   dispose(): void {
     this.running = false;
+    window.removeEventListener("pointerdown", this.wakeSound);
+    // The party outlives the race — it is the same children next time round —
+    // so this hands back the one thing the race borrowed from it.
+    if (this.party?.onResults) {
+      this.party.onResults = undefined;
+    }
     this.loop?.stop();
     this.engine.stop();
     this.stick.enabled = false;
@@ -810,14 +1016,56 @@ export class Game {
   private snapCamera(): void {
     this.car.render(1);
     this.rivals.render(1);
+    for (const ghost of this.ghosts) {
+      ghost.car.render(1);
+    }
     const p = this.car.group.position;
     this.eye.set(p.x, 0, p.z);
     this.gridShot(p);
-    this.hud.update(0, RIVALS.count + 1);
+    this.hud.update(0, this.cars);
     // Drawn once before anybody moves, so the corner is a map from the first
     // frame rather than an empty white box until the flag drops.
     this.drawMap();
   }
+}
+
+/** A packet slot with nothing in it yet. */
+function blankState(): CarState {
+  return {
+    who: 0,
+    x: 0,
+    z: 0,
+    heading: 0,
+    vx: 0,
+    vz: 0,
+    yawRate: 0,
+    slip: 0,
+    height: 0,
+    roll: 0,
+    pitch: 0,
+    progress: 0,
+  };
+}
+
+/** A car, written into a packet slot. */
+function fillState(
+  into: CarState,
+  who: number,
+  car: Car,
+  progress: number,
+): void {
+  into.who = who;
+  into.x = car.position.x;
+  into.z = car.position.z;
+  into.heading = car.heading;
+  into.vx = car.velocity.x;
+  into.vz = car.velocity.y;
+  into.yawRate = car.yawRate;
+  into.slip = car.slip;
+  into.height = car.height;
+  into.roll = car.roll;
+  into.pitch = car.pitch;
+  into.progress = progress;
 }
 
 /** Hands the frame back to the browser, so the waiting card can paint. */

@@ -1664,3 +1664,173 @@ canvas {
   letter-spacing: 0.08em;
   opacity: 0.5;
 }
+
+/* ---------- Racing somebody in the same room ---------- */
+
+/* The lobby: a code on one side, who is here on the other. Side by side when
+   the screen is wide enough for the code to stay big, stacked when it is not —
+   and the code stays first either way, because it is the thing the other child
+   is pointing a camera at. */
+.lobby-body {
+  flex: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-content: safe center;
+  justify-content: center;
+  gap: 18px;
+  padding: 8px 16px;
+  overflow-y: auto;
+  touch-action: pan-y;
+}
+
+.lobby-code {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 14px;
+  border: 1px solid var(--stroke);
+  border-radius: 22px;
+  background: #fff;
+}
+
+/* Big, because a camera reads a big one from further away and across a table is
+   further away than it sounds. Capped so it cannot push the rest off a phone. */
+.qr {
+  width: min(46vh, 300px);
+  height: min(46vh, 300px);
+  display: block;
+  border-radius: 8px;
+}
+
+.lobby-how {
+  margin: 0;
+  font-size: 15px;
+  opacity: 0.6;
+  text-align: center;
+}
+
+/* The code in letters as well. A camera that will not focus is not a reason to
+   give up on the game — somebody can read this one out. */
+.lobby-letters {
+  font-size: 30px;
+  letter-spacing: 0.24em;
+  font-variant-numeric: tabular-nums;
+}
+
+.lobby-side {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 240px;
+  max-width: 340px;
+}
+
+.lobby-who {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.lobby-car {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border: 1px solid var(--stroke);
+  border-radius: 999px;
+  background: #fff;
+  font-weight: 700;
+  font-size: 17px;
+}
+
+.lobby-car.mine {
+  border-color: #d6473c;
+  border-width: 2px;
+}
+
+.lobby-car.empty {
+  background: transparent;
+  border-style: dashed;
+  font-weight: 400;
+  opacity: 0.5;
+}
+
+/* The car's own colour, which is how a child knows which line is them without
+   reading a word of it. */
+.lobby-dot {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1px solid var(--stroke);
+  flex: 0 0 auto;
+}
+
+.lobby-says {
+  margin: 0;
+  font-size: 16px;
+  opacity: 0.7;
+}
+
+.lobby-tracks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.lobby-tracks .chip {
+  border-width: 2px;
+}
+
+.lobby-tracks .chip[data-on="no"] {
+  border-color: var(--stroke);
+  opacity: 0.65;
+}
+
+/* A phone on its side, where the code and the list have to share a short
+   screen: the code comes down to whatever height is left. */
+@media (max-height: 520px) {
+  .qr {
+    width: min(40vh, 220px);
+    height: min(40vh, 220px);
+  }
+
+  .lobby-letters {
+    font-size: 22px;
+  }
+
+  .lobby-body {
+    gap: 12px;
+    padding: 4px 12px;
+  }
+
+  .lobby-car {
+    padding: 6px 12px;
+    font-size: 15px;
+  }
+}
+
+/* Why the last screen went away. Sits under the list rather than over it: it is
+   news, not a decision to be made. */
+.menu-note {
+  margin: 0;
+  padding: 0 20px calc(var(--safe-b) + 10px);
+  text-align: center;
+  font-weight: 700;
+  color: #b23b31;
+}
+
+/* A button that is not yours to press: the host's start button before anybody
+   has joined, and a guest's finish card waiting on the host. Faded and flat
+   rather than hidden — what it says is the explanation. */
+.big-button:disabled,
+.chip:disabled {
+  opacity: 0.45;
+  box-shadow: none;
+  cursor: default;
+}
+
+.big-button:disabled:active,
+.chip:disabled:active {
+  transform: none;
+}

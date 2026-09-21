@@ -1892,6 +1892,26 @@ export const SOUND = {
   hearFrom: 70,
   /** Each rival's engine a little off the others', so they do not beat. */
   rivalPitch: [0.92, 1.06, 1.17] as ReadonlyArray<number>,
+  /**
+   * The lights going out.
+   *
+   * Three beeps on one note and then a longer one a fifth above it, which is
+   * the shape every racing game's countdown has had since arcades: the ear
+   * hears three of the same thing and knows the fourth is different before it
+   * arrives. Made here out of oscillators like everything else the game plays —
+   * nothing is sampled from anywhere.
+   *
+   * A triangle rather than the square the finish fanfare uses: three squares in
+   * a row at this length are harsh on an iPad speaker held close to a face.
+   */
+  beepHz: 700,
+  goHz: 1050,
+  beepFor: 0.16,
+  goFor: 0.5,
+  beepLevel: 0.12,
+  /** How hard the engine blips under the last one — the rev everybody gives it
+   *  on the line. Enough to feel, not enough to be a noise of its own. */
+  goRev: 0.16,
 } as const;
 
 /**
@@ -2279,4 +2299,93 @@ export const EDITOR = {
    *  rejected with a word rather than saved as an unplayable track. */
   minSpan: 0.22,
   minCorners: 6,
+} as const;
+
+/**
+ * Racing somebody in the same room.
+ *
+ * Everything here is aimed at one number: how long it takes what one child
+ * does with their thumb to show up on the other child's screen. Three things
+ * decide that, and all three are settled by the shape of the thing rather
+ * than by any value below.
+ *
+ * - **Nothing goes through a server.** The cars talk straight to each other
+ *   over WebRTC, and on one house's wi-fi that is a couple of milliseconds.
+ *   A server only ever introduces them — see `net/room.ts`.
+ * - **Your own car is never waiting for the network.** Every screen simulates
+ *   the car its own child is driving, exactly as in a single-player race, so
+ *   the stick answers in the same frame however bad the wi-fi is. What travels
+ *   is where the cars ended up, not what anybody asked for.
+ * - **The channel is unordered.** A packet that arrives late is thrown away
+ *   rather than holding up the ones behind it, which is the whole reason not
+ *   to send this over an ordinary reliable socket.
+ */
+export const NET = {
+  /**
+   * How many children can be in one race, host included.
+   *
+   * Four, because the grid is four cars and the placings, the minimap and the
+   * finish card are all written for four. Every human takes a slot a computer
+   * car would have had, so the field is always four and a race with three
+   * friends in it has nobody else on the track.
+   */
+  most: 4,
+  /**
+   * How long a join code is.
+   *
+   * Five characters from an alphabet of twenty-two — no letters that read as
+   * other letters, no digits that read as letters — which is five million
+   * codes. Long enough that nobody stumbles onto somebody else's race, short
+   * enough to read out over a table if a camera will not focus.
+   */
+  code: 5,
+  /** The letters and digits a code is made of: nothing that can be misread. */
+  alphabet: "ABCDEFGHJKLMNPQRSTVWXY",
+  /**
+   * How many times a second each car says where it is.
+   *
+   * Twenty, against a simulation that runs at sixty. The gap is covered by
+   * interpolating between the last two packets, and raising this does far less
+   * for how the other cars look than `smooth` does — it is the *buffer* that
+   * decides whether they glide or stutter, not the packet rate.
+   */
+  rate: 20,
+  /**
+   * How far behind the newest packet the other cars are drawn, in seconds.
+   *
+   * One packet's worth plus a little. This is the price of smooth motion: a
+   * car shown at the instant its last packet arrived has nothing to move
+   * towards and has to jump when the next one lands. Sixty milliseconds is a
+   * car length at racing speed, close enough that racing wheel to wheel still
+   * works, and small enough that a bump lands where it looked like it would.
+   */
+  smooth: 0.06,
+  /**
+   * How long a car will be carried on its own momentum when packets stop, and
+   * how long before it is given up on entirely.
+   *
+   * A dropped packet or two should not freeze a car in the middle of a corner:
+   * it keeps going the way it was going, which is what it was almost certainly
+   * about to do anyway. Past `carries` it is left where it is rather than
+   * driven off into the scenery on a guess.
+   */
+  carries: 0.25,
+  drops: 6,
+  /** How often the clocks are compared, in seconds, and how many round trips
+   *  are kept to take the best of. The best of several is much better than an
+   *  average: a fast trip is the truth about the network, a slow one is a
+   *  queue somewhere. */
+  pings: 1,
+  keepPings: 8,
+  /** How long the countdown is held after everybody says they are ready, so
+   *  the slowest screen has the flag before the quickest does. */
+  warm: 0.6,
+  /** How long to wait for a screen that is still loading before starting
+   *  without it. A child staring at a loading card because somebody else's
+   *  iPad is having a think is worse than a car that joins a second late. */
+  patience: 12,
+  /** How long to try to find a race before telling the child it is not there.
+   *  Long enough for a slow phone on a slow broker, short enough that a wrong
+   *  code is a shrug rather than a wait. */
+  waitFor: 10,
 } as const;

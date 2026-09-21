@@ -94,6 +94,45 @@ times round you go.
 sharing story for now — the intention is a server one day, with short codes for
 swapping tracks about, and until then this is how a track leaves the device.
 
+## Racing somebody in the same room
+
+**Race a friend** on the front screen opens a race and puts a QR code on the
+screen. The other child points their camera at it, their browser opens the game
+with the code in the address, and they are in the lobby — no typing, no account,
+no typing of codes. The code is printed underneath in letters as well, for a
+camera that will not focus.
+
+Everybody needs to be **on the same wi-fi**, and up to four can race. Every child
+takes a slot a computer car would have had, so the field is always four: race
+three friends and there are no computer cars at all. The host picks the track —
+including one they drew themselves, which travels to the other screens with the
+race, so nobody has to have it saved.
+
+How it works, since this is the only part of the game that talks to anything
+outside the device:
+
+- The screens talk **straight to each other** over WebRTC, phone to iPad through
+  the router in the hall. Nothing about the race goes through a server, which is
+  why it is quick: on one house's wi-fi the delay is a couple of milliseconds.
+- Two browsers cannot find each other on their own, so the _introduction_ — a few
+  hundred bytes of "here is how to reach me" — goes through PeerJS's free broker
+  before the race. That is the one moment the internet is needed; after it, the
+  broker has no part in it. `net/room.ts` is where to point this at a broker of
+  our own if that ever matters.
+- **Your own car is never waiting for the network.** Every screen simulates the
+  car its own child is driving, exactly as in a race on your own, so the stick
+  answers in the same frame however bad the wi-fi is. What travels is where the
+  cars ended up — twenty times a second, on an _unordered_ channel, so a late
+  packet is thrown away rather than holding up the ones behind it.
+- The other cars are drawn sixty milliseconds in the past and moved between the
+  two packets either side of that moment, which is what makes them glide instead
+  of jerking forward twenty times a second. See `net/ghost.ts`; it is the whole
+  trick, and `NET.smooth` is the price of it in car lengths.
+- The countdown is read off a **shared clock** rather than counted on each
+  screen: the host says what time the flag drops on its own clock, and each
+  screen works out when that is on theirs. Counting three seconds from "the
+  message arrived" would hand the race to whoever heard first.
+
 ## Architecture
 
 Worth knowing before changing anything:
@@ -261,6 +300,7 @@ src/
   core/            loop, the thumbstick, rng, zoom lock, engine sound
   render/          the orthographic stage, and the flat-sprite helpers
   entities/        the circuit, the cars, the rivals, the skids, the patches
+  net/             racing another child: the connection, the wire, the ghosts
   track/           what a track *is* as data, and where saved ones are kept
   ui/              the track list, the builder, the HUD, the cards, the CSS
   game.ts          owns the scene and one race

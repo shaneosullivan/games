@@ -27,16 +27,26 @@ export function myStickers(): Array<Sticker> {
     if (!raw) {
       return [];
     }
-    const saved: unknown = JSON.parse(raw);
-    if (!Array.isArray(saved)) {
-      return [];
-    }
-    return saved.filter(isSticker).slice(0, STICKER.most).map(tidy);
+    return tidyStickers(JSON.parse(raw));
   } catch {
     // A blocked store, or something that is not a sticker any more, means a
     // plain car. Nothing here is worth a broken garage.
     return [];
   }
+}
+
+/**
+ * A list of stickers from somewhere that cannot be trusted, made safe.
+ *
+ * The store is one such place and another screen's idea of what is stuck on
+ * its car is another — both arrive as whatever JSON somebody else wrote, and
+ * both want exactly this treatment.
+ */
+export function tidyStickers(value: unknown): Array<Sticker> {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value.filter(isSticker).slice(0, STICKER.most).map(tidy);
 }
 
 export function keepStickers(stickers: ReadonlyArray<Sticker>): void {

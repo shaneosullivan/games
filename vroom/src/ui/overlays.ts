@@ -46,6 +46,21 @@ export class Overlay {
     }
   }
 
+  /**
+   * What the button says, and whether it does anything.
+   *
+   * A guest's finish card has a button that is not theirs to press — the next
+   * race is the host's to start — and a dead button with the truth written on
+   * it is better than a live one that does nothing.
+   */
+  setButton(text: string, live = true): void {
+    const b = this.root.querySelector("button");
+    if (b) {
+      b.textContent = text;
+      b.disabled = !live;
+    }
+  }
+
   setBody(text: string): void {
     const p = this.root.querySelector("p");
     if (p) {

@@ -42,7 +42,13 @@ export function myColour(): number {
  * is that colour turned up — see `PLAYER.neonSaturation`.
  */
 export function carColour(environment: Environment): number {
-  return environment === "neon" ? neonised(myColour()) : myColour();
+  return carPaint(myColour(), environment);
+}
+
+/** The same, for a colour that is not this screen's own — another child's car
+ *  in a race together, which has to be painted for the same city. */
+export function carPaint(colour: number, environment: Environment): number {
+  return environment === "neon" ? neonised(colour) : colour;
 }
 
 /** The same hue, wound out to full. Colours with no hue come back unchanged. */

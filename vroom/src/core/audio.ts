@@ -29,9 +29,21 @@ export class Engine {
   private readonly others: Array<Voice> = [];
   private muted = false;
 
-  /** Call from a real gesture — the button that starts the race. */
+  /**
+   * Call from a real gesture — the button that starts the race, or the first
+   * touch on the glass.
+   *
+   * Called again later it wakes a context the browser suspended, which is not
+   * an edge case: a child who joined a race by scanning a code never pressed
+   * anything, so the context they got was made outside a gesture and is asleep
+   * until they touch the screen.
+   */
   start(): void {
-    if (this.ctx || this.muted) {
+    if (this.ctx) {
+      void this.ctx.resume();
+      return;
+    }
+    if (this.muted) {
       return;
     }
     const Ctor =
@@ -138,6 +150,59 @@ export class Engine {
     g.connect(this.master);
     source.start(now);
     source.stop(now + 0.26);
+  }
+
+  /**
+   * One of the lights on the grid: `beat` 0, 1, 2, then 3 for "go".
+   *
+   * Three the same and then one that is higher and longer, which is what a
+   * countdown sounds like — and by the fourth a child is already pushing the
+   * stick, so the last one is the only one that has to be unmistakable.
+   */
+  light(beat: number): void {
+    const ctx = this.ctx;
+    if (!ctx || !this.master || this.muted) {
+      return;
+    }
+    const go = beat >= 3;
+    const at = ctx.currentTime;
+    const hz = go ? SOUND.goHz : SOUND.beepHz;
+    const held = go ? SOUND.goFor : SOUND.beepFor;
+
+    const osc = ctx.createOscillator();
+    osc.type = "triangle";
+    osc.frequency.setValueAtTime(hz, at);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, at);
+    g.gain.exponentialRampToValueAtTime(SOUND.beepLevel, at + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, at + held);
+    osc.connect(g);
+    g.connect(this.master);
+    osc.start(at);
+    osc.stop(at + held + 0.02);
+
+    if (!go) {
+      return;
+    }
+    // And the blip of throttle everybody gives it as the flag drops. A swept
+    // sawtooth under the note, which is the same thing the engines are made
+    // of, so it sits in the same sound rather than beside it.
+    const rev = ctx.createOscillator();
+    rev.type = "sawtooth";
+    rev.frequency.setValueAtTime(SOUND.idleHz, at);
+    rev.frequency.exponentialRampToValueAtTime(SOUND.fullHz * 0.8, at + 0.3);
+    const tame = ctx.createBiquadFilter();
+    tame.type = "lowpass";
+    tame.frequency.value = SOUND.tone;
+    const revGain = ctx.createGain();
+    revGain.gain.setValueAtTime(0.0001, at);
+    revGain.gain.exponentialRampToValueAtTime(SOUND.goRev, at + 0.06);
+    revGain.gain.exponentialRampToValueAtTime(0.0001, at + 0.45);
+    rev.connect(tame);
+    tame.connect(revGain);
+    revGain.connect(this.master);
+    rev.start(at);
+    rev.stop(at + 0.47);
   }
 
   /** The chequered flag: three notes going up. */
