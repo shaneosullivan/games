@@ -1,10 +1,10 @@
-import {ENVIRONMENTS, LAYOUT, Palette} from "../config";
+import {ENVIRONMENTS, LAYOUT} from "../config";
 import chofterUrl from "../assets/chofter.png";
 import {deleteTrack, loadTracks} from "../track/store";
 import {BUILT_INS, TrackSpec} from "../track/spec";
-import {outline} from "../track/outline";
 import {rate, RATING_NAMES} from "../track/rating";
 import {Garage} from "./garage";
+import {swatch} from "./swatch";
 
 /**
  * The track list: what you see when the game opens.
@@ -22,25 +22,10 @@ export interface MenuHandlers {
   onModels: () => void;
   /** The garage: which car is yours. */
   onGarage: () => void;
-  /** Racing somebody else in the same house: opening one, and joining one by
-   *  typing the code rather than pointing a camera at it. */
+  /** Racing somebody else in the same house. Which end of it you are — putting
+   *  the race on, or looking for one — is the next screen's question. */
   onTogether: () => void;
-  onJoin: () => void;
 }
-
-/** SVG lives in its own namespace, and an element made without it is an
- *  element the browser draws as nothing at all. */
-const SVG = "http://www.w3.org/2000/svg";
-
-/** The card's picture, in its own little coordinate system: a hundred across,
- *  with room at the edges for half the width of the road. */
-const SHAPE = {
-  size: 100,
-  pad: 14,
-  road: 15,
-  middle: 2,
-  dashes: "5 7",
-} as const;
 
 export class Menu {
   readonly root = document.createElement("div");
@@ -129,16 +114,6 @@ export class Menu {
     together.textContent = "🏁 Race a friend";
     together.addEventListener("click", () => this.handlers.onTogether());
 
-    // Beside it rather than inside it: opening a race and joining one are two
-    // different children doing two different things at the same moment, and a
-    // child who has been read a code over the table should not have to guess
-    // that it lives behind the button for starting one.
-    const join = document.createElement("button");
-    join.type = "button";
-    join.className = "chip";
-    join.textContent = "⌨️ Type a code";
-    join.addEventListener("click", () => this.handlers.onJoin());
-
     const build = document.createElement("button");
     build.type = "button";
     build.className = "big-button";
@@ -171,7 +146,7 @@ export class Menu {
       models.addEventListener("click", () => this.handlers.onModels());
       foot.appendChild(models);
     }
-    foot.append(together, join, build);
+    foot.append(together, build);
     if (!this.wide) {
       foot.appendChild(garage);
     }
@@ -205,40 +180,12 @@ export class Menu {
    * road is drawn as one fat stroke with a thin centre line down it, the same
    * two colours the real thing uses, on the same ground.
    */
-  private shapeOf(spec: TrackSpec, palette: Palette): HTMLElement {
-    const box = document.createElementNS(SVG, "svg");
-    box.setAttribute("class", "track-swatch");
-    box.setAttribute("viewBox", `0 0 ${SHAPE.size} ${SHAPE.size}`);
-    box.setAttribute("aria-hidden", "true");
-    box.style.background = hex(palette.ground);
-    box.style.borderColor = hex(palette.kerbA);
-
-    const d = outline(spec, SHAPE.size, SHAPE.pad);
-    const road = document.createElementNS(SVG, "path");
-    road.setAttribute("d", d);
-    road.setAttribute("fill", "none");
-    road.setAttribute("stroke", hex(palette.tarmac));
-    road.setAttribute("stroke-width", String(SHAPE.road));
-    road.setAttribute("stroke-linejoin", "round");
-
-    const line = document.createElementNS(SVG, "path");
-    line.setAttribute("d", d);
-    line.setAttribute("fill", "none");
-    line.setAttribute("stroke", hex(palette.line));
-    line.setAttribute("stroke-width", String(SHAPE.middle));
-    line.setAttribute("stroke-dasharray", SHAPE.dashes);
-    line.setAttribute("stroke-linejoin", "round");
-
-    box.append(road, line);
-    return box as unknown as HTMLElement;
-  }
-
   private card(spec: TrackSpec, mine: boolean): HTMLElement {
     const card = document.createElement("div");
     card.className = "track-card";
 
     const palette = ENVIRONMENTS[spec.environment];
-    const swatch = this.shapeOf(spec, palette);
+    const picture = swatch(spec);
 
     const words = document.createElement("div");
     words.className = "track-words";
@@ -270,7 +217,7 @@ export class Menu {
     play.textContent = "Race";
     play.addEventListener("click", () => this.handlers.onPlay(spec));
 
-    card.append(swatch, words, play);
+    card.append(picture, words, play);
 
     if (mine) {
       const edit = document.createElement("button");
@@ -307,10 +254,6 @@ function section(text: string): HTMLElement {
   h.className = "menu-section";
   h.textContent = text;
   return h;
-}
-
-function hex(colour: number): string {
-  return `#${colour.toString(16).padStart(6, "0")}`;
 }
 
 /**

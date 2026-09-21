@@ -61,6 +61,9 @@ export type Control =
   | {kind: "welcome"; seat: number; roster: Array<Seat>}
   /** Host to everybody, whenever that changes. */
   | {kind: "roster"; roster: Array<Seat>}
+  /** Host to everybody: this is what we are going to race. A lobby's worth of
+   *  news, not a start — see `race` for that. */
+  | {kind: "track"; spec: TrackSpec}
   /** Host to everybody: load this and tell me when you have. The computer
    *  cars are dealt by the host so that every screen has the same field. */
   | {kind: "race"; spec: TrackSpec; rivals: Array<Look>}
@@ -279,6 +282,10 @@ export function tidyControl(value: unknown): Control | null {
         kind: "roster",
         roster: tidyRoster((value as {roster?: unknown}).roster),
       };
+    case "track": {
+      const {spec} = value as {spec?: unknown};
+      return isSpec(spec) ? {kind: "track", spec} : null;
+    }
     case "race": {
       const {spec, rivals} = value as {spec?: unknown; rivals?: unknown};
       if (!isSpec(spec)) {

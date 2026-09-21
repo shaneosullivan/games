@@ -8,6 +8,8 @@ import {tidyCode} from "./net/room";
 import {Editor} from "./ui/editor";
 import {Join} from "./ui/join";
 import {Lobby} from "./ui/lobby";
+import {Scan} from "./ui/scan";
+import {Together} from "./ui/together";
 import {Menu} from "./ui/menu";
 import {ModelViewer, MODELS_HASH} from "./ui/models";
 import {Loading} from "./ui/loading";
@@ -49,6 +51,8 @@ let garage: Garage | null = null;
 let menu: Menu | null = null;
 let lobby: Lobby | null = null;
 let join: Join | null = null;
+let scan: Scan | null = null;
+let together: Together | null = null;
 /**
  * The other children, while there are any.
  *
@@ -74,6 +78,11 @@ function clear(): void {
   lobby?.dispose();
   lobby = null;
   join = null;
+  // The camera off before anything else: a scanner left running behind another
+  // screen is a light on the back of an iPad that nobody asked for.
+  scan?.dispose();
+  scan = null;
+  together = null;
   app!.replaceChildren();
 }
 
@@ -94,8 +103,7 @@ function showMenu(note?: string): void {
     onEdit: spec => showEditor(spec),
     onModels: showModels,
     onGarage: () => showGarage(showMenu),
-    onTogether: () => void hostRace(),
-    onJoin: () => showJoin(),
+    onTogether: () => showTogether(),
   });
   app!.appendChild(menu.root);
   if (note) {
@@ -110,19 +118,72 @@ function showMenu(note?: string): void {
 }
 
 /**
+ * Racing a friend: which end of it are you?
+ *
+ * Both children tap the same button on the front screen and want opposite
+ * things from there, so this asks. Picking a track makes you the one putting
+ * the race on; the other two ways are both "I am looking for one".
+ */
+function showTogether(picking = false): void {
+  const joined = party;
+  clear();
+  together = new Together(
+    {
+      onHost: spec => {
+        // Already in a lobby: this is the host changing their mind about the
+        // track, which must not throw away the code everybody has joined with.
+        if (joined?.isHost) {
+          party = joined;
+          joined.setTrack(spec);
+          showLobby();
+        } else {
+          void hostRace(spec);
+        }
+      },
+      onType: () => showJoin(),
+      onScan: () => showScan(),
+      onCancel: () => {
+        if (joined?.isHost) {
+          party = joined;
+          showLobby();
+        } else {
+          showMenu();
+        }
+      },
+    },
+    picking,
+  );
+  app!.appendChild(together.root);
+}
+
+/** Reading the code off the other screen with this device's own camera. */
+function showScan(): void {
+  clear();
+  scan = new Scan({
+    onCode: code => void joinRace(code),
+    onType: () => showJoin(),
+    onCancel: () => showTogether(),
+  });
+  app!.appendChild(scan.root);
+}
+
+/**
  * Opening a race for somebody else to join.
  *
  * The broker is on the internet and can take a moment, so this waits behind a
  * card like everything else that takes a moment — and if it cannot be reached,
  * says so in words a child can act on rather than leaving a dead screen.
  */
-async function hostRace(): Promise<void> {
+async function hostRace(spec: TrackSpec): Promise<void> {
   clear();
   const card = new Loading("Race a friend");
   card.mount(app!);
   card.set(0.4, "Opening the race\u2026");
   try {
     party = await Party.open();
+    // Decided before anybody could join, so the code and the track appear on
+    // the screen together and a guest is told what it has joined.
+    party.setTrack(spec);
   } catch {
     await card.close();
     showMenu("Could not open a race. Is this iPad on the wi-fi?");
@@ -138,7 +199,7 @@ function showJoin(): void {
   clear();
   join = new Join({
     onJoin: code => void joinRace(code),
-    onCancel: () => showMenu(),
+    onCancel: () => showTogether(),
   });
   app!.appendChild(join.root);
 }
@@ -196,6 +257,7 @@ function showLobby(back = false): void {
         dealRivals(count, spec.environment, taken),
       ),
     onGarage: () => showGarage(() => showLobby(true)),
+    onChangeTrack: () => showTogether(true),
   });
   app!.appendChild(lobby.root);
   if (back) {

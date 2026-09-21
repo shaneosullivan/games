@@ -96,16 +96,26 @@ swapping tracks about, and until then this is how a track leaves the device.
 
 ## Racing somebody in the same room
 
-**Race a friend** on the front screen opens a race and puts a QR code on the
-screen. The other child points their camera at it, their browser opens the game
-with the code in the address, and they are in the lobby — no account, nothing to
-type.
+**Race a friend** on the front screen asks which end of it you are, because two
+children tap the same button and want opposite things:
 
-The code is printed underneath in letters as well, and **⌨️ Type a code** is the
-way in for anybody who would rather read it than scan it: a camera that will not
-focus, a code read out across a room, a link a parent forwarded. Lower case,
-spaces and a pasted address all work, and the button stays dark until there are
-five real characters in the box.
+- **Choose a track** — you are putting the race on. Pick the track, and the next
+  screen is a QR code with the five-letter code printed under it.
+- **Enter a code** — type the letters the other screen is showing. Lower case,
+  spaces and a pasted address all work.
+- **Scan a QR code** — read their screen with this device's camera, without
+  leaving the game.
+
+That last one is not a duplicate of the phone's own camera app, and the reason
+is worth writing down: **a scanned link cannot be made to open an installed
+web app.** iOS has no way to hand an `https` address to a home-screen app —
+the Camera app opens Safari, full stop — so a child who has Vroom on their home
+screen and scans a code gets a _second copy_ of it in the browser instead of the
+one they are holding. Android can do it, but only for an installed WebAPK with
+Digital Asset Links set up, which is a Play-Store-shaped amount of ceremony for
+one button. Scanning from inside the game sidesteps all of it: the camera is
+ours, so nothing ever leaves the app. The QR still carries a full address, so
+the camera-app route works fine for a friend who does _not_ have the game open.
 
 Everybody needs to be **on the same wi-fi**, and up to four can race. Every child
 takes a slot a computer car would have had, so the field is always four: race

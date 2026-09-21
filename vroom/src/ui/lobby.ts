@@ -1,10 +1,10 @@
-import {ENVIRONMENTS, NET, SHAPES} from "../config";
+import {NET, SHAPES} from "../config";
 import chofterUrl from "../assets/chofter.png";
 import {Party} from "../net/party";
 import {Look} from "../net/protocol";
-import {BUILT_INS, TrackSpec} from "../track/spec";
-import {loadTracks} from "../track/store";
+import {TrackSpec} from "../track/spec";
 import {joinUrl, qrSquare} from "./qr";
+import {hex, swatch} from "./swatch";
 
 /**
  * The room before the race: a code on the screen and the cars arriving.
@@ -23,19 +23,24 @@ import {joinUrl, qrSquare} from "./qr";
 export interface LobbyHandlers {
   /** Back to the track list. Closes the race. */
   onExit: () => void;
-  /** The host, starting it: everybody loads this track. */
+  /** The host, starting it: everybody loads the track it was opened with. */
   onStart: (spec: TrackSpec) => void;
   /** The garage, so a child can pick their car while they wait. */
   onGarage: () => void;
+  /** Second thoughts about the track, before anybody has driven anywhere. */
+  onChangeTrack: () => void;
 }
 
 export class Lobby {
   readonly root = document.createElement("div");
 
-  /** Which track the host has picked. Guests have no say and are not shown a
-   *  picker; it is the host's track, the way it is the host's house. */
-  private chosen: TrackSpec;
-  private readonly tracks: Array<TrackSpec>;
+  /** The track this race is on, chosen before the room was ever opened. Guests
+   *  are shown it and have no say: it is the host's track, the way it is the
+   *  host's house. */
+  /** Which track was on the screen last time it was drawn, so a guest being
+   *  told what the race is — which arrives after the lobby is already up —
+   *  redraws it once rather than every second. */
+  private shown: string | null = null;
   /** The bits that are redrawn as people arrive, rather than the whole screen —
    *  rebuilding it all would take the QR code away and put it back, which on a
    *  screen somebody is pointing a camera at reads as a flicker. */
@@ -49,8 +54,6 @@ export class Lobby {
     private readonly handlers: LobbyHandlers,
   ) {
     this.root.className = "screen lobby";
-    this.tracks = [...BUILT_INS, ...loadTracks()];
-    this.chosen = this.tracks[0];
     this.draw();
     party.onRoster = () => this.refresh();
     // The ping is worth showing: it is the one number that says whether the
@@ -73,6 +76,7 @@ export class Lobby {
 
   private draw(): void {
     this.root.replaceChildren();
+    this.shown = this.party.spec?.id ?? null;
 
     const head = document.createElement("header");
     head.className = "menu-head";
@@ -103,26 +107,29 @@ export class Lobby {
     this.says.className = "lobby-says";
     list.append(this.who, this.says);
 
-    if (this.party.isHost) {
-      const picker = document.createElement("div");
-      picker.className = "lobby-tracks";
-      for (const spec of this.tracks) {
-        const pick = document.createElement("button");
-        pick.type = "button";
-        pick.className = "chip";
-        pick.textContent = spec.name;
-        pick.dataset.on = spec.id === this.chosen.id ? "yes" : "no";
-        pick.style.borderColor = hex(ENVIRONMENTS[spec.environment].tarmac);
-        pick.addEventListener("click", () => {
-          this.chosen = spec;
-          for (const other of picker.querySelectorAll("button")) {
-            other.dataset.on = "no";
-          }
-          pick.dataset.on = "yes";
-        });
-        picker.appendChild(pick);
+    // What everybody is about to race, so a guest knows what they have joined
+    // and a host can see they picked the one they meant to.
+    const chosen = this.party.spec;
+    if (chosen) {
+      const on = document.createElement("div");
+      on.className = "lobby-track";
+      const words = document.createElement("div");
+      words.className = "track-words";
+      const name = document.createElement("strong");
+      name.textContent = chosen.name;
+      const sub = document.createElement("span");
+      sub.textContent = chosen.laps === 1 ? "1 lap" : `${chosen.laps} laps`;
+      words.append(name, sub);
+      on.append(swatch(chosen), words);
+      if (this.party.isHost) {
+        const change = document.createElement("button");
+        change.type = "button";
+        change.className = "chip ghost";
+        change.textContent = "Change";
+        change.addEventListener("click", () => this.handlers.onChangeTrack());
+        on.appendChild(change);
       }
-      list.appendChild(picker);
+      list.appendChild(on);
     }
 
     body.appendChild(list);
@@ -140,9 +147,12 @@ export class Lobby {
       this.go.type = "button";
       this.go.className = "big-button";
       this.go.textContent = "Start the race";
-      this.go.addEventListener("click", () =>
-        this.handlers.onStart(this.chosen),
-      );
+      this.go.addEventListener("click", () => {
+        const spec = this.party.spec;
+        if (spec) {
+          this.handlers.onStart(spec);
+        }
+      });
       foot.appendChild(this.go);
     }
 
@@ -160,6 +170,10 @@ export class Lobby {
   /** Who is here, as their cars. No names anywhere: a child's car *is* their
    *  name, which needs no keyboard and no reading. */
   private refresh(): void {
+    if ((this.party.spec?.id ?? null) !== this.shown) {
+      this.draw();
+      return;
+    }
     this.who.replaceChildren();
     for (const seat of [...this.party.seats.values()].sort(
       (a, b) => a.seat - b.seat,
@@ -205,10 +219,6 @@ function carChip(look: Look, name: string, mine: boolean): HTMLElement {
   words.textContent = `${what?.emoji ?? "🏎️"} ${name}`;
   chip.append(dot, words);
   return chip;
-}
-
-function hex(colour: number): string {
-  return `#${colour.toString(16).padStart(6, "0")}`;
 }
 
 /** The same mark as the menu's, and the same reason for it. */

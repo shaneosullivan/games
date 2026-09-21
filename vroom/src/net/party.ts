@@ -194,6 +194,23 @@ export class Party {
    * car" — one message doing two jobs rather than a second one that would only
    * ever be sent from the lobby.
    */
+  /**
+   * The host choosing what everybody will race, before anybody has joined.
+   *
+   * Sent to each guest as it arrives and again whenever the host changes its
+   * mind, so the lobby on every screen names the same track. It is not a
+   * start: the track travels again with the race itself, which is what a
+   * screen actually loads from.
+   */
+  setTrack(spec: TrackSpec): void {
+    if (!this.isHost) {
+      return;
+    }
+    this.spec = spec;
+    this.room.say({kind: "track", spec});
+    this.onRoster?.();
+  }
+
   refreshLook(): void {
     if (this.isHost) {
       this.seats.set(this.seat, {seat: this.seat, look: myLook(), ping: 0});
@@ -359,9 +376,18 @@ export class Party {
           from,
         );
         this.room.say({kind: "roster", roster: [...this.seats.values()]});
+        // And what everybody is here to race, so a guest's lobby can name it
+        // rather than showing a code and nothing else.
+        if (this.spec) {
+          this.room.say({kind: "track", spec: this.spec}, from);
+        }
         this.onRoster?.();
         return;
       }
+      case "track":
+        this.spec = msg.spec;
+        this.onRoster?.();
+        return;
       case "welcome":
         this.seat = msg.seat;
         this.takeRoster(msg.roster);
