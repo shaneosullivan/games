@@ -405,6 +405,19 @@ export function tidyCode(raw: string): string {
   return code.slice(0, NET.code);
 }
 
+/**
+ * A code out of whatever somebody typed or pasted.
+ *
+ * Usually five characters typed off another screen. Sometimes the whole
+ * address they arrived in, because a parent forwarded the link rather than the
+ * code — so anything after `join=` wins, and what is left is held to the
+ * alphabet a code is made of.
+ */
+export function codeFromText(raw: string): string {
+  const at = raw.lastIndexOf("join=");
+  return tidyCode(at >= 0 ? raw.slice(at + "join=".length) : raw);
+}
+
 /** The broker answering: a peer is no use until it has an id. */
 function wake(peer: Peer): Promise<Peer> {
   return new Promise((done, fail) => {

@@ -190,6 +190,11 @@ export function unpackCars(
       pitch: view.getFloat32(at + 37, true),
       progress: view.getFloat32(at + 41, true),
     });
+    // On to the next car. Forgetting this read every car in the packet from
+    // the same offset, so a screen heard about the car whoever sent it was
+    // driving and about nothing else — and the computer cars, which only the
+    // host drives, stood on the grid for everybody else all race.
+    at += PER_CAR;
   }
   return {clock: view.getFloat32(1, true), cars};
 }

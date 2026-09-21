@@ -22,8 +22,10 @@ export interface MenuHandlers {
   onModels: () => void;
   /** The garage: which car is yours. */
   onGarage: () => void;
-  /** Racing somebody else in the same house. */
+  /** Racing somebody else in the same house: opening one, and joining one by
+   *  typing the code rather than pointing a camera at it. */
   onTogether: () => void;
+  onJoin: () => void;
 }
 
 /** SVG lives in its own namespace, and an element made without it is an
@@ -127,6 +129,16 @@ export class Menu {
     together.textContent = "🏁 Race a friend";
     together.addEventListener("click", () => this.handlers.onTogether());
 
+    // Beside it rather than inside it: opening a race and joining one are two
+    // different children doing two different things at the same moment, and a
+    // child who has been read a code over the table should not have to guess
+    // that it lives behind the button for starting one.
+    const join = document.createElement("button");
+    join.type = "button";
+    join.className = "chip";
+    join.textContent = "⌨️ Type a code";
+    join.addEventListener("click", () => this.handlers.onJoin());
+
     const build = document.createElement("button");
     build.type = "button";
     build.className = "big-button";
@@ -159,7 +171,7 @@ export class Menu {
       models.addEventListener("click", () => this.handlers.onModels());
       foot.appendChild(models);
     }
-    foot.append(together, build);
+    foot.append(together, join, build);
     if (!this.wide) {
       foot.appendChild(garage);
     }

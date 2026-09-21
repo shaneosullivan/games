@@ -98,9 +98,14 @@ swapping tracks about, and until then this is how a track leaves the device.
 
 **Race a friend** on the front screen opens a race and puts a QR code on the
 screen. The other child points their camera at it, their browser opens the game
-with the code in the address, and they are in the lobby — no typing, no account,
-no typing of codes. The code is printed underneath in letters as well, for a
-camera that will not focus.
+with the code in the address, and they are in the lobby — no account, nothing to
+type.
+
+The code is printed underneath in letters as well, and **⌨️ Type a code** is the
+way in for anybody who would rather read it than scan it: a camera that will not
+focus, a code read out across a room, a link a parent forwarded. Lower case,
+spaces and a pasted address all work, and the button stays dark until there are
+five real characters in the box.
 
 Everybody needs to be **on the same wi-fi**, and up to four can race. Every child
 takes a slot a computer car would have had, so the field is always four: race
@@ -128,6 +133,10 @@ outside the device:
   two packets either side of that moment, which is what makes them glide instead
   of jerking forward twenty times a second. See `net/ghost.ts`; it is the whole
   trick, and `NET.smooth` is the price of it in car lengths.
+- Crossing the line ends _your_ race, not everybody's. The screen that finishes
+  first keeps simulating the computer cars and keeps saying where they are,
+  because the others are still driving — without that, the moment the first car
+  finishes every other screen watches the field stop dead in a corner.
 - The countdown is read off a **shared clock** rather than counted on each
   screen: the host says what time the flag drops on its own clock, and each
   screen works out when that is on theirs. Counting three seconds from "the

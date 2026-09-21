@@ -147,6 +147,8 @@ export class Game {
   /** The two controls, held rather than made every step. */
   private readonly aimDrive: Drive = {kind: "aim", aim: this.want};
   private readonly keyDrive = {kind: "wheel" as const, steer: 0, throttle: 0};
+  /** Nothing asked of the car at all, for the roll-out after the flag. */
+  private readonly coast = {kind: "wheel" as const, steer: 0, throttle: 0};
   private readonly heard: Array<{
     speed: number;
     slip: number;
@@ -506,7 +508,16 @@ export class Game {
     if (this.counting >= 0) {
       this.tickStart(dt);
     }
-    if (!this.running || this.finished) {
+    if (this.finished) {
+      // Crossing the line ends *your* race, not everybody's. In a race against
+      // other children the world has to keep turning until they are home too —
+      // otherwise the moment the first car finishes, every other screen sees
+      // the computer cars stop dead in the middle of a corner and the race they
+      // are still driving turns into a car park.
+      this.carryOn(dt);
+      return;
+    }
+    if (!this.running) {
       return;
     }
     this.time += dt;
@@ -603,6 +614,44 @@ export class Game {
       pool.push(blankState());
     }
     return pool[i];
+  }
+
+  /**
+   * The race, for everybody who has not finished it.
+   *
+   * Only the parts of a step that are somebody else's business: the computer
+   * cars, which this screen may be the only one driving, and saying where they
+   * all are. Nothing here touches the placings, the lap count or the clock —
+   * those are settled for this child, who is watching the finish.
+   *
+   * Their own car is given a step with nothing asked of it, so it rolls to a
+   * stop the way a car does rather than stopping dead on the line.
+   */
+  private carryOn(dt: number): void {
+    const party = this.party;
+    // Everybody home: there is nobody left to keep the track moving for.
+    if (!party || party.places.length >= party.size) {
+      return;
+    }
+    this.coast.steer = 0;
+    this.coast.throttle = 0;
+    this.car.update(dt, this.coast, this.track, this.patches);
+    this.rivals.update(dt, this.track, this.patches);
+    this.jostle();
+    this.tyres.bounce(this.car);
+    for (const rival of this.rivals.cars) {
+      this.tyres.bounce(rival);
+    }
+    this.car.keepIn(this.track);
+    this.talk(dt);
+    this.car.setAbove(this.bridges.above(this.car.hint));
+    this.rivals.setAbove(i => this.bridges.above(i));
+    for (const ghost of this.ghosts) {
+      ghost.car.setAbove(this.bridges.above(ghost.car.hint));
+    }
+    this.skids.update(dt);
+    this.trails.update(dt);
+    this.drawMap();
   }
 
   /** The other cars' engines and tyres, from where the player is. */

@@ -6,6 +6,7 @@ import {dealRivals} from "./entities/rivals";
 import {Party} from "./net/party";
 import {tidyCode} from "./net/room";
 import {Editor} from "./ui/editor";
+import {Join} from "./ui/join";
 import {Lobby} from "./ui/lobby";
 import {Menu} from "./ui/menu";
 import {ModelViewer, MODELS_HASH} from "./ui/models";
@@ -47,6 +48,7 @@ let models: ModelViewer | null = null;
 let garage: Garage | null = null;
 let menu: Menu | null = null;
 let lobby: Lobby | null = null;
+let join: Join | null = null;
 /**
  * The other children, while there are any.
  *
@@ -71,6 +73,7 @@ function clear(): void {
   menu = null;
   lobby?.dispose();
   lobby = null;
+  join = null;
   app!.replaceChildren();
 }
 
@@ -92,6 +95,7 @@ function showMenu(note?: string): void {
     onModels: showModels,
     onGarage: () => showGarage(showMenu),
     onTogether: () => void hostRace(),
+    onJoin: () => showJoin(),
   });
   app!.appendChild(menu.root);
   if (note) {
@@ -129,7 +133,17 @@ async function hostRace(): Promise<void> {
   showLobby();
 }
 
-/** Joining one, from a scanned code. */
+/** Typing the code instead of pointing a camera at it. */
+function showJoin(): void {
+  clear();
+  join = new Join({
+    onJoin: code => void joinRace(code),
+    onCancel: () => showMenu(),
+  });
+  app!.appendChild(join.root);
+}
+
+/** Joining one, from a scanned or typed code. */
 async function joinRace(code: string): Promise<void> {
   clear();
   // Out of the address bar straight away: a reload half an hour later must not
