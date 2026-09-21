@@ -217,10 +217,16 @@ function buildGame(game) {
     );
     return;
   }
-  if (!fs.existsSync(path.join(game.dir, "node_modules"))) {
-    console.log(`  · ${game.name}: installing dependencies`);
-    run("npm install --no-audit --no-fund", game.dir);
-  }
+  // Every time, not only when node_modules is missing.
+  //
+  // It used to be skipped whenever the folder existed at all, which is true on
+  // every deploy after the first: the build cache restores node_modules, so a
+  // game that had just gained a dependency was built against the *previous*
+  // build's modules and failed on an import of something the repo plainly
+  // contained. An install with nothing to do takes about a second; a deploy
+  // that fails because of one takes an afternoon.
+  console.log(`  · ${game.name}: installing dependencies`);
+  run("npm install --no-audit --no-fund", game.dir);
   console.log(`  · ${game.name}: building`);
   try {
     run("npm run build", game.dir);
