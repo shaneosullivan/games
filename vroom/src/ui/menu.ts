@@ -144,17 +144,21 @@ export class Menu {
     const foot = document.createElement("div");
     foot.className = "menu-foot";
 
-    // In the built game as well as the dev server. It began as a tool for
-    // building the game and it was hidden in a production build, which meant
-    // the one place anybody actually plays this was the one place it could not
-    // be reached. It is a room full of the things in the game, turning round;
-    // there is nothing in it a child should not find.
-    const models = document.createElement("button");
-    models.type = "button";
-    models.className = "chip";
-    models.textContent = "🧊 Models";
-    models.addEventListener("click", () => this.handlers.onModels());
-    foot.appendChild(models);
+    // The dev server only. It is a tool for building the game rather than part
+    // of it, and on the front screen of the real thing it is one more button
+    // between a child and a race. It was shown everywhere for a while, on the
+    // argument that the place the game is actually played was the one place the
+    // tool could not be reached — which is a good argument for the person
+    // building the game and no argument at all for the person playing it.
+    // `#models` still opens it in any build, which is all that argument needed.
+    if (import.meta.env.DEV) {
+      const models = document.createElement("button");
+      models.type = "button";
+      models.className = "chip";
+      models.textContent = "🧊 Models";
+      models.addEventListener("click", () => this.handlers.onModels());
+      foot.appendChild(models);
+    }
     foot.append(together, build);
     if (!this.wide) {
       foot.appendChild(garage);
