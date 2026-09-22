@@ -6,6 +6,7 @@ import {
   TRAIL,
   CAR,
   PLAYER,
+  RACE,
   RIVALS,
   SCENERY,
   START,
@@ -147,8 +148,12 @@ export class Game {
   /** The two controls, held rather than made every step. */
   private readonly aimDrive: Drive = {kind: "aim", aim: this.want};
   private readonly keyDrive = {kind: "wheel" as const, steer: 0, throttle: 0};
-  /** Nothing asked of the car at all, for the roll-out after the flag. */
-  private readonly coast = {kind: "wheel" as const, steer: 0, throttle: 0};
+  /** The brakes, for after the flag: crossing the line stops you driving. */
+  private readonly coast = {
+    kind: "wheel" as const,
+    steer: 0,
+    throttle: -RACE.stops,
+  };
   private readonly heard: Array<{
     speed: number;
     slip: number;
@@ -633,9 +638,13 @@ export class Game {
     if (!party || party.places.length >= party.size) {
       return;
     }
-    this.coast.steer = 0;
-    this.coast.throttle = 0;
+    // Over the line and off the throttle: the car brakes to a stop rather than
+    // rolling on down the road with nobody driving it, and the last walking
+    // pace of it is simply taken away — see `RACE.stopsBelow`.
     this.car.update(dt, this.coast, this.track, this.patches);
+    if (this.car.speed < RACE.stopsBelow) {
+      this.car.velocity.set(0, 0);
+    }
     this.rivals.update(dt, this.track, this.patches);
     this.jostle();
     this.tyres.bounce(this.car);

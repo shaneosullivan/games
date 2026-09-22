@@ -2142,6 +2142,29 @@ export const BUMP = {
 export const RACE = {
   /** The most laps a drawn track may ask for. */
   maxLaps: 10,
+  /**
+   * How hard the brakes go on once you are over the line.
+   *
+   * Crossing the line ends your race, and a car that carries on down the road
+   * afterwards looks like somebody still driving it. So it brakes — firmly,
+   * the way anybody does past a finish line, rather than stopping dead on the
+   * paint as though it had hit something.
+   *
+   * This only comes up in a race with other children, because that is the only
+   * time the world keeps turning after your own flag; on your own the race is
+   * over for everybody the moment it is over for you.
+   */
+  stops: 0.85,
+  /**
+   * The speed below which a finished car is simply stopped, in units a second.
+   *
+   * Braking hard leaves a car creeping at walking pace rather than coming to
+   * rest: at that speed the tyre forces are changing sign every step or two and
+   * the last of the momentum never quite goes. It does not matter anywhere else
+   * in the game — nobody is watching a car at one and a half units a second —
+   * but it matters here, where the whole point is that the car has stopped.
+   */
+  stopsBelow: 3,
 } as const;
 
 /**
