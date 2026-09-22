@@ -275,15 +275,19 @@ export class Party {
       // Painted for the place it is racing in, the same as this screen's own
       // car is: under the neon everybody's colour is turned up, and a car that
       // missed that would be the one dull thing in the city.
-      const ghost = new Ghost(who, {
-        ...car.look,
-        // A computer car keeps the colour the host dealt it: the host is not
-        // repainting those for the city either, so repainting them here would
-        // be the one car that did not match.
-        colour: car.ai
-          ? car.look.colour
-          : carPaint(car.look.colour, this.spec?.environment ?? "hills"),
-      });
+      const ghost = new Ghost(
+        who,
+        {
+          ...car.look,
+          // A computer car keeps the colour the host dealt it: the host is not
+          // repainting those for the city either, so repainting them here would
+          // be the one car that did not match.
+          colour: car.ai
+            ? car.look.colour
+            : carPaint(car.look.colour, this.spec?.environment ?? "hills"),
+        },
+        car.ai ? "" : (this.seats.get(car.slot)?.name ?? ""),
+      );
       const t = gridSlot(track, car.slot, here);
       track.tangentAt(t, way);
       ghost.place(here.x, here.z, Math.atan2(way.x, way.z), 0);

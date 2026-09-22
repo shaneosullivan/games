@@ -1,6 +1,7 @@
 import {NET} from "../config";
 import {Car, shortestAngle} from "../entities/car";
 import {Track} from "../entities/track";
+import {nameTag} from "../render/nameTag";
 import {CarState, Look} from "./protocol";
 
 /**
@@ -41,6 +42,9 @@ export class Ghost {
     /** Which car this is: a seat, or `AI + n`. */
     readonly who: number,
     look: Look,
+    /** What the child driving it calls themselves, if they said. Computer cars
+     *  have nobody to be, and get no label. */
+    name = "",
   ) {
     this.car = new Car(
       look.colour,
@@ -49,6 +53,12 @@ export class Ghost {
       look.kit,
       look.shape,
     );
+    const tag = nameTag(name);
+    if (tag) {
+      // On the car's own group, so it rides with it: up over a ramp, and under
+      // a flyover rather than over the top of one.
+      this.car.group.add(tag);
+    }
   }
 
   /** Where it starts, before anybody has said anything about it. */

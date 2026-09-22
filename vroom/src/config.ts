@@ -2354,6 +2354,38 @@ export const EDITOR = {
 } as const;
 
 /**
+ * The other children's names, over their cars.
+ *
+ * Every number here is chosen to be *quiet*. A name is worth having — two blue
+ * cars and a cow, and the question is which of them is your sister — but it is
+ * worth having the way a road sign is, not the way a scoreboard is. Half
+ * transparent, about a third the length of a car wide, and high enough to clear
+ * the roof without floating free of it.
+ */
+export const TAG = {
+  /** How far above the car it sits, in world units, and how wide it is drawn.
+   *  The car is sixteen long, so this is a little over a third of that. */
+  above: 11,
+  wide: 26,
+  /** The shape of the label's own little canvas, and how big it is in pixels —
+   *  enough that the letters are clean on a tall screen without being a texture
+   *  worth worrying about. */
+  pixels: 256,
+  aspect: 4,
+  /** The letters, as a fraction of the canvas's height, and the dark edge under
+   *  them so they read on tarmac and on concrete alike. */
+  text: 0.62,
+  edge: 0.12,
+  shade: 0.55,
+  /** How faint. Low enough to ignore while driving, high enough to read when
+   *  looked at. */
+  opacity: 0.45,
+  /** Drawn after the cars, so a name is never half behind its own car's roof. */
+  order: 60,
+  font: "system-ui, -apple-system, 'Segoe UI', sans-serif",
+} as const;
+
+/**
  * The shadow a car throws while it is off the ground.
  *
  * The ground itself is lit by a real sun that casts real shadows, and a car on
