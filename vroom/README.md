@@ -117,6 +117,12 @@ one button. Scanning from inside the game sidesteps all of it: the camera is
 ours, so nothing ever leaves the app. The QR still carries a full address, so
 the camera-app route works fine for a friend who does _not_ have the game open.
 
+Both children then get the same screen before the lobby: **who are you** — the
+car you race and, since there is somebody to be told apart from now, a name to
+type. Nothing is required; a race with no names in it reads as Player 1 and
+Player 2 the way it always did. On your own this screen never appears, because
+the car you last chose is simply the car you drive.
+
 Everybody needs to be **on the same wi-fi**, and up to four can race. Every child
 takes a slot a computer car would have had, so the field is always four: race
 three friends and there are no computer cars at all. The host picks the track —

@@ -8,6 +8,7 @@ import {
   SHAPES,
   Sticker,
 } from "../config";
+import {tidyName} from "../core/name";
 import {tidyStickers} from "../core/stickers";
 import {isSpec, TrackSpec} from "../track/spec";
 
@@ -47,8 +48,11 @@ export interface Look {
 
 /** One screen in the race, as everybody else sees it. */
 export interface Seat {
-  /** Which grid slot, and the only name a car has on the wire. */
+  /** Which grid slot. */
   seat: number;
+  /** What the child at it calls themselves, or empty for whoever has not said
+   *  — in which case the grid slot is the name, as it always was. */
+  name: string;
   look: Look;
   /** Round trip to this one, in milliseconds, for the lobby to show. */
   ping: number;
@@ -56,7 +60,7 @@ export interface Seat {
 
 export type Control =
   /** Guest to host, first thing: the code it scanned and the car it drives. */
-  | {kind: "hello"; code: string; look: Look}
+  | {kind: "hello"; code: string; look: Look; name: string}
   /** Host to guest: you are in, and this is who else is here. */
   | {kind: "welcome"; seat: number; roster: Array<Seat>}
   /** Host to everybody, whenever that changes. */
@@ -266,8 +270,14 @@ export function tidyControl(value: unknown): Control | null {
   switch (msg.kind) {
     case "hello": {
       const {code, look} = value as {code?: unknown; look?: unknown};
+      const named = (value as {name?: unknown}).name;
       return typeof code === "string" && code.length <= NET.code + 4
-        ? {kind: "hello", code, look: tidyLook(look)}
+        ? {
+            kind: "hello",
+            code,
+            look: tidyLook(look),
+            name: tidyName(typeof named === "string" ? named : ""),
+          }
         : null;
     }
     case "welcome": {
@@ -359,8 +369,10 @@ function tidyRoster(value: unknown): Array<Seat> {
       continue;
     }
     const ping = (entry as {ping?: unknown})?.ping;
+    const named = (entry as {name?: unknown})?.name;
     roster.push({
       seat,
+      name: tidyName(typeof named === "string" ? named : ""),
       look: tidyLook((entry as {look?: unknown})?.look),
       ping: typeof ping === "number" && Number.isFinite(ping) ? ping : 0,
     });

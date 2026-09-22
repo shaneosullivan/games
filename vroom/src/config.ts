@@ -2354,6 +2354,17 @@ export const EDITOR = {
 } as const;
 
 /**
+ * What a child calls themselves when somebody else is in the race.
+ *
+ * Twelve characters, which is a first name or a nickname and not a sentence:
+ * it has to sit on the finish card beside a time, on a phone, four of them one
+ * under another.
+ */
+export const NAME = {
+  most: 12,
+} as const;
+
+/**
  * Racing somebody in the same room.
  *
  * Everything here is aimed at one number: how long it takes what one child

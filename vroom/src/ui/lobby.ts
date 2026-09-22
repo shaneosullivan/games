@@ -139,7 +139,7 @@ export class Lobby {
     const garage = document.createElement("button");
     garage.type = "button";
     garage.className = "chip";
-    garage.textContent = "🎨 Your car";
+    garage.textContent = "🎨 Your car and name";
     garage.addEventListener("click", () => this.handlers.onGarage());
     foot.appendChild(garage);
 
@@ -178,10 +178,12 @@ export class Lobby {
     for (const seat of [...this.party.seats.values()].sort(
       (a, b) => a.seat - b.seat,
     )) {
+      // Your own name rather than "You" in this one place: a child who has
+      // just typed it wants to see that it took.
       this.who.appendChild(
         carChip(
           seat.look,
-          this.party.name(seat.seat),
+          seat.name || this.party.name(seat.seat),
           seat.seat === this.party.seat,
         ),
       );

@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import {NET, RIVALS} from "../config";
 import {carPaint, myDesign, myColour, myKit, myShape} from "../core/garage";
+import {myName} from "../core/name";
 import {myStickers} from "../core/stickers";
 import {Track} from "../entities/track";
 import {TrackSpec} from "../track/spec";
@@ -103,7 +104,7 @@ export class Party {
       onLeave: from => this.left(from),
     };
     if (this.isHost) {
-      this.seats.set(0, {seat: 0, look: myLook(), ping: 0});
+      this.seats.set(0, {seat: 0, name: myName(), look: myLook(), ping: 0});
     }
   }
 
@@ -116,7 +117,7 @@ export class Party {
    *  join screen tells the child. */
   static async join(code: string): Promise<Party> {
     const party = new Party(await Room.join(code));
-    party.room.say({kind: "hello", code, look: myLook()});
+    party.room.say({kind: "hello", code, look: myLook(), name: myName()});
     return party;
   }
 
@@ -143,9 +144,19 @@ export class Party {
     return this.room.clock();
   }
 
-  /** What to call somebody. No typing: a child's car is the name of it. */
+  /**
+   * What to call somebody.
+   *
+   * Whatever they typed, and the grid slot when they typed nothing — a race
+   * where nobody could be bothered naming themselves still reads sensibly.
+   * Your own name is not used on your own screen: "You" is shorter, clearer,
+   * and the one thing on a finish card nobody has to look up.
+   */
   name(seat: number): string {
-    return seat === this.seat ? "You" : `Player ${seat + 1}`;
+    if (seat === this.seat) {
+      return "You";
+    }
+    return this.seats.get(seat)?.name || `Player ${seat + 1}`;
   }
 
   /**
@@ -213,11 +224,21 @@ export class Party {
 
   refreshLook(): void {
     if (this.isHost) {
-      this.seats.set(this.seat, {seat: this.seat, look: myLook(), ping: 0});
+      this.seats.set(this.seat, {
+        seat: this.seat,
+        name: myName(),
+        look: myLook(),
+        ping: 0,
+      });
       this.room.say({kind: "roster", roster: [...this.seats.values()]});
       this.onRoster?.();
     } else {
-      this.room.say({kind: "hello", code: this.code, look: myLook()});
+      this.room.say({
+        kind: "hello",
+        code: this.code,
+        look: myLook(),
+        name: myName(),
+      });
     }
   }
 
@@ -356,6 +377,7 @@ export class Party {
         if (already !== undefined) {
           this.seats.set(already, {
             seat: already,
+            name: msg.name,
             look: msg.look,
             ping: this.room.pingTo(from),
           });
@@ -370,7 +392,12 @@ export class Party {
         }
         this.whose.set(from, slot);
         this.room.setSeat(from, slot);
-        this.seats.set(slot, {seat: slot, look: msg.look, ping: 0});
+        this.seats.set(slot, {
+          seat: slot,
+          name: msg.name,
+          look: msg.look,
+          ping: 0,
+        });
         this.room.say(
           {kind: "welcome", seat: slot, roster: [...this.seats.values()]},
           from,

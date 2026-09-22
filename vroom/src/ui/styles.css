@@ -2042,3 +2042,43 @@ canvas {
     font-size: 18px;
   }
 }
+
+/* What to call you, on the screen before a race with a friend. Beside the car
+   rather than on a screen of its own: who you are is one question, and it has
+   one answer with a car in it. */
+.name-row {
+  display: flex;
+  justify-content: center;
+  padding: 2px 0 6px;
+}
+
+.name-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 700;
+  font-size: 16px;
+}
+
+.name-input {
+  box-sizing: border-box;
+  width: 190px;
+  padding: 8px 14px;
+  border: 2px solid var(--stroke);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.name-input:focus {
+  outline: none;
+  border-color: #d6473c;
+}
+
+.name-input::placeholder {
+  opacity: 0.35;
+  font-weight: 400;
+}

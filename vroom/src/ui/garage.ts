@@ -8,6 +8,7 @@ import {
   DriverKit,
   FILM,
   LIGHT,
+  NAME,
   PLAYER,
   SHAPES,
   Sticker,
@@ -24,6 +25,7 @@ import {
   myKit,
   myShape,
 } from "../core/garage";
+import {chooseName, myName, tidyName} from "../core/name";
 import {keepStickers, myStickers} from "../core/stickers";
 import {car, stick} from "../models/car";
 import {loadBeasts} from "../models/beastModels";
@@ -57,6 +59,43 @@ const EMOJI: Record<string, string> = {
   bolt: "⚡",
   crown: "👑",
 };
+
+/**
+ * What to call you, for a race with somebody else in it.
+ *
+ * Only shown when this screen is the one before such a race: on your own there
+ * is nobody to be told apart from, and a box asking a child to name themselves
+ * for no reason is a box they will fill in with nonsense.
+ *
+ * Saved as it is typed. There is no Done button here to hang it off, and a
+ * name that is only kept if you leave the screen the right way is a name that
+ * goes missing.
+ */
+function nameRow(): HTMLElement {
+  const row = document.createElement("div");
+  row.className = "name-row";
+  const label = document.createElement("label");
+  label.className = "name-label";
+  label.textContent = "Your name";
+  const box = document.createElement("input");
+  box.type = "text";
+  box.className = "name-input ui-interactive";
+  box.value = myName();
+  box.maxLength = NAME.most;
+  box.placeholder = "Anyone";
+  box.autocomplete = "off";
+  box.spellcheck = false;
+  box.addEventListener("input", () => {
+    const tidy = tidyName(box.value);
+    if (box.value !== tidy) {
+      box.value = tidy;
+    }
+    chooseName(tidy);
+  });
+  label.appendChild(box);
+  row.appendChild(label);
+  return row;
+}
 
 export class Garage {
   readonly root = document.createElement("div");
@@ -104,12 +143,22 @@ export class Garage {
   private gone = false;
 
   /**
-   * @param onDone  back to the track list; only used when this is a screen of
-   *   its own. Embedded beside the list there is nowhere to go back to.
+   * @param onDone  back to wherever this was opened from; only used when this
+   *   is a screen of its own. Embedded beside the list there is nowhere to go
+   *   back to.
+   * @param labels  what the way out and the title say, and whether there is a
+   *   name to type. All three change when this screen is the step before a
+   *   race with a friend rather than the garage: there it is not somewhere a
+   *   child wandered into, it is the game asking who they are.
    */
   constructor(
     private readonly onDone: (() => void) | null,
     private readonly embedded = false,
+    private readonly labels: {
+      title?: string;
+      done?: string;
+      naming?: boolean;
+    } = {},
   ) {
     this.root.className = embedded ? "garage-panel" : "screen garage";
 
@@ -180,11 +229,11 @@ export class Garage {
       const back = document.createElement("button");
       back.type = "button";
       back.className = "chip ghost";
-      back.textContent = "◀ Tracks";
+      back.textContent = this.labels.done ?? "◀ Tracks";
       back.addEventListener("click", () => this.onDone?.());
       const title = document.createElement("strong");
       title.className = "models-title";
-      title.textContent = "Your car";
+      title.textContent = this.labels.title ?? "Your car";
       bar.append(back, title);
     }
 
@@ -245,6 +294,9 @@ export class Garage {
     // them — see `.garage-view` in the stylesheet.
     const controls = document.createElement("div");
     controls.className = "garage-controls";
+    if (this.labels.naming) {
+      controls.appendChild(nameRow());
+    }
     controls.append(this.shapeSide, this.carSide, this.driverSide, this.says);
     this.root.append(...(bar ? [bar] : []), this.tabs(), this.view, controls);
 

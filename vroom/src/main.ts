@@ -191,7 +191,7 @@ async function hostRace(spec: TrackSpec): Promise<void> {
   }
   await card.close();
   listen(party);
-  showLobby();
+  whoAmI();
 }
 
 /** Typing the code instead of pointing a camera at it. */
@@ -222,7 +222,25 @@ async function joinRace(code: string): Promise<void> {
   }
   await card.close();
   listen(party);
-  showLobby();
+  whoAmI();
+}
+
+/**
+ * Who is about to drive: the step every race with a friend starts with.
+ *
+ * On your own the car you last chose is simply the car you drive, and being
+ * asked again every time would be a screen in the way. With somebody else
+ * there it is the opposite: two children are about to look for each other on
+ * the same track, and which car is yours — and what you are called — is the
+ * thing that makes that possible. So it is a step rather than a button
+ * somebody might never press.
+ */
+function whoAmI(): void {
+  showGarage(() => showLobby(true), {
+    title: "Who are you?",
+    done: "Ready ▶",
+    naming: true,
+  });
 }
 
 /**
@@ -256,7 +274,12 @@ function showLobby(back = false): void {
       joined.start(spec, (count, taken) =>
         dealRivals(count, spec.environment, taken),
       ),
-    onGarage: () => showGarage(() => showLobby(true)),
+    onGarage: () =>
+      showGarage(() => showLobby(true), {
+        title: "Who are you?",
+        done: "Ready ▶",
+        naming: true,
+      }),
     onChangeTrack: () => showTogether(true),
   });
   app!.appendChild(lobby.root);
@@ -283,9 +306,12 @@ function showModels(hash = ""): void {
 
 /** The garage: which car is yours. Where it goes back to depends on where it
  *  was opened from — the track list, or a lobby with a race waiting. */
-function showGarage(onDone: () => void): void {
+function showGarage(
+  onDone: () => void,
+  labels: {title?: string; done?: string; naming?: boolean} = {},
+): void {
   clear();
-  garage = new Garage(onDone);
+  garage = new Garage(onDone, false, labels);
   window.garage = garage;
   app!.appendChild(garage.root);
 }
