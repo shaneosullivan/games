@@ -2354,6 +2354,36 @@ export const EDITOR = {
 } as const;
 
 /**
+ * The shadow a car throws while it is off the ground.
+ *
+ * The ground itself is lit by a real sun that casts real shadows, and a car on
+ * the road gets one. This is the one it gets in mid-air, and it exists for two
+ * reasons: the game turns real shadows off on a machine that cannot keep up,
+ * and a jump is the one moment where the shadow is not decoration but the only
+ * thing on the screen saying how high you are.
+ *
+ * It used to sit directly under the car and shrink, which is what a lamp
+ * hanging above a car would do. The sun is not above the car — it is low and
+ * off to one side, on purpose (see `LIGHT.from`) — so a car that leaves the
+ * ground throws its shadow *sideways*, further the higher it goes, and the
+ * shadow stays the size the car is. That displacement is the whole of looking
+ * right: it is what a child sees on a real ramp.
+ */
+export const SHADOW = {
+  /** How dark it is on the ground, and how much of that is left at the top of
+   *  a big jump — thinner with height, the way a real one softens, but never
+   *  gone or the car has nothing under it at all. */
+  dark: 0.42,
+  least: 0.16,
+  /** The height, in units, by which it has faded as far as it goes. About the
+   *  top of a good jump off a ramp. */
+  fades: 26,
+  /** How much it spreads per unit of height: a real shadow's edges go soft as
+   *  it is thrown further, and a little growth reads as that. */
+  spread: 0.004,
+} as const;
+
+/**
  * What a child calls themselves when somebody else is in the race.
  *
  * Twelve characters, which is a first name or a nickname and not a sentence:

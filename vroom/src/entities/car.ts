@@ -5,13 +5,15 @@ import {
   CarShape,
   DriverKit,
   ITEM,
+  LIGHT,
   PHYSICS,
+  SHADOW,
   SIM,
   Sticker,
   SURFACE,
   TRAIL,
 } from "../config";
-import {flatVertex, LAYER, order, tile} from "../render/sprites";
+import {LAYER, order, tile} from "../render/sprites";
 import {car as carModel} from "../models/car";
 import {Patches} from "./patches";
 import type {ItemKind} from "../track/spec";
@@ -187,12 +189,20 @@ export class Car {
   ) {
     this.paint = colour;
     this.sprite = carModel(colour, design, stickers, kit, shape);
-    // Under the car and only ever seen in mid-air. It stays the size the car
-    // was on the ground, which is what makes the car look as though it has
-    // left it rather than merely got bigger.
+    // Only ever seen in mid-air; on the ground the sun casts a real one. Its
+    // own material rather than the shared flat one, because it fades with
+    // height and the shared materials are cached — turning this one down would
+    // turn down everything else drawn with it.
     this.shadow = new THREE.Mesh(
       tile(CAR.width * 1.05, CAR.length * 1.05, 0x000000),
-      flatVertex(),
+      new THREE.MeshBasicMaterial({
+        color: 0x000000,
+        transparent: true,
+        opacity: SHADOW.dark,
+        // Flat on the ground and stacked by draw order, like every other decal
+        // in the game — see `material`.
+        depthWrite: false,
+      }),
     );
     this.shadow.position.y = LAYER.shadow - LAYER.car;
     this.shadow.visible = false;
@@ -974,12 +984,33 @@ export class Car {
     // is genuinely eight units up looks eight units up.
     this.group.position.y = LAYER.car + this.height;
     this.sprite.rotation.set(this.pitch, 0, this.roll);
-    // The shadow stays on the ground and shrinks with height, which is most of
-    // what says how far up the car is.
+    // The shadow, thrown where the sun would actually throw it.
+    //
+    // Down onto the ground, and *sideways* — by the height times how far the
+    // sun leans, which is the same arithmetic as a stick in the ground. That
+    // displacement is what says how high the car is; the shadow itself stays
+    // the size the car is, because the sun is a long way away and a directional
+    // light does not make things bigger as they approach it.
     this.shadow.visible = this.height > 0.2;
-    this.shadow.position.y = LAYER.shadow - LAYER.car - this.height;
-    const shrink = 1 / (1 + this.height * 0.03);
-    this.shadow.scale.set(shrink, 1, shrink);
+    if (this.shadow.visible) {
+      this.shadow.position.y = LAYER.shadow - LAYER.car - this.height;
+      const lean = this.height / LIGHT.from.y;
+      const awayX = -LIGHT.from.x * lean;
+      const awayZ = -LIGHT.from.z * lean;
+      // Into the car's own frame: the shadow hangs off the group, and the
+      // group is turned to face wherever the car is pointing.
+      const turn = this.group.rotation.y;
+      const cos = Math.cos(turn);
+      const sin = Math.sin(turn);
+      this.shadow.position.x = awayX * cos - awayZ * sin;
+      this.shadow.position.z = awayX * sin + awayZ * cos;
+      // And softer the further it is thrown: a little wider, a little lighter.
+      const up = Math.min(1, this.height / SHADOW.fades);
+      const spread = 1 + this.height * SHADOW.spread;
+      this.shadow.scale.set(spread, 1, spread);
+      (this.shadow.material as THREE.MeshBasicMaterial).opacity =
+        SHADOW.dark + (SHADOW.least - SHADOW.dark) * up;
+    }
   }
 }
 
