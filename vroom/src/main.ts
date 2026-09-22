@@ -345,16 +345,16 @@ async function showRace(
       showMenu();
     },
     () => {
-      // Another go. On your own that is simply another race; with other
-      // children it is the host putting everybody back on the grid, and
-      // everybody's screen hears about it the same way it heard about the
-      // first one.
+      // What the finish card's button does. On your own it is another go at
+      // the same circuit — the one you are trying to beat. With a friend the
+      // race is over and the question is which track next, so it goes back to
+      // the picker with the room and everybody in it still open; choosing one
+      // lands back in the lobby, where the code is still on the screen for
+      // anybody who wants to join the next one.
       if (!joined) {
         void showRace(spec);
       } else if (joined.isHost) {
-        joined.start(spec, (count, taken) =>
-          dealRivals(count, spec.environment, taken),
-        );
+        showTogether(true);
       }
     },
     joined,

@@ -884,10 +884,18 @@ export class Game {
           : ` You hit the wall ${this.knocks === 1 ? "once" : `${this.knocks} times`} — the long way round the outside is usually the quick way.`),
     );
     if (this.party) {
-      // Only the host can put everybody back on the grid, so nobody else is
-      // offered a button that would do nothing.
+      // Racing the same circuit twice in a row is what a child does on their
+      // own, when the race they just drove is the one they are trying to beat.
+      // With a friend it is the wrong offer: the pair of them have just had
+      // their race and the question on the table is which track next. So the
+      // button goes back to the tracks rather than back to the grid.
+      //
+      // And only the host is offered it at all, since the next race is theirs
+      // to pick — nobody else gets a button that would do nothing.
       this.done.setButton(
-        this.party.isHost ? "Race again" : "Waiting for the host\u2026",
+        this.party.isHost
+          ? "Pick another track"
+          : "The host picks the next one\u2026",
         this.party.isHost,
       );
       this.tellPlaces();
