@@ -2,9 +2,8 @@ import {ENVIRONMENTS, LAYOUT} from "../config";
 import chofterUrl from "../assets/chofter.png";
 import {deleteTrack, loadTracks} from "../track/store";
 import {BUILT_INS, TrackSpec} from "../track/spec";
-import {rate, RATING_NAMES} from "../track/rating";
 import {Garage} from "./garage";
-import {swatch} from "./swatch";
+import {ratingBadge, swatch} from "./swatch";
 
 /**
  * The track list: what you see when the game opens.
@@ -202,14 +201,7 @@ export class Menu {
     sub.textContent = bits.join(" · ");
     words.append(name, sub);
 
-    // Worked out from the track, not claimed by whoever drew it — which is the
-    // only way a rating means anything to the next person to pick it.
-    const rating = rate(spec);
-    const badge = document.createElement("span");
-    badge.className = "rating";
-    badge.dataset.rating = rating;
-    badge.textContent = RATING_NAMES[rating];
-    words.appendChild(badge);
+    words.appendChild(ratingBadge(spec));
 
     const play = document.createElement("button");
     play.type = "button";

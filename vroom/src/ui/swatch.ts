@@ -1,6 +1,17 @@
 import {ENVIRONMENTS} from "../config";
 import {outline} from "../track/outline";
+import {rate, RATING_NAMES} from "../track/rating";
 import {TrackSpec} from "../track/spec";
+
+/**
+ * How a track looks in a list: its picture, and how hard it is.
+ *
+ * Both of them here rather than in the track list, because two screens show
+ * tracks now — the list you race from and the one you pick from when starting a
+ * race with a friend — and a child choosing between four circuits wants the
+ * same two facts on either screen. A second copy of these would be a second
+ * thing to keep in step.
+ */
 
 /**
  * The little picture of a track: the circuit itself, in its own colours.
@@ -9,10 +20,6 @@ import {TrackSpec} from "../track/spec";
  * which of their four green tracks this was — that is, nothing. The road is
  * drawn as one fat stroke with a thin centre line down it, the same two colours
  * the real thing uses, on the same ground.
- *
- * Here rather than in the track list because two screens show tracks now: the
- * list you race from, and the one you pick from when starting a race with a
- * friend. A second copy of this would be a second thing to keep in step.
  */
 
 /** SVG lives in its own namespace, and an element made without it is an element
@@ -56,6 +63,23 @@ export function swatch(spec: TrackSpec): HTMLElement {
 
   box.append(road, line);
   return box as unknown as HTMLElement;
+}
+
+/**
+ * How hard it is, as a badge.
+ *
+ * Worked out from the track rather than claimed by whoever drew it — which is
+ * the only way a rating means anything to the next person to pick it. The word
+ * is there as well as the colour: a badge that differs only by hue is a badge
+ * half the people looking at it cannot use.
+ */
+export function ratingBadge(spec: TrackSpec): HTMLElement {
+  const rating = rate(spec);
+  const badge = document.createElement("span");
+  badge.className = "rating";
+  badge.dataset.rating = rating;
+  badge.textContent = RATING_NAMES[rating];
+  return badge;
 }
 
 export function hex(colour: number): string {

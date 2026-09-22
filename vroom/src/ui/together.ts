@@ -2,7 +2,7 @@ import chofterUrl from "../assets/chofter.png";
 import {ENVIRONMENTS} from "../config";
 import {BUILT_INS, TrackSpec} from "../track/spec";
 import {loadTracks} from "../track/store";
-import {swatch} from "./swatch";
+import {ratingBadge, swatch} from "./swatch";
 
 /**
  * Racing a friend: which end of it are you?
@@ -122,7 +122,10 @@ export class Together {
         );
       }
       sub.textContent = bits.join(" · ");
-      words.append(name, sub);
+      // How hard it is, the same badge the front screen shows: picking the
+      // track for a race with a friend is exactly the moment somebody wants to
+      // know whether they are about to hand everybody a hairpin.
+      words.append(name, sub, ratingBadge(spec));
       card.append(swatch(spec), words);
       card.addEventListener("click", () => this.handlers.onHost(spec));
       body.appendChild(card);
