@@ -4,6 +4,7 @@ import {
   BRIDGE,
   CAR,
   ENVIRONMENTS,
+  GRID,
   HEIGHT,
   Palette,
   RIVALS,
@@ -655,6 +656,22 @@ export class Track {
       });
     }
     return found;
+  }
+
+  /**
+   * Where one car starts, in a field of `count` lined up across the road.
+   *
+   * One row, everybody level, spread evenly either side of the middle — see
+   * `GRID`. Every car in the race is placed by this, whoever is driving it, so
+   * a child and a computer car and another child's car cannot disagree about
+   * where the grid is.
+   */
+  gridLine(index: number, count: number, out: THREE.Vector3): number {
+    const t = wrap(this.startAt - GRID.behind);
+    this.pointAt(t, out);
+    this.sideAt(t, this.tmp);
+    out.addScaledVector(this.tmp, (index - (count - 1) / 2) * GRID.across);
+    return t;
   }
 
   /** Where the grid sits: a fraction of a lap back from the line. */

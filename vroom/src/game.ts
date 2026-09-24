@@ -5,7 +5,6 @@ import {
   ITEM,
   TRAIL,
   CAR,
-  PLAYER,
   RACE,
   RIVALS,
   SCENERY,
@@ -20,6 +19,7 @@ import {Tyres} from "./entities/tyres";
 import {Stands} from "./entities/stands";
 import {beginWatching, sawFrame} from "./core/quality";
 import {carColour, myDesign, myKit, myShape} from "./core/garage";
+import {fetchMusic} from "./core/music";
 import {myStickers} from "./core/stickers";
 import {LOADING, SIM} from "./config";
 import {MiniMap} from "./ui/minimap";
@@ -35,7 +35,7 @@ import {collide} from "./entities/collide";
 import {loadBeasts} from "./models/beastModels";
 import {Rivals} from "./entities/rivals";
 import {Ghost} from "./net/ghost";
-import {gridSlot, Party} from "./net/party";
+import {Party} from "./net/party";
 import {AI, CarState} from "./net/protocol";
 import {Skids} from "./entities/skids";
 import {Scenery} from "./entities/scenery";
@@ -131,6 +131,15 @@ export class Game {
   private finishing = -1;
   /** How many times round this race is. */
   private laps = 1;
+  /**
+   * The track's music, on its way.
+   *
+   * A promise rather than the bytes, and never waited for: it is the biggest
+   * thing a race downloads, and a child on slow wi-fi should be driving while
+   * it arrives rather than watching a loading bar for it. If it lands before
+   * the flag it plays from the start; if it lands later it joins in.
+   */
+  private tune: Promise<ArrayBuffer | null> | null = null;
 
   private readonly intro: Overlay;
   private readonly done: Overlay;
@@ -300,18 +309,25 @@ export class Game {
     // them as cars it is *shown* rather than cars it is running.
     const party = this.party;
     if (party) {
+      this.cars = party.seats.size + party.rivals.length;
       this.rivals = new Rivals(
         this.track,
         spec.environment,
         party.isHost ? party.rivals : [],
-        (i, out) => gridSlot(this.track, party.seats.size + i, out),
+        (i, out) => this.track.gridLine(party.seats.size + i, this.cars, out),
       );
       this.ghosts = party.buildGhosts(this.track);
-      this.cars = party.seats.size + party.rivals.length;
     } else {
-      this.rivals = new Rivals(this.track, spec.environment);
-      this.ghosts = [];
       this.cars = RIVALS.count + 1;
+      // The player takes the first place on the line and the computer cars the
+      // rest of it, so the whole field is laid out by one rule.
+      this.rivals = new Rivals(
+        this.track,
+        spec.environment,
+        undefined,
+        (i, out) => this.track.gridLine(i + 1, this.cars, out),
+      );
+      this.ghosts = [];
     }
     this.rest.length = 0;
     this.rivals.cars.forEach((car, i) =>
@@ -326,6 +342,10 @@ export class Game {
     this.bridges = new Bridges(this.track, palette);
     this.tyres = new Tyres(rng, this.track, palette);
     this.stands = new Stands(rng, this.track, palette, spec.environment);
+
+    // Off to fetch the music while the scenery is being built. Nothing waits
+    // on it — see `tune`.
+    this.tune = fetchMusic(spec.environment);
 
     report(0.45, "Building the scenery\u2026");
     await frame();
@@ -389,11 +409,14 @@ export class Game {
 
   /** Everybody on the grid: the rivals in front, the player at the back. */
   private gridUp(): void {
-    // Against other children the grid is two abreast with the children at the
-    // front; on your own it is the old one, three computer cars ahead of you.
-    const t = this.party
-      ? gridSlot(this.track, this.party.seat, this.here)
-      : this.track.gridAt(RIVALS.count, PLAYER.offset, this.here);
+    // Everybody side by side on one line, this car included: your slot on it is
+    // your seat in a race with other children, and the first place on it in a
+    // race on your own.
+    const t = this.track.gridLine(
+      this.party ? this.party.seat : 0,
+      this.cars,
+      this.here,
+    );
     // Where the player's grid slot is, relative to the line. Kept because
     // placing is decided on how far past the line each car is, and the player
     // starts the furthest back of the four.
@@ -425,6 +448,7 @@ export class Game {
     beginWatching();
     this.countdown.classList.remove("hidden");
     this.engine.start();
+    void this.tune?.then(bytes => this.engine.play(bytes));
     // A guest pressed nothing to get here — the code was scanned and the race
     // started itself — and a browser will not make a sound until somebody has
     // touched the screen. So the first touch, whatever it is for, is also the
@@ -450,6 +474,7 @@ export class Game {
     // Here and not in the constructor: a browser will not start an audio
     // context outside a real gesture, and the button that got us here is one.
     this.engine.start();
+    void this.tune?.then(bytes => this.engine.play(bytes));
   }
 
   /**
@@ -866,7 +891,9 @@ export class Game {
     this.hud.setVisible(false);
     this.map.setVisible(false);
     this.engine.flag();
-    this.engine.setMuted(true);
+    // Everything else down gently rather than switched off: the music ends
+    // instead of stopping, and the child's own sound switch is left alone.
+    this.engine.fade();
     // The shot comes back down in front of the car, the way it left at the
     // start. The card waits for it — see `endFilm`.
     this.finishing = 0;

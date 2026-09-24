@@ -1583,6 +1583,25 @@ export const TAXI = {
 /** What can be painted on a car on top of its colour. */
 export type CarDesign = "plain" | "checkers" | "stripes";
 
+/**
+ * The grid: everybody side by side on one line.
+ *
+ * Not the staggered queue a real race starts from. Four cars two abreast means
+ * the pair at the back are a car length down before anybody has touched the
+ * stick, and between two children in the same room that is the kind of
+ * unfairness that ends a game — the whole field can see it and none of them
+ * earned it. One line across the road starts everybody level, and the road is
+ * wide enough to do it: seventy-six units of tarmac, four cars seven wide.
+ */
+export const GRID = {
+  /** How far apart, across the road. Four cars at this spacing put the outside
+   *  pair twenty-five units off the middle, which is inside the tarmac and
+   *  well inside the barriers. */
+  across: 17,
+  /** How far back from the line the row sits, as a fraction of a lap. */
+  behind: 0.01,
+} as const;
+
 /** The player's car, and how the grid is laid out. */
 export const PLAYER = {
   /** The colour a car is until somebody chooses otherwise. */
@@ -1942,6 +1961,46 @@ export const SOUND = {
    */
   rivals: 0.35,
   hearFrom: 70,
+  /**
+   * The music, while a race is on.
+   *
+   * One piece per place: the hills, the desert and the city each have their
+   * own, chosen for the track rather than the game, which is the whole reason
+   * they are worth the download.
+   *
+   * Quiet on purpose. Everything else the game plays is *information* — the
+   * pitch of your engine is how fast you are going, the hiss is how sideways,
+   * and a car you cannot see is coming up behind you on the left. Music that
+   * covers those is music that makes the game harder to play, so it sits
+   * underneath them.
+   *
+   * The number is small because the music is mastered loud, the way anything
+   * recorded is, while the game's own noises are synthesised quietly. Measured
+   * in a race rather than guessed — comparing the two as power, which is how
+   * sound adds, not by subtracting one loudness from the other: at this level
+   * the music sits at roughly two thirds of the engines. Straight out of the
+   * file it was five times louder than them, which buried every cue the game
+   * makes a noise for.
+   *
+   * It is one number. If it wants to be louder or quieter, this is the knob.
+   */
+  music: 0.15,
+  /** How long it takes to come up at the start and go down at the flag. Long
+   *  enough not to be a switch being thrown. */
+  musicFade: 1.6,
+  /**
+   * The silence an encoder leaves on the end of a file, which is cut off the
+   * loop so the piece starts again the instant it finishes.
+   *
+   * Every one of these tracks came back from the encoder with twelve to
+   * fifteen milliseconds of nothing on the end — padding, which every codec
+   * adds and nobody notices until the file is looped, when it becomes a small
+   * hole in the music once a minute. `musicLookBack` is how far into the end
+   * to go looking for the last real sound, and `musicQuiet` is how quiet
+   * counts as nothing.
+   */
+  musicLookBack: 1,
+  musicQuiet: 0.003,
   /** Each rival's engine a little off the others', so they do not beat. */
   rivalPitch: [0.92, 1.06, 1.17] as ReadonlyArray<number>,
   /**
@@ -2240,13 +2299,27 @@ export const NEON = {
   /**
    * How hard the tubes are driven.
    *
-   * Well past one on purpose: everything above the display range is what the
-   * bloom pass gathers into a glow, so this number is really "how big is the
-   * halo" rather than "how bright is the tube".
+   * Past one on purpose: everything above the display range is what the bloom
+   * pass gathers into a glow, so this number is really "how big is the halo"
+   * rather than "how bright is the tube".
+   *
+   * It was more than twice this, which lit the whole street through the glow
+   * alone and left a wash of light across the road that the signs were not
+   * actually casting. A sign should read as a sign — a bright shape with a
+   * little bloom around it — and the city around it should stay dark, because
+   * a night that is not dark is not a night.
    */
-  emissive: 4.2,
-  /** The light each one throws, and how far it carries. */
-  lampPower: 900,
+  emissive: 1.9,
+  /**
+   * The light each one throws, and how far it carries.
+   *
+   * A trace, deliberately. These were six times stronger, and thirty of them
+   * at that strength turned the road into a lit stage: the tarmac under a sign
+   * was brighter than the sign, and the neon track stopped looking like night
+   * at all. Enough now to tint the road its colour where a sign stands over it
+   * and no more.
+   */
+  lampPower: 150,
   lampReach: 190,
   /**
    * The buildings, in two rows.
@@ -2286,9 +2359,18 @@ export const NEON = {
   window: 4.4,
   windowGap: 11,
   windowsLit: 0.5,
-  /** How many are faulty, how fast they stutter, and how far down they drop
-   *  when they do. Not to nothing — a dead tube still catches the streetlight. */
-  brokenChance: 0.35,
+  /**
+   * How many are faulty, how fast they stutter, and how far down they drop
+   * when they do. Not to nothing — a dead tube still catches the streetlight.
+   *
+   * None of them, now. A third of the signs stuttering is what a real dead
+   * neon tube does and it made the city feel like a place, but it is also
+   * thirty flashing lights around a track a child is trying to drive, which is
+   * distracting at best and worse than that for anybody who does not get on
+   * with flashing lights. The machinery stays because this is the one number
+   * that brings it back.
+   */
+  brokenChance: 0,
   flickerFrom: 3,
   flickerTo: 11,
   dimmed: 0.06,

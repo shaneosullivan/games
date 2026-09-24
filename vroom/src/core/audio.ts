@@ -28,6 +28,11 @@ export class Engine {
   private me: Voice | null = null;
   private readonly others: Array<Voice> = [];
   private muted = false;
+  /** The track's own music, looping, and the knob it comes through. The knob is
+   *  its own rather than the master's so the music can be balanced against the
+   *  engines without touching them — see `SOUND.music`. */
+  private tune: AudioBufferSourceNode | null = null;
+  private tuneGain: GainNode | null = null;
 
   /**
    * Call from a real gesture — the button that starts the race, or the first
@@ -153,6 +158,91 @@ export class Engine {
   }
 
   /**
+   * The music for this track, from the bytes the loader fetched.
+   *
+   * Decoded here rather than where it was fetched, because decoding wants an
+   * audio context and there is no context until somebody has touched the
+   * screen. Looped by the audio clock rather than by an `<audio>` element on
+   * purpose: an encoded file carries a few milliseconds of silence at each end,
+   * and a gap that size every time a two-minute loop comes round is the sort of
+   * thing nobody can name and everybody notices.
+   *
+   * It comes up over `SOUND.musicFade` rather than starting at full: a race
+   * begins with a countdown, and music that arrives all at once on "three"
+   * lands like a switch being thrown.
+   */
+  async play(bytes: ArrayBuffer | null): Promise<void> {
+    const ctx = this.ctx;
+    if (!ctx || !this.master || !bytes || this.tune) {
+      return;
+    }
+    let audio: AudioBuffer;
+    try {
+      audio = await ctx.decodeAudioData(bytes);
+    } catch {
+      // Something this browser cannot play. Quieter than it should be, and
+      // still a race.
+      return;
+    }
+    // Gone again while it was decoding — a child who left before the flag.
+    if (!this.ctx || !this.master) {
+      return;
+    }
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+    gain.gain.linearRampToValueAtTime(
+      SOUND.music,
+      ctx.currentTime + SOUND.musicFade,
+    );
+    gain.connect(this.master);
+    const source = ctx.createBufferSource();
+    source.buffer = audio;
+    source.loop = true;
+    // Round again the moment the music ends rather than a hole later; see
+    // `SOUND.musicLookBack`.
+    source.loopEnd = lastSound(audio);
+    source.connect(gain);
+    source.start();
+    this.tune = source;
+    this.tuneGain = gain;
+  }
+
+  /**
+   * Everything down, gently: the chequered flag.
+   *
+   * Crossing the line is the end of the racing, so it is the end of the music —
+   * it goes out over `SOUND.musicFade` and the player is stopped for good
+   * rather than left looping silently behind the finish card.
+   *
+   * The engines go with it. Not with `setMuted`, which is the child's own
+   * switch: using that here would leave the sound button showing the game muted
+   * when nobody had muted it, and the next race would open silent.
+   */
+  fade(): void {
+    const ctx = this.ctx;
+    if (!ctx || !this.master) {
+      return;
+    }
+    const now = ctx.currentTime;
+    const done = now + SOUND.musicFade;
+    for (const knob of [this.master.gain, this.tuneGain?.gain]) {
+      if (!knob) {
+        continue;
+      }
+      knob.cancelScheduledValues(now);
+      knob.setValueAtTime(knob.value, now);
+      knob.linearRampToValueAtTime(0, done);
+    }
+    const tune = this.tune;
+    this.tune = null;
+    try {
+      tune?.stop(done);
+    } catch {
+      // Already stopped, which is the same outcome by a different road.
+    }
+  }
+
+  /**
    * One of the lights on the grid: `beat` 0, 1, 2, then 3 for "go".
    *
    * Three the same and then one that is higher and longer, which is what a
@@ -244,6 +334,15 @@ export class Engine {
    * caterpillar game had once already.
    */
   stop(): void {
+    try {
+      this.tune?.stop();
+    } catch {
+      // A source that was never started throws; nothing to do about it and
+      // nothing that matters.
+    }
+    this.tune = null;
+    this.tuneGain?.disconnect();
+    this.tuneGain = null;
     this.me?.stop();
     for (const voice of this.others) {
       voice.stop();
@@ -255,6 +354,27 @@ export class Engine {
     this.master = null;
     this.noise = null;
   }
+}
+
+/**
+ * Where the music actually stops, as opposed to where the file does.
+ *
+ * Only the last second is looked at, and only the first channel: this is
+ * hunting for an encoder's padding, which is a few milliseconds of digital
+ * silence on the end, not for a fade-out somebody wrote.
+ */
+function lastSound(audio: AudioBuffer): number {
+  const ch = audio.getChannelData(0);
+  const from = Math.max(
+    0,
+    ch.length - Math.floor(SOUND.musicLookBack * audio.sampleRate),
+  );
+  for (let i = ch.length - 1; i >= from; i--) {
+    if (Math.abs(ch[i]) >= SOUND.musicQuiet) {
+      return (i + 1) / audio.sampleRate;
+    }
+  }
+  return audio.duration;
 }
 
 /** One car's worth of sound: an engine, its tyres, and where it is. */

@@ -29,7 +29,7 @@ export default defineConfig({
   // Vite's built-in asset list doesn't include models, so a bare `.glb` import
   // would be handed to the JS parser and the build would die. This treats them
   // as assets — content-hashed, never inlined, beside index.html.
-  assetsInclude: ["**/*.glb"],
+  assetsInclude: ["**/*.glb", "**/*.m4a"],
 
   // host: true binds 0.0.0.0 so a tablet on the same Wi-Fi can reach it.
   server: {

@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import {NET, RIVALS} from "../config";
+import {NET} from "../config";
 import {carPaint, myDesign, myColour, myKit, myShape} from "../core/garage";
 import {myName} from "../core/name";
 import {myStickers} from "../core/stickers";
@@ -288,7 +288,12 @@ export class Party {
         },
         car.ai ? "" : (this.seats.get(car.slot)?.name ?? ""),
       );
-      const t = gridSlot(track, car.slot, here);
+      const t = gridSlot(
+        track,
+        car.slot,
+        this.seats.size + this.rivals.length,
+        here,
+      );
       track.tangentAt(t, way);
       ghost.place(here.x, here.z, Math.atan2(way.x, way.z), 0);
       this.ghosts.push(ghost);
@@ -558,21 +563,19 @@ export class Party {
 }
 
 /**
- * Where a car starts, in a race with other children in it.
+ * Where a car starts: its place on the one line everybody shares.
  *
- * Two abreast rather than the single file a race against the computer uses,
- * and the children in the front rows. Single file would hand whoever the host
- * happened to be a car length a slot, which between two children in the same
- * room is the kind of unfairness that ends a game.
+ * A thin wrapper on the track's own arithmetic, kept because the ghosts are
+ * placed here and the driven cars are placed in `game.ts`, and the two must not
+ * drift apart about where the grid is.
  */
 export function gridSlot(
   track: Track,
   slot: number,
+  count: number,
   out: THREE.Vector3,
 ): number {
-  const row = slot >> 1;
-  const side = slot % 2 === 0 ? 1 : -1;
-  return track.gridAt(row, side * RIVALS.offset, out);
+  return track.gridLine(slot, count, out);
 }
 
 /** This screen's own car, as the garage has it. */

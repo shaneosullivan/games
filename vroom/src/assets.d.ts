@@ -4,6 +4,11 @@
  * error even though the bundler handles it perfectly well. Named for what it
  * declares rather than `models.d.ts`, which would shadow `src/models/`.
  */
+declare module "*.m4a" {
+  const src: string;
+  export default src;
+}
+
 declare module "*.glb" {
   const src: string;
   export default src;
