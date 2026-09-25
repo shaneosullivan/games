@@ -64,15 +64,19 @@ export const BUILT_IN: TrackSpec = {
 };
 
 /**
- * The ones the game ships with: one for each place there is, and one that was
- * drawn.
+ * The ones the game ships with: one for each place there is, one that was
+ * drawn with a finger, and six that were generated.
  *
  * More than one because two of the three environments were only ever seen by a
  * child who drew a track and remembered to change the setting — a whole desert
  * and a whole city, built and lit and never opened. Peanut is the odd one out
  * and deliberately so: it was drawn with a finger in the builder rather than
- * written down here, and it has things dropped on it, which none of the other
- * three do.
+ * written down here.
+ *
+ * The six after it are generated, and in difficulty order: two easy, two
+ * medium, two hard, spread across the three places. Their ratings are the
+ * game's own reading of them rather than a label — see `CIRCUITS` for how they
+ * were arrived at.
  */
 export const BUILT_INS: ReadonlyArray<TrackSpec> = [
   BUILT_IN,
@@ -95,6 +99,66 @@ export const BUILT_INS: ReadonlyArray<TrackSpec> = [
     shape: CIRCUITS.neon.shape.map(p => ({x: p.x, z: p.z})),
     startAt: CIRCUITS.neon.startAt,
     items: [],
+  },
+  {
+    version: SPEC_VERSION,
+    id: "built-in-buttercup",
+    name: CIRCUITS.buttercup.name,
+    environment: "hills",
+    laps: 1,
+    shape: CIRCUITS.buttercup.shape.map(p => ({x: p.x, z: p.z})),
+    startAt: CIRCUITS.buttercup.startAt,
+    items: CIRCUITS.buttercup.items.map(i => ({...i})),
+  },
+  {
+    version: SPEC_VERSION,
+    id: "built-in-sandy",
+    name: CIRCUITS.sandy.name,
+    environment: "desert",
+    laps: 1,
+    shape: CIRCUITS.sandy.shape.map(p => ({x: p.x, z: p.z})),
+    startAt: CIRCUITS.sandy.startAt,
+    items: CIRCUITS.sandy.items.map(i => ({...i})),
+  },
+  {
+    version: SPEC_VERSION,
+    id: "built-in-market",
+    name: CIRCUITS.market.name,
+    environment: "neon",
+    laps: 1,
+    shape: CIRCUITS.market.shape.map(p => ({x: p.x, z: p.z})),
+    startAt: CIRCUITS.market.startAt,
+    items: CIRCUITS.market.items.map(i => ({...i})),
+  },
+  {
+    version: SPEC_VERSION,
+    id: "built-in-fox",
+    name: CIRCUITS.fox.name,
+    environment: "hills",
+    laps: 1,
+    shape: CIRCUITS.fox.shape.map(p => ({x: p.x, z: p.z})),
+    startAt: CIRCUITS.fox.startAt,
+    items: CIRCUITS.fox.items.map(i => ({...i})),
+  },
+  {
+    version: SPEC_VERSION,
+    id: "built-in-scorpion",
+    name: CIRCUITS.scorpion.name,
+    environment: "desert",
+    laps: 1,
+    shape: CIRCUITS.scorpion.shape.map(p => ({x: p.x, z: p.z})),
+    startAt: CIRCUITS.scorpion.startAt,
+    items: CIRCUITS.scorpion.items.map(i => ({...i})),
+  },
+  {
+    version: SPEC_VERSION,
+    id: "built-in-skyline",
+    name: CIRCUITS.skyline.name,
+    environment: "neon",
+    laps: 1,
+    shape: CIRCUITS.skyline.shape.map(p => ({x: p.x, z: p.z})),
+    startAt: CIRCUITS.skyline.startAt,
+    items: CIRCUITS.skyline.items.map(i => ({...i})),
   },
   {
     version: SPEC_VERSION,

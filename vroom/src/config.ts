@@ -826,6 +826,201 @@ export const CIRCUITS = {
       across: number;
     }>,
   },
+  /**
+   * Six more, drawn by arithmetic rather than by a finger.
+   *
+   * A radius that wobbles with a handful of harmonics, sampled into corners —
+   * which gives a closed loop that never crosses itself and always flows. Three
+   * thousand of them were generated and then *rated by the game's own rating
+   * function*, and these are the ones that landed where they were wanted: two
+   * easy, two medium, two hard. The difficulty is measured, not claimed, and
+   * the computer cars were made to drive every one of them for a minute before
+   * it was kept — a circuit nobody can get round is not a circuit.
+   */
+  buttercup: {
+    name: "Buttercup Loop",
+    startAt: 0,
+    shape: [
+      {x: 448, z: 0},
+      {x: 489, z: 235},
+      {x: 347, z: 435},
+      {x: 99, z: 432},
+      {x: -77, z: 339},
+      {x: -253, z: 317},
+      {x: -488, z: 235},
+      {x: -575, z: 0},
+      {x: -431, z: -208},
+      {x: -251, z: -314},
+      {x: -98, z: -428},
+      {x: 112, z: -489},
+      {x: 298, z: -374},
+      {x: 379, z: -182},
+    ] as ReadonlyArray<{x: number; z: number}>,
+    items: [
+      {kind: "ramp", t: 0.05, across: -6},
+      {kind: "ramp", t: 0.45, across: 7},
+    ] as ReadonlyArray<{
+      kind: "ramp" | "oil" | "mud";
+      t: number;
+      across: number;
+    }>,
+  },
+  sandy: {
+    name: "Sandy Sweep",
+    startAt: 0,
+    shape: [
+      {x: 606, z: 0},
+      {x: 439, z: 212},
+      {x: 225, z: 282},
+      {x: 87, z: 382},
+      {x: -113, z: 496},
+      {x: -333, z: 418},
+      {x: -411, z: 198},
+      {x: -425, z: 0},
+      {x: -451, z: -217},
+      {x: -341, z: -428},
+      {x: -103, z: -450},
+      {x: 79, z: -345},
+      {x: 247, z: -309},
+      {x: 495, z: -238},
+    ] as ReadonlyArray<{x: number; z: number}>,
+    items: [
+      {kind: "ramp", t: 0.06, across: 5},
+      {kind: "mud", t: 0.66, across: -9},
+    ] as ReadonlyArray<{
+      kind: "ramp" | "oil" | "mud";
+      t: number;
+      across: number;
+    }>,
+  },
+  market: {
+    name: "Night Market",
+    startAt: 0,
+    shape: [
+      {x: 425, z: 0},
+      {x: 449, z: 186},
+      {x: 359, z: 359},
+      {x: 214, z: 518},
+      {x: 0, z: 439},
+      {x: -105, z: 254},
+      {x: -246, z: 246},
+      {x: -411, z: 170},
+      {x: -424, z: 0},
+      {x: -442, z: -183},
+      {x: -362, z: -362},
+      {x: -161, z: -389},
+      {x: 0, z: -433},
+      {x: 184, z: -443},
+      {x: 249, z: -249},
+      {x: 272, z: -113},
+    ] as ReadonlyArray<{x: number; z: number}>,
+    items: [
+      {kind: "mud", t: 0.37, across: 8},
+      {kind: "ramp", t: 0.1, across: -6},
+    ] as ReadonlyArray<{
+      kind: "ramp" | "oil" | "mud";
+      t: number;
+      across: number;
+    }>,
+  },
+  fox: {
+    name: "Fox Run",
+    startAt: 0,
+    shape: [
+      {x: 557, z: 0},
+      {x: 348, z: 144},
+      {x: 171, z: 171},
+      {x: 157, z: 378},
+      {x: 0, z: 459},
+      {x: -174, z: 419},
+      {x: -426, z: 426},
+      {x: -474, z: 196},
+      {x: -267, z: 0},
+      {x: -321, z: -133},
+      {x: -327, z: -327},
+      {x: -141, z: -339},
+      {x: 0, z: -437},
+      {x: 207, z: -501},
+      {x: 292, z: -292},
+      {x: 397, z: -165},
+    ] as ReadonlyArray<{x: number; z: number}>,
+    items: [{kind: "ramp", t: 0.04, across: 6}] as ReadonlyArray<{
+      kind: "ramp" | "oil" | "mud";
+      t: number;
+      across: number;
+    }>,
+  },
+  scorpion: {
+    name: "Scorpion Tail",
+    startAt: 0,
+    shape: [
+      {x: 635, z: 0},
+      {x: 245, z: 72},
+      {x: 290, z: 186},
+      {x: 362, z: 418},
+      {x: 88, z: 194},
+      {x: 22, z: 150},
+      {x: -78, z: 543},
+      {x: -242, z: 530},
+      {x: -319, z: 369},
+      {x: -409, z: 263},
+      {x: -193, z: 57},
+      {x: -165, z: 0},
+      {x: -522, z: -153},
+      {x: -383, z: -246},
+      {x: -162, z: -187},
+      {x: -244, z: -534},
+      {x: -92, z: -642},
+      {x: 36, z: -248},
+      {x: 90, z: -197},
+      {x: 204, z: -236},
+      {x: 264, z: -170},
+      {x: 575, z: -169},
+    ] as ReadonlyArray<{x: number; z: number}>,
+    items: [
+      {kind: "oil", t: 0.26, across: -7},
+      {kind: "mud", t: 0.51, across: 9},
+      {kind: "ramp", t: 0.03, across: 5},
+    ] as ReadonlyArray<{
+      kind: "ramp" | "oil" | "mud";
+      t: number;
+      across: number;
+    }>,
+  },
+  skyline: {
+    name: "Skyline Snake",
+    startAt: 0,
+    shape: [
+      {x: 347, z: 0},
+      {x: 346, z: 112},
+      {x: 396, z: 288},
+      {x: 127, z: 175},
+      {x: 88, z: 272},
+      {x: 0, z: 264},
+      {x: -191, z: 589},
+      {x: -131, z: 180},
+      {x: -413, z: 300},
+      {x: -329, z: 107},
+      {x: -265, z: 0},
+      {x: -211, z: -69},
+      {x: -341, z: -248},
+      {x: -306, z: -421},
+      {x: -72, z: -222},
+      {x: 0, z: -564},
+      {x: 73, z: -224},
+      {x: 180, z: -248},
+      {x: 156, z: -114},
+      {x: 547, z: -178},
+    ] as ReadonlyArray<{x: number; z: number}>,
+    items: [
+      {kind: "oil", t: 0.27, across: 8},
+      {kind: "ramp", t: 0.04, across: -6},
+    ] as ReadonlyArray<{
+      kind: "ramp" | "oil" | "mud";
+      t: number;
+      across: number;
+    }>,
+  },
   neon: {
     name: "Neon Mile",
     startAt: 0.02,
