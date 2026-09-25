@@ -137,12 +137,21 @@ export const CAMERA = {
    * swung round with the car would make the stick mean something different
    * every second.
    *
-   * The angle is atan(up / back), and with the two equal that is 45 degrees
-   * exactly — steep enough to see a corner coming, shallow enough that the
-   * cars have a side to them.
+   * The angle is atan(up / back) — twenty-five degrees, which is the angle the
+   * opening shot looks at the grid from, near enough.
+   *
+   * It was forty-five, looking down on the roofs of the cars: from up there a
+   * car is a shape on a plan of the road, the horizon is off the top of the
+   * screen and every circuit is grey tarmac. From down here the cars have a
+   * side to them, the road runs away to somewhere, and the race looks like the
+   * countdown that started it.
+   *
+   * Lower still would be the opening shot exactly, and that is as far as this
+   * should go: the ground ahead flattens into a few pixels as the angle drops,
+   * and by ten degrees a corner is a line rather than a shape.
    */
   back: 150,
-  up: 150,
+  up: 70,
   /** How wide the lens is. Narrow, because a wide one bends a straight road
    *  into a fan at the edges of the screen. */
   fov: 42,
@@ -152,11 +161,17 @@ export const CAMERA = {
   /**
    * How far ahead of the car the shot leads, at full speed.
    *
-   * Straight down the car's own heading rather than its velocity: leading on
-   * the velocity means a sideways slide swings the whole picture, and this is
-   * a game about sideways slides.
+   * Nothing, now: the camera watches the car itself and the car sits in the
+   * middle of the screen. It used to look fifty units up the road, which buys
+   * a little more warning of what is coming and costs the one thing a child
+   * actually tracks — where their own car is. With the shot led, the car rode
+   * low in the frame and drifted about it with every change of speed.
+   *
+   * The lead is still worked out along the car's own heading rather than its
+   * velocity, so turning this back up cannot make a sideways slide swing the
+   * whole picture. This is a game about sideways slides.
    */
-  lead: 52,
+  lead: 0,
   /**
    * How much room the near-fade clears around the car.
    *
@@ -631,8 +646,7 @@ export const LIGHT = {
    *
    * Low, and that is the whole point of it. It was nearly straight overhead,
    * which put every shadow directly underneath the thing casting it — where,
-   * from a camera looking down at forty-five degrees, the thing itself hides
-   * it. A low sun throws a shadow sideways where it can be seen, and a
+   * from a camera looking down at the road, the thing itself hides it. A low sun throws a shadow sideways where it can be seen, and a
    * visible shadow is most of what puts a car on the road rather than above
    * it.
    */
@@ -1639,8 +1653,8 @@ export const PLAYER = {
    *
    * The colour is the car; this is the child's own mark on it. They go on the
    * decks — the nose in front of the driver and the engine cover behind them —
-   * because the camera looks down at forty-five degrees and the top of a car
-   * is nearly all it ever sees of one.
+   * because the camera looks down on the car and its top and shoulders are
+   * most of what it ever sees.
    *
    * Laid on the surface the body already has rather than modelled: each shape
    * is cut flat and then dropped onto the deck, so it follows the taper of the
@@ -2325,12 +2339,13 @@ export const NEON = {
    * The buildings, in two rows.
    *
    * The near row is right on the street and **low**, and that is not a style
-   * choice. The camera sits a hundred and fifty units up and a hundred and
-   * fifty behind, so the line of sight to the car passes through a height of
-   * roughly however far a thing is in front of it — meaning anything close to
-   * the road and taller than about ninety units will sooner or later stand
-   * between the player and their own car. Low-rise along the street and towers
-   * set back is also simply what a city looks like.
+   * choice. The camera sits seventy units up and a hundred and fifty behind,
+   * so the line of sight to the car climbs about one unit in two — meaning
+   * anything close to the road and taller than about half its distance in
+   * front of the car will sooner or later stand between the player and their
+   * own car. The near-fade dissolves whatever does, but a street where half
+   * the buildings are dissolving is its own kind of mess. Low-rise along the
+   * street and towers set back is also simply what a city looks like.
    */
   nearBlocks: 30,
   nearFrom: 6,
