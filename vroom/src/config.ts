@@ -138,7 +138,11 @@ export const CAMERA = {
    * every second.
    *
    * The angle is atan(up / back) — twenty-five degrees, which is the angle the
-   * opening shot looks at the grid from, near enough.
+   * opening shot looks at the grid from, near enough — and the *distance* is
+   * the hypotenuse, which is a separate thing and easy to change by accident.
+   * Two hundred and twelve units, which is what it has always been: dropping
+   * the camera without moving it back pulled it in to a hundred and sixty-six
+   * and zoomed the whole game in by a third.
    *
    * It was forty-five, looking down on the roofs of the cars: from up there a
    * car is a shape on a plan of the road, the horizon is off the top of the
@@ -150,8 +154,8 @@ export const CAMERA = {
    * should go: the ground ahead flattens into a few pixels as the angle drops,
    * and by ten degrees a corner is a line rather than a shape.
    */
-  back: 150,
-  up: 70,
+  back: 192,
+  up: 90,
   /** How wide the lens is. Narrow, because a wide one bends a straight road
    *  into a fan at the edges of the screen. */
   fov: 42,
