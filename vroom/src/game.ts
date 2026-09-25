@@ -99,6 +99,18 @@ export class Game {
   /** update() does nothing unless this is set, so a card can hold the race
    *  still while the circuit is already being drawn behind it. */
   running = false;
+  /**
+   * Thrown away: stop whatever you are doing.
+   *
+   * A race is built in awaited steps behind the loading card, and anything
+   * that takes the child somewhere else before the last of them — tapping the
+   * track list while it loads, or a host starting the next race — disposes a
+   * game that is still loading. Without this, `load` carried serenely on to
+   * the end and started a loop, an audio context and a piece of music for a
+   * race nobody was watching: two tracks playing over each other, one of them
+   * belonging to a game that no longer existed.
+   */
+  private gone = false;
 
   /** How far the player has come, in laps, and where they were last step. */
   private progress = 0;
@@ -288,6 +300,9 @@ export class Game {
     const palette = this.track.palette;
     this.stage = new Stage(this.host, palette);
 
+    if (this.gone) {
+      return;
+    }
     report(0.25, "Rolling out the cars\u2026");
     // The cow's model, if anybody in the race could be a cow — which is
     // anybody, since the rivals are dealt at random. It started loading when
@@ -347,6 +362,9 @@ export class Game {
     // on it — see `tune`.
     this.tune = fetchMusic(spec.environment);
 
+    if (this.gone) {
+      return;
+    }
     report(0.45, "Building the scenery\u2026");
     await frame();
     this.scenery = new Scenery(rng, this.track, palette);
@@ -356,6 +374,9 @@ export class Game {
       ...this.stands.fades,
     ];
 
+    if (this.gone) {
+      return;
+    }
     report(0.65, "Putting it all together\u2026");
     await frame();
     this.stage.scene.add(this.track.group);
@@ -383,6 +404,9 @@ export class Game {
     this.gridUp();
     this.snapCamera();
 
+    if (this.gone) {
+      return;
+    }
     report(0.75, "Warming up the shaders\u2026");
     await frame();
     // The one that matters. Every material compiles the first time it is
@@ -390,6 +414,9 @@ export class Game {
     // spent with the countdown already running.
     await this.stage.renderer.compileAsync(this.stage.scene, this.stage.camera);
 
+    if (this.gone) {
+      return;
+    }
     report(0.9, "Nearly there\u2026");
     // And a few real frames, because compiling is not the whole of it:
     // geometry and textures go to the card the first time they are drawn, and
@@ -399,6 +426,9 @@ export class Game {
       this.render(1, SIM.step);
     }
 
+    if (this.gone) {
+      return;
+    }
     report(1, "Ready");
     this.loop = new GameLoop(this.update, this.render);
     this.loop.start();
@@ -448,7 +478,7 @@ export class Game {
     beginWatching();
     this.countdown.classList.remove("hidden");
     this.engine.start();
-    void this.tune?.then(bytes => this.engine.play(bytes));
+    void this.tune?.then(bytes => this.startMusic(bytes));
     // A guest pressed nothing to get here — the code was scanned and the race
     // started itself — and a browser will not make a sound until somebody has
     // touched the screen. So the first touch, whatever it is for, is also the
@@ -474,7 +504,21 @@ export class Game {
     // Here and not in the constructor: a browser will not start an audio
     // context outside a real gesture, and the button that got us here is one.
     this.engine.start();
-    void this.tune?.then(bytes => this.engine.play(bytes));
+    void this.tune?.then(bytes => this.startMusic(bytes));
+  }
+
+  /**
+   * The music, once it has arrived — if there is still a race to play it into.
+   *
+   * It is fetched while the circuit is built and can land at any time after
+   * that, including after the flag has fallen or after the child has gone back
+   * to the track list. Starting it then is music with no race under it.
+   */
+  private startMusic(bytes: ArrayBuffer | null): void {
+    if (this.gone || this.finished) {
+      return;
+    }
+    void this.engine.play(bytes);
   }
 
   /**
@@ -1052,6 +1096,7 @@ export class Game {
    * stuck behind a card that never came down.
    */
   dispose(): void {
+    this.gone = true;
     this.running = false;
     window.removeEventListener("pointerdown", this.wakeSound);
     // The party outlives the race — it is the same children next time round —
