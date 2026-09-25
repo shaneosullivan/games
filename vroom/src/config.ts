@@ -2433,6 +2433,23 @@ export const TYRES = {
  */
 export const BRIDGE = {
   /**
+   * How far apart the two roads have to be *pointing* before a flyover is
+   * built, in degrees.
+   *
+   * A crossing is two roads cutting across each other. Two roads running side
+   * by side are not a crossing, however close they get — and a circuit that
+   * doubles back on itself, which is most of what a child draws with a finger,
+   * is full of road running beside road. Without this the game found those by
+   * distance alone and threw a bridge over them: one track came back with a
+   * flyover across its own start line, so the race began with all four cars
+   * buried under a road nobody was driving on.
+   *
+   * Thirty degrees. Anything from there to a hundred and fifty is a road going
+   * somewhere else; outside that band the two are travelling the same line, one
+   * of them backwards, and belong on the same ground.
+   */
+  crossesAt: 30,
+  /**
    * How far the deck reaches either side of the crossing, in world units
    * along the road.
    *

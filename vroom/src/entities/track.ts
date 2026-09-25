@@ -565,6 +565,20 @@ export class Track {
     // Far enough apart along the lap that this is a crossing and not simply
     // the road being next to itself.
     const apart = Math.max(30, Math.round(TRACK.segments * 0.05));
+    // How square the two roads have to meet before this is a crossing at all;
+    // see `BRIDGE.crossesAt`. The side vectors serve for the test — they are
+    // the tangents turned ninety degrees, so the angle between them is the
+    // angle between the roads.
+    //
+    // Judged at the *closest* pair in a cluster rather than at every pair in
+    // it, because that pair is the crossing point itself. Testing each pair
+    // let a cluster be seeded by a stray pair out at the edge of a long
+    // doubling-back, where two roads running side by side finally part company
+    // at exactly the threshold angle — which is how a flyover ended up over a
+    // start line with the whole grid underneath it.
+    const parallel = Math.cos((BRIDGE.crossesAt * Math.PI) / 180);
+    const across = (low: number, high: number): boolean =>
+      Math.abs(this.sides[low].dot(this.sides[high])) <= parallel;
 
     const hits: Array<{low: number; high: number; d: number}> = [];
     for (let i = 0; i < TRACK.segments; i++) {
@@ -646,6 +660,12 @@ export class Track {
         }
       }
 
+      // Everything in this cluster is spoken for either way — a road running
+      // beside itself must not be left to seed a second cluster further along
+      // — but only a cluster that actually crosses gets a deck.
+      if (!across(seed.low, seed.high)) {
+        continue;
+      }
       found.push({
         low: seed.low,
         lowFrom: seed.low + lowMin,

@@ -185,7 +185,15 @@ function deck(
     parts.map(m => m.geometry as THREE.BufferGeometry),
     false,
   );
-  const material = flatVertex();
+  // Its own material, not the shared one. `flatVertex` hands out a cached
+  // material per substance, and this deck is about to change three things
+  // about it — depth, opacity and transparency. Written straight onto the
+  // cached one, those changes landed on every other flat thing drawn with it,
+  // and every deck shared a single opacity: the bridge a child was under only
+  // ever faded to two thirds, because a second bridge somewhere else on the
+  // circuit was pulling the same number back towards solid. Two decks
+  // disagreeing settle at exactly 0.67, which is what was on the screen.
+  const material = flatVertex().clone();
   // One opacity for the whole deck, so it fades as a single thing.
   material.depthWrite = false;
   // And no depth *test* either, which matters now that the cars and the
