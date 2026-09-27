@@ -239,6 +239,23 @@ export const STAND = {
   /** Two of them, one each side of the road at the line. Far enough out that
    *  they frame the straight rather than leaning over it. */
   from: 124,
+  /**
+   * How wide a stand counts as when asking whether it is in the way, and how
+   * much further out it has to get before it comes back.
+   *
+   * The near-fade cannot help here. It dissolves a cone from the camera out to
+   * the car, and a cone has no width at the camera — so a grandstand a few
+   * yards in front of the lens gets a hole punched in it exactly the size of
+   * the car and goes on filling the rest of the screen. What is wanted for
+   * something that big and that close is not a hole but for it to be gone,
+   * which is what the game does with it now.
+   *
+   * The second number is hysteresis. Without it a stand sitting on the
+   * boundary blinks on and off as the car wanders a foot either way, and a
+   * blinking grandstand is far worse than one that is simply there.
+   */
+  blocks: 70,
+  clears: 96,
   /** How big one is: rows deep, and how much each row rises and steps back. */
   rows: 7,
   /** How thick each tier is, and how deep. Chunky on purpose: a thin slab
@@ -306,35 +323,47 @@ export const STAND = {
   confettiLasts: 4,
   confettiSize: 2.4,
   /**
-   * The desert gets fire instead.
+   * The desert gets spark fountains instead.
    *
    * Paper falling out of a clear desert sky is a town's idea of a party. What
-   * a desert circuit does at the flag is throw flame off the gantry, and it is
-   * the better ending anyway: the confetti drifts down behind you, and this
-   * goes up in front of you while you are still braking.
+   * this does at the flag is the stage pyrotechnic: two fountains standing on
+   * the ground either side of the line, throwing a narrow column of sparks
+   * straight up, the sparks arcing over at the top and falling back.
    *
-   * Fire rises, so the gravity is negative — the flames accelerate upward
-   * rather than falling back — and it is thrown in bursts over a second and a
-   * half rather than all at once, because one puff is an explosion and a
-   * handful in a row is a fire.
+   * Narrow is the whole character of it. They were thrown as a sphere before —
+   * a ball of fire either side of the car — and a fountain is the opposite
+   * thing: almost all of the speed is upward and barely any of it sideways, so
+   * the column stays a column and the sparks that leave it are the few that
+   * spray off the sides.
    */
-  flame: [0xfff3c4, 0xffd24a, 0xff9a2e, 0xf2542d],
-  flameCount: 70,
-  flameSpeed: 13,
-  flameLift: 20,
-  /** Sparks fall. They are thrown up and out and gravity brings them back,
-   *  which is what makes an arc rather than a jet. */
-  flameRise: 40,
-  flameLasts: 1.1,
-  flameSize: 1.7,
-  /** How long the fire burns, and how often it is fed. */
+  flame: [0xffffff, 0xfff6d2, 0xffd98a, 0xffb347],
+  flameCount: 34,
+  /** Sideways, which is what makes the column's width — small on purpose. */
+  flameSpeed: 3,
+  /** And upward, which is its height. At this against the gravity below, a
+   *  spark tops out about forty units up: a tall, thin jet. */
+  flameLift: 62,
+  /** Sparks fall. Thrown up and gravity brings them back, which is what makes
+   *  a fountain rather than a firework. */
+  flameRise: 48,
+  flameLasts: 1.5,
+  flameSize: 1.15,
+  /** How long they run, and how often they are fed. Often, and a few at a
+   *  time: a fountain is a continuous jet, and a jet fed in visible gulps is a
+   *  row of puffs. */
   flameFor: 2.6,
-  flameEvery: 0.24,
-  /** Where beside the car it goes off: how far out to either side, and how
-   *  high. Far enough out, against how far the sparks are thrown, that none
-   *  of them cross in front of the car in the shot. */
-  flameBeside: 26,
-  flameLow: 6,
+  flameEvery: 0.05,
+  /**
+   * Where beside the car they stand: how far out to either side, and how high
+   * the nozzle is off the ground.
+   *
+   * Far enough out that the column never crosses the car in the shot — which
+   * is measured rather than judged, by projecting the sparks to the screen and
+   * counting the ones that land on the car. The camera sits lower than it used
+   * to and the columns are tall, so this is wider than it was.
+   */
+  flameBeside: 38,
+  flameLow: 1,
 } as const;
 
 /**
@@ -695,6 +724,23 @@ export const TRACK = {
    * real place with a real edge, and that edge is the wall.
    */
   half: 38,
+  /**
+   * How much of its width the road keeps on the inside of a very tight corner.
+   *
+   * Everything about a road here is drawn by stepping sideways from the centre
+   * line — tarmac, kerbs, run-off, barriers, the flyover decks. That works
+   * until a corner is tighter than the step: on the inside of the bend the
+   * offset points cross over each other, and the ribbon turns inside out and
+   * throws triangles across the map. A child drawing with a finger makes
+   * corners like that without trying, and two of the circuits this game ships
+   * with had them — seventy-seven inside-out triangles on one of them.
+   *
+   * So the inside edge is held off the centre of the turn: it may come in no
+   * closer than this fraction of the corner's radius. The road narrows a
+   * little through a hairpin, which is what a real one does, instead of
+   * exploding.
+   */
+  tightest: 0.25,
   grass: 34,
   /** How many points the ribbon is built from. One every few metres: enough
    *  that a corner is a curve rather than a polygon. */
@@ -954,32 +1000,28 @@ export const CIRCUITS = {
     name: "Scorpion Tail",
     startAt: 0,
     shape: [
-      {x: 635, z: 0},
-      {x: 245, z: 72},
-      {x: 290, z: 186},
-      {x: 362, z: 418},
-      {x: 88, z: 194},
-      {x: 22, z: 150},
-      {x: -78, z: 543},
-      {x: -242, z: 530},
-      {x: -319, z: 369},
-      {x: -409, z: 263},
-      {x: -193, z: 57},
-      {x: -165, z: 0},
-      {x: -522, z: -153},
-      {x: -383, z: -246},
-      {x: -162, z: -187},
-      {x: -244, z: -534},
-      {x: -92, z: -642},
-      {x: 36, z: -248},
-      {x: 90, z: -197},
-      {x: 204, z: -236},
-      {x: 264, z: -170},
-      {x: 575, z: -169},
+      {x: 333, z: 0},
+      {x: 544, z: 198},
+      {x: 340, z: 285},
+      {x: 314, z: 543},
+      {x: 46, z: 261},
+      {x: -39, z: 221},
+      {x: -277, z: 480},
+      {x: -318, z: 267},
+      {x: -583, z: 212},
+      {x: -399, z: 0},
+      {x: -233, z: -85},
+      {x: -409, z: -343},
+      {x: -153, z: -265},
+      {x: -88, z: -496},
+      {x: 92, z: -522},
+      {x: 180, z: -312},
+      {x: 436, z: -366},
+      {x: 214, z: -78},
     ] as ReadonlyArray<{x: number; z: number}>,
     items: [
       {kind: "oil", t: 0.26, across: -7},
-      {kind: "mud", t: 0.51, across: 9},
+      {kind: "mud", t: 0.62, across: 9},
       {kind: "ramp", t: 0.03, across: 5},
     ] as ReadonlyArray<{
       kind: "ramp" | "oil" | "mud";
@@ -991,30 +1033,28 @@ export const CIRCUITS = {
     name: "Skyline Snake",
     startAt: 0,
     shape: [
-      {x: 347, z: 0},
-      {x: 346, z: 112},
-      {x: 396, z: 288},
-      {x: 127, z: 175},
-      {x: 88, z: 272},
-      {x: 0, z: 264},
-      {x: -191, z: 589},
-      {x: -131, z: 180},
-      {x: -413, z: 300},
-      {x: -329, z: 107},
-      {x: -265, z: 0},
-      {x: -211, z: -69},
-      {x: -341, z: -248},
-      {x: -306, z: -421},
-      {x: -72, z: -222},
-      {x: 0, z: -564},
-      {x: 73, z: -224},
-      {x: 180, z: -248},
-      {x: 156, z: -114},
-      {x: 547, z: -178},
+      {x: 530, z: 0},
+      {x: 293, z: 106},
+      {x: 366, z: 307},
+      {x: 249, z: 431},
+      {x: 71, z: 404},
+      {x: -84, z: 477},
+      {x: -122, z: 212},
+      {x: -333, z: 280},
+      {x: -547, z: 199},
+      {x: -428, z: 0},
+      {x: -449, z: -163},
+      {x: -198, z: -167},
+      {x: -195, z: -338},
+      {x: -101, z: -574},
+      {x: 68, z: -387},
+      {x: 244, z: -423},
+      {x: 278, z: -234},
+      {x: 359, z: -131},
     ] as ReadonlyArray<{x: number; z: number}>,
     items: [
-      {kind: "oil", t: 0.27, across: 8},
-      {kind: "ramp", t: 0.04, across: -6},
+      {kind: "oil", t: 0.31, across: 8},
+      {kind: "ramp", t: 0.05, across: -6},
     ] as ReadonlyArray<{
       kind: "ramp" | "oil" | "mud";
       t: number;
@@ -2645,6 +2685,18 @@ export const BRIDGE = {
    */
   crossesAt: 30,
   /**
+   * The longest a deck may be, as a multiple of `reach`.
+   *
+   * A crossing is found by growing a cluster of nearby pairs, and where a
+   * genuine junction happens to sit at the end of a long stretch of road
+   * running beside itself, that cluster grows down the whole stretch. The deck
+   * built from it is then not a bridge but a lid over a third of the lap — and
+   * a ribbon that wide, laid round a tight corner, turns itself inside out and
+   * throws triangles across the map. A bridge is a short thing over a
+   * junction; this says how short.
+   */
+  longest: 3,
+  /**
    * How far the deck reaches either side of the crossing, in world units
    * along the road.
    *
@@ -2657,11 +2709,15 @@ export const BRIDGE = {
   /**
    * What the deck fades to while the player is underneath it.
    *
-   * Not to nothing. Fading the deck away entirely would leave the car
-   * apparently driving through the middle of a road that is not there, and a
-   * ghost of it says "you are under this" much better than a hole does.
+   * To nothing. It used to stop at a ghost, on the argument that a hole in the
+   * road says the bridge is gone while a ghost says "you are beneath this" —
+   * which reads well and drives badly. What a child on the lower road wants is
+   * the road they are on: at a third opacity the bridge still lay across the
+   * corner, still hid the kerbs they were aiming at, and still made a dark
+   * tunnel of the one bit of track they were trying to see out of. Only the
+   * road being driven on is drawn.
    */
-  under: 0.3,
+  under: 0,
   /** How fast it fades, per second. Quick enough to be out of the way before
    *  the car is, slow enough not to blink. */
   fade: 6,

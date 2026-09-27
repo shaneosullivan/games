@@ -38,6 +38,19 @@ const UP = new THREE.Vector3(0, 1, 0);
 export class Stands {
   readonly group = new THREE.Group();
 
+  /**
+   * The two stands themselves, and whether each is currently in the way.
+   *
+   * Held because a grandstand between the camera and the car is not something
+   * to dissolve a hole in — see `STAND.blocks` — it is something to take off
+   * the screen, and taking it off the screen means knowing which people belong
+   * to it as well as which slab.
+   */
+  private readonly builds: Array<{
+    mesh: THREE.Mesh;
+    at: THREE.Vector3;
+    hidden: boolean;
+  }> = [];
   private readonly people: Array<THREE.InstancedMesh> = [];
   /** For the pieces only some of them wear — a ponytail, a bun, a beard —
    *  who is wearing one. */
@@ -49,6 +62,8 @@ export class Stands {
     z: number;
     turn: number;
     phase: number;
+    /** Which stand they are sitting in, so they go when it does. */
+    stand: number;
   }> = [];
   private cheering = 0;
   /** The stand and its crowd get out of the way of the car, the way the trees
@@ -78,6 +93,9 @@ export class Stands {
   private readonly none = new THREE.Vector3(0, 0, 0);
   private readonly tint = new THREE.Color();
   private readonly flare = new THREE.Vector3();
+  /** Held for the blocking test, which runs every frame. */
+  private readonly axis = new THREE.Vector3();
+  private readonly rel = new THREE.Vector3();
 
   constructor(
     rng: Rng,
@@ -129,6 +147,12 @@ export class Stands {
       built.rotation.y = turn;
       this.group.add(built);
       this.fades.push(fade);
+      const which = this.builds.length;
+      this.builds.push({
+        mesh: built,
+        at: new THREE.Vector3(x, 0, z),
+        hidden: false,
+      });
 
       // Fill the tiers. Rows step up and back exactly as the model does, so
       // the people sit on the seats rather than through them.
@@ -148,6 +172,7 @@ export class Stands {
             z: z - across * sin + back * cos,
             turn,
             phase: rng.range(0, Math.PI * 2),
+            stand: which,
           });
         }
       }
@@ -303,9 +328,57 @@ export class Stands {
         gravity: STAND.flameRise,
         ttl: STAND.flameLasts,
         size: STAND.flameSize,
-        // A full sphere of sparks that arc and fall, rather than a jet.
-        spherical: 1,
+        // Nought: every spark leaves straight up, and the only spread is the
+        // small sideways speed above. That is what makes a fountain rather
+        // than a ball of fire.
+        spherical: 0,
       });
+    }
+  }
+
+  /**
+   * Takes a grandstand off the screen while it stands between the camera and
+   * the car.
+   *
+   * The camera never turns, so at a start line running across the shot one of
+   * the two stands sits squarely behind the car — and a grandstand a few yards
+   * from the lens is most of the picture. The near-fade is no use for it: its
+   * cone comes to a point at the camera, so all it can do to something that
+   * close is cut a car-shaped hole in it.
+   *
+   * Only while it is actually in the way. A stand beside the road, or one the
+   * camera is looking past rather than through, is part of the place and stays
+   * exactly where it is.
+   */
+  keepClear(eye: THREE.Vector3, car: THREE.Vector3): void {
+    this.axis.subVectors(car, eye);
+    const span = Math.max(this.axis.lengthSq(), 1e-4);
+    let moved = false;
+    for (const build of this.builds) {
+      this.rel.subVectors(build.at, eye);
+      const along = this.rel.dot(this.axis) / span;
+      let blocking = false;
+      // Between the two of them rather than behind the camera or past the car.
+      if (along > 0.02 && along < 0.98) {
+        const off = this.rel
+          .addScaledVector(this.axis, -along)
+          .setY(0)
+          .length();
+        // Hysteresis: it has to get properly clear before it comes back, or a
+        // stand on the boundary blinks with every twitch of the car.
+        blocking = build.hidden ? off < STAND.clears : off < STAND.blocks;
+      }
+      if (blocking !== build.hidden) {
+        build.hidden = blocking;
+        build.mesh.visible = !blocking;
+        moved = true;
+      }
+    }
+    // The crowd's matrices are written only when something about them changes
+    // — four hundred people rewritten every frame would be four hundred people
+    // rewritten for nothing — so this is one of the moments they change.
+    if (moved && this.cheering <= 0) {
+      this.settle();
     }
   }
 
@@ -328,10 +401,11 @@ export class Stands {
           STAND.jumpHeight *
           fading;
         this.q.setFromAxisAngle(UP, seat.turn);
+        const there = !this.builds[seat.stand]?.hidden && (!worn || worn[i]);
         this.m.compose(
           this.pos.set(seat.x, seat.y + hop, seat.z),
           this.q,
-          worn && !worn[i] ? this.none : this.one,
+          there ? this.one : this.none,
         );
         mesh.setMatrixAt(i, this.m);
       });
@@ -345,10 +419,11 @@ export class Stands {
       const worn = this.wears.get(mesh);
       this.seats.forEach((seat, i) => {
         this.q.setFromAxisAngle(UP, seat.turn);
+        const there = !this.builds[seat.stand]?.hidden && (!worn || worn[i]);
         this.m.compose(
           this.pos.set(seat.x, seat.y, seat.z),
           this.q,
-          worn && !worn[i] ? this.none : this.one,
+          there ? this.one : this.none,
         );
         mesh.setMatrixAt(i, this.m);
       });

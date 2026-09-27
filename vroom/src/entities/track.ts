@@ -81,6 +81,16 @@ export class Track {
    *  are what `nearest` searches and what the ribbons are built from. */
   private readonly points: Array<THREE.Vector3> = [];
   private readonly sides: Array<THREE.Vector3> = [];
+  /**
+   * How hard the road bends at each sample, signed: positive where the corner
+   * turns towards the sideways vector, negative where it turns away.
+   *
+   * Kept because every ribbon in the game is drawn by stepping sideways from
+   * the centre line, and a step further than the corner's own radius lands on
+   * the far side of the centre of the turn — which is how a ribbon ends up
+   * inside out. See `room`.
+   */
+  private readonly bend: Array<number> = [];
 
   private readonly tmp = new THREE.Vector3();
   /** The racing tables; see `racing()`. */
@@ -107,6 +117,17 @@ export class Track {
       this.sides.push(new THREE.Vector3(-d.z, 0, d.x).normalize());
     }
 
+    // The curvature, from the turn between one sample's heading and the next.
+    // The side vector is the heading turned ninety degrees, so the cross
+    // product of two of them is the same as the cross product of the headings.
+    const step = this.length / TRACK.segments;
+    for (let i = 0; i < TRACK.segments; i++) {
+      const a = this.sides[i];
+      const b = this.sides[(i + 1) % TRACK.segments];
+      const cross = a.z * -b.x - -a.x * b.z;
+      this.bend.push(cross / step);
+    }
+
     this.racing();
     this.tangles = this.crossings();
     this.deckMargin = Math.max(
@@ -131,6 +152,29 @@ export class Track {
         }),
       );
     }
+  }
+
+  /**
+   * How far sideways a ribbon may actually step here.
+   *
+   * On the outside of a bend, as far as it likes. On the inside, no closer to
+   * the centre of the turn than `TRACK.tightest` of the way — beyond that the
+   * offset points cross over one another and the ribbon folds inside out. A
+   * road that narrows through a hairpin looks like a road; one that turns
+   * itself inside out looks like a fault, because it is one.
+   */
+  private room(i: number, off: number): number {
+    const bend = this.bend[i];
+    if (bend === 0) {
+      return off;
+    }
+    // How much of the width survives at this offset. One is the full width; at
+    // nought the offset point has reached the centre of the turn.
+    const left = 1 - off * bend;
+    if (left >= TRACK.tightest) {
+      return off;
+    }
+    return (1 - TRACK.tightest) / bend;
   }
 
   /** Where the centre line is at this fraction of a lap. */
@@ -201,7 +245,10 @@ export class Track {
    * reappears in the gap.
    */
   deckHalfWidth(from: number, to: number): number {
-    return Math.max(4, Math.ceil((to - from) / 2) + this.deckMargin);
+    return Math.min(
+      this.deckMargin * BRIDGE.longest,
+      Math.max(4, Math.ceil((to - from) / 2) + this.deckMargin),
+    );
   }
 
   /**
@@ -331,8 +378,36 @@ export class Track {
       const s0 = this.sides[i];
       const s1 = this.sides[j];
 
-      const push = (p: THREE.Vector3, s: THREE.Vector3, off: number): void => {
-        verts.push(p.x + s.x * off, height, p.z + s.z * off);
+      // The four corners of this segment's quad, with the sideways step held
+      // inside the corner's radius; see `room`.
+      const a0 = this.room(i, from);
+      const a1 = this.room(j, from);
+      const b1 = this.room(j, to);
+      // And if it is *still* wound the wrong way round, it is not drawn.
+      //
+      // The clamp above deals with a corner tighter than the road is wide,
+      // which is the common case. It cannot deal with a centre line that
+      // doubles back on itself inside a single segment — a knot, which a
+      // spline through two nearly-coincident corners will happily produce. A
+      // gap of a few units in the road is a blemish; the alternative is a
+      // triangle stretched across the whole map, which is what was happening.
+      const cross =
+        (p1.x + s1.x * a1 - (p0.x + s0.x * a0)) *
+          (p1.z + s1.z * b1 - (p0.z + s0.z * a0)) -
+        (p1.z + s1.z * a1 - (p0.z + s0.z * a0)) *
+          (p1.x + s1.x * b1 - (p0.x + s0.x * a0));
+      if (cross >= 0) {
+        continue;
+      }
+
+      const push = (
+        p: THREE.Vector3,
+        s: THREE.Vector3,
+        off: number,
+        at: number,
+      ): void => {
+        const room = this.room(at, off);
+        verts.push(p.x + s.x * room, height, p.z + s.z * room);
       };
       // Two triangles a segment, wound so they face up.
       //
@@ -340,12 +415,12 @@ export class Track {
       // the opposite way to what the winding assumed, so every road triangle
       // faced the ground — which cost nothing while the material was unlit and
       // double-sided, and turned the whole road black the moment it was lit.
-      push(p0, s0, from);
-      push(p1, s1, to);
-      push(p1, s1, from);
-      push(p0, s0, from);
-      push(p0, s0, to);
-      push(p1, s1, to);
+      push(p0, s0, from, i);
+      push(p1, s1, to, j);
+      push(p1, s1, from, j);
+      push(p0, s0, from, i);
+      push(p0, s0, to, i);
+      push(p1, s1, to, j);
 
       const c = stripe && Math.floor(i / stripe.every) % 2 === 1 ? b : a;
       for (let v = 0; v < 6; v++) {
@@ -468,10 +543,12 @@ export class Track {
       if (this.underBridge(i)) {
         continue;
       }
-      const x0 = p0.x + s0.x * offset;
-      const z0 = p0.z + s0.z * offset;
-      const x1 = p1.x + s1.x * offset;
-      const z1 = p1.z + s1.z * offset;
+      const near0 = this.room(i, offset);
+      const near1 = this.room(j, offset);
+      const x0 = p0.x + s0.x * near0;
+      const z0 = p0.z + s0.z * near0;
+      const x1 = p1.x + s1.x * near1;
+      const z1 = p1.z + s1.z * near1;
       const h = HEIGHT.wall;
 
       verts.push(x0, 0, z0, x1, 0, z1, x1, h, z1);

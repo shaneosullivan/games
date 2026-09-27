@@ -1083,6 +1083,9 @@ export class Game {
     for (const fade of this.fades) {
       fade.setFocus(this.stage.camera.position, p, CAMERA.clear);
     }
+    // A grandstand is too big and too close for that to help — see
+    // `Stands.keepClear` — so one in the way goes off the screen instead.
+    this.stands.keepClear(this.stage.camera.position, p);
   }
 
   /**
