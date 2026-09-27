@@ -107,6 +107,9 @@ export class Stands {
       STAND.confetti,
       0.9,
       environment === "desert",
+      // Sparks in the desert are motes; everywhere else this is paper, and
+      // paper tumbles.
+      environment === "desert" ? "mote" : "paper",
     );
     const p = new THREE.Vector3();
     const s = new THREE.Vector3();
@@ -266,9 +269,13 @@ export class Stands {
    *  the shot rather than appearing in it. */
   readonly over = new THREE.Vector3();
 
-  /** Everybody on their feet, and paper everywhere — or, in the desert, fire.
-   *  See `STAND.flame`. */
-  cheer(at: THREE.Vector3, palette: Palette): void {
+  /**
+   * Everybody on their feet, and paper everywhere — or, in the desert, spark
+   * fountains. See `STAND.flame`.
+   *
+   * The paper is its own colours rather than the crowd's: see `STAND.paper`.
+   */
+  cheer(at: THREE.Vector3): void {
     this.cheering = STAND.jumpFor;
     if (this.environment === "desert") {
       this.over.copy(at);
@@ -277,13 +284,13 @@ export class Stands {
       this.feed = 0;
       return;
     }
-    // Three goes, spread across the road, so it falls as a shower rather than
-    // as one ball of paper.
-    for (let i = -1; i <= 1; i++) {
-      this.over.set(at.x + i * 26, 34, at.z + i * 12);
+    // Five goes, spread right across the road, so it comes down as a shower
+    // over the whole finish rather than as one ball of paper above the car.
+    for (let i = -2; i <= 2; i++) {
+      this.over.set(at.x + i * 30, 34 + Math.abs(i) * 4, at.z + i * 14);
       this.confetti.burst(this.over, {
-        color: palette.crowd,
-        count: Math.round(STAND.confetti / 3),
+        color: STAND.paper,
+        count: Math.round(STAND.confetti / 5),
         speed: STAND.confettiSpeed,
         lift: STAND.confettiLift,
         gravity: STAND.confettiFall,

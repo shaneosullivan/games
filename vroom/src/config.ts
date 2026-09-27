@@ -316,12 +316,24 @@ export const STAND = {
    * same piece is bigger than the car. Paper is paper: about a foot across,
    * and a lot of it.
    */
-  confetti: 460,
+  /**
+   * The paper itself: the colours a scrap can be.
+   *
+   * Read off the reference rather than chosen — red, yellow, magenta, blue and
+   * green, which is what nearly every pixel of coloured paper in it turns out
+   * to be. It used to take the crowd's colours, which are muted because they
+   * are clothes seen from a distance, and confetti made of them read as a
+   * cloud of dust.
+   */
+  paper: [0xd8382f, 0xe0c62f, 0xd13bb8, 0x3b50c8, 0x3f8a3f],
+  confetti: 760,
   confettiSpeed: 30,
   confettiLift: 44,
   confettiFall: 38,
   confettiLasts: 4,
-  confettiSize: 2.4,
+  /** Small. Confetti is scraps of paper, and at any size worth noticing they
+   *  read as flying tiles. */
+  confettiSize: 0.55,
   /**
    * The desert gets spark fountains instead.
    *

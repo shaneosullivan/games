@@ -41,6 +41,17 @@ export class ParticleBurst {
   private readonly ttl: Array<number> = [];
   private readonly gravity: Array<number> = [];
   private readonly size: Array<number> = [];
+  /**
+   * Which way each piece is turned and how fast it tumbles.
+   *
+   * Only paper needs it. A mote is a ball and looks the same whichever way up
+   * it is, but a flat scrap of paper that never turns is a sticker on the air:
+   * the whole character of falling confetti is that it flashes as it flips
+   * from edge-on to face-on.
+   */
+  private readonly spin: Array<THREE.Vector3> = [];
+  private readonly spun: Array<number> = [];
+  private readonly rate: Array<number> = [];
   private cursor = 0;
 
   private readonly m = new THREE.Matrix4();
@@ -51,8 +62,17 @@ export class ParticleBurst {
     private readonly max: number,
     radius = 0.09,
     additive = false,
+    /**
+     * What each piece is: a mote — a little ball, which is what a spark or a
+     * speck of pollen is — or paper, a flat scrap that tumbles as it falls.
+     */
+    private readonly shape: "mote" | "paper" = "mote",
   ) {
-    const geo = new THREE.IcosahedronGeometry(radius, 0);
+    const paper = shape === "paper";
+    // Paper is longer than it is wide, and thin enough to disappear edge-on.
+    const geo = paper
+      ? new THREE.PlaneGeometry(radius * 1.5, radius * 3.4)
+      : new THREE.IcosahedronGeometry(radius, 0);
     // `vertexColors: true` makes the shader read a `color` attribute. Without
     // one it reads black, and per-instance colour never gets a chance to
     // multiply in — the particles render invisibly (fatally so when additive).
@@ -64,6 +84,9 @@ export class ParticleBurst {
       vertexColors: true,
       transparent: true,
       depthWrite: false,
+      // Paper has a back as well as a front, and spends half its time showing
+      // it. A single-sided scrap simply vanishes for half of every tumble.
+      side: paper ? THREE.DoubleSide : THREE.FrontSide,
       blending: additive ? THREE.AdditiveBlending : THREE.NormalBlending,
     });
     this.mesh = new THREE.InstancedMesh(geo, mat, max);
@@ -81,6 +104,9 @@ export class ParticleBurst {
       this.ttl.push(1);
       this.gravity.push(5.5);
       this.size.push(1);
+      this.spin.push(new THREE.Vector3(0, 1, 0));
+      this.spun.push(0);
+      this.rate.push(0);
     }
     this.hideAll();
   }
@@ -129,6 +155,16 @@ export class ParticleBurst {
       this.colors[i].set(palette[(Math.random() * palette.length) | 0]);
       this.gravity[i] = gravity;
       this.size[i] = size * (0.7 + Math.random() * 0.6);
+      // A tumble of its own: any axis, either way round, at its own pace.
+      this.spin[i]
+        .set(
+          Math.random() * 2 - 1,
+          Math.random() * 2 - 1,
+          Math.random() * 2 - 1,
+        )
+        .normalize();
+      this.spun[i] = Math.random() * Math.PI * 2;
+      this.rate[i] = (Math.random() * 2 - 1) * 7;
       this.ttl[i] = ttl * (0.75 + Math.random() * 0.5);
       this.life[i] = this.ttl[i];
     }
@@ -145,8 +181,18 @@ export class ParticleBurst {
       this.pos[i].addScaledVector(this.vel[i], dt);
 
       const t = Math.max(0, this.life[i] / this.ttl[i]);
-      // Squared fade reads as a spark burning out rather than a linear dissolve.
-      const scale = t * t * 1.5 * this.size[i] + 0.0001;
+      // A spark burns out — squared, so it goes quickly at the end. Paper does
+      // not burn out: it stays the size it is and is whisked away at the last,
+      // because a scrap of paper that shrinks as it falls is a scrap of paper
+      // going away from you rather than one landing.
+      const scale =
+        this.shape === "paper"
+          ? Math.min(1, t * 3.5) * 1.5 * this.size[i] + 0.0001
+          : t * t * 1.5 * this.size[i] + 0.0001;
+      if (this.shape === "paper") {
+        this.spun[i] += this.rate[i] * dt;
+        this.q.setFromAxisAngle(this.spin[i], this.spun[i]);
+      }
       this.m.compose(this.pos[i], this.q, this.s.setScalar(scale));
       this.mesh.setMatrixAt(i, this.m);
       this.mesh.setColorAt(i, this.colors[i]);

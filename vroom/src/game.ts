@@ -952,7 +952,7 @@ export class Game {
     // sitting down. Being cheered for finishing fourth of four is how a game
     // starts feeling like it is humouring you, and a child can tell.
     if (place < this.cars) {
-      this.stands.cheer(this.car.position, this.track.palette);
+      this.stands.cheer(this.car.position);
     }
 
     const round = this.laps === 1 ? "" : ` over ${this.laps} laps`;
