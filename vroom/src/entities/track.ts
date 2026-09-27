@@ -378,25 +378,40 @@ export class Track {
       const s0 = this.sides[i];
       const s1 = this.sides[j];
 
-      // The four corners of this segment's quad, with the sideways step held
-      // inside the corner's radius; see `room`.
-      const a0 = this.room(i, from);
-      const a1 = this.room(j, from);
-      const b1 = this.room(j, to);
-      // And if it is *still* wound the wrong way round, it is not drawn.
+      // The four corners of this segment, with the sideways step held inside
+      // the corner's radius; see `room`. Named, because what follows is a
+      // winding test and a winding test written out of named corners is one
+      // that can be checked by reading it.
+      const nearL = this.room(i, from);
+      const farL = this.room(j, from);
+      const nearR = this.room(i, to);
+      const farR = this.room(j, to);
+      const aX = p0.x + s0.x * nearL;
+      const aZ = p0.z + s0.z * nearL;
+      const bX = p1.x + s1.x * farR;
+      const bZ = p1.z + s1.z * farR;
+      const cX = p1.x + s1.x * farL;
+      const cZ = p1.z + s1.z * farL;
+      const dX = p0.x + s0.x * nearR;
+      const dZ = p0.z + s0.z * nearR;
+
+      // And if it would *still* come out inside out, it is not drawn.
       //
       // The clamp above deals with a corner tighter than the road is wide,
       // which is the common case. It cannot deal with a centre line that
-      // doubles back on itself inside a single segment — a knot, which a
-      // spline through two nearly-coincident corners will happily produce. A
-      // gap of a few units in the road is a blemish; the alternative is a
-      // triangle stretched across the whole map, which is what was happening.
-      const cross =
-        (p1.x + s1.x * a1 - (p0.x + s0.x * a0)) *
-          (p1.z + s1.z * b1 - (p0.z + s0.z * a0)) -
-        (p1.z + s1.z * a1 - (p0.z + s0.z * a0)) *
-          (p1.x + s1.x * b1 - (p0.x + s0.x * a0));
-      if (cross >= 0) {
+      // doubles back inside a single segment — a knot, which a spline through
+      // two nearly-coincident corners will happily produce. A few units of
+      // missing road is a blemish; the alternative is a triangle stretched
+      // across the map.
+      //
+      // The two triangles are the ones pushed below, in the order pushed, and
+      // that matters more than it looks: written against the corners in a
+      // different order this test had its sign inverted, so it threw away
+      // every good segment and kept the handful of bad ones. The road went
+      // missing and the shards stayed.
+      const first = (bX - aX) * (cZ - aZ) - (bZ - aZ) * (cX - aX);
+      const second = (dX - aX) * (bZ - aZ) - (dZ - aZ) * (bX - aX);
+      if (first >= 0 || second >= 0) {
         continue;
       }
 
