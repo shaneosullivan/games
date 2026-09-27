@@ -1086,6 +1086,8 @@ export class Game {
     // A grandstand is too big and too close for that to help — see
     // `Stands.keepClear` — so one in the way goes off the screen instead.
     this.stands.keepClear(this.stage.camera.position, p);
+    // And only the road around the car is drawn at all; see `Track.showNear`.
+    this.track.showNear(p, this.car.hint);
   }
 
   /**

@@ -77,6 +77,17 @@ export class Track {
   /** How far past the tangle a deck reaches, in samples on this circuit. */
   readonly deckMargin: number;
 
+  /** The road, in pieces: which meshes make up each, where it is and how far
+   *  it reaches. See `lay` and `showNear`. */
+  private readonly pieces: Array<{
+    meshes: Array<THREE.Mesh>;
+    at: THREE.Vector3;
+    reach: number;
+    /** Which stretch of the lap it is, for telling the road you are on from
+     *  the road that merely runs beside it. */
+    from: number;
+    to: number;
+  }> = [];
   /** The sampled centre line, and the sideways direction at each sample. Both
    *  are what `nearest` searches and what the ribbons are built from. */
   private readonly points: Array<THREE.Vector3> = [];
@@ -135,22 +146,127 @@ export class Track {
       Math.round(BRIDGE.reach / (this.length / TRACK.segments)),
     );
 
-    this.group.add(
-      this.ribbon(-TRACK.half, TRACK.half, this.palette.tarmac, LAYER.tarmac),
+    this.lay();
+  }
+
+  /**
+   * The road, built in pieces.
+   *
+   * One mesh per layer per piece rather than one wrapping the whole lap, so
+   * that the far side of the circuit can be left undrawn — see `TRACK.chunk`
+   * and `showNear`. A piece is a few hundred units of road; the pieces tile
+   * exactly, each segment belonging to one of them, so there are no seams.
+   */
+  private lay(): void {
+    const per = Math.max(
+      8,
+      Math.round(TRACK.chunk / (this.length / TRACK.segments)),
     );
-    this.group.add(this.kerbs());
-    this.group.add(this.barriers());
-    this.group.add(this.walls());
-    this.group.add(this.startLine());
-    if (this.palette.centreLine) {
-      // Dashed, down the middle. Painted over the tarmac and under everything
-      // else, the same as the start line is.
-      this.group.add(
-        this.ribbon(-1.4, 1.4, this.palette.line, LAYER.paint, {
-          other: this.palette.tarmac,
-          every: 7,
-        }),
-      );
+    const at = new THREE.Vector3();
+    for (let start = 0; start < TRACK.segments; start += per) {
+      const count = Math.min(per, TRACK.segments - start);
+      const span = {start, count};
+      const meshes = [
+        this.ribbon(
+          -TRACK.half,
+          TRACK.half,
+          this.palette.tarmac,
+          LAYER.tarmac,
+          undefined,
+          span,
+        ),
+        this.kerbs(span),
+        this.barriers(span),
+        this.walls(span),
+      ];
+      if (this.palette.centreLine) {
+        // Dashed, down the middle. Painted over the tarmac and under
+        // everything else, the same as the start line is.
+        meshes.push(
+          this.ribbon(
+            -1.4,
+            1.4,
+            this.palette.line,
+            LAYER.paint,
+            {other: this.palette.tarmac, every: 7},
+            span,
+          ),
+        );
+      }
+      // Where this piece is and how far it reaches, for deciding whether it is
+      // near enough to draw. The road's own half width goes into the reach, so
+      // a piece whose middle is just out of range but whose kerb is not still
+      // gets drawn.
+      at.set(0, 0, 0);
+      for (let k = 0; k <= count; k++) {
+        at.add(this.points[wrapIndex(start + k)]);
+      }
+      at.divideScalar(count + 1);
+      let reach = 0;
+      for (let k = 0; k <= count; k++) {
+        reach = Math.max(
+          reach,
+          at.distanceTo(this.points[wrapIndex(start + k)]),
+        );
+      }
+      for (const mesh of meshes) {
+        this.group.add(mesh);
+      }
+      this.pieces.push({
+        meshes,
+        at: at.clone(),
+        reach: reach + Track.limit,
+        from: start,
+        to: start + count,
+      });
+    }
+    // The chequered line belongs to wherever it is, and is drawn with it.
+    const line = this.startLine();
+    this.group.add(line);
+    this.pointAt(this.startAt, at);
+    this.pieces.push({
+      meshes: [line],
+      at: at.clone(),
+      reach: Track.limit,
+      from: Math.round(this.startAt * TRACK.segments),
+      to: Math.round(this.startAt * TRACK.segments),
+    });
+  }
+
+  /**
+   * Draws only the road near the car.
+   *
+   * The far side of a circuit is a mile of road seen almost edge-on, where a
+   * stripe of kerb is thinner than a pixel — every shortcoming in the geometry
+   * shows there at once, and none of it tells a driver anything. Out past
+   * `TRACK.sees` it is simply not drawn, and since the fog is well under way by
+   * then the road fades out rather than ending.
+   */
+  showNear(at: THREE.Vector3, hint: number): void {
+    for (const piece of this.pieces) {
+      const gap = TRACK.sees + piece.reach;
+      const range = at.distanceTo(piece.at);
+      let on = range < gap;
+      if (on) {
+        // How far round the lap this piece is from the car: nought while the
+        // car is on it, and rising once it is not.
+        const away = Math.max(
+          0,
+          Math.max(
+            ringGap(piece.from, hint) < 0 ? -ringGap(piece.from, hint) : 0,
+            ringGap(hint, piece.to) < 0 ? -ringGap(hint, piece.to) : 0,
+          ),
+        );
+        // Close enough to share the ground, and from another part of the lap:
+        // this is the road running beside the road, and it is not the one
+        // being driven on. See `TRACK.elsewhere`.
+        if (away > TRACK.apart && range < piece.reach + TRACK.elsewhere) {
+          on = false;
+        }
+      }
+      for (const mesh of piece.meshes) {
+        mesh.visible = on;
+      }
     }
   }
 
@@ -470,7 +586,7 @@ export class Track {
   }
 
   /** Red and white, both sides, the way every circuit in the world does it. */
-  private kerbs(): THREE.Mesh {
+  private kerbs(span: {start: number; count: number}): THREE.Mesh {
     const w = KERB;
     const stripe = {other: this.palette.kerbB, every: TRACK.stripe};
     return mergeMeshes([
@@ -480,6 +596,7 @@ export class Track {
         this.palette.kerbA,
         LAYER.kerb,
         stripe,
+        span,
       ),
       this.ribbon(
         -TRACK.half - w,
@@ -487,6 +604,7 @@ export class Track {
         this.palette.kerbA,
         LAYER.kerb,
         stripe,
+        span,
       ),
     ]);
   }
@@ -498,11 +616,25 @@ export class Track {
    * ground. That was fine looking straight down and is not now — see
    * `walls()`, which stands it up.
    */
-  private barriers(): THREE.Mesh {
+  private barriers(span: {start: number; count: number}): THREE.Mesh {
     const limit = Track.limit;
     return mergeMeshes([
-      this.ribbon(limit - 10, limit, this.palette.sand, LAYER.sand),
-      this.ribbon(-limit, -limit + 10, this.palette.sand, LAYER.sand),
+      this.ribbon(
+        limit - 10,
+        limit,
+        this.palette.sand,
+        LAYER.sand,
+        undefined,
+        span,
+      ),
+      this.ribbon(
+        -limit,
+        -limit + 10,
+        this.palette.sand,
+        LAYER.sand,
+        undefined,
+        span,
+      ),
     ]);
   }
 
@@ -519,13 +651,13 @@ export class Track {
    * of the track is between the two on every left-hand corner, and a wall you
    * cannot see past is a car you cannot see.
    */
-  private walls(): THREE.Mesh {
+  private walls(span: {start: number; count: number}): THREE.Mesh {
     const limit = Track.limit;
     // The same rhythm as the kerb below it, so the two read as one edge.
     const stripe = {other: this.palette.kerbB, every: TRACK.stripe};
     const parts = [
-      this.wallStrip(limit, this.palette.kerbA, stripe),
-      this.wallStrip(-limit, this.palette.kerbA, stripe),
+      this.wallStrip(limit, this.palette.kerbA, stripe, span),
+      this.wallStrip(-limit, this.palette.kerbA, stripe, span),
     ];
     const {material, fade} = fadingVertex("walls");
     this.fades.push(fade);
@@ -540,6 +672,7 @@ export class Track {
     offset: number,
     colour: number,
     stripe: {other: number; every: number},
+    span: {start: number; count: number},
   ): THREE.BufferGeometry {
     const verts: Array<number> = [];
     const colours: Array<number> = [];
@@ -549,8 +682,9 @@ export class Track {
     // Inward, so the face a driver sees is the lit one.
     const facing = offset > 0 ? -1 : 1;
 
-    for (let i = 0; i < TRACK.segments; i++) {
-      const j = (i + 1) % TRACK.segments;
+    for (let k = 0; k < span.count; k++) {
+      const i = wrapIndex(span.start + k);
+      const j = wrapIndex(i + 1);
       const p0 = this.points[i];
       const p1 = this.points[j];
       const s0 = this.sides[i];
@@ -564,6 +698,16 @@ export class Track {
       const z0 = p0.z + s0.z * near0;
       const x1 = p1.x + s1.x * near1;
       const z1 = p1.z + s1.z * near1;
+      // The same guard the road has, in the form a fence needs it.
+      //
+      // A wall panel is built between one sample's offset point and the next.
+      // Where a corner is tight enough that those two points swap order — the
+      // outside edge of a hairpin doubling back on itself — the panel is built
+      // backwards and comes out as a slab lying across the track. So: the edge
+      // has to run the same way the road does, or there is no panel here.
+      if ((x1 - x0) * (p1.x - p0.x) + (z1 - z0) * (p1.z - p0.z) <= 0) {
+        continue;
+      }
       const h = HEIGHT.wall;
 
       verts.push(x0, 0, z0, x1, 0, z1, x1, h, z1);

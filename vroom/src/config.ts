@@ -753,6 +753,38 @@ export const TRACK = {
    * exploding.
    */
   tightest: 0.25,
+  /**
+   * How much road is built as one piece, in world units, and how far from the
+   * car road is drawn at all.
+   *
+   * The circuit used to be one mesh per layer wrapping the whole lap, which
+   * meant the far side of it was always on the screen — a mile of road seen
+   * almost edge-on, where a stripe of kerb is thinner than a pixel and every
+   * shortcoming in it shows at once. It is built in pieces now, and a piece
+   * further than `sees` from the car is not drawn.
+   *
+   * `sees` sits two thirds of the way through the fog (see `CAMERA.fogFrom`
+   * and `fogTo`), so a piece is most of the way to fog colour by the time it
+   * goes: the road fades out rather than ending. Nearer than that and the
+   * edge of the world shows on a long straight, which is a worse fault than
+   * the one this is here to fix.
+   */
+  chunk: 300,
+  sees: 900,
+  /**
+   * When a piece of road that belongs somewhere else in the lap is close
+   * enough to be in the way, and how far round the lap counts as "somewhere
+   * else".
+   *
+   * A circuit drawn with a finger doubles back beside itself, and where it
+   * does, two roads share the same ground: the kerbs and run-off of the one
+   * you are not on get painted across the tarmac of the one you are, because
+   * flat things here are stacked by draw order rather than by depth. The
+   * answer is the same as it is for a flyover — only the road being driven on
+   * is drawn — so a piece this close that belongs that far away is left out.
+   */
+  elsewhere: 150,
+  apart: 60,
   grass: 34,
   /** How many points the ribbon is built from. One every few metres: enough
    *  that a corner is a curve rather than a polygon. */
