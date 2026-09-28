@@ -694,6 +694,18 @@ export class Track {
       }
       const near0 = this.room(i, offset);
       const near1 = this.room(j, offset);
+      // A barrier belongs at the edge of the track or nowhere.
+      //
+      // `room` holds a sideways step inside the corner's radius, which is
+      // right for the road — it narrows through a hairpin — and wrong for the
+      // fence along it: a barrier held inward leaves the edge and stands in
+      // the racing line, a short wall across the road with a car wedged
+      // against it. Where it cannot go where it belongs, it is left out. The
+      // edge of the world is enforced by `Car.keepIn` either way, so what is
+      // lost is the sight of a fence and not the fence's job.
+      if (Math.abs(near0 - offset) > 0.01 || Math.abs(near1 - offset) > 0.01) {
+        continue;
+      }
       const x0 = p0.x + s0.x * near0;
       const z0 = p0.z + s0.z * near0;
       const x1 = p1.x + s1.x * near1;
