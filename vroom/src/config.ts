@@ -2554,15 +2554,27 @@ export const RATING = {
   /**
    * Where the bands fall.
    *
-   * Read off real tracks rather than picked, and re-read when the cars started
-   * obeying physics: a corner is now worth the square root of grip times
-   * radius rather than a rate of turn, and every score moved. A lazy oval
-   * still scores nothing at all; Sunday Hills scores 18, Dune Run 21, Neon
-   * Mile 23, a ring of alternating fast and slow corners 35, and a scribble of
-   * hairpins 39 — with the hazards on top of that.
+   * Read off real tracks rather than picked, and re-read whenever the scale
+   * moves under them — which it has now done twice. The first time was the
+   * cars starting to obey physics, when a corner became the square root of
+   * grip times radius rather than a rate of turn. The second is this one: the
+   * three circuits the game shipped with were measured at 18, 21 and 23 when
+   * the bands below were last set, and they measure 21.1, 23.6 and 25.9 today.
+   * Nothing about them changed. The scale drifted, and it quietly took the
+   * game's three gentle opening circuits out of Easy and into Medium — a
+   * child looking at the list saw nothing easy but the two that were built to
+   * be.
+   *
+   * So they are read off the tracks again. Sunday Hills, Dune Run and Neon
+   * Mile are the circuits a child starts on and they are Easy, which is what
+   * they were called when these numbers were last honest. Night Market and Fox
+   * Run, which have real corners in them, are Medium; Peanut is Medium because
+   * nearly all of its difficulty is the five things dropped on it rather than
+   * its shape. The two that were generated to be hard — a ring of hairpins
+   * apiece, at 44 and 47 — are Hard.
    */
-  medium: 21,
-  hard: 34,
+  medium: 28,
+  hard: 40,
 } as const;
 
 /**
