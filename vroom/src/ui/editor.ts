@@ -10,7 +10,7 @@ import {
   TrackSpec,
 } from "../track/spec";
 import {rate, RATING_NAMES} from "../track/rating";
-import {tangle} from "../track/clearance";
+import {tangle, type Tangle} from "../track/clearance";
 import {showJson} from "./modal";
 
 /** What the finger is doing on the canvas. */
@@ -83,6 +83,8 @@ export class Editor {
   /** The stroke being drawn, in world units, and the tool in hand. */
   private stroke: Array<{x: number; z: number}> = [];
   private drawing = false;
+  /** Where the last drawing ran into itself, while that is still the news. */
+  private snag: Tangle | null = null;
   private tool: Tool | null = null;
 
   private scale = 1;
@@ -345,6 +347,7 @@ export class Editor {
       return;
     }
     this.drawing = true;
+    this.snag = null;
     this.stroke = [w];
   };
 
@@ -391,7 +394,18 @@ export class Editor {
     // minutes dropping ramps onto was never going to work has been let down
     // by the builder. Whatever was drawn before is left alone, so the answer
     // to this is to draw again and not to start again.
-    if (tangle(shape)) {
+    const snag = tangle(shape);
+    if (snag) {
+      // Marked on the canvas as well as said, because "those roads" is a
+      // puzzle on a drawing with twenty corners in it. The loop usually only
+      // wants nudging — the one that prompted this needed its two straights a
+      // twelfth of the canvas further apart — and that is a small thing to
+      // ask once a child can see which two.
+      this.snag = snag;
+      // The refused loop stays on the field. A ring on a blank green square
+      // marks nothing; a ring on the loop just drawn marks the two roads it
+      // is about. Cleared, like the ring, the moment a finger goes down.
+      this.stroke = drawn;
       this.tell("Those roads run into each other — draw them further apart.");
       this.paint();
       return;
@@ -674,6 +688,15 @@ export class Editor {
         g.font = `${Math.round(ITEM.radius * 1.1 * this.scale)}px system-ui`;
         g.fillText(TOOLS.find(t => t.tool === item.kind)?.icon ?? "", ix, iy);
       }
+    }
+
+    if (this.snag) {
+      const [sx, sy] = this.toScreen(this.snag.x, this.snag.z);
+      g.strokeStyle = "#e8443a";
+      g.lineWidth = Math.max(2, EDITOR.snagMark * 0.12 * this.scale);
+      g.beginPath();
+      g.arc(sx, sy, EDITOR.snagMark * this.scale, 0, Math.PI * 2);
+      g.stroke();
     }
     g.restore();
   }

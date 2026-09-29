@@ -2810,6 +2810,10 @@ export const EDITOR = {
    * metres, and a road is a hundred and forty wide.
    */
   clearSamples: 300,
+  /** How big the ring is that marks where a loop ran into itself, in world
+   *  units. A bit wider than the road it is drawn over, so it reads as a ring
+   *  round the trouble and not as a blob on it. */
+  snagMark: 110,
 } as const;
 
 /**
