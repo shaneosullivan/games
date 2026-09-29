@@ -87,6 +87,8 @@ export class Track {
      *  the road that merely runs beside it. */
     from: number;
     to: number;
+    /** Other pieces laid on the same ground as this one; see `rivalries`. */
+    rivals: Array<number>;
   }> = [];
   /** The sampled centre line, and the sideways direction at each sample. Both
    *  are what `nearest` searches and what the ribbons are built from. */
@@ -158,13 +160,18 @@ export class Track {
    * exactly, each segment belonging to one of them, so there are no seams.
    */
   private lay(): void {
-    const per = Math.max(
-      8,
-      Math.round(TRACK.chunk / (this.length / TRACK.segments)),
-    );
+    // Pieces of as near the same length as the lap allows, rather than a
+    // fixed length and whatever is left over. A leftover of one segment is a
+    // sliver of a piece, and a sliver sitting between two pieces makes them
+    // strangers to one another — which cost the road under the car at one
+    // hairpin, because the two sides of it were no longer neighbours and so
+    // were free to hide each other. See `rivalries`.
+    const many = Math.max(2, Math.round(this.length / TRACK.chunk));
+    const edge = (k: number): number => Math.round((k * TRACK.segments) / many);
     const at = new THREE.Vector3();
-    for (let start = 0; start < TRACK.segments; start += per) {
-      const count = Math.min(per, TRACK.segments - start);
+    for (let piece = 0; piece < many; piece++) {
+      const start = edge(piece);
+      const count = edge(piece + 1) - start;
       const span = {start, count};
       const meshes = [
         this.ribbon(
@@ -218,6 +225,7 @@ export class Track {
         reach: reach + Track.limit,
         from: start,
         to: start + count,
+        rivals: [],
       });
     }
     // The chequered line belongs to wherever it is, and is drawn with it.
@@ -230,7 +238,69 @@ export class Track {
       reach: Track.limit,
       from: Math.round(this.startAt * TRACK.segments),
       to: Math.round(this.startAt * TRACK.segments),
+      rivals: [],
     });
+    this.rivalries();
+  }
+
+  /**
+   * Which pieces of road are laid on the same ground as which.
+   *
+   * A circuit is allowed to run into itself — a child draws a loop with a stem
+   * and the two halves of the stem end up sharing a field. Both pieces are
+   * real road and both are near the car, so neither "far away" nor "elsewhere
+   * in the lap" tells them apart: at the mouth of a stem the road overlapping
+   * yours is the road you were on twenty samples ago.
+   *
+   * What does tell them apart is which one the car is on, and that is only
+   * knowable at the time. So the pairs are found once, here, and the choosing
+   * is left to `showNear`.
+   *
+   * Pairs sharing ground only where they join are not rivals — every piece
+   * touches the next one, and a road that hid the road it runs into would hide
+   * the whole lap.
+   */
+  private rivalries(): void {
+    const room = Track.limit * 2;
+    for (let a = 0; a < this.pieces.length; a++) {
+      for (let b = a + 1; b < this.pieces.length; b++) {
+        const one = this.pieces[a];
+        const two = this.pieces[b];
+        if (one.at.distanceTo(two.at) > one.reach + two.reach) {
+          continue;
+        }
+        // Pieces that follow one another are the same road and never rivals,
+        // however close they come. At the mouth of a hairpin the road runs
+        // right beside the road, and a rule that hid one of the two would
+        // take away the piece the car is about to drive onto — the road
+        // vanishing from under it for as long as the hairpin lasts.
+        if (
+          wrapIndex(one.to) === wrapIndex(two.from) ||
+          wrapIndex(two.to) === wrapIndex(one.from)
+        ) {
+          continue;
+        }
+        let shares = false;
+        for (let i = one.from; i < one.to && !shares; i++) {
+          for (let j = two.from; j < two.to; j++) {
+            if (Math.abs(ringGap(i, j)) <= TRACK.joins) {
+              continue;
+            }
+            if (
+              this.points[wrapIndex(i)].distanceTo(this.points[wrapIndex(j)]) <
+              room
+            ) {
+              shares = true;
+              break;
+            }
+          }
+        }
+        if (shares) {
+          one.rivals.push(b);
+          two.rivals.push(a);
+        }
+      }
+    }
   }
 
   /**
@@ -243,29 +313,39 @@ export class Track {
    * then the road fades out rather than ending.
    */
   showNear(at: THREE.Vector3, hint: number): void {
-    for (const piece of this.pieces) {
-      const gap = TRACK.sees + piece.reach;
-      const range = at.distanceTo(piece.at);
-      let on = range < gap;
-      if (on) {
-        // How far round the lap this piece is from the car: nought while the
-        // car is on it, and rising once it is not.
-        const away = Math.max(
-          0,
-          Math.max(
-            ringGap(piece.from, hint) < 0 ? -ringGap(piece.from, hint) : 0,
-            ringGap(hint, piece.to) < 0 ? -ringGap(hint, piece.to) : 0,
-          ),
-        );
-        // Close enough to share the ground, and from another part of the lap:
-        // this is the road running beside the road, and it is not the one
-        // being driven on. See `TRACK.elsewhere`.
-        if (away > TRACK.apart && range < piece.reach + TRACK.elsewhere) {
-          on = false;
+    // How far round the lap each piece is from the car: nought while the car
+    // is on it, and rising once it is not.
+    const away = this.pieces.map(piece =>
+      Math.max(
+        0,
+        Math.max(
+          ringGap(piece.from, hint) < 0 ? -ringGap(piece.from, hint) : 0,
+          ringGap(hint, piece.to) < 0 ? -ringGap(hint, piece.to) : 0,
+        ),
+      ),
+    );
+    const on = this.pieces.map(
+      piece => at.distanceTo(piece.at) < TRACK.sees + piece.reach,
+    );
+    // Where two pieces are laid on the same ground, only the one the car is
+    // nearer to along the lap is drawn — which is the one being driven on.
+    // Drawing both is what puts a barrier across the road and a kerb through
+    // the middle of it, and there is no angle to see them apart at: they are
+    // on the same ground.
+    for (const [i, piece] of this.pieces.entries()) {
+      if (!on[i]) {
+        continue;
+      }
+      for (const other of piece.rivals) {
+        if (on[other] && away[other] < away[i]) {
+          on[i] = false;
+          break;
         }
       }
+    }
+    for (const [i, piece] of this.pieces.entries()) {
       for (const mesh of piece.meshes) {
-        mesh.visible = on;
+        mesh.visible = on[i];
       }
     }
   }

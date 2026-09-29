@@ -769,22 +769,26 @@ export const TRACK = {
    * edge of the world shows on a long straight, which is a worse fault than
    * the one this is here to fix.
    */
-  chunk: 300,
+  chunk: 110,
   sees: 900,
   /**
-   * When a piece of road that belongs somewhere else in the lap is close
-   * enough to be in the way, and how far round the lap counts as "somewhere
-   * else".
+   * How near two samples have to be along the lap before they count as the
+   * same bit of road rather than two bits sharing a field; see `rivalries`.
    *
-   * A circuit drawn with a finger doubles back beside itself, and where it
-   * does, two roads share the same ground: the kerbs and run-off of the one
-   * you are not on get painted across the tarmac of the one you are, because
-   * flat things here are stacked by draw order rather than by depth. The
-   * answer is the same as it is for a flyover — only the road being driven on
-   * is drawn — so a piece this close that belongs that far away is left out.
+   * Every piece of road touches the next one, so without this every piece
+   * would be found to be laid on the ground of its neighbour, and a rule that
+   * draws only one of two roads on the same ground would draw none of the
+   * lap. Comfortably longer than the join and far shorter than the shortest
+   * stem a child can draw.
+   *
+   * `chunk` is short for the same reason. A piece is kept whole or dropped
+   * whole, and the piece behind the car is always kept — so a piece is the
+   * length of the stub of the other road that shows at the mouth of a
+   * hairpin. Three hundred units of that was the barrier lying across the
+   * road in the photograph; a hundred is the end of a hairpin, which is what
+   * it is.
    */
-  elsewhere: 150,
-  apart: 60,
+  joins: 45,
   grass: 34,
   /** How many points the ribbon is built from. One every few metres: enough
    *  that a corner is a curve rather than a polygon. */
@@ -2799,21 +2803,6 @@ export const EDITOR = {
    *  rejected with a word rather than saved as an unplayable track. */
   minSpan: 0.22,
   minCorners: 6,
-  /**
-   * How finely a finished loop is read when checking it does not run into
-   * itself; see `tangle`.
-   *
-   * Every sample is compared with every other, so this is a square: three
-   * hundred is ninety thousand comparisons, which is nothing once at the end
-   * of a stroke and would be too much per frame. Fine enough that two roads
-   * side by side are caught — at three hundred samples a lap is read every few
-   * metres, and a road is a hundred and forty wide.
-   */
-  clearSamples: 300,
-  /** How big the ring is that marks where a loop ran into itself, in world
-   *  units. A bit wider than the road it is drawn over, so it reads as a ring
-   *  round the trouble and not as a blob on it. */
-  snagMark: 110,
 } as const;
 
 /**
