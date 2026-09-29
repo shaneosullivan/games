@@ -10,6 +10,7 @@ import {
   TrackSpec,
 } from "../track/spec";
 import {rate, RATING_NAMES} from "../track/rating";
+import {tangle} from "../track/clearance";
 import {showJson} from "./modal";
 
 /** What the finger is doing on the canvas. */
@@ -383,7 +384,20 @@ export class Editor {
       return;
     }
 
-    this.shape = thin(drawn, EDITOR.corners);
+    const shape = thin(drawn, EDITOR.corners);
+    // A loop that runs along itself cannot be built as a road; see `tangle`.
+    // Caught here, at the end of the stroke, rather than at the finish: a
+    // child who is told at the end that the track they have spent five
+    // minutes dropping ramps onto was never going to work has been let down
+    // by the builder. Whatever was drawn before is left alone, so the answer
+    // to this is to draw again and not to start again.
+    if (tangle(shape)) {
+      this.tell("Those roads run into each other — draw them further apart.");
+      this.paint();
+      return;
+    }
+
+    this.shape = shape;
     this.items = [];
     this.startAt = 0;
     this.rebuild();

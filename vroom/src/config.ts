@@ -2799,6 +2799,17 @@ export const EDITOR = {
    *  rejected with a word rather than saved as an unplayable track. */
   minSpan: 0.22,
   minCorners: 6,
+  /**
+   * How finely a finished loop is read when checking it does not run into
+   * itself; see `tangle`.
+   *
+   * Every sample is compared with every other, so this is a square: three
+   * hundred is ninety thousand comparisons, which is nothing once at the end
+   * of a stroke and would be too much per frame. Fine enough that two roads
+   * side by side are caught — at three hundred samples a lap is read every few
+   * metres, and a road is a hundred and forty wide.
+   */
+  clearSamples: 300,
 } as const;
 
 /**
