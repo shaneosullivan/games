@@ -268,6 +268,31 @@ export class Stage {
     this.camera.updateProjectionMatrix();
   };
 
+  /**
+   * How much of the sun's shadow map falls on a point: one well inside it,
+   * nought outside, and a short fade across the edge.
+   *
+   * The map covers a few hundred units around the car, which is what keeps it
+   * sharp — see `FILM.shadowReach`. A car further away than that casts
+   * nothing at all, and on a circuit a rival is further away than that most
+   * of the time, so the cars a child is racing spent most of the race with
+   * nothing under them. They draw their own instead; this says when they have
+   * to. Nought whenever shadows are off altogether, which is a whole quality
+   * tier of devices where no car ever had one.
+   */
+  covered(at: THREE.Vector3): number {
+    if (!this.renderer.shadowMap.enabled || !this.sun.castShadow) {
+      return 0;
+    }
+    // Where the shadow camera is *this* frame. Three does this itself while
+    // it draws the shadow map, which is after this is asked.
+    this.sun.shadow.updateMatrices(this.sun);
+    const p = inLight.copy(at).project(this.sun.shadow.camera);
+    const out = Math.max(Math.abs(p.x), Math.abs(p.y));
+    const fade = (out - FILM.shadowEdge) / (1 - FILM.shadowEdge);
+    return 1 - Math.max(0, Math.min(1, fade));
+  }
+
   render(): void {
     this.composer.render();
   }
@@ -285,3 +310,6 @@ export class Stage {
     this.renderer.domElement.remove();
   }
 }
+
+/** Scratch for `covered`. */
+const inLight = new THREE.Vector3();

@@ -1088,6 +1088,11 @@ export class Game {
     this.stands.keepClear(this.stage.camera.position, p);
     // And only the road around the car is drawn at all; see `Track.showNear`.
     this.track.showNear(p, this.car.hint);
+    // A car the sun's shadow map does not reach draws its own, so that the
+    // cars a child is racing are never floating; see `Stage.covered`.
+    for (const car of [this.car, ...this.rest.map(other => other.car)]) {
+      car.shadowForItself(1 - this.stage.covered(car.group.position));
+    }
   }
 
   /**

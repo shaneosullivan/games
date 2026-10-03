@@ -176,6 +176,15 @@ export class Car {
     new THREE.Vector2(),
   ];
   private readonly shadow: THREE.Mesh;
+  /**
+   * How much of its shadow the car has to draw for itself while on the
+   * ground, nought to one; see `Stage.covered`.
+   *
+   * Nought for the car the camera is following, which is always in the middle
+   * of the sun's shadow map and gets a real one. The cars it is racing spend
+   * most of a lap outside it.
+   */
+  private own = 0;
   /** What it is painted, kept because the minimap draws a dot per car and the
    *  dot has to be the colour of the car it stands for — whoever built it. */
   readonly paint: number;
@@ -209,6 +218,20 @@ export class Car {
     this.shadow.renderOrder = order(LAYER.shadow);
     this.sprite.renderOrder = order(LAYER.car);
     this.group.add(this.shadow, this.sprite);
+  }
+
+  /**
+   * How much shadow this car has to draw for itself; see `own`.
+   *
+   * Redraws it there and then. The camera is pointed after the cars have been
+   * drawn — it follows them — and it is the camera that decides where the
+   * sun's shadow map lands, so this arrives after this car's `render`. Left
+   * until the next frame it lagged, and a car crossing the edge of the map
+   * flickered a shade lighter for a frame.
+   */
+  shadowForItself(amount: number): void {
+    this.own = amount;
+    this.placeShadow();
   }
 
   /**
@@ -984,17 +1007,29 @@ export class Car {
     // is genuinely eight units up looks eight units up.
     this.group.position.y = LAYER.car + this.height;
     this.sprite.rotation.set(this.pitch, 0, this.roll);
-    // The shadow, thrown where the sun would actually throw it.
-    //
-    // Down onto the ground, and *sideways* — by the height times how far the
-    // sun leans, which is the same arithmetic as a stick in the ground. That
-    // displacement is what says how high the car is; the shadow itself stays
-    // the size the car is, because the sun is a long way away and a directional
-    // light does not make things bigger as they approach it.
-    this.shadow.visible = this.height > 0.2;
+    this.placeShadow();
+  }
+
+  /**
+   * The shadow, thrown where the sun would actually throw it.
+   *
+   * Down onto the ground, and *sideways* — by the height times how far the
+   * sun leans, which is the same arithmetic as a stick in the ground. That
+   * displacement is what says how high the car is; the shadow itself stays
+   * the size the car is, because the sun is a long way away and a directional
+   * light does not make things bigger as they approach it.
+   */
+  private placeShadow(): void {
+    // In the air it always draws its own — the sun's would be yards away, and
+    // the gap between car and shadow is the whole point of a jump. On the
+    // ground it draws one only where the sun's map does not reach it.
+    const mine = Math.max(this.height > 0.2 ? 1 : 0, this.own);
+    this.shadow.visible = mine > 0.01;
     if (this.shadow.visible) {
       this.shadow.position.y = LAYER.shadow - LAYER.car - this.height;
-      const lean = this.height / LIGHT.from.y;
+      // Thrown from the top of the body rather than from the ground; see
+      // `SHADOW.stands`.
+      const lean = (this.height + SHADOW.stands) / LIGHT.from.y;
       const awayX = -LIGHT.from.x * lean;
       const awayZ = -LIGHT.from.z * lean;
       // Into the car's own frame: the shadow hangs off the group, and the
@@ -1009,7 +1044,7 @@ export class Car {
       const spread = 1 + this.height * SHADOW.spread;
       this.shadow.scale.set(spread, 1, spread);
       (this.shadow.material as THREE.MeshBasicMaterial).opacity =
-        SHADOW.dark + (SHADOW.least - SHADOW.dark) * up;
+        (SHADOW.dark + (SHADOW.least - SHADOW.dark) * up) * mine;
     }
   }
 }

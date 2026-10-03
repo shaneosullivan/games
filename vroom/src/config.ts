@@ -665,6 +665,16 @@ export const FILM = {
   /** How far around the car shadows are cast. Everything past this is lit but
    *  casts nothing, which nobody notices and which keeps the map sharp. */
   shadowReach: 320,
+  /**
+   * How far across the shadow map's edge a car starts drawing its own shadow
+   * instead, as a fraction of the way out: 0.9 is the last tenth.
+   *
+   * A band rather than a line, so a rival dropping out of the map fades from
+   * the sun's shadow to its own rather than swapping one for the other in a
+   * frame. Both are drawn in the band, which is a shade too dark for the
+   * width of it, and much less noticeable than a blink.
+   */
+  shadowEdge: 0.9,
 } as const;
 
 export const LIGHT = {
@@ -2865,6 +2875,18 @@ export const SHADOW = {
   /** How much it spreads per unit of height: a real shadow's edges go soft as
    *  it is thrown further, and a little growth reads as that. */
   spread: 0.004,
+  /**
+   * How tall the car stands for the purpose of throwing its own shadow.
+   *
+   * A shadow thrown from nought lands exactly under the car, where the car
+   * hides every bit of it — which is what the first attempt at this did, and
+   * from the camera's angle it was indistinguishable from no shadow at all.
+   * The sun here leans almost forty-five degrees, so a real one is thrown
+   * most of a car's width to the side and that is the part you actually see.
+   * Half the body's height, so the patch straddles the car rather than
+   * sitting beside it like a second car.
+   */
+  stands: 4.3,
 } as const;
 
 /**
