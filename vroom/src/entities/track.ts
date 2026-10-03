@@ -327,19 +327,25 @@ export class Track {
     const on = this.pieces.map(
       piece => at.distanceTo(piece.at) < TRACK.sees + piece.reach,
     );
-    // Where two pieces are laid on the same ground, only the one the car is
-    // nearer to along the lap is drawn — which is the one being driven on.
-    // Drawing both is what puts a barrier across the road and a kerb through
-    // the middle of it, and there is no angle to see them apart at: they are
-    // on the same ground.
+    // A road laid on the road being driven on is not drawn, because the two
+    // of them on the same ground is what puts a barrier across the track and
+    // a kerb through the middle of it, and there is no angle to see them
+    // apart at.
+    //
+    // Only that one. The first version of this hid the further of *any* two
+    // pieces sharing ground, and two stretches that overlap each other off on
+    // the far side of the circuit have nothing to do with the car: hiding one
+    // of them tore a hole in the view, with the road ahead simply absent. A
+    // road is only in the way if it is in the way of the road you are on.
     for (const [i, piece] of this.pieces.entries()) {
-      if (!on[i]) {
+      if (away[i] > TRACK.joins) {
         continue;
       }
+      // The piece under the car, and the little either side of it that it is
+      // about to be on; what shares ground with those is what obscures it.
       for (const other of piece.rivals) {
-        if (on[other] && away[other] < away[i]) {
-          on[i] = false;
-          break;
+        if (away[other] > away[i]) {
+          on[other] = false;
         }
       }
     }
