@@ -89,6 +89,8 @@ export class Game {
   private ghosts: Array<Ghost> = [];
   /** How many cars are in the race, this one included. */
   private cars = RIVALS.count + 1;
+  /** Which place on the starting line is the player's, this race. */
+  private slot = 0;
   /** Everything that dissolves when it stands between the camera and the car. */
   private fades: Array<NearFade> = [];
   readonly engine: Engine;
@@ -334,13 +336,25 @@ export class Game {
       this.ghosts = party.buildGhosts(this.track);
     } else {
       this.cars = RIVALS.count + 1;
-      // The player takes the first place on the line and the computer cars the
-      // rest of it, so the whole field is laid out by one rule.
+      // A different place on the line every time.
+      //
+      // The player used to be given the first slot every race, which is the
+      // same view of the same three cars from the same side of the road every
+      // time a child presses Race. It is the cheapest variety in the game: the
+      // first corner is a different corner from the inside than it is from the
+      // outside, and that is a whole race that feels different.
+      this.slot = Math.floor(Math.random() * this.cars);
+      const theirs: Array<number> = [];
+      for (let k = 0; k < this.cars; k++) {
+        if (k !== this.slot) {
+          theirs.push(k);
+        }
+      }
       this.rivals = new Rivals(
         this.track,
         spec.environment,
         undefined,
-        (i, out) => this.track.gridLine(i + 1, this.cars, out),
+        (i, out) => this.track.gridLine(theirs[i], this.cars, out),
       );
       this.ghosts = [];
     }
@@ -443,7 +457,7 @@ export class Game {
     // your seat in a race with other children, and the first place on it in a
     // race on your own.
     const t = this.track.gridLine(
-      this.party ? this.party.seat : 0,
+      this.party ? this.party.seat : this.slot,
       this.cars,
       this.here,
     );
@@ -1086,8 +1100,8 @@ export class Game {
     // A grandstand is too big and too close for that to help — see
     // `Stands.keepClear` — so one in the way goes off the screen instead.
     this.stands.keepClear(this.stage.camera.position, p);
-    // And only the road around the car is drawn at all; see `Track.showNear`.
-    this.track.showNear(p, this.car.hint);
+    // And the road fades with how far it is to drive to; see `Track.focus`.
+    this.track.focus(this.track.drivingAt(this.car.hint));
     // A car the sun's shadow map does not reach draws its own, so that the
     // cars a child is racing are never floating; see `Stage.covered`.
     for (const car of [this.car, ...this.rest.map(other => other.car)]) {
