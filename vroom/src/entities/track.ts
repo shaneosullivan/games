@@ -264,12 +264,19 @@ export class Track {
    * Its own, never the shared cached one: `flatVertex` hands out a material
    * that half the game is drawn with, and the fade belongs to the road.
    */
-  private skin(key: string, height: number): THREE.Material {
+  private skin(
+    key: string,
+    height: number,
+    substance?: Substance,
+  ): THREE.Material {
     const had = this.skins.get(key);
     if (had) {
       return had;
     }
-    const made = lapFading(flatVertex(substanceFor(height)).clone(), key);
+    const made = lapFading(
+      flatVertex(substance ?? substanceFor(height)).clone(),
+      key,
+    );
     this.skins.set(key, made);
     return made;
   }
@@ -624,11 +631,17 @@ export class Track {
     return mesh;
   }
 
+  /** The one material the merged piles beside the road share, as they shared
+   *  a plain one before; see `mergeMeshes`. */
+  private beside(): THREE.Material {
+    return this.skin("beside", 0, "concrete");
+  }
+
   /** Red and white, both sides, the way every circuit in the world does it. */
   private kerbs(span: {start: number; count: number}): THREE.Mesh {
     const w = KERB;
     const stripe = {other: this.palette.kerbB, every: TRACK.stripe};
-    return mergeMeshes([
+    return mergeMeshes(this.beside(), [
       this.ribbon(
         TRACK.half,
         TRACK.half + w,
@@ -657,7 +670,7 @@ export class Track {
    */
   private barriers(span: {start: number; count: number}): THREE.Mesh {
     const limit = Track.limit;
-    return mergeMeshes([
+    return mergeMeshes(this.beside(), [
       this.ribbon(
         limit - 10,
         limit,
@@ -1051,12 +1064,19 @@ export function wrap(t: number): number {
 }
 
 /** One mesh out of several, so a pile of ribbons is a single draw call. */
-function mergeMeshes(meshes: Array<THREE.Mesh>): THREE.Mesh {
+function mergeMeshes(
+  /** The merged pile's material. It has to be handed in: the kerbs and the
+   *  run-off are built from ribbons that fade with driving distance, and a
+   *  merge that reached for a plain material of its own threw the fading
+   *  away — which is why the road faded and the things beside it did not. */
+  skin: THREE.Material,
+  meshes: Array<THREE.Mesh>,
+): THREE.Mesh {
   const merged = mergeGeometries(
     meshes.map(m => m.geometry as THREE.BufferGeometry),
     false,
   );
-  const mesh = new THREE.Mesh(merged, flatVertex("concrete"));
+  const mesh = new THREE.Mesh(merged, skin);
   mesh.receiveShadow = true;
   // The topmost of what went in: a merged pile is drawn in one go, so it can
   // only have one place in the order, and the highest is the one that matters.
