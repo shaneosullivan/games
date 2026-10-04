@@ -770,53 +770,10 @@ export const TRACK = {
    * The circuit used to be one mesh per layer wrapping the whole lap, which
    * meant the far side of it was always on the screen — a mile of road seen
    * almost edge-on, where a stripe of kerb is thinner than a pixel and every
-   * shortcoming in it shows at once. It is built in pieces now, and a piece
-   * further than `sees` from the car is not drawn.
-   *
-   * `sees` sits two thirds of the way through the fog (see `CAMERA.fogFrom`
-   * and `fogTo`), so a piece is most of the way to fog colour by the time it
-   * goes: the road fades out rather than ending. Nearer than that and the
-   * edge of the world shows on a long straight, which is a worse fault than
-   * the one this is here to fix.
+   * shortcoming in it shows at once. It is built in pieces, and a piece with
+   * nothing left to show is skipped; see `ROAD` for what decides that.
    */
   chunk: 300,
-  sees: 900,
-  /**
-   * How near two samples have to be along the lap before they count as the
-   * same bit of road rather than two bits sharing a field; see `rivalries`.
-   *
-   * Every piece of road touches the next one, so without this every piece
-   * would be found to be laid on the ground of its neighbour, and a rule that
-   * draws only one of two roads on the same ground would draw none of the
-   * lap. Comfortably longer than the join and far shorter than the shortest
-   * stem a child can draw.
-   *
-   * `chunk` is short for the same reason. A piece is kept whole or dropped
-   * whole, and the piece behind the car is always kept — so a piece is the
-   * length of the stub of the other road that shows at the mouth of a
-   * hairpin. Three hundred units of that was the barrier lying across the
-   * road in the photograph; a hundred is the end of a hairpin, which is what
-   * it is.
-   */
-  joins: 45,
-  /**
-   * How far past the touching the hidden stretch reaches, in samples.
-   *
-   * The road the car is not on is cut off where the two stop sharing ground,
-   * and cut off exactly there it ends with its kerb and barrier showing at
-   * the join. A few samples of margin puts the end of it behind the road
-   * that is covering it.
-   */
-  blend: 4,
-  /**
-   * The fewest samples a piece may have, where swallowing it does not lose a
-   * cut the overlap needs.
-   *
-   * A piece of one or two segments is a sliver, and a sliver between two
-   * pieces stops them being neighbours — which is how the road under the car
-   * went missing at a hairpin once already. See `rivalries`.
-   */
-  leastPiece: 6,
   grass: 34,
   /** How many points the ribbon is built from. One every few metres: enough
    *  that a corner is a curve rather than a polygon. */
@@ -2905,6 +2862,28 @@ export const SHADOW = {
    * sitting beside it like a second car.
    */
   stands: 4.3,
+} as const;
+
+/**
+ * How far away the road has to be before it stops being drawn.
+ *
+ * In seconds of driving at full speed, because that is what the distance
+ * means to the person holding the iPad: the road you will reach in ten
+ * seconds is solid, and by fifteen it has gone. A circuit that doubles back
+ * beside itself puts two roads in the same field, and measured this way the
+ * one that is half a lap away *is* half a lap away however close it looks —
+ * so the rule that keeps the far side of a hairpin out of your way and the
+ * rule that keeps the horizon tidy turn out to be the same rule.
+ *
+ * It fades rather than switching. Taking the road away a piece at a time,
+ * however cleverly the pieces were chosen, is a few hundred units of road
+ * appearing in one frame; see `lapFading`.
+ */
+export const ROAD = {
+  /** Seconds of driving at `CAR.top` before the road starts to fade, and
+   *  before it has gone altogether. */
+  solid: 10,
+  gone: 15,
 } as const;
 
 /**

@@ -8,10 +8,12 @@ import {
   HEIGHT,
   Palette,
   RIVALS,
+  ROAD,
   TRACK,
 } from "../config";
 import {TrackSpec} from "../track/spec";
 import {fadingVertex, flatVertex, LAYER, order, paint} from "../render/sprites";
+import {drivingGap, lapFading, lapFocus, lapRange} from "../render/lapFade";
 import {NearFade} from "../../../shared/fadeInFront";
 import {Substance} from "../render/materials";
 
@@ -87,8 +89,6 @@ export class Track {
      *  the road that merely runs beside it. */
     from: number;
     to: number;
-    /** Other pieces laid on the same ground as this one; see `rivalries`. */
-    rivals: Array<number>;
   }> = [];
   /** The sampled centre line, and the sideways direction at each sample. Both
    *  are what `nearest` searches and what the ribbons are built from. */
@@ -104,6 +104,10 @@ export class Track {
    * inside out. See `room`.
    */
   private readonly bend: Array<number> = [];
+
+  /** The road's own materials, one per layer: the cached flat ones are
+   *  shared with everything else in the game and must not be meddled with. */
+  private readonly skins = new Map<string, THREE.Material>();
 
   private readonly tmp = new THREE.Vector3();
   /** The racing tables; see `racing()`. */
@@ -148,6 +152,7 @@ export class Track {
       Math.round(BRIDGE.reach / (this.length / TRACK.segments)),
     );
 
+    lapRange(CAR.top * ROAD.solid, CAR.top * ROAD.gone);
     this.lay();
   }
 
@@ -160,84 +165,23 @@ export class Track {
    * exactly, each segment belonging to one of them, so there are no seams.
    */
   /**
-   * Which samples have another part of the lap laid on top of them.
-   *
-   * A circuit drawn with a finger doubles back beside itself, and where it
-   * does the two roads share a field. Only those samples may ever be taken
-   * away, and knowing which they are is what lets the rest be left alone.
-   */
-  private shared(): Array<boolean> {
-    const n = TRACK.segments;
-    const room = Track.limit * 2;
-    const flag = new Array<boolean>(n).fill(false);
-    for (let i = 0; i < n; i++) {
-      for (let j = i + 1; j < n; j++) {
-        // Near along the lap is the same bit of road, not two bits of it.
-        if (Math.abs(ringGap(i, j)) <= TRACK.joins) {
-          continue;
-        }
-        if (this.points[i].distanceTo(this.points[j]) < room) {
-          flag[i] = true;
-          flag[j] = true;
-        }
-      }
-    }
-    // Widened a little, so that the edge of a hidden stretch is past the
-    // place the two roads actually touch and no kerb of the wrong one is
-    // left poking out of the end of it.
-    const wide = flag.slice();
-    for (let i = 0; i < n; i++) {
-      if (!flag[i]) {
-        continue;
-      }
-      for (let k = -TRACK.blend; k <= TRACK.blend; k++) {
-        wide[wrapIndex(i + k)] = true;
-      }
-    }
-    return wide;
-  }
-
-  /**
    * Where the road is cut into pieces.
    *
-   * Cut wherever road that has another road on top of it begins or ends, and
-   * then again every `TRACK.chunk` or so to keep the pieces a sensible size.
+   * Only so that a piece of road entirely too far away to be drawn can be
+   * skipped. The pieces used to be cut at the overlaps, because a piece was
+   * hidden or drawn whole and the cut was the only precision there was; the
+   * fade is per vertex, so they can be plain equal lengths again.
    *
-   * The first cut is the point of it. A piece is hidden or drawn whole, so a
-   * piece that is partly overlapped and mostly not took perfectly good road
-   * away with it when it went — a hundred units of it, ending in a cliff. Cut
-   * on the overlap and what is taken away is the overlap.
+   * Equal lengths rather than a fixed length and a remainder: a remainder of
+   * one segment is a sliver, and slivers have caused enough trouble here.
    */
   private cuts(): Array<number> {
-    const n = TRACK.segments;
-    const shared = this.shared();
-    const per = Math.max(
-      8,
-      Math.round(TRACK.chunk / (this.length / TRACK.segments)),
-    );
-    const edges: Array<number> = [0];
-    for (let i = 1; i < n; i++) {
-      if (shared[i] !== shared[i - 1] || i - edges[edges.length - 1] >= per) {
-        edges.push(i);
-      }
+    const many = Math.max(2, Math.round(this.length / TRACK.chunk));
+    const edges: Array<number> = [];
+    for (let k = 0; k <= many; k++) {
+      edges.push(Math.round((k * TRACK.segments) / many));
     }
-    edges.push(n);
-    // A piece of one or two segments is a sliver, and a sliver between two
-    // pieces makes them strangers — see `rivalries`. Swallow it into the one
-    // before it, except where that would lose the cut the overlap needs.
-    const kept = [edges[0]];
-    for (let k = 1; k < edges.length - 1; k++) {
-      const runs = edges[k] - kept[kept.length - 1];
-      if (
-        runs < TRACK.leastPiece &&
-        shared[edges[k]] === shared[edges[k] - 1]
-      ) {
-        continue;
-      }
-      kept.push(edges[k]);
-    }
-    kept.push(n);
-    return kept;
+    return edges;
   }
 
   private lay(): void {
@@ -299,7 +243,6 @@ export class Track {
         reach: reach + Track.limit,
         from: start,
         to: start + count,
-        rivals: [],
       });
     }
     // The chequered line belongs to wherever it is, and is drawn with it.
@@ -312,120 +255,51 @@ export class Track {
       reach: Track.limit,
       from: Math.round(this.startAt * TRACK.segments),
       to: Math.round(this.startAt * TRACK.segments),
-      rivals: [],
     });
-    this.rivalries();
   }
 
   /**
-   * Which pieces of road are laid on the same ground as which.
+   * A road material that fades with driving distance, one per layer.
    *
-   * A circuit is allowed to run into itself — a child draws a loop with a stem
-   * and the two halves of the stem end up sharing a field. Both pieces are
-   * real road and both are near the car, so neither "far away" nor "elsewhere
-   * in the lap" tells them apart: at the mouth of a stem the road overlapping
-   * yours is the road you were on twenty samples ago.
-   *
-   * What does tell them apart is which one the car is on, and that is only
-   * knowable at the time. So the pairs are found once, here, and the choosing
-   * is left to `showNear`.
-   *
-   * Pairs sharing ground only where they join are not rivals — every piece
-   * touches the next one, and a road that hid the road it runs into would hide
-   * the whole lap.
+   * Its own, never the shared cached one: `flatVertex` hands out a material
+   * that half the game is drawn with, and the fade belongs to the road.
    */
-  private rivalries(): void {
-    const room = Track.limit * 2;
-    for (let a = 0; a < this.pieces.length; a++) {
-      for (let b = a + 1; b < this.pieces.length; b++) {
-        const one = this.pieces[a];
-        const two = this.pieces[b];
-        if (one.at.distanceTo(two.at) > one.reach + two.reach) {
-          continue;
-        }
-        // Pieces that follow one another are the same road and never rivals,
-        // however close they come. At the mouth of a hairpin the road runs
-        // right beside the road, and a rule that hid one of the two would
-        // take away the piece the car is about to drive onto — the road
-        // vanishing from under it for as long as the hairpin lasts.
-        if (
-          wrapIndex(one.to) === wrapIndex(two.from) ||
-          wrapIndex(two.to) === wrapIndex(one.from)
-        ) {
-          continue;
-        }
-        let shares = false;
-        for (let i = one.from; i < one.to && !shares; i++) {
-          for (let j = two.from; j < two.to; j++) {
-            if (Math.abs(ringGap(i, j)) <= TRACK.joins) {
-              continue;
-            }
-            if (
-              this.points[wrapIndex(i)].distanceTo(this.points[wrapIndex(j)]) <
-              room
-            ) {
-              shares = true;
-              break;
-            }
-          }
-        }
-        if (shares) {
-          one.rivals.push(b);
-          two.rivals.push(a);
-        }
-      }
+  private skin(key: string, height: number): THREE.Material {
+    const had = this.skins.get(key);
+    if (had) {
+      return had;
     }
+    const made = lapFading(flatVertex(substanceFor(height)).clone(), key);
+    this.skins.set(key, made);
+    return made;
+  }
+
+  /** How far round the lap a sample is, in units of road. */
+  drivingAt(index: number): number {
+    return wrapIndex(index) * (this.length / TRACK.segments);
   }
 
   /**
-   * Draws only the road near the car.
+   * Points the road's fade at the car.
    *
-   * The far side of a circuit is a mile of road seen almost edge-on, where a
-   * stripe of kerb is thinner than a pixel — every shortcoming in the geometry
-   * shows there at once, and none of it tells a driver anything. Out past
-   * `TRACK.sees` it is simply not drawn, and since the fog is well under way by
-   * then the road fades out rather than ending.
+   * The road fades with how far it is *to drive* — see `lapFading`, which
+   * does the fading itself, per vertex and in the shader. This says where
+   * the car is, and skips the pieces that are too far along the road to show
+   * anything at all, which is the only thing the pieces are still for.
    */
-  showNear(at: THREE.Vector3, hint: number): void {
-    // How far round the lap each piece is from the car: nought while the car
-    // is on it, and rising once it is not.
-    const away = this.pieces.map(piece =>
-      Math.max(
-        0,
-        Math.max(
-          ringGap(piece.from, hint) < 0 ? -ringGap(piece.from, hint) : 0,
-          ringGap(hint, piece.to) < 0 ? -ringGap(hint, piece.to) : 0,
-        ),
-      ),
-    );
-    const on = this.pieces.map(
-      piece => at.distanceTo(piece.at) < TRACK.sees + piece.reach,
-    );
-    // A road laid on the road being driven on is not drawn, because the two
-    // of them on the same ground is what puts a barrier across the track and
-    // a kerb through the middle of it, and there is no angle to see them
-    // apart at.
-    //
-    // Only that one. The first version of this hid the further of *any* two
-    // pieces sharing ground, and two stretches that overlap each other off on
-    // the far side of the circuit have nothing to do with the car: hiding one
-    // of them tore a hole in the view, with the road ahead simply absent. A
-    // road is only in the way if it is in the way of the road you are on.
-    for (const [i, piece] of this.pieces.entries()) {
-      if (away[i] > TRACK.joins) {
-        continue;
+  focus(lapAt: number): void {
+    lapFocus(lapAt, this.length);
+    const step = this.length / TRACK.segments;
+    const gone = CAR.top * ROAD.gone;
+    for (const piece of this.pieces) {
+      // The nearest point of this piece, measured along the road.
+      let near = Infinity;
+      for (let i = piece.from; i <= piece.to; i++) {
+        near = Math.min(near, drivingGap(i * step, lapAt, this.length));
       }
-      // The piece under the car, and the little either side of it that it is
-      // about to be on; what shares ground with those is what obscures it.
-      for (const other of piece.rivals) {
-        if (away[other] > away[i]) {
-          on[other] = false;
-        }
-      }
-    }
-    for (const [i, piece] of this.pieces.entries()) {
+      const on = near <= gone;
       for (const mesh of piece.meshes) {
-        mesh.visible = on[i];
+        mesh.visible = on;
       }
     }
   }
@@ -640,6 +514,9 @@ export class Track {
   ): THREE.Mesh {
     const verts: Array<number> = [];
     const colours: Array<number> = [];
+    /** How far along the lap each vertex is; see `lapFading`. */
+    const laps: Array<number> = [];
+    const step = this.length / TRACK.segments;
     /* Constructed, not converted — see the note in paint(). */
     const a = new THREE.Color(colour);
     const b = new THREE.Color(stripe?.other ?? colour);
@@ -699,6 +576,7 @@ export class Track {
       ): void => {
         const room = this.room(at, off);
         verts.push(p.x + s.x * room, height, p.z + s.z * room);
+        laps.push(at * step);
       };
       // Two triangles a segment, wound so they face up.
       //
@@ -722,6 +600,7 @@ export class Track {
     const geo = new THREE.BufferGeometry();
     geo.setAttribute("position", new THREE.Float32BufferAttribute(verts, 3));
     geo.setAttribute("color", new THREE.Float32BufferAttribute(colours, 3));
+    geo.setAttribute("lapAt", new THREE.Float32BufferAttribute(laps, 1));
     // Straight up, stated rather than computed: a ribbon is flat by
     // construction, and this way the lighting does not depend on the winding
     // being right anywhere else.
@@ -734,7 +613,7 @@ export class Track {
       "uv",
       new THREE.BufferAttribute(new Float32Array((verts.length / 3) * 2), 2),
     );
-    const mesh = new THREE.Mesh(geo, flatVertex(substanceFor(height)));
+    const mesh = new THREE.Mesh(geo, this.skin(`road${height}`, height));
     mesh.renderOrder = order(height);
     // The road takes the shadow of whatever is on it, which is most of what
     // puts a car on a surface rather than above one.
@@ -821,7 +700,10 @@ export class Track {
     ];
     const {material, fade} = fadingVertex("walls");
     this.fades.push(fade);
-    const mesh = new THREE.Mesh(mergeGeometries(parts, false), material);
+    const mesh = new THREE.Mesh(
+      mergeGeometries(parts, false),
+      lapFading(material, "walls"),
+    );
     mesh.renderOrder = order(LAYER.car);
     mesh.frustumCulled = false;
     return mesh;
@@ -837,6 +719,8 @@ export class Track {
     const verts: Array<number> = [];
     const colours: Array<number> = [];
     const normals: Array<number> = [];
+    const laps: Array<number> = [];
+    const step = this.length / TRACK.segments;
     const a = new THREE.Color(colour);
     const b = new THREE.Color(stripe.other);
     // Inward, so the face a driver sees is the lit one.
@@ -884,6 +768,11 @@ export class Track {
 
       verts.push(x0, 0, z0, x1, 0, z1, x1, h, z1);
       verts.push(x0, 0, z0, x1, h, z1, x0, h, z0);
+      // Which end of the panel each of those six corners belongs to, so the
+      // fence fades with the road it stands beside.
+      const near = i * step;
+      const far = j * step;
+      laps.push(near, far, far, near, far, near);
 
       const c = Math.floor(i / stripe.every) % 2 === 1 ? b : a;
       for (let v = 0; v < 6; v++) {
@@ -901,6 +790,7 @@ export class Track {
     geo.setAttribute("position", new THREE.Float32BufferAttribute(verts, 3));
     geo.setAttribute("color", new THREE.Float32BufferAttribute(colours, 3));
     geo.setAttribute("normal", new THREE.Float32BufferAttribute(normals, 3));
+    geo.setAttribute("lapAt", new THREE.Float32BufferAttribute(laps, 1));
     geo.setAttribute(
       "uv",
       new THREE.BufferAttribute(new Float32Array((verts.length / 3) * 2), 2),
@@ -937,10 +827,16 @@ export class Track {
         );
       }
     }
-    const mesh = new THREE.Mesh(
-      mergeGeometries(parts, false),
-      flatVertex("concrete"),
+    const merged = mergeGeometries(parts, false);
+    const where = this.startAt * this.length;
+    merged.setAttribute(
+      "lapAt",
+      new THREE.Float32BufferAttribute(
+        new Array<number>(merged.getAttribute("position").count).fill(where),
+        1,
+      ),
     );
+    const mesh = new THREE.Mesh(merged, this.skin("startLine", LAYER.paint));
     mesh.renderOrder = order(LAYER.paint);
     mesh.frustumCulled = false;
     return mesh;
