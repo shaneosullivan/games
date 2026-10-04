@@ -159,19 +159,93 @@ export class Track {
    * and `showNear`. A piece is a few hundred units of road; the pieces tile
    * exactly, each segment belonging to one of them, so there are no seams.
    */
+  /**
+   * Which samples have another part of the lap laid on top of them.
+   *
+   * A circuit drawn with a finger doubles back beside itself, and where it
+   * does the two roads share a field. Only those samples may ever be taken
+   * away, and knowing which they are is what lets the rest be left alone.
+   */
+  private shared(): Array<boolean> {
+    const n = TRACK.segments;
+    const room = Track.limit * 2;
+    const flag = new Array<boolean>(n).fill(false);
+    for (let i = 0; i < n; i++) {
+      for (let j = i + 1; j < n; j++) {
+        // Near along the lap is the same bit of road, not two bits of it.
+        if (Math.abs(ringGap(i, j)) <= TRACK.joins) {
+          continue;
+        }
+        if (this.points[i].distanceTo(this.points[j]) < room) {
+          flag[i] = true;
+          flag[j] = true;
+        }
+      }
+    }
+    // Widened a little, so that the edge of a hidden stretch is past the
+    // place the two roads actually touch and no kerb of the wrong one is
+    // left poking out of the end of it.
+    const wide = flag.slice();
+    for (let i = 0; i < n; i++) {
+      if (!flag[i]) {
+        continue;
+      }
+      for (let k = -TRACK.blend; k <= TRACK.blend; k++) {
+        wide[wrapIndex(i + k)] = true;
+      }
+    }
+    return wide;
+  }
+
+  /**
+   * Where the road is cut into pieces.
+   *
+   * Cut wherever road that has another road on top of it begins or ends, and
+   * then again every `TRACK.chunk` or so to keep the pieces a sensible size.
+   *
+   * The first cut is the point of it. A piece is hidden or drawn whole, so a
+   * piece that is partly overlapped and mostly not took perfectly good road
+   * away with it when it went — a hundred units of it, ending in a cliff. Cut
+   * on the overlap and what is taken away is the overlap.
+   */
+  private cuts(): Array<number> {
+    const n = TRACK.segments;
+    const shared = this.shared();
+    const per = Math.max(
+      8,
+      Math.round(TRACK.chunk / (this.length / TRACK.segments)),
+    );
+    const edges: Array<number> = [0];
+    for (let i = 1; i < n; i++) {
+      if (shared[i] !== shared[i - 1] || i - edges[edges.length - 1] >= per) {
+        edges.push(i);
+      }
+    }
+    edges.push(n);
+    // A piece of one or two segments is a sliver, and a sliver between two
+    // pieces makes them strangers — see `rivalries`. Swallow it into the one
+    // before it, except where that would lose the cut the overlap needs.
+    const kept = [edges[0]];
+    for (let k = 1; k < edges.length - 1; k++) {
+      const runs = edges[k] - kept[kept.length - 1];
+      if (
+        runs < TRACK.leastPiece &&
+        shared[edges[k]] === shared[edges[k] - 1]
+      ) {
+        continue;
+      }
+      kept.push(edges[k]);
+    }
+    kept.push(n);
+    return kept;
+  }
+
   private lay(): void {
-    // Pieces of as near the same length as the lap allows, rather than a
-    // fixed length and whatever is left over. A leftover of one segment is a
-    // sliver of a piece, and a sliver sitting between two pieces makes them
-    // strangers to one another — which cost the road under the car at one
-    // hairpin, because the two sides of it were no longer neighbours and so
-    // were free to hide each other. See `rivalries`.
-    const many = Math.max(2, Math.round(this.length / TRACK.chunk));
-    const edge = (k: number): number => Math.round((k * TRACK.segments) / many);
+    const cuts = this.cuts();
     const at = new THREE.Vector3();
-    for (let piece = 0; piece < many; piece++) {
-      const start = edge(piece);
-      const count = edge(piece + 1) - start;
+    for (let piece = 0; piece < cuts.length - 1; piece++) {
+      const start = cuts[piece];
+      const count = cuts[piece + 1] - start;
       const span = {start, count};
       const meshes = [
         this.ribbon(

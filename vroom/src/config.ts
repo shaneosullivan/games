@@ -779,7 +779,7 @@ export const TRACK = {
    * edge of the world shows on a long straight, which is a worse fault than
    * the one this is here to fix.
    */
-  chunk: 110,
+  chunk: 300,
   sees: 900,
   /**
    * How near two samples have to be along the lap before they count as the
@@ -799,6 +799,24 @@ export const TRACK = {
    * it is.
    */
   joins: 45,
+  /**
+   * How far past the touching the hidden stretch reaches, in samples.
+   *
+   * The road the car is not on is cut off where the two stop sharing ground,
+   * and cut off exactly there it ends with its kerb and barrier showing at
+   * the join. A few samples of margin puts the end of it behind the road
+   * that is covering it.
+   */
+  blend: 4,
+  /**
+   * The fewest samples a piece may have, where swallowing it does not lose a
+   * cut the overlap needs.
+   *
+   * A piece of one or two segments is a sliver, and a sliver between two
+   * pieces stops them being neighbours — which is how the road under the car
+   * went missing at a hairpin once already. See `rivalries`.
+   */
+  leastPiece: 6,
   grass: 34,
   /** How many points the ribbon is built from. One every few metres: enough
    *  that a corner is a curve rather than a polygon. */
