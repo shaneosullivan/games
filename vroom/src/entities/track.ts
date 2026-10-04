@@ -13,7 +13,13 @@ import {
 } from "../config";
 import {TrackSpec} from "../track/spec";
 import {fadingVertex, flatVertex, LAYER, order, paint} from "../render/sprites";
-import {drivingGap, lapFading, lapFocus, lapRange} from "../render/lapFade";
+import {
+  drivingGap,
+  lapFading,
+  lapFocus,
+  lapRange,
+  lapYield,
+} from "../render/lapFade";
 import {NearFade} from "../../../shared/fadeInFront";
 import {Substance} from "../render/materials";
 
@@ -104,6 +110,9 @@ export class Track {
    * inside out. See `room`.
    */
   private readonly bend: Array<number> = [];
+  /** Where the road laid on each sample is, along the lap, or -1 for the
+   *  samples nothing is laid on. See `twins`. */
+  private twin: Array<number> = [];
 
   /** The road's own materials, one per layer: the cached flat ones are
    *  shared with everything else in the game and must not be meddled with. */
@@ -153,6 +162,12 @@ export class Track {
     );
 
     lapRange(CAR.top * ROAD.solid, CAR.top * ROAD.gone);
+    lapYield(
+      CAR.top * ROAD.yields,
+      CAR.top * ROAD.holds,
+      CAR.top * ROAD.holdsBack,
+    );
+    this.twins();
     this.lay();
   }
 
@@ -164,6 +179,48 @@ export class Track {
    * and `showNear`. A piece is a few hundred units of road; the pieces tile
    * exactly, each segment belonging to one of them, so there are no seams.
    */
+  /**
+   * For each sample, the other part of the lap laid on top of it.
+   *
+   * A circuit drawn with a finger doubles back beside itself, and the two
+   * roads then share a field. Both are a short drive away, so neither fades
+   * for distance — what tells them apart is which one the car is on, and
+   * that is only knowable while driving. So each bit of road is told here
+   * where its twin is, and the shader picks between them; see `lapFading`.
+   *
+   * The nearest twin, where there is more than one. A road can only give way
+   * to one other at a time, and the nearest is the one in the way.
+   */
+  private twins(): void {
+    const n = TRACK.segments;
+    const step = this.length / n;
+    const room = Track.limit * 2;
+    // Far enough along the lap to be another stretch of road rather than the
+    // next few metres of this one.
+    const another = CAR.top * ROAD.another;
+    this.twin = new Array<number>(n).fill(-1);
+    const best = new Array<number>(n).fill(Infinity);
+    for (let i = 0; i < n; i++) {
+      for (let j = i + 1; j < n; j++) {
+        if (drivingGap(i * step, j * step, this.length) <= another) {
+          continue;
+        }
+        const apart = this.points[i].distanceTo(this.points[j]);
+        if (apart >= room) {
+          continue;
+        }
+        if (apart < best[i]) {
+          best[i] = apart;
+          this.twin[i] = j * step;
+        }
+        if (apart < best[j]) {
+          best[j] = apart;
+          this.twin[j] = i * step;
+        }
+      }
+    }
+  }
+
   /**
    * Where the road is cut into pieces.
    *
@@ -521,8 +578,10 @@ export class Track {
   ): THREE.Mesh {
     const verts: Array<number> = [];
     const colours: Array<number> = [];
-    /** How far along the lap each vertex is; see `lapFading`. */
+    /** How far along the lap each vertex is, and where the road laid on it
+     *  is if there is one; see `lapFading`. */
     const laps: Array<number> = [];
+    const twins: Array<number> = [];
     const step = this.length / TRACK.segments;
     /* Constructed, not converted — see the note in paint(). */
     const a = new THREE.Color(colour);
@@ -584,6 +643,7 @@ export class Track {
         const room = this.room(at, off);
         verts.push(p.x + s.x * room, height, p.z + s.z * room);
         laps.push(at * step);
+        twins.push(this.twin[wrapIndex(at)]);
       };
       // Two triangles a segment, wound so they face up.
       //
@@ -608,6 +668,7 @@ export class Track {
     geo.setAttribute("position", new THREE.Float32BufferAttribute(verts, 3));
     geo.setAttribute("color", new THREE.Float32BufferAttribute(colours, 3));
     geo.setAttribute("lapAt", new THREE.Float32BufferAttribute(laps, 1));
+    geo.setAttribute("twinAt", new THREE.Float32BufferAttribute(twins, 1));
     // Straight up, stated rather than computed: a ribbon is flat by
     // construction, and this way the lighting does not depend on the winding
     // being right anywhere else.
@@ -733,6 +794,7 @@ export class Track {
     const colours: Array<number> = [];
     const normals: Array<number> = [];
     const laps: Array<number> = [];
+    const twins: Array<number> = [];
     const step = this.length / TRACK.segments;
     const a = new THREE.Color(colour);
     const b = new THREE.Color(stripe.other);
@@ -786,6 +848,9 @@ export class Track {
       const near = i * step;
       const far = j * step;
       laps.push(near, far, far, near, far, near);
+      const mine = this.twin[i];
+      const next = this.twin[j];
+      twins.push(mine, next, next, mine, next, mine);
 
       const c = Math.floor(i / stripe.every) % 2 === 1 ? b : a;
       for (let v = 0; v < 6; v++) {
@@ -804,6 +869,7 @@ export class Track {
     geo.setAttribute("color", new THREE.Float32BufferAttribute(colours, 3));
     geo.setAttribute("normal", new THREE.Float32BufferAttribute(normals, 3));
     geo.setAttribute("lapAt", new THREE.Float32BufferAttribute(laps, 1));
+    geo.setAttribute("twinAt", new THREE.Float32BufferAttribute(twins, 1));
     geo.setAttribute(
       "uv",
       new THREE.BufferAttribute(new Float32Array((verts.length / 3) * 2), 2),
@@ -842,12 +908,14 @@ export class Track {
     }
     const merged = mergeGeometries(parts, false);
     const where = this.startAt * this.length;
+    const many = merged.getAttribute("position").count;
     merged.setAttribute(
       "lapAt",
-      new THREE.Float32BufferAttribute(
-        new Array<number>(merged.getAttribute("position").count).fill(where),
-        1,
-      ),
+      new THREE.Float32BufferAttribute(new Array<number>(many).fill(where), 1),
+    );
+    merged.setAttribute(
+      "twinAt",
+      new THREE.Float32BufferAttribute(new Array<number>(many).fill(-1), 1),
     );
     const mesh = new THREE.Mesh(merged, this.skin("startLine", LAYER.paint));
     mesh.renderOrder = order(LAYER.paint);

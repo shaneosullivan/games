@@ -2884,6 +2884,40 @@ export const ROAD = {
    *  before it has gone altogether. */
   solid: 10,
   gone: 15,
+  /**
+   * How much nearer the road lying on this one has to be before this one
+   * gives way to it entirely, in seconds of driving.
+   *
+   * Where a circuit doubles back beside itself the two roads are both a
+   * short drive away, so neither fades for distance and both get drawn —
+   * which is a barrier across the track and a kerb through the middle of it.
+   * The one the car is further from gives way instead.
+   *
+   * Smooth, and over a second, so that at the mouth of a hairpin — where the
+   * two are the same road really and equally far away — both stay, and
+   * nothing is ever switched.
+   */
+  yields: 1,
+  /**
+   * How far either side of the car the road is solid whatever is laid on it,
+   * in seconds of driving.
+   *
+   * Measured forwards: "about to drive on" is the whole point of it. A
+   * lollipop ends in a hairpin, and the road the far side of that hairpin
+   * shares its ground with the road this side — so without this, a child
+   * driving at the hairpin watched the way out of it disappear.
+   */
+  holds: 5,
+  /** And how much of the road just travelled is kept, in seconds. It is on
+   *  the screen below the car, and watching it wink out is as bad as
+   *  watching the road ahead do it. */
+  holdsBack: 1,
+  /**
+   * How far apart along the road two stretches must be before one counts as
+   * laid on the other rather than being the same road a moment later, in
+   * seconds of driving.
+   */
+  another: 3,
 } as const;
 
 /**

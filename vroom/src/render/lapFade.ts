@@ -25,6 +25,9 @@ const carAt = {value: 0};
 const lapIs = {value: 1};
 const solidTo = {value: 1e9};
 const goneBy = {value: 1e9};
+const yieldBy = {value: 1};
+const holdTo = {value: 1};
+const holdBack = {value: 1};
 
 /** Where the car is along the lap, and the lap's length, both in units. */
 export function lapFocus(at: number, length: number): void {
@@ -39,6 +42,14 @@ export function lapRange(solid: number, gone: number): void {
   goneBy.value = gone;
 }
 
+/** How much nearer the road lying on this one has to be, in units of road,
+ *  before this one gives way to it entirely. */
+export function lapYield(by: number, hold: number, back: number): void {
+  yieldBy.value = by;
+  holdTo.value = hold;
+  holdBack.value = back;
+}
+
 /** How solid something this far along the road from the car is, 0..1. The
  *  same arithmetic as the shader, for measuring what the shader is doing. */
 export function lapSolidity(away: number): number {
@@ -47,6 +58,28 @@ export function lapSolidity(away: number): number {
     Math.min(1, (away - solidTo.value) / (goneBy.value - solidTo.value)),
   );
   return 1 - t * t * (3 - 2 * t);
+}
+
+/**
+ * How solid a bit of road is given the road laid on top of it: one when the
+ * car is on this one, nought when it is well onto the other. The same
+ * arithmetic as the shader, for measuring what the shader is doing.
+ */
+export function lapYielding(
+  mineTo: number,
+  twinTo: number,
+  lap: number,
+): number {
+  const ease = (e0: number, e1: number, x: number): number => {
+    const u = Math.max(0, Math.min(1, (x - e0) / (e1 - e0)));
+    return u * u * (3 - 2 * u);
+  };
+  const gives = ease(0, yieldBy.value, mineTo - twinTo);
+  const keep = Math.max(
+    1 - ease(holdTo.value, holdTo.value * 1.3, mineTo),
+    1 - ease(holdBack.value, holdBack.value * 2, lap - mineTo),
+  );
+  return 1 - gives * (1 - keep);
 }
 
 /** How far it is to drive between two points on the lap, either way round. */
@@ -89,17 +122,23 @@ export function lapFading<T extends THREE.Material>(
     shader.uniforms.lapIs = lapIs;
     shader.uniforms.solidTo = solidTo;
     shader.uniforms.goneBy = goneBy;
+    shader.uniforms.yieldBy = yieldBy;
+    shader.uniforms.holdTo = holdTo;
+    shader.uniforms.holdBack = holdBack;
     shader.vertexShader = shader.vertexShader
       .replace(
         "#include <common>",
         `#include <common>
          attribute float lapAt;
-         varying float vLapAt;`,
+         attribute float twinAt;
+         varying float vLapAt;
+         varying float vTwinAt;`,
       )
       .replace(
         "#include <begin_vertex>",
         `#include <begin_vertex>
-         vLapAt = lapAt;`,
+         vLapAt = lapAt;
+         vTwinAt = twinAt;`,
       );
     shader.fragmentShader = shader.fragmentShader
       .replace(
@@ -109,11 +148,23 @@ export function lapFading<T extends THREE.Material>(
          uniform float lapIs;
          uniform float solidTo;
          uniform float goneBy;
+         uniform float yieldBy;
+         uniform float holdTo;
+         uniform float holdBack;
          varying float vLapAt;
+         varying float vTwinAt;
          // A lap is a loop, so the long way round is not how far it is.
          float drivingGap(float a, float b, float len) {
            float d = abs(a - b);
            return min(d, len - d);
+         }
+         // How far there is still to drive from b to reach a, going the way
+         // the road goes. Which of two roads you reach *next* is what says
+         // which one you are about to be on; nearest either way does not,
+         // because at the mouth of a hairpin the nearest other road is the
+         // one just behind you, and the road ahead would give way to it.
+         float drivingTo(float a, float b, float len) {
+           return mod(a - b + len, len);
          }
          // Ordered dither, so a half-faded road is a half-filled screen door
          // rather than a hard edge. Four by four is coarse enough to be
@@ -138,6 +189,31 @@ export function lapFading<T extends THREE.Material>(
         `#include <clipping_planes_fragment>
          float lapAway = drivingGap(vLapAt, carAt, lapIs);
          float lapSolid = 1.0 - smoothstep(solidTo, goneBy, lapAway);
+         // And where a second road is laid on this one, the one the car is
+         // further from along the road gives way. Both are near, so neither
+         // fades for distance; what tells them apart is which one is being
+         // driven on. Smooth in the difference, so where they meet — the
+         // mouth of a hairpin, where they are the same road really — both
+         // stay, and nothing ever switches.
+         if (vTwinAt >= 0.0) {
+           // Of two roads on the same ground, the one you reach later gives
+           // way to the one you reach sooner — which is the one being driven
+           // on, or about to be.
+           float mineTo = drivingTo(vLapAt, carAt, lapIs);
+           float twinTo = drivingTo(vTwinAt, carAt, lapIs);
+           float gives = smoothstep(0.0, yieldBy, mineTo - twinTo);
+           // Except for the road about to be driven on, which is never taken
+           // away however plainly something else is laid on it. A lollipop
+           // ends in a hairpin, and the road the far side of that hairpin is
+           // shared with the road this side of it: without this, a child
+           // driving at the hairpin watched the way out of it disappear.
+           // Measured forwards, because that is what "about to" means.
+           float keep = max(
+             1.0 - smoothstep(holdTo, holdTo * 1.3, mineTo),
+             1.0 - smoothstep(holdBack, holdBack * 2.0, lapIs - mineTo)
+           );
+           lapSolid *= 1.0 - gives * (1.0 - keep);
+         }
          if (lapSolid < bayer(gl_FragCoord.xy)) { discard; }`,
       );
   };
