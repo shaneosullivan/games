@@ -8,19 +8,30 @@ thing deploys as a folder.
 
 ```
 .
-├── bee/          Bee Quest — a 3D bee game for iPad (TypeScript + Three.js)
-├── eat-em-up/    Eat em up — a 3D caterpillar game for iPad (TypeScript + Three.js)
-├── shared/       the few widgets the games have in common
-├── site/         the gallery that lists the games and publishes them
-└── README.md     you are here
+├── bee/               Bee Quest — a 3D bee game for iPad (TypeScript + Three.js)
+├── eat-em-up/         Eat em up — a 3D caterpillar game for iPad (TypeScript + Three.js)
+├── penguin/           Penguin — slide down a snowy mountain on your tummy
+├── squirrel-glider/   Squirrel Glider — glide the length of a mountain valley
+├── the-chase/         The Chase — a hare running home ahead of three wolfhounds
+├── vroom/             Vroom — race a lap, then draw your own track (in development)
+├── whale/             Whale — swim a coral reef as a beluga
+├── scripts/           the new-game scaffold and the .glb model tools
+├── shared/            the few widgets the games have in common
+├── site/              the gallery that lists the games and publishes them
+└── README.md          you are here
 ```
 
 ## The games
 
-| Game                                 | What it is                                                                                                                                                                                                                     |
-| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| [**Bee Quest**](bee/README.md)       | Fly a bee, found a hive, feed the brood, see off a wasp, get the honey home past a bear, hop a river of frogs and net the ants. Eight levels. Built for a child on an iPad.                                                    |
-| [**Eat em up**](eat-em-up/README.md) | Be a caterpillar in a friendly wood. Eat leaves, flowers, berries, fruit, mushrooms and grass; climb the trees and the rocks for the ones out of reach; grow as you go, and turn into a butterfly. Nothing in it can hurt you. |
+| Game                                             | What it is                                                                                                                                                                                                                     |
+| ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| [**Bee Quest**](bee/README.md)                   | Fly a bee, found a hive, feed the brood, see off a wasp, get the honey home past a bear, hop a river of frogs and net the ants. Built for a child on an iPad.                                                                  |
+| [**Eat em up**](eat-em-up/README.md)             | Be a caterpillar in a friendly wood. Eat leaves, flowers, berries, fruit, mushrooms and grass; climb the trees and the rocks for the ones out of reach; grow as you go, and turn into a butterfly. Nothing in it can hurt you. |
+| [**Penguin**](penguin/README.md)                 | Slide down a snowy mountain on your tummy. Scoop up the fish, go round the trees, burst through the snowmen, and shoot off the ice at the bottom into the sea.                                                                 |
+| [**Squirrel Glider**](squirrel-glider/README.md) | Jump off a cliff as a flying squirrel and glide a whole mountain valley. Follow the acorns through the glowing arches, ride the rising air by the walls, and land in the big red net.                                          |
+| [**The Chase**](the-chase/README.md)             | Be a hare with three Irish wolfhounds after you. Jump the logs and boulders, run through the hollow ones, go round the trees, and get home to the burrow.                                                                      |
+| [**Whale**](whale/README.md)                     | Swim a coral reef as a beluga. Eat the fish, dodge the plastic, come up for air and breach. Find the shipwreck, and the black hole where you hunt by sonar.                                                                    |
+| [**Vroom**](vroom/README.md)                     | Race a lap, hold it sideways through the corners, then draw a track of your own. _In development._                                                                                                                             |
 
 The gallery also links out to native apps on the App Store (Mazers, Super
 Bubbly, Kidz Fun Art). Those aren't in this repo — they're listed by hand in
