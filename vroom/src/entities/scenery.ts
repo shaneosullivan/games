@@ -70,7 +70,10 @@ export class Scenery {
     const at = new THREE.Vector3();
     const spots: Array<{x: number; z: number; turn: number; scale: number}> =
       [];
-    for (let i = 0; i < some(SCENERY.trees); i++) {
+    // The city gets a thinner planting than the other two; see
+    // `SCENERY.palms`.
+    const many = palette.flora === "palm" ? SCENERY.palms : SCENERY.trees;
+    for (let i = 0; i < some(many); i++) {
       if (!place(at, SCENERY.band)) {
         continue;
       }

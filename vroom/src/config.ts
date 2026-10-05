@@ -2213,6 +2213,17 @@ export const STICKER = {
 export const SCENERY = {
   seed: 20260907,
   trees: 420,
+  /**
+   * And how many in the neon city, which wants far fewer.
+   *
+   * A wood either side of the road is right for the hills and for a desert
+   * of cactus, where the trees are the scenery. In the city they are not:
+   * the signs, the towers, the lit windows and the street lights are, and a
+   * palm every few yards in front of all of it turns the skyline into a
+   * hedge. The city is also the heaviest of the three environments to draw,
+   * so the ones that go are not missed twice.
+   */
+  palms: 110,
   tyres: 90,
   crowd: 260,
   /** How far out from the barrier things are scattered. */
