@@ -2439,6 +2439,38 @@ export const ITEM = {
     landDip: 0.2,
     landKeep: 0.9,
     landFor: 0.28,
+    /**
+     * How fast the nose drops through the flight, in radians a second at
+     * full speed.
+     *
+     * Nothing turns a car in mid-air — there is nothing up there to push
+     * against — so its attitude is whatever it left the lip with, while the
+     * path it is on bends down underneath it. That gap is the whole look of
+     * a jump: a car that held the ramp's angle all the way would arrive
+     * tail-first. A real one noses over, because the wheels and the engine
+     * are slung low and the lip gives it that as it goes. So the body turns
+     * at its own steady rate and the ground comes up to meet it.
+     */
+    noseOver: 0.55,
+    /** The most the nose is allowed to drop, in radians. Physics would let it
+     *  wind round and round; a car arriving at seventy degrees is already as
+     *  dramatic as a child needs, and past that it reads as a crash. */
+    noseMost: 1.2,
+    /**
+     * Landing, when it does not arrive flat.
+     *
+     * A car coming down on one corner does not stop dead and sit up: it hits,
+     * it comes off again, and the bounce is what puts it level. `bounce` is
+     * how much of the drop it gets back, `bounceLeast` the speed below which
+     * a bump is just a bump, and `bounces` the most in one arrival so that a
+     * landing always ends.
+     */
+    bounce: 0.42,
+    bounceLeast: 2.5,
+    bounces: 3,
+    /** The most spin a bounce may be given, radians a second, so that a car
+     *  dropped on its nose rights itself briskly without becoming a blur. */
+    tumbleMost: 9,
     /** The vertical speed, in metres a second, at which a landing costs the
      *  whole of `landKeep`. Below it the car keeps more, because it did not
      *  fall as far — a hop off a kerb is not a jump. */

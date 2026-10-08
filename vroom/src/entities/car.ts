@@ -136,6 +136,10 @@ export class Car {
   roll = 0;
   pitch = 0;
   private rollRate = 0;
+  /** How fast the nose is dropping through a jump, and how many times this
+   *  arrival has come back off the ground. See the landing in `update`. */
+  private pitchRate = 0;
+  private bounced = 0;
   /** Nose-over-tail, for a take-off with all four wheels on the ramp. */
   /** Whether it has already taken off from the ramp it is currently on, so a
    *  long ramp cannot launch the same car twice. */
@@ -270,6 +274,9 @@ export class Car {
     // real moment about a real axis, and modelling it properly would need a
     // suspension and a roll centre; this is that moment, as a rate.
     this.rollRate = lean * ITEM.ramp.roll * Math.min(1, this.speed / CAR.top);
+    // And the nose goes over at its own rate from here; see `ramp.noseOver`.
+    this.pitchRate = -ITEM.ramp.noseOver * Math.min(1, this.speed / CAR.top);
+    this.bounced = 0;
   }
 
   /** Off the ground, and how far through the jump. */
@@ -304,6 +311,8 @@ export class Car {
     this.roll = 0;
     this.pitch = 0;
     this.rollRate = 0;
+    this.pitchRate = 0;
+    this.bounced = 0;
     this.landing = 0;
     this.launched = false;
     this.decided = false;
@@ -832,23 +841,55 @@ export class Car {
     } else if (this.air > 0 || this.height > 0) {
       this.height += this.climb * dt;
       this.climb -= PHYSICS.gravity * s * dt;
+      // Turning at whatever rate it left with, because nothing up here can
+      // change it. The path bends down underneath the car; the car does not
+      // follow it. That gap is what makes a jump look like a jump.
       this.roll += this.rollRate * dt;
-      // The nose follows the trajectory, because that is where the car is
-      // going: up off the lip, over at the top, down on the way in. Nothing
-      // schedules this and nothing clamps it.
-      this.pitch = Math.atan2(this.climb, Math.max(20, this.speed));
+      this.pitch += this.pitchRate * dt;
+      if (this.pitch < -ITEM.ramp.noseMost) {
+        this.pitch = -ITEM.ramp.noseMost;
+        this.pitchRate = 0;
+      }
       if (this.height <= 0) {
         this.height = 0;
-        // Landing. The vertical speed is absorbed by the suspension and a
+        // Arriving. The vertical speed is absorbed by the suspension and a
         // share of the horizontal goes with it, which is the difference
         // between landing a jump and teleporting to the far side of one.
-        const bump = Math.min(1, -this.climb / (ITEM.ramp.landHard * s));
+        const down = -this.climb;
+        const bump = Math.min(1, down / (ITEM.ramp.landHard * s));
         this.velocity.multiplyScalar(1 - bump * (1 - ITEM.ramp.landKeep));
-        this.climb = 0;
-        this.air = 0;
-        this.rollRate = 0;
-        this.landing = ITEM.ramp.landFor * bump;
-        this.pitch = -ITEM.ramp.landDip * bump;
+
+        // A car that comes down on one corner does not stop dead and sit up.
+        // It hits, it comes off again, and the bounce is what puts it level:
+        // the wheel that touched first is the one it turns about. So the
+        // bounce is given exactly the spin that has it flat by the time it
+        // comes back down — which is what the nose slapping down after a
+        // jump actually is — and the arrival ends when the hop is too small
+        // to see, or when it has had its three.
+        const upright = Math.round(this.roll / TAU) * TAU;
+        const flat =
+          Math.abs(this.pitch) < 0.05 && Math.abs(this.roll - upright) < 0.05;
+        if (
+          down > ITEM.ramp.bounceLeast * s &&
+          this.bounced < ITEM.ramp.bounces &&
+          !flat
+        ) {
+          this.bounced += 1;
+          this.climb = down * ITEM.ramp.bounce;
+          this.air = (2 * this.climb) / (PHYSICS.gravity * s);
+          const hop = Math.max(this.air, 0.08);
+          const most = ITEM.ramp.tumbleMost;
+          this.pitchRate = clamp(-this.pitch / hop, -most, most);
+          this.rollRate = clamp((upright - this.roll) / hop, -most, most);
+        } else {
+          this.climb = 0;
+          this.air = 0;
+          this.rollRate = 0;
+          this.pitchRate = 0;
+          this.bounced = 0;
+          this.landing = ITEM.ramp.landFor * bump;
+          this.pitch = -ITEM.ramp.landDip * bump;
+        }
       }
     } else if (this.roll !== 0 || this.pitch !== 0) {
       this.landing = Math.max(0, this.landing - dt);
