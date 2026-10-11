@@ -12,6 +12,7 @@ import {
   spectatorHair,
   spectatorFlag,
   spectatorHat,
+  spectatorStetson,
   spectatorHead,
   spectatorLong,
   spectatorTail,
@@ -184,14 +185,29 @@ export class Stands {
     // What everybody looks like, decided once and kept. A crowd of one
     // haircut is a crowd of clones, and at this size the head is most of what
     // there is to tell one from another.
-    const looks = this.seats.map(() => ({
-      hair: rng.pick(STAND.hair),
-      skin: rng.pick(STAND.skins),
-      shirt: rng.pick(palette.crowd),
-      style: rng.pick(STAND.styles),
-      hat: rng.range(0, 1) < STAND.hats ? rng.pick(palette.crowd) : null,
-      flag: rng.range(0, 1) < STAND.flags ? rng.pick(palette.crowd) : null,
-    }));
+    // Out in the sand a good share of them are in cowboy hats, which is the
+    // one thing that tells you where the race is from the grandstand rather
+    // than from the scenery; see `STAND.stetsons`.
+    const west = palette.flora === "cactus";
+    const looks = this.seats.map(() => {
+      const stetson =
+        west && rng.range(0, 1) < STAND.stetsons
+          ? rng.pick(STAND.stetson)
+          : null;
+      return {
+        hair: rng.pick(STAND.hair),
+        skin: rng.pick(STAND.skins),
+        shirt: rng.pick(palette.crowd),
+        style: rng.pick(STAND.styles),
+        // Nobody wears two hats.
+        hat:
+          stetson === null && rng.range(0, 1) < STAND.hats
+            ? rng.pick(palette.crowd)
+            : null,
+        stetson,
+        flag: rng.range(0, 1) < STAND.flags ? rng.pick(palette.crowd) : null,
+      };
+    });
 
     // Each piece is its own instanced mesh in the same seats, because an
     // instance takes one colour and a person is not one colour — and because
@@ -235,6 +251,11 @@ export class Stands {
         built: spectatorHat(),
         colour: look => look.hat ?? 0xffffff,
         worn: look => look.hat !== null,
+      },
+      {
+        built: spectatorStetson(),
+        colour: look => look.stetson ?? 0xffffff,
+        worn: look => look.stetson !== null,
       },
       {
         built: spectatorFlag(),

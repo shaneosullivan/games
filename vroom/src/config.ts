@@ -275,6 +275,16 @@ export const STAND = {
    */
   person: 4,
   perStand: 280,
+  /**
+   * Cowboy hats, in the desert and nowhere else.
+   *
+   * A crowd out in the sand with nothing on their heads looked like a crowd
+   * that had been moved there from somewhere else. How many of them wear
+   * one, and in what browns — a stetson is leather, so it takes its own
+   * colours rather than the shirts', which are bright.
+   */
+  stetsons: 0.42,
+  stetson: [0x8a5a34, 0xa9743f, 0x6f4526, 0xc4934f] as const,
   /** The crowd's hair and faces. The shirts are the environment's own
    *  `crowd` colours; these are the same wherever the race is. */
   hair: [0x2b1d16, 0x5a3821, 0x8c5a2b, 0xc98f3f, 0xe8d9a0, 0x9a9a9a] as const,

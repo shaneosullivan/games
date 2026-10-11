@@ -164,6 +164,41 @@ export function spectatorHat(): Assembly {
 }
 
 /**
+ * A cowboy hat, for the desert.
+ *
+ * Taller in the crown and far wider in the brim than the cap above, because
+ * at this size those two things are the whole difference — a band and a star
+ * would be a pixel each. The brim flares and carries a rolled rim, which is
+ * what gives it the curl you read as a stetson rather than a saucer.
+ */
+export function spectatorStetson(): Assembly {
+  const a = new Assembly();
+  const crown = new THREE.CylinderGeometry(
+    HEAD * 0.72,
+    HEAD * 0.84,
+    HEAD * 1.05,
+    8,
+  );
+  crown.translate(0, TOP + HEAD * 1.1, 0);
+  a.add(crown, "matte", 0xffffff);
+  // Wider at the rim than at the crown, so it sits like a brim and not a
+  // plate: the outer edge is the higher of the two.
+  const brim = new THREE.CylinderGeometry(
+    HEAD * 1.8,
+    HEAD * 1.62,
+    HEAD * 0.1,
+    10,
+  );
+  brim.translate(0, TOP + HEAD * 0.62, 0);
+  a.add(brim, "matte", 0xffffff);
+  const rim = new THREE.TorusGeometry(HEAD * 1.76, HEAD * 0.09, 4, 10);
+  rim.rotateX(Math.PI / 2);
+  rim.translate(0, TOP + HEAD * 0.69, 0);
+  a.add(rim, "matte", 0xffffff);
+  return a;
+}
+
+/**
  * A little flag on a stick, held up beside the head.
  *
  * Pole and cloth in the one colour, because an instance takes one colour and
