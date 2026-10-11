@@ -19,6 +19,8 @@ const PALETTE: Record<string, string> = {
   m: "#f3d3a8",
   e: "#2a1a10",
   t: "#8a5a32",
+  y: "#ffd257",
+  b: "#c98f2a",
 };
 
 /** Arms up: hanging from a vine, and in the air, which look the same and
@@ -118,7 +120,29 @@ function bake(rows: Array<string>, flip: boolean): HTMLCanvasElement {
   return canvas;
 }
 
+/** A banana, hung between the vines to be swung through. Seven pixels of
+ *  crescent: at this size the shape is the whole word. */
+const BANANA = [
+  "...bb..",
+  "..byy..",
+  ".byy...",
+  ".by....",
+  ".byy...",
+  "..byy..",
+  "...bb..",
+];
+
 const baked = new Map<string, HTMLCanvasElement>();
+
+/** The banana, baked like the monkey is. */
+export function bananaSprite(): HTMLCanvasElement {
+  let had = baked.get("banana");
+  if (!had) {
+    had = bake(BANANA, false);
+    baked.set("banana", had);
+  }
+  return had;
+}
 
 /** A pose, facing a way. Baked on first ask and kept. */
 export function monkeySprite(

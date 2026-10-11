@@ -1,5 +1,6 @@
-import {JUNGLE, MONKEY, PAINT, WORLD} from "../config";
-import {monkeySprite, type Pose} from "../art/monkey";
+import {JUNGLE, LAKE, MONKEY, PAINT, WORLD} from "../config";
+import {bananaSprite, monkeySprite, type Pose} from "../art/monkey";
+import type {Party} from "./particles";
 import type {Jungle, Tree} from "../world/jungle";
 import type {Monkey} from "../entities/monkey";
 import type {Screen} from "./screen";
@@ -19,6 +20,7 @@ export function paint(
   camera: number,
   time: number,
   alpha: number,
+  party: Party,
 ): void {
   const g = screen.ctx;
   const w = screen.wide;
@@ -49,6 +51,7 @@ export function paint(
   );
 
   ground(g, w, h, camera);
+  lake(g, w, camera, time);
 
   // The vines, and the monkey among them: the vine being held is drawn after
   // the others so the monkey is never behind the thing it is holding.
@@ -60,8 +63,10 @@ export function paint(
     rope(g, x, vine.y, vine.angle, vine.long, vine === monkey.vine);
   }
 
+  bananas(g, jungle, camera, w);
   home(g, Math.round(jungle.homeX - camera), h);
   drawMonkey(g, monkey, camera, alpha);
+  party.draw(g, camera);
   dapples(g, jungle, camera, time, w, h);
 }
 
@@ -145,6 +150,63 @@ function ground(
     const at = Math.round(x - camera);
     const tall = 2 + ((x / 11) % 3);
     g.fillRect(at, WORLD.floor - tall + 1, 2, tall);
+  }
+}
+
+/**
+ * The lake halfway along.
+ *
+ * Cut into the ground rather than laid on top of it, so there is a bank to
+ * fall off: the earth stops at the water's edge and the water sits a little
+ * below the floor. Three bands of blue and a moving line of light on top,
+ * which at this size is all a lake needs to be wet.
+ */
+function lake(
+  g: CanvasRenderingContext2D,
+  w: number,
+  camera: number,
+  time: number,
+): void {
+  const from = Math.round(LAKE.from - camera);
+  const wide = LAKE.wide;
+  if (from > w || from + wide < 0) {
+    return;
+  }
+  const top = WORLD.floor + LAKE.deep;
+  // The gap in the ground, filled with water.
+  g.fillStyle = PAINT.waterDark;
+  g.fillRect(from, WORLD.floor, wide, 200);
+  g.fillStyle = PAINT.water;
+  g.fillRect(from, top - 4, wide, 200);
+  // Glints, moving along the surface. Off the world so they travel with the
+  // lake, and on a slow sine so the water looks like it is working.
+  g.fillStyle = PAINT.waterLight;
+  for (let x = 0; x < wide; x += 9) {
+    const bob = Math.sin(time * 1.4 + x * 0.21);
+    if (bob < 0.25) {
+      continue;
+    }
+    g.fillRect(from + x, top - 4 + Math.round(bob), 4, 1);
+  }
+}
+
+/** The bananas nobody has taken yet. */
+function bananas(
+  g: CanvasRenderingContext2D,
+  jungle: Jungle,
+  camera: number,
+  w: number,
+): void {
+  const sprite = bananaSprite();
+  for (const banana of jungle.bananas) {
+    if (banana.taken) {
+      continue;
+    }
+    const x = Math.round(banana.x - camera);
+    if (x < -10 || x > w + 10) {
+      continue;
+    }
+    g.drawImage(sprite, x - 3, Math.round(banana.y) - 3);
   }
 }
 

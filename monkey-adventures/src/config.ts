@@ -65,6 +65,34 @@ export const EDGE = {
   margin: 8,
 } as const;
 
+/**
+ * The lake, halfway along.
+ *
+ * The one place in the jungle where the floor is not a floor. Everywhere
+ * else a missed vine costs you the swing and nothing more — you land, you
+ * run, you try the vine again — and that is deliberate, because this is a
+ * game for a child and nothing in it should hurt. The lake is the one place
+ * that asks for the crossing back, and even there it asks for the crossing
+ * and not the whole jungle: you go back to the near shore, not to the
+ * start, because losing four minutes of swinging to one mistimed tap is how
+ * a child stops playing.
+ */
+export const LAKE = {
+  /** Where it starts and how wide it is, in pixels. Halfway along, and wide
+   *  enough that it plainly cannot be jumped — it has to be swung. */
+  from: 1500,
+  wide: 620,
+  /** How far below the floor the water sits, so there is a bank to fall
+   *  down rather than a blue stripe painted on the ground. */
+  deep: 16,
+  /** How far back from the water the monkey is put after a splash. Enough
+   *  room to get running again before the bank. */
+  backBy: 70,
+  /** How long the splash is watched before the monkey is put back, in
+   *  seconds. Long enough to see what happened and understand it. */
+  watchFor: 0.9,
+} as const;
+
 /** The monkey. */
 export const MONKEY = {
   /** How big the sprite is, in picture pixels. */
@@ -218,6 +246,25 @@ export const JUNGLE = {
   vineEvery: 125,
   vineVaries: 30,
   /**
+   * And how far apart over the lake.
+   *
+   * Closer, because over the lake a missed vine costs the crossing rather
+   * than a moment on the floor, and the place that punishes a mistake is
+   * the wrong place to ask for the hardest swinging. The jungle gets harder
+   * as it goes; the water is where it gets kinder.
+   */
+  vineEveryLake: 88,
+  vineVariesLake: 10,
+  /** How often a gap between two vines has a banana in it, and how far down
+   *  the longer of the two vines it hangs. Three gaps in five, so they are
+   *  a regular pleasure rather than a rare event — and low, at the height
+   *  the monkey passes through at the bottom of a swing. */
+  bananaOdds: 0.6,
+  bananaHigh: 0.92,
+  /** How close the monkey has to be to take one. Generous: a banana you
+   *  swung through and did not get is just annoying. */
+  bananaReach: 11,
+  /**
    * How long a vine is, and how much that varies.
    *
    * Set from the jump, not picked: a standing jump lifts the monkey's hands
@@ -262,6 +309,36 @@ export const JUNGLE = {
   dappleAlpha: 0.14,
 } as const;
 
+/**
+ * The party at the end.
+ *
+ * Reaching home is the only ending this game has, so it is worth something
+ * louder than a line of text: bursts of colour thrown up over the hut, a
+ * few at a time, for as long as the child wants to sit and watch them.
+ */
+export const PARTY = {
+  /** How many bits of colour in one burst, and how often a new burst goes
+   *  up, in seconds. */
+  bits: 26,
+  every: 0.55,
+  /** How fast they are thrown, in pixels a second, and how much that
+   *  varies between one bit and the next. */
+  speed: 95,
+  varies: 55,
+  /** How long a bit lasts, in seconds, and how much of that it spends
+   *  fading. */
+  lasts: 1.5,
+  /** Gravity on the bits, as a fraction of the world's. Less than the
+   *  monkey gets: confetti hangs. */
+  weight: 0.45,
+  /** The colours thrown. Bright against the green, and warm, which is what
+   *  the plan asks of everything here. */
+  colours: ["#ffd257", "#ff8a3d", "#ff5d8f", "#8fe36b", "#6cc8ff", "#fff3b0"],
+  /** A splash is the same machinery in blues, thrown up out of the water. */
+  splashBits: 18,
+  splashColours: ["#bfe9ff", "#86cdf0", "#ffffff", "#5fb0d8"],
+} as const;
+
 /** The colours. Warm and friendly, as the plan asks: nothing in here is pure
  *  black, and the greens are yellowed rather than blued. */
 export const PAINT = {
@@ -281,6 +358,9 @@ export const PAINT = {
   dapple: "#fff3b0",
   home: "#b5793f",
   homeDark: "#8a5a2d",
+  water: "#4aa3c7",
+  waterDark: "#2f7fa3",
+  waterLight: "#8fd6ea",
 } as const;
 
 /** The fixed step the world is worked out in. The drawing interpolates

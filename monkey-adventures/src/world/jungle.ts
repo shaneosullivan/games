@@ -1,4 +1,4 @@
-import {CLIMB, JUNGLE, SWING, WIND, WORLD} from "../config";
+import {CLIMB, JUNGLE, LAKE, SWING, WIND, WORLD} from "../config";
 
 /** A vine hanging from the canopy, with a swing of its own. */
 export interface Vine {
@@ -22,6 +22,14 @@ export interface Tree {
   wide: number;
 }
 
+/** A banana hanging between two vines, worth a point to whoever swings
+ *  through it. */
+export interface Banana {
+  x: number;
+  y: number;
+  taken: boolean;
+}
+
 export interface Dapple {
   x: number;
   y: number;
@@ -41,15 +49,32 @@ export class Jungle {
   readonly nearTrees: Array<Tree> = [];
   readonly farTrees: Array<Tree> = [];
   readonly dapples: Array<Dapple> = [];
+  readonly bananas: Array<Banana> = [];
   /** Where home is: the end of the jungle. */
   readonly homeX = WORLD.far;
+  /** The water, halfway along. */
+  readonly lakeFrom = LAKE.from;
+  readonly lakeTo = LAKE.from + LAKE.wide;
 
   constructor(seed = 1) {
     const rng = made(seed);
+    // Walked along rather than stepped by a fixed amount, because the gap
+    // changes over the water: the vines bunch up where falling costs the
+    // crossing. The step is taken from where the *next* vine would land, so
+    // the bunching starts a little before the bank rather than at it —
+    // there is no use in a close vine you had to make a long swing to reach.
     for (
       let x = JUNGLE.vineEvery;
       x < WORLD.far - JUNGLE.vineEvery;
-      x += JUNGLE.vineEvery + (rng() - 0.5) * 2 * JUNGLE.vineVaries
+      x +=
+        (this.overWater(x + JUNGLE.vineEvery)
+          ? JUNGLE.vineEveryLake
+          : JUNGLE.vineEvery) +
+        (rng() - 0.5) *
+          2 *
+          (this.overWater(x + JUNGLE.vineEvery)
+            ? JUNGLE.vineVariesLake
+            : JUNGLE.vineVaries)
     ) {
       this.vines.push({
         x,
@@ -60,7 +85,29 @@ export class Jungle {
         phase: rng() * Math.PI * 2,
       });
     }
+    // Bananas between the vines, not on them: hung in the gap, at about the
+    // height a monkey passes through at the bottom of a swing. That is the
+    // point of them — they are not a detour, they are a reason to swing low
+    // and long instead of letting go early and safe.
+    for (let i = 0; i + 1 < this.vines.length; i++) {
+      if (rng() > JUNGLE.bananaOdds) {
+        continue;
+      }
+      const left = this.vines[i];
+      const right = this.vines[i + 1];
+      const mid = (left.x + right.x) / 2;
+      const hang = Math.max(left.long, right.long);
+      this.bananas.push({
+        x: mid,
+        y: JUNGLE.canopy + hang * JUNGLE.bananaHigh + rng() * 10,
+        taken: false,
+      });
+    }
     for (let x = -60; x < WORLD.far + 200; x += JUNGLE.treeEvery) {
+      // Nothing grows in the lake.
+      if (this.overWater(x)) {
+        continue;
+      }
       this.nearTrees.push({
         x: x + (rng() - 0.5) * 40,
         tall: 70 + rng() * 50,
@@ -103,6 +150,12 @@ export class Jungle {
       vine.angle += (want - vine.angle) * settle;
       vine.spin = 0;
     }
+  }
+
+  /** Whether a point is over the water. A little inside the banks, so the
+   *  edge of the lake is a bank to stand on rather than a line to fall off. */
+  overWater(x: number): boolean {
+    return x > LAKE.from && x < LAKE.from + LAKE.wide;
   }
 
   /**

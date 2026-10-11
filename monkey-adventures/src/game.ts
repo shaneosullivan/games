@@ -1,8 +1,10 @@
-import {EDGE, MONKEY, SIM, WORLD} from "./config";
+import {EDGE, JUNGLE, LAKE, MONKEY, PARTY, SIM, WORLD} from "./config";
 import {Input} from "./core/input";
 import {Monkey} from "./entities/monkey";
 import {paint} from "./render/draw";
+import {Party} from "./render/particles";
 import {Screen} from "./render/screen";
+import {Hud} from "./ui/hud";
 import {Jungle} from "./world/jungle";
 
 /**
@@ -19,6 +21,15 @@ export class Game {
   jungle = new Jungle();
   monkey = new Monkey();
   camera = 0;
+  readonly party = new Party();
+  readonly hud: Hud;
+  /** How many bananas have been taken, and whether home has been reached. */
+  bananas = 0;
+  finished = false;
+  /** While this is counting down the monkey is in the water and the game is
+   *  letting the player see it before putting them back. */
+  private sinking = 0;
+  private partyIn = 0;
   private time = 0;
   private behind = 0;
   private last = 0;
@@ -27,6 +38,7 @@ export class Game {
   constructor(into: HTMLElement) {
     this.screen = new Screen(into);
     this.input = new Input(this.screen.canvas);
+    this.hud = new Hud(into, () => this.restart());
     this.last = performance.now();
     requestAnimationFrame(this.frame);
   }
@@ -51,6 +63,36 @@ export class Game {
 
   private step(dt: number, tapped: boolean): void {
     this.time += dt;
+    this.party.update(dt);
+
+    if (this.finished) {
+      // Home. The jungle carries on breathing and the party keeps going up
+      // over the hut until somebody presses the button.
+      this.jungle.update(dt, this.time, null);
+      this.partyIn -= dt;
+      if (this.partyIn <= 0) {
+        this.partyIn = PARTY.every;
+        this.party.burst(
+          this.jungle.homeX + (Math.random() - 0.5) * 70,
+          WORLD.floor - 30 - Math.random() * 20,
+        );
+      }
+      return;
+    }
+
+    if (this.sinking > 0) {
+      // In the water: the monkey sinks where it fell while the player takes
+      // in what happened, and then it is put back on the near bank.
+      this.sinking -= dt;
+      this.monkey.wasY = this.monkey.y;
+      this.monkey.y += 26 * dt;
+      this.jungle.update(dt, this.time, null);
+      if (this.sinking <= 0) {
+        this.toTheBank();
+      }
+      return;
+    }
+
     this.monkey.step(
       dt,
       this.input.push,
@@ -59,6 +101,8 @@ export class Game {
       this.jungle,
     );
     this.jungle.update(dt, this.time, this.monkey.vine);
+    this.takeBananas();
+    this.checkTheWater();
 
     // The camera sits the monkey a third of the way across, so there is
     // twice as much jungle ahead as behind — which is where the next vine
@@ -72,9 +116,85 @@ export class Game {
     );
     this.keepInView();
 
-    if (this.monkey.arrived) {
-      this.restart();
+    if (this.monkey.arrived && !this.finished) {
+      this.finished = true;
+      this.partyIn = 0;
+      this.hud.setFinished(true, this.bananas, this.jungle.bananas.length);
     }
+  }
+
+  /**
+   * Swinging through a banana takes it.
+   *
+   * Measured from the monkey's middle rather than its hands, because a
+   * banana is taken by passing through it and the whole monkey passes
+   * through it.
+   */
+  private takeBananas(): void {
+    const mx = this.monkey.x;
+    const my = this.monkey.y - MONKEY.tall / 2;
+    for (const banana of this.jungle.bananas) {
+      if (banana.taken || Math.abs(banana.x - mx) > JUNGLE.bananaReach) {
+        continue;
+      }
+      if (Math.hypot(banana.x - mx, banana.y - my) > JUNGLE.bananaReach) {
+        continue;
+      }
+      banana.taken = true;
+      this.bananas += 1;
+      this.hud.setScore(this.bananas);
+      this.party.burst(banana.x, banana.y, 8, PARTY.colours, true);
+    }
+  }
+
+  /**
+   * Falling in the lake.
+   *
+   * The water is the one place a mistake costs anything, and it costs the
+   * crossing rather than the jungle: back to the near bank, which is where
+   * the attempt started. Letting go over water and missing is a thing a
+   * child will do twenty times, and twenty times back to the beginning is
+   * how a game gets put down.
+   */
+  private checkTheWater(): void {
+    if (this.monkey.doing === "swing" || this.monkey.doing === "climb") {
+      return;
+    }
+    if (!this.jungle.overWater(this.monkey.x)) {
+      return;
+    }
+    if (this.monkey.y < WORLD.floor) {
+      return;
+    }
+    this.sinking = LAKE.watchFor;
+    this.monkey.vx = 0;
+    this.monkey.vy = 0;
+    this.party.burst(
+      this.monkey.x,
+      WORLD.floor + 2,
+      PARTY.splashBits,
+      PARTY.splashColours,
+      true,
+    );
+  }
+
+  /** Back to the bank, facing the water, to go again. */
+  private toTheBank(): void {
+    const monkey = this.monkey;
+    monkey.vine = null;
+    monkey.tree = null;
+    monkey.doing = "ground";
+    monkey.x = this.jungle.lakeFrom - LAKE.backBy;
+    monkey.y = WORLD.floor;
+    monkey.wasX = monkey.x;
+    monkey.wasY = monkey.y;
+    monkey.vx = 0;
+    monkey.vy = 0;
+    monkey.facingLeft = false;
+    // The camera goes with it. Without this the monkey is put on the bank
+    // and then dragged straight back off it by the rule that keeps it on
+    // screen, because the view is still out over the water.
+    this.camera = monkey.x - this.screen.wide / 3;
   }
 
   /**
@@ -110,16 +230,22 @@ export class Game {
     }
   }
 
-  /** Home, and round again. Nothing here can be failed — falling off costs
-   *  you the swing you were on and nothing else — so arriving is the only
-   *  ending there is, and it starts the jungle over. */
+  /** Everything back to the beginning, from the button at the end. */
   private restart(): void {
     this.jungle = new Jungle();
     this.monkey = new Monkey();
     this.camera = 0;
+    this.bananas = 0;
+    this.finished = false;
+    this.sinking = 0;
+    this.party.clear();
+    this.hud.setFinished(false);
+    this.hud.setScore(0);
+    this.hud.setProgress(0);
   }
 
   private draw(alpha: number): void {
+    this.hud.setProgress(this.monkey.x / this.jungle.homeX);
     paint(
       this.screen,
       this.jungle,
@@ -127,6 +253,7 @@ export class Game {
       Math.round(this.camera),
       this.time,
       alpha,
+      this.party,
     );
   }
 
