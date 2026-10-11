@@ -139,12 +139,20 @@ export class Game {
    *  — a chomp from a crocodile a child cannot see is a mystery noise. */
   private snapping(): void {
     for (const croc of this.jungle.crocs) {
-      if (!croc.bit) {
-        continue;
-      }
       const at = croc.x - this.camera;
-      if (at > -20 && at < this.screen.wide + 20) {
+      const onScreen = at > -20 && at < this.screen.wide + 20;
+      if (croc.bit && onScreen) {
         this.sound.chomp();
+      }
+      // Water thrown about as the head comes through the surface.
+      if (croc.rose && onScreen) {
+        this.party.burst(
+          croc.x,
+          WORLD.floor + LAKE.deep - 6,
+          10,
+          PARTY.splashColours,
+          true,
+        );
       }
     }
   }

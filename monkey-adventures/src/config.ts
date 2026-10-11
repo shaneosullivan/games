@@ -132,9 +132,19 @@ export const CROC = {
   holds: 0.1,
   snaps: 0.07,
   rests: 0.45,
-  /** The widest they open, in pixels of drop. Three is a lot of mouth when
-   *  the whole animal is five tall. */
-  opens: 3,
+  /** The widest they open, in pixels of drop. Four is a lot of mouth when
+   *  the whole animal is six tall. */
+  opens: 4,
+  /**
+   * How far the head comes up out of the water when it lunges, in pixels.
+   *
+   * The thing that makes a crocodile frightening is not the mouth, it is
+   * that the water was empty a second ago. So it rises as it gapes, is
+   * highest at the snap, and sinks back while it waits — which also means
+   * a child looking at flat water has been given fair warning before
+   * anything happens.
+   */
+  rises: 9,
   /** How quickly the jaws shut again once nobody is overhead. */
   closes: 7,
 } as const;

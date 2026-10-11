@@ -228,14 +228,16 @@ function crocs(
     }
     const left = croc.dir < 0;
     const drop = Math.round(croc.jaw * CROC.opens);
+    // Up out of the water as it lunges; see `CROC.rises`.
+    const up = Math.round(croc.rise * CROC.rises);
     // The mouth behind the jaw, so an open one is dark inside rather than a
     // gap you can see the lake through.
     if (drop > 0) {
       g.fillStyle = PAINT.crocMouth;
-      g.fillRect(x + (left ? -9 : 9), line + 3, 9, drop + 1);
+      g.fillRect(x + (left ? -11 : 11), line + 4 - up, 10, drop + 1);
     }
-    g.drawImage(crocSprite("jaw", left), x - 9, line + 3 + drop);
-    g.drawImage(crocSprite("body", left), x - 9, line);
+    g.drawImage(crocSprite("jaw", left), x - 11, line + 4 - up + drop);
+    g.drawImage(crocSprite("body", left), x - 11, line - up);
   }
 }
 

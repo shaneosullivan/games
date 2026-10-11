@@ -21,9 +21,10 @@ const PALETTE: Record<string, string> = {
   t: "#8a5a32",
   y: "#ffd257",
   b: "#c98f2a",
-  g: "#3f7b3f",
-  G: "#2d5a2e",
-  w: "#f2efe6",
+  g: "#5bb04a",
+  G: "#3c8035",
+  B: "#c9d98a",
+  w: "#f6f4ec",
 };
 
 /** Arms up: hanging from a vine, and in the air, which look the same and
@@ -144,15 +145,20 @@ const BANANA = [
  * jungle goes; swimming the other way flips it.
  */
 const CROC_BODY = [
-  "..........yy......",
-  "....GG..GGggGG....",
-  "..GGGGGGgggggggggg",
-  "GGgggggggggggggggg",
-  "..gggggggggg......",
+  "..G...G.........yy....",
+  ".GGG.GGG....GGGGGGGG..",
+  "GGGGGGGGGGgggggggggggg",
+  ".gggggggggggggggggggg.",
+  ".ggggggggggwwwwwwwwww.",
+  "..BBBBBBBB............",
 ];
 
-/** The lower jaw, drawn under the snout. */
-const CROC_JAW = ["..............GGGG", "..............wwww"];
+/** The lower jaw, drawn under the snout and dropped to open the mouth. */
+const CROC_JAW = [
+  "..........wwwwwwwwww..",
+  "..........gggggggggg..",
+  "...........BBBBBBBB...",
+];
 
 const baked = new Map<string, HTMLCanvasElement>();
 

@@ -74,6 +74,10 @@ export interface Croc {
    *  together on this tick — which is when the noise is made. */
   bite: number;
   bit: boolean;
+  /** How far out of the water its head is, 0 to 1, and whether it broke the
+   *  surface on this tick — which is when the water is thrown about. */
+  rise: number;
+  rose: boolean;
   /** Its own clock, so four of them do not snap in time with each other. */
   phase: number;
 }
@@ -208,6 +212,8 @@ export class Jungle {
         jaw: 0,
         bite: rng() * (CROC.gapes + CROC.holds + CROC.snaps + CROC.rests),
         bit: false,
+        rise: 0,
+        rose: false,
         phase: rng() * Math.PI * 2,
       });
     }
@@ -239,6 +245,8 @@ export class Jungle {
       // It has nothing to catch — see `CROC` — so this is pure theatre, and
       // the theatre is in the timing.
       croc.bit = false;
+      croc.rose = false;
+      const wasUp = croc.rise;
       const overhead = Math.abs(monkeyX - croc.x) < CROC.notices;
       if (overhead) {
         const whole = CROC.gapes + CROC.holds + CROC.snaps + CROC.rests;
@@ -249,21 +257,35 @@ export class Jungle {
         }
         const t = croc.bite;
         if (t < CROC.gapes) {
+          // Coming up and opening together, slowing as it goes.
           const u = t / CROC.gapes;
           croc.jaw = 1 - (1 - u) * (1 - u);
+          croc.rise = croc.jaw;
         } else if (t < CROC.gapes + CROC.holds) {
           croc.jaw = 1;
+          croc.rise = 1;
         } else if (t < CROC.gapes + CROC.holds + CROC.snaps) {
           croc.jaw = 1 - (t - CROC.gapes - CROC.holds) / CROC.snaps;
+          croc.rise = 1;
         } else {
           if (croc.jaw > 0) {
             croc.bit = true;
           }
           croc.jaw = 0;
+          // Sinking back while it waits, which is the warning for next time.
+          const down = (t - CROC.gapes - CROC.holds - CROC.snaps) / CROC.rests;
+          croc.rise = Math.max(0, 1 - down);
         }
       } else {
         croc.bite = 0;
-        croc.jaw += (0 - croc.jaw) * (1 - Math.exp(-CROC.closes * dt));
+        const shut = 1 - Math.exp(-CROC.closes * dt);
+        croc.jaw += (0 - croc.jaw) * shut;
+        croc.rise += (0 - croc.rise) * shut;
+      }
+      // The moment the head breaks the surface, so the water can be thrown
+      // about exactly once rather than every frame it is up.
+      if (wasUp <= 0.25 && croc.rise > 0.25) {
+        croc.rose = true;
       }
     }
 
