@@ -118,10 +118,22 @@ export const CROC = {
   roams: 48,
   /** How near overhead the monkey has to be before one notices, in pixels. */
   notices: 46,
-  /** How quickly the jaws work once they have noticed, in radians a second,
-   *  and the widest they open, in pixels of drop. Three pixels is a lot of
-   *  mouth when the whole animal is five tall. */
-  snaps: 5.5,
+  /**
+   * The bite, in seconds: the gape, the snap, and the wait before going
+   * again.
+   *
+   * Not a wave. A jaw that opens and shuts at the same speed is a puppet
+   * talking; what makes a bite read as a bite is that the two halves take
+   * wildly different times — the mouth comes open slowly, hangs there a
+   * moment, and then shuts in about a frame and a half. The pause after is
+   * what stops four crocodiles looking like a machine.
+   */
+  gapes: 0.38,
+  holds: 0.1,
+  snaps: 0.07,
+  rests: 0.45,
+  /** The widest they open, in pixels of drop. Three is a lot of mouth when
+   *  the whole animal is five tall. */
   opens: 3,
   /** How quickly the jaws shut again once nobody is overhead. */
   closes: 7,

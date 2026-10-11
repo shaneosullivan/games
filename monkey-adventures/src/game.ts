@@ -1,5 +1,6 @@
 import {EDGE, JUNGLE, LAKE, MONKEY, PARTY, SIM, WORLD} from "./config";
 import {Input} from "./core/input";
+import {Sound} from "./core/sound";
 import {Monkey} from "./entities/monkey";
 import {paint} from "./render/draw";
 import {Party} from "./render/particles";
@@ -22,6 +23,7 @@ export class Game {
   monkey = new Monkey();
   camera = 0;
   readonly party = new Party();
+  readonly sound = new Sound();
   readonly hud: Hud;
   /** How many bananas have been taken, and whether home has been reached. */
   bananas = 0;
@@ -38,7 +40,16 @@ export class Game {
   constructor(into: HTMLElement) {
     this.screen = new Screen(into);
     this.input = new Input(this.screen.canvas);
-    this.hud = new Hud(into, () => this.restart());
+    this.hud = new Hud(
+      into,
+      () => this.restart(),
+      muted => this.sound.setMuted(muted),
+    );
+    // A browser will not make a noise until the page has been touched, so
+    // the audio is built on the first touch and not on load.
+    const wake = (): void => this.sound.wake();
+    window.addEventListener("pointerdown", wake, {once: true});
+    window.addEventListener("keydown", wake, {once: true});
     this.last = performance.now();
     requestAnimationFrame(this.frame);
   }
@@ -101,6 +112,7 @@ export class Game {
       this.jungle,
     );
     this.jungle.update(dt, this.time, this.monkey.vine, this.monkey.x);
+    this.snapping();
     this.takeBananas();
     this.checkTheWater();
 
@@ -123,6 +135,20 @@ export class Game {
     }
   }
 
+  /** The crocodiles, when their jaws come together. Only the ones on screen
+   *  — a chomp from a crocodile a child cannot see is a mystery noise. */
+  private snapping(): void {
+    for (const croc of this.jungle.crocs) {
+      if (!croc.bit) {
+        continue;
+      }
+      const at = croc.x - this.camera;
+      if (at > -20 && at < this.screen.wide + 20) {
+        this.sound.chomp();
+      }
+    }
+  }
+
   /**
    * Swinging through a banana takes it.
    *
@@ -142,6 +168,7 @@ export class Game {
       }
       banana.taken = true;
       this.bananas += 1;
+      this.sound.banana();
       this.hud.setScore(this.bananas);
       this.party.burst(banana.x, banana.y, 8, PARTY.colours, true);
     }
@@ -167,6 +194,7 @@ export class Game {
       return;
     }
     this.sinking = LAKE.watchFor;
+    this.sound.splash();
     this.monkey.vx = 0;
     this.monkey.vy = 0;
     this.party.burst(

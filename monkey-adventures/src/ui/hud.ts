@@ -1,4 +1,5 @@
 import {ProgressBar} from "../../../shared/progressBar";
+import {SoundButton} from "../../../shared/soundButton";
 
 /**
  * The few things on screen that are not jungle.
@@ -20,7 +21,11 @@ export class Hud {
   private readonly again: HTMLButtonElement;
   readonly root: HTMLDivElement;
 
-  constructor(into: HTMLElement, onRestart: () => void) {
+  constructor(
+    into: HTMLElement,
+    onRestart: () => void,
+    onMute: (muted: boolean) => void,
+  ) {
     inject();
 
     this.root = document.createElement("div");
@@ -31,7 +36,13 @@ export class Hud {
     this.score = document.createElement("div");
     this.score.className = "hud-score";
     this.score.textContent = "🍌 0";
-    top.append(this.bar.root, this.score);
+    // The mute, which is the repo's shared one for the same reason the bar
+    // is: a child should find it in the same place and the same shape in
+    // every game here. A game that makes a noise and cannot be hushed is a
+    // game that gets played with the iPad face down.
+    const sound = new SoundButton({onToggle: onMute});
+    sound.root.classList.add("hud-tap");
+    top.append(this.bar.root, this.score, sound.root);
 
     this.done = document.createElement("div");
     this.done.className = "hud-done hud-gone";
@@ -125,6 +136,9 @@ function inject(): void {
 }
 .hud-done.hud-gone {
   display: none;
+}
+.hud-tap {
+  pointer-events: auto;
 }
 .hud-words {
   font-size: clamp(28px, 7vw, 54px);

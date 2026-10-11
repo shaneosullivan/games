@@ -38,6 +38,10 @@ export interface Croc {
   /** Which way it is swimming, and how open its jaws are, 0 to 1. */
   dir: number;
   jaw: number;
+  /** How far through a bite it is, in seconds, and whether the jaws came
+   *  together on this tick — which is when the noise is made. */
+  bite: number;
+  bit: boolean;
   /** Its own clock, so four of them do not snap in time with each other. */
   phase: number;
 }
@@ -151,6 +155,8 @@ export class Jungle {
         from: at,
         dir: rng() < 0.5 ? -1 : 1,
         jaw: 0,
+        bite: rng() * (CROC.gapes + CROC.holds + CROC.snaps + CROC.rests),
+        bit: false,
         phase: rng() * Math.PI * 2,
       });
     }
@@ -178,14 +184,39 @@ export class Jungle {
         croc.dir = -croc.dir;
         croc.x += croc.dir * CROC.speed * dt;
       }
-      // Jaws: working while somebody is overhead, shut again once they are
-      // not. It has nothing to bite — see `CROC` — so this is pure theatre,
-      // which is the whole job.
+      // The bite, while somebody is overhead; shut again once they are not.
+      // It has nothing to catch — see `CROC` — so this is pure theatre, and
+      // the theatre is in the timing.
+      croc.bit = false;
       const overhead = Math.abs(monkeyX - croc.x) < CROC.notices;
       if (overhead) {
-        const open = (Math.sin(time * CROC.snaps + croc.phase) + 1) / 2;
-        croc.jaw = open;
+        const whole = CROC.gapes + CROC.holds + CROC.snaps + CROC.rests;
+        const was = croc.bite;
+        croc.bite = (croc.bite + dt) % whole;
+        if (croc.bite < was) {
+          // Wrapped: a new bite is starting.
+          croc.bit = false;
+        }
+        const t = croc.bite;
+        if (t < CROC.gapes) {
+          // Opening, slowing as it goes, the way a hinge with weight on it
+          // does.
+          const u = t / CROC.gapes;
+          croc.jaw = 1 - (1 - u) * (1 - u);
+        } else if (t < CROC.gapes + CROC.holds) {
+          croc.jaw = 1;
+        } else if (t < CROC.gapes + CROC.holds + CROC.snaps) {
+          croc.jaw = 1 - (t - CROC.gapes - CROC.holds) / CROC.snaps;
+        } else {
+          // Shut. The frame it first becomes shut is the one that makes the
+          // noise.
+          if (croc.jaw > 0) {
+            croc.bit = true;
+          }
+          croc.jaw = 0;
+        }
       } else {
+        croc.bite = 0;
         croc.jaw += (0 - croc.jaw) * (1 - Math.exp(-CROC.closes * dt));
       }
     }
