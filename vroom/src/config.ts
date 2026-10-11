@@ -2961,6 +2961,25 @@ export const ROAD = {
    * seconds of driving.
    */
   another: 3,
+  /**
+   * How much room two roads need before both are drawn in full, as a
+   * multiple of the ground one road takes up.
+   *
+   * One is barrier touching barrier. Below that there is not room for two
+   * roadsides and the one being driven on gets it, which is the rule above.
+   * Above it there is a strip of grass between the two, which is what two
+   * roads near each other look like and is fine.
+   *
+   * What was not fine was the step between them. A serpentine — somebody's
+   * initial, drawn with a finger — runs its legs a couple of hundred units
+   * apart and pinches to almost nothing where they turn. At the pinch one
+   * leg gave way and the two read as a single wide road; a few lengths on,
+   * past the threshold, the second leg arrived whole, verge and barrier and
+   * all, so the single road appeared to split around a wedge of grass with a
+   * wall down each side of it. Fading the giving-way out across the gap
+   * instead turns that step into the two roads simply drawing apart.
+   */
+  roomy: 1.45,
 } as const;
 
 /**

@@ -113,6 +113,9 @@ export class Track {
   /** Where the road laid on each sample is, along the lap, or -1 for the
    *  samples nothing is laid on. See `twins`. */
   private twin: Array<number> = [];
+  /** And how much the two are in each other's way, nought to one; see
+   *  `ROAD.roomy`. */
+  private twinNear: Array<number> = [];
 
   /** The road's own materials, one per layer: the cached flat ones are
    *  shared with everything else in the game and must not be meddled with. */
@@ -195,10 +198,12 @@ export class Track {
     const n = TRACK.segments;
     const step = this.length / n;
     const room = Track.limit * 2;
+    const roomy = room * ROAD.roomy;
     // Far enough along the lap to be another stretch of road rather than the
     // next few metres of this one.
     const another = CAR.top * ROAD.another;
     this.twin = new Array<number>(n).fill(-1);
+    this.twinNear = new Array<number>(n).fill(0);
     const best = new Array<number>(n).fill(Infinity);
     for (let i = 0; i < n; i++) {
       for (let j = i + 1; j < n; j++) {
@@ -206,7 +211,7 @@ export class Track {
           continue;
         }
         const apart = this.points[i].distanceTo(this.points[j]);
-        if (apart >= room) {
+        if (apart >= roomy) {
           continue;
         }
         if (apart < best[i]) {
@@ -218,6 +223,9 @@ export class Track {
           this.twin[j] = i * step;
         }
       }
+    }
+    for (let i = 0; i < n; i++) {
+      this.twinNear[i] = this.twin[i] < 0 ? 0 : inTheWay(best[i], room, roomy);
     }
   }
 
@@ -582,6 +590,7 @@ export class Track {
      *  is if there is one; see `lapFading`. */
     const laps: Array<number> = [];
     const twins: Array<number> = [];
+    const nears: Array<number> = [];
     const step = this.length / TRACK.segments;
     /* Constructed, not converted — see the note in paint(). */
     const a = new THREE.Color(colour);
@@ -644,6 +653,7 @@ export class Track {
         verts.push(p.x + s.x * room, height, p.z + s.z * room);
         laps.push(at * step);
         twins.push(this.twin[wrapIndex(at)]);
+        nears.push(this.twinNear[wrapIndex(at)]);
       };
       // Two triangles a segment, wound so they face up.
       //
@@ -669,6 +679,7 @@ export class Track {
     geo.setAttribute("color", new THREE.Float32BufferAttribute(colours, 3));
     geo.setAttribute("lapAt", new THREE.Float32BufferAttribute(laps, 1));
     geo.setAttribute("twinAt", new THREE.Float32BufferAttribute(twins, 1));
+    geo.setAttribute("twinNear", new THREE.Float32BufferAttribute(nears, 1));
     // Straight up, stated rather than computed: a ribbon is flat by
     // construction, and this way the lighting does not depend on the winding
     // being right anywhere else.
@@ -795,6 +806,7 @@ export class Track {
     const normals: Array<number> = [];
     const laps: Array<number> = [];
     const twins: Array<number> = [];
+    const nears: Array<number> = [];
     const step = this.length / TRACK.segments;
     const a = new THREE.Color(colour);
     const b = new THREE.Color(stripe.other);
@@ -851,6 +863,9 @@ export class Track {
       const mine = this.twin[i];
       const next = this.twin[j];
       twins.push(mine, next, next, mine, next, mine);
+      const mineNear = this.twinNear[i];
+      const nextNear = this.twinNear[j];
+      nears.push(mineNear, nextNear, nextNear, mineNear, nextNear, mineNear);
 
       const c = Math.floor(i / stripe.every) % 2 === 1 ? b : a;
       for (let v = 0; v < 6; v++) {
@@ -870,6 +885,7 @@ export class Track {
     geo.setAttribute("normal", new THREE.Float32BufferAttribute(normals, 3));
     geo.setAttribute("lapAt", new THREE.Float32BufferAttribute(laps, 1));
     geo.setAttribute("twinAt", new THREE.Float32BufferAttribute(twins, 1));
+    geo.setAttribute("twinNear", new THREE.Float32BufferAttribute(nears, 1));
     geo.setAttribute(
       "uv",
       new THREE.BufferAttribute(new Float32Array((verts.length / 3) * 2), 2),
@@ -916,6 +932,10 @@ export class Track {
     merged.setAttribute(
       "twinAt",
       new THREE.Float32BufferAttribute(new Array<number>(many).fill(-1), 1),
+    );
+    merged.setAttribute(
+      "twinNear",
+      new THREE.Float32BufferAttribute(new Array<number>(many).fill(0), 1),
     );
     const mesh = new THREE.Mesh(merged, this.skin("startLine", LAYER.paint));
     mesh.renderOrder = order(LAYER.paint);
@@ -1119,6 +1139,16 @@ export function ringGap(a: number, b: number): number {
 export function signed(t: number): number {
   const w = wrap(t);
   return w > 0.5 ? w - 1 : w;
+}
+
+/**
+ * How much two roads this far apart are in each other's way: one where
+ * there is not room for both roadsides, nought once there is grass between
+ * them, and eased across the gap between. See `ROAD.roomy`.
+ */
+function inTheWay(apart: number, room: number, roomy: number): number {
+  const t = Math.max(0, Math.min(1, (apart - room) / (roomy - room)));
+  return 1 - t * t * (3 - 2 * t);
 }
 
 /** A sample index, wrapped into the ring. */

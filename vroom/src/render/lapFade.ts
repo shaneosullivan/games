@@ -131,14 +131,17 @@ export function lapFading<T extends THREE.Material>(
         `#include <common>
          attribute float lapAt;
          attribute float twinAt;
+         attribute float twinNear;
          varying float vLapAt;
-         varying float vTwinAt;`,
+         varying float vTwinAt;
+         varying float vTwinNear;`,
       )
       .replace(
         "#include <begin_vertex>",
         `#include <begin_vertex>
          vLapAt = lapAt;
-         vTwinAt = twinAt;`,
+         vTwinAt = twinAt;
+         vTwinNear = twinNear;`,
       );
     shader.fragmentShader = shader.fragmentShader
       .replace(
@@ -153,6 +156,7 @@ export function lapFading<T extends THREE.Material>(
          uniform float holdBack;
          varying float vLapAt;
          varying float vTwinAt;
+         varying float vTwinNear;
          // A lap is a loop, so the long way round is not how far it is.
          float drivingGap(float a, float b, float len) {
            float d = abs(a - b);
@@ -201,7 +205,11 @@ export function lapFading<T extends THREE.Material>(
            // on, or about to be.
            float mineTo = drivingTo(vLapAt, carAt, lapIs);
            float twinTo = drivingTo(vTwinAt, carAt, lapIs);
-           float gives = smoothstep(0.0, yieldBy, mineTo - twinTo);
+           // And only as much as the two are in each other way: all of it
+           // where there is not room for two roadsides, none of it once
+           // there is grass between them -- see ROAD.roomy, which is where
+           // twinNear comes from.
+           float gives = smoothstep(0.0, yieldBy, mineTo - twinTo) * vTwinNear;
            // Except for the road about to be driven on, which is never taken
            // away however plainly something else is laid on it. A lollipop
            // ends in a hairpin, and the road the far side of that hairpin is
