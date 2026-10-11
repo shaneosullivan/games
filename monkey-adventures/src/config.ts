@@ -193,6 +193,54 @@ export const CLIMB = {
   stopsBelow: 6,
 } as const;
 
+/**
+ * The rope a vine is made of.
+ *
+ * A vine used to be a stick on a hinge: one angle, swung as a pendulum, with
+ * a sine drawn along it to suggest a bend. It read as a vine from a
+ * distance and as a windscreen wiper up close, and it could do none of the
+ * things a rope does — it could not whip, it could not go slack, and the
+ * end of it could not lag behind the middle.
+ *
+ * So each one is a line of knots now, free apart from the one tied to the
+ * branch, pulled on by gravity and the wind and put back in line by solving
+ * the distances between them a few times a frame. Verlet, which is the
+ * right tool for this: positions only, no stored velocities to disagree
+ * with the constraints, and a rope that is inelastic because the solver
+ * says so rather than because a spring was stiff enough.
+ */
+export const ROPE = {
+  /**
+   * How many knots a vine is cut into, per hundred pixels of length.
+   *
+   * Enough that the curve is a curve and not a dog-leg, few enough that
+   * thirty vines are cheap. At twelve to the hundred the links are eight
+   * pixels, which is under half the width of the monkey — the bend is
+   * finer than anything the eye is measuring it against.
+   */
+  knotsPer100: 12,
+  /**
+   * How many times the distances are solved each step.
+   *
+   * This is the stiffness. One pass and the rope stretches like elastic
+   * under a swinging monkey; ten and it is a chain. Eight is where a monkey
+   * on the end stopped visibly bobbing.
+   */
+  solves: 8,
+  /** What a knot keeps of its motion each second: a rope swings for a long
+   *  time but not for ever, and a vine that never settles is a distraction
+   *  at the edge of the screen. */
+  keeps: 0.55,
+  /** How much heavier the knot the monkey is holding is than a bare one.
+   *  This is what makes the rope follow the monkey rather than the monkey
+   *  follow the rope. */
+  heavy: 9,
+  /** How hard the wind pushes a knot, in pixels a second squared. Enough to
+   *  see at the end of a long vine and not enough to matter to anybody
+   *  hanging on it. */
+  breeze: 70,
+} as const;
+
 /** Swinging, which is the whole game. */
 export const SWING = {
   /**
@@ -211,6 +259,10 @@ export const SWING = {
    * the stick does while you are off the ground. Pushing the way you are
    * already going makes the swing bigger, which is the whole trick, and it
    * is discoverable by waggling — which is what a child does anyway.
+   *
+   * In radians a second squared. The monkey swings on an exact length —
+   * that is what keeps a vine a vine — so the push it gives is a turn about
+   * the branch, and the rope's shape follows from where its hand ends up.
    */
   pump: 2.6,
   /** The shortest and longest a grab may be, as a fraction of the vine. Grab
@@ -325,6 +377,17 @@ export const JUNGLE = {
   /** Where the vines hang from: the canopy, as a distance down from the top
    *  of the picture. */
   canopy: 14,
+  /**
+   * How many of the near trees are giants, and how far their crowns push
+   * up into the leaves overhead.
+   *
+   * A jungle where every tree stops halfway up the picture is a wood. What
+   * makes it a jungle is that some of them carry on out of sight into the
+   * canopy — and these are the climbable ones, so a giant is also a way up
+   * to the highest vines rather than only a thing to look at.
+   */
+  giants: 0.3,
+  giantInto: 8,
   /** Trees behind, and how far apart. Two layers, the far one moving slower,
    *  which is the cheapest depth there is. */
   treeEvery: 90,

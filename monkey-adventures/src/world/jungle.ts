@@ -1,18 +1,50 @@
-import {CLIMB, CROC, JUNGLE, LAKE, SWING, WIND, WORLD} from "../config";
+import {CLIMB, CROC, JUNGLE, LAKE, ROPE, WIND, WORLD} from "../config";
 
-/** A vine hanging from the canopy, with a swing of its own. */
+/**
+ * One knot of a rope.
+ *
+ * Verlet: where it is and where it was, and the difference between those is
+ * its speed. Nothing stores a velocity, which is exactly why the rope never
+ * fights its own constraints — move a knot and it has, by definition, been
+ * moving.
+ */
+export interface Knot {
+  x: number;
+  y: number;
+  /** Where it was last step. */
+  px: number;
+  py: number;
+  /** How hard it is to shift. One for a bare knot, more for the one with a
+   *  monkey on it. */
+  mass: number;
+}
+
+/** A vine: a line of knots, the first tied to the branch. */
 export interface Vine {
   /** Where it is tied on. */
   x: number;
   y: number;
   long: number;
-  /** Which way it is hanging, in radians from straight down, and how fast
-   *  that is changing. While nobody is holding it this is a gentle sway;
-   *  while the monkey is on it, it is the monkey's swing. */
-  angle: number;
-  spin: number;
-  /** Where in its idle sway it started, so a row of vines is not a chorus
-   *  line all swinging together. */
+  knots: Array<Knot>;
+  /** How long each link wants to be. */
+  link: number;
+  /**
+   * The knot somebody is holding, if anybody is, and where they are holding
+   * it. Set by the monkey each step before the rope is worked out.
+   *
+   * A held rope is two different things at once and has to be treated as
+   * such: above the hand it is pulled straight by the weight on it, and
+   * below the hand it is a loose end swinging about. Simulating the whole
+   * thing freely and then insisting on the length fought the swing to a
+   * standstill — the length came out right and the monkey could not get
+   * going, because re-deriving every knot from the branch each frame threw
+   * away the push that had just been given to it.
+   */
+  pinned: number | null;
+  pinX: number;
+  pinY: number;
+  /** Where in the breeze it started, so a row of vines is not a chorus line
+   *  all swinging together. */
   phase: number;
 }
 
@@ -93,12 +125,25 @@ export class Jungle {
             ? JUNGLE.vineVariesLake
             : JUNGLE.vineVaries)
     ) {
+      const long = JUNGLE.vineLong + (rng() - 0.5) * 2 * JUNGLE.vineVaries2;
+      const many = Math.max(4, Math.round((long / 100) * ROPE.knotsPer100));
+      const link = long / (many - 1);
+      const knots: Array<Knot> = [];
+      for (let k = 0; k < many; k++) {
+        // Hung straight down to start with. One breath of wind and it is
+        // not straight any more.
+        const y = JUNGLE.canopy + k * link;
+        knots.push({x, y, px: x, py: y, mass: 1});
+      }
       this.vines.push({
         x,
         y: JUNGLE.canopy,
-        long: JUNGLE.vineLong + (rng() - 0.5) * 2 * JUNGLE.vineVaries2,
-        angle: 0,
-        spin: 0,
+        long,
+        knots,
+        link,
+        pinned: null,
+        pinX: x,
+        pinY: JUNGLE.canopy,
         phase: rng() * Math.PI * 2,
       });
     }
@@ -133,10 +178,16 @@ export class Jungle {
       ) {
         continue;
       }
+      // Some of them are giants that carry on up into the canopy; see
+      // `JUNGLE.giants`. Measured from the leaves downwards rather than
+      // picked, so a giant reaches them whatever height the picture is.
+      const giant = rng() < JUNGLE.giants;
       this.nearTrees.push({
         x: at,
-        tall: 70 + rng() * 50,
-        wide: 26 + rng() * 16,
+        tall: giant
+          ? WORLD.floor - JUNGLE.canopy + JUNGLE.giantInto + rng() * 6
+          : 70 + rng() * 50,
+        wide: giant ? 30 + rng() * 14 : 26 + rng() * 16,
       });
     }
     for (let x = -60; x < WORLD.far + 200; x += JUNGLE.farTreeEvery) {
@@ -194,13 +245,10 @@ export class Jungle {
         const was = croc.bite;
         croc.bite = (croc.bite + dt) % whole;
         if (croc.bite < was) {
-          // Wrapped: a new bite is starting.
           croc.bit = false;
         }
         const t = croc.bite;
         if (t < CROC.gapes) {
-          // Opening, slowing as it goes, the way a hinge with weight on it
-          // does.
           const u = t / CROC.gapes;
           croc.jaw = 1 - (1 - u) * (1 - u);
         } else if (t < CROC.gapes + CROC.holds) {
@@ -208,8 +256,6 @@ export class Jungle {
         } else if (t < CROC.gapes + CROC.holds + CROC.snaps) {
           croc.jaw = 1 - (t - CROC.gapes - CROC.holds) / CROC.snaps;
         } else {
-          // Shut. The frame it first becomes shut is the one that makes the
-          // noise.
           if (croc.jaw > 0) {
             croc.bit = true;
           }
@@ -222,21 +268,132 @@ export class Jungle {
     }
 
     for (const vine of this.vines) {
-      if (vine === held) {
-        continue;
-      }
-      // Eased towards where the wind says it should be, so a vine that has
-      // just been let go of swings down to the breeze rather than jumping
-      // to it. Each vine has its own phase, so a row of them is a jungle
-      // moving rather than a chorus line.
-      const breeze =
-        Math.sin(time * WIND.slow + vine.phase) * (1 - WIND.rustle) +
-        Math.sin(time * WIND.quick + vine.phase * 1.7) * WIND.rustle;
-      const want = breeze * WIND.sways;
-      const settle = 1 - Math.exp(-SWING.settles * dt);
-      vine.angle += (want - vine.angle) * settle;
-      vine.spin = 0;
+      this.sway(vine, dt, time);
     }
+    void held;
+  }
+
+  /**
+   * One rope, one step.
+   *
+   * Verlet on every knot but the first, then the distances put back several
+   * times over. The order matters: integrate first and correct afterwards,
+   * because a constraint applied to a position is also a correction to the
+   * speed — the knot's "previous position" is left where it was, so pulling
+   * a knot back into line slows it down exactly as a taut rope would.
+   */
+  private sway(vine: Vine, dt: number, time: number): void {
+    // The wind, as a push rather than as a shape. A rope shoved sideways
+    // and left to sort itself out bends the way a rope bends; a rope posed
+    // into a curve is a drawing of one.
+    const breeze =
+      Math.sin(time * WIND.slow + vine.phase) * (1 - WIND.rustle) +
+      Math.sin(time * WIND.quick + vine.phase * 1.7) * WIND.rustle;
+    const push = breeze * ROPE.breeze;
+    const keep = Math.exp(Math.log(ROPE.keeps) * dt);
+    const from = vine.pinned ?? 0;
+
+    // The part of the rope that hangs free: everything below the hand, or
+    // the whole thing if nobody is on it.
+    for (let i = from + 1; i < vine.knots.length; i++) {
+      const knot = vine.knots[i];
+      const vx = (knot.x - knot.px) * keep;
+      const vy = (knot.y - knot.py) * keep;
+      knot.px = knot.x;
+      knot.py = knot.y;
+      const share = i / (vine.knots.length - 1);
+      // Verlet: the step is the last step plus the acceleration times the
+      // square of the time.
+      knot.x += vx + push * share * dt * dt;
+      knot.y += vy + WORLD.gravity * dt * dt;
+    }
+
+    const top = vine.knots[0];
+    top.x = vine.x;
+    top.y = vine.y;
+    top.px = vine.x;
+    top.py = vine.y;
+
+    if (vine.pinned !== null) {
+      // Taut from the branch to the hand, because that is what a rope with
+      // a monkey hanging on it does: the knots in between are strung along
+      // the straight line between the two, evenly.
+      const hand = vine.knots[vine.pinned];
+      hand.px = hand.x;
+      hand.py = hand.y;
+      hand.x = vine.pinX;
+      hand.y = vine.pinY;
+      for (let i = 1; i < vine.pinned; i++) {
+        const t = i / vine.pinned;
+        const knot = vine.knots[i];
+        knot.x = vine.x + (hand.x - vine.x) * t;
+        knot.y = vine.y + (hand.y - vine.y) * t;
+        knot.px = knot.x;
+        knot.py = knot.y;
+      }
+    }
+
+    for (let pass = 0; pass < ROPE.solves; pass++) {
+      for (let i = from; i < vine.knots.length - 1; i++) {
+        const a = vine.knots[i];
+        const b = vine.knots[i + 1];
+        const dx = b.x - a.x;
+        const dy = b.y - a.y;
+        const apart = Math.hypot(dx, dy) || 0.0001;
+        if (apart <= vine.link) {
+          continue;
+        }
+        const off = (apart - vine.link) / apart;
+        // The branch and the hand do not move for anybody.
+        const fixed = i === from;
+        const total = a.mass + b.mass;
+        const toA = fixed ? 0 : b.mass / total;
+        const toB = fixed ? 1 : a.mass / total;
+        a.x += dx * off * toA;
+        a.y += dy * off * toA;
+        b.x -= dx * off * toB;
+        b.y -= dy * off * toB;
+      }
+    }
+
+    // And one pass down the free part that will not be argued with, so the
+    // vine is exactly as long as it is and never a pixel more or less.
+    // Solving converges but never quite arrives, and the leftover reads as
+    // the vine stretching — or sinking.
+    for (let i = from + 1; i < vine.knots.length; i++) {
+      const a = vine.knots[i - 1];
+      const b = vine.knots[i];
+      let dx = b.x - a.x;
+      let dy = b.y - a.y;
+      const apart = Math.hypot(dx, dy);
+      if (apart < 0.0001) {
+        dx = 0;
+        dy = 1;
+      } else {
+        dx /= apart;
+        dy /= apart;
+      }
+      b.x = a.x + dx * vine.link;
+      b.y = a.y + dy * vine.link;
+    }
+
+    // Nothing hangs into the water or through the floor. A vine that dips
+    // into the lake looks like it is sinking, and a rope lying through the
+    // ground looks like nothing at all.
+    for (let i = from + 1; i < vine.knots.length; i++) {
+      const knot = vine.knots[i];
+      const limit = this.surfaceAt(knot.x);
+      if (knot.y > limit) {
+        knot.y = limit;
+        knot.py = limit;
+      }
+    }
+  }
+
+  /** How low anything may hang at this point: the ground, or the top of the
+   *  water where there is water. */
+  surfaceAt(x: number): number {
+    return this.overWater(x) ? WORLD.floor + LAKE.deep - 5 : WORLD.floor;
   }
 
   /** Whether a point is over the water. A little inside the banks, so the
@@ -273,18 +430,17 @@ export class Jungle {
 
   /** Where the far end of a vine is. */
   tip(vine: Vine): {x: number; y: number} {
-    return {
-      x: vine.x + Math.sin(vine.angle) * vine.long,
-      y: vine.y + Math.cos(vine.angle) * vine.long,
-    };
+    const last = vine.knots[vine.knots.length - 1];
+    return {x: last.x, y: last.y};
   }
 
   /** Where a point a fraction of the way down a vine is. */
   along(vine: Vine, at: number): {x: number; y: number} {
-    return {
-      x: vine.x + Math.sin(vine.angle) * vine.long * at,
-      y: vine.y + Math.cos(vine.angle) * vine.long * at,
-    };
+    const i = Math.max(
+      0,
+      Math.min(vine.knots.length - 1, Math.round(at * (vine.knots.length - 1))),
+    );
+    return {x: vine.knots[i].x, y: vine.knots[i].y};
   }
 }
 

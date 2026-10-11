@@ -1,5 +1,5 @@
-import {CLIMB, MONKEY, SWING, WORLD} from "../config";
-import type {Jungle, Tree, Vine} from "../world/jungle";
+import {CLIMB, MONKEY, ROPE, SWING, WORLD} from "../config";
+import type {Jungle, Knot, Tree, Vine} from "../world/jungle";
 
 /** What the monkey is doing. Three things, and the whole game is the moving
  *  between them. */
@@ -30,7 +30,21 @@ export class Monkey {
   /** The vine it is holding, how far down the vine it took hold, and how
    *  long until it may take hold of anything again. */
   vine: Vine | null = null;
+  /** Which knot of the rope it has hold of. */
   grip = 1;
+  private knot: Knot | null = null;
+  /**
+   * The swing, as an angle about the branch and a rate of turn.
+   *
+   * Kept here rather than being read off the rope, because a length that is
+   * exactly right is what makes a vine a vine: an angle and a radius cannot
+   * stretch, whereas a chain of knots has to be argued into not doing. The
+   * rope then takes its shape from where the hand is, which is the way
+   * round that gives both a swing that works and a rope that bends.
+   */
+  private angle = 0;
+  private spin = 0;
+  private radius = 0;
   private waitFor = 0;
   /** The trunk it is on, and how long until it may take one again. */
   tree: Tree | null = null;
@@ -92,8 +106,9 @@ export class Monkey {
       this.facingLeft = lean < 0;
     } else if (lean !== 0 && this.doing !== "swing") {
       this.facingLeft = lean < 0;
-    } else if (this.doing === "swing" && this.vine) {
-      this.facingLeft = this.vine.spin < 0;
+    } else if (this.doing === "swing" && this.knot) {
+      // Facing the way the rope is carrying it.
+      this.facingLeft = this.knot.x - this.knot.px < 0;
     }
   }
 
@@ -231,38 +246,71 @@ export class Monkey {
    */
   private swing(dt: number, lean: number, tapped: boolean): void {
     const vine = this.vine;
-    if (!vine) {
+    const knot = this.knot;
+    if (!vine || !knot) {
       return;
     }
-    const long = Math.max(8, vine.long * this.grip);
-    vine.spin +=
-      (-(WORLD.gravity / long) * Math.sin(vine.angle) + lean * SWING.pump) * dt;
-    vine.spin *= Math.exp(-SWING.slows * dt);
-    vine.spin = Math.max(-SWING.fastest, Math.min(SWING.fastest, vine.spin));
-    vine.angle += vine.spin * dt;
-    // The rope goes slack a little past level, so that is as far as a swing
-    // gets. Stopping the spin there rather than bouncing off it: a monkey
-    // at the top of its swing hangs for a moment, which is exactly the
-    // moment a player is waiting for.
-    if (Math.abs(vine.angle) > SWING.most) {
-      vine.angle = Math.sign(vine.angle) * SWING.most;
-      vine.spin = 0;
+    // A pendulum, in the angle. Leaning pushes in whichever direction the
+    // swing is already going, which is how pumping works — push with the
+    // swing and it grows, push against it and it dies.
+    this.spin +=
+      (-(WORLD.gravity / this.radius) * Math.sin(this.angle) +
+        lean * SWING.pump) *
+      dt;
+    this.spin *= Math.exp(-SWING.slows * dt);
+    this.spin = Math.max(-SWING.fastest, Math.min(SWING.fastest, this.spin));
+    this.angle += this.spin * dt;
+    // A rope goes slack a little past level, so that is as far as a swing
+    // gets. Stopping there rather than bouncing off it: a monkey at the top
+    // of its swing hangs for a moment, which is the moment a player waits
+    // for.
+    if (Math.abs(this.angle) > SWING.most) {
+      this.angle = Math.sign(this.angle) * SWING.most;
+      this.spin = 0;
     }
 
-    this.x = vine.x + Math.sin(vine.angle) * long;
-    this.y = vine.y + Math.cos(vine.angle) * long + MONKEY.tall - 2;
+    const handX = vine.x + Math.sin(this.angle) * this.radius;
+    const handY = vine.y + Math.cos(this.angle) * this.radius;
+    // Told to the rope, which strings itself between the branch and here.
+    vine.pinned = this.gripAt(vine);
+    vine.pinX = handX;
+    vine.pinY = handY;
+
+    this.x = handX;
+    this.y = handY + MONKEY.tall - 2;
     // Where it would fly off to from here, kept up to date so that letting
     // go is simply stopping: the speed is already right.
-    this.vx = Math.cos(vine.angle) * vine.spin * long;
-    this.vy = -Math.sin(vine.angle) * vine.spin * long;
+    this.vx = Math.cos(this.angle) * this.spin * this.radius;
+    this.vy = -Math.sin(this.angle) * this.spin * this.radius;
 
     if (tapped) {
       this.letGo();
     }
   }
 
+  /** Which knot of this vine the hand is on. */
+  private gripAt(vine: Vine): number {
+    return Math.max(
+      1,
+      Math.min(
+        vine.knots.length - 1,
+        Math.round(this.grip * (vine.knots.length - 1)),
+      ),
+    );
+  }
+
   /** Lets go, keeping the speed the swing had built up. */
   letGo(): void {
+    if (this.vine) {
+      // The rope is let go of as well: from here it is a loose vine again,
+      // and it carries on from where the hand left it rather than snapping
+      // anywhere.
+      this.vine.pinned = null;
+    }
+    if (this.knot) {
+      this.knot.mass = 1;
+    }
+    this.knot = null;
     this.vine = null;
     this.doing = "air";
     this.waitFor = MONKEY.letGo;
@@ -286,19 +334,16 @@ export class Monkey {
       if (Math.abs(vine.x - this.x) > vine.long + MONKEY.reach) {
         continue;
       }
-      // How far along the vine the monkey's hands are, as a fraction, found
-      // by projecting onto the vine and then kept inside the part of it that
-      // is worth holding.
-      const dx = this.x - vine.x;
-      const dy = this.handY - vine.y;
-      const ux = Math.sin(vine.angle);
-      const uy = Math.cos(vine.angle);
-      const along = (dx * ux + dy * uy) / vine.long;
-      const at = Math.max(SWING.grabLow, Math.min(1, along));
-      const on = jungle.along(vine, at);
-      const d = Math.hypot(this.x - on.x, this.handY - on.y);
-      if (d <= MONKEY.reach && (!best || d < best.d)) {
-        best = {vine, at, d};
+      // Every knot below the top few, because the rope is a real shape now
+      // and the nearest part of it is a question with a different answer
+      // depending on how it happens to be hanging.
+      const lowest = Math.max(1, Math.floor(vine.knots.length * SWING.grabLow));
+      for (let i = lowest; i < vine.knots.length; i++) {
+        const knot = vine.knots[i];
+        const d = Math.hypot(this.x - knot.x, this.handY - knot.y);
+        if (d <= MONKEY.reach && (!best || d < best.d)) {
+          best = {vine, at: i / (vine.knots.length - 1), d};
+        }
       }
     }
     if (!best) {
@@ -310,16 +355,29 @@ export class Monkey {
   /** Grabs a particular vine at a particular point, handing the speed it was
    *  carrying to the swing so that a fast arrival swings hard. */
   takeHold(vine: Vine, at: number): void {
-    const long = Math.max(8, vine.long * at);
+    const i = Math.max(
+      1,
+      Math.min(vine.knots.length - 1, Math.round(at * (vine.knots.length - 1))),
+    );
+    const knot = vine.knots[i];
     this.vine = vine;
-    this.grip = at;
+    this.knot = knot;
+    this.grip = i / (vine.knots.length - 1);
+    this.radius = Math.max(8, vine.link * i);
     this.doing = "swing";
-    vine.angle = Math.atan2(this.x - vine.x, this.handY - vine.y);
-    // The part of the speed that is going round the circle; the rest is
-    // along the rope and a rope cannot do anything with it.
-    vine.spin =
-      (this.vx * Math.cos(vine.angle) - this.vy * Math.sin(vine.angle)) / long;
-    this.x = vine.x + Math.sin(vine.angle) * long;
-    this.y = vine.y + Math.cos(vine.angle) * long + MONKEY.tall - 2;
+    knot.mass = ROPE.heavy;
+    // Where it caught the rope, and how fast it was going round the branch
+    // when it did: a fast arrival swings hard, which is the whole reward
+    // for letting go at the right moment on the vine before.
+    this.angle = Math.atan2(this.x - vine.x, this.handY - vine.y);
+    this.spin =
+      (this.vx * Math.cos(this.angle) - this.vy * Math.sin(this.angle)) /
+      this.radius;
+    this.spin = Math.max(-SWING.fastest, Math.min(SWING.fastest, this.spin));
+    this.x = vine.x + Math.sin(this.angle) * this.radius;
+    this.y = vine.y + Math.cos(this.angle) * this.radius + MONKEY.tall - 2;
+    vine.pinned = i;
+    vine.pinX = this.x;
+    vine.pinY = this.y - MONKEY.tall + 2;
   }
 }

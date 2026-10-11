@@ -1,7 +1,7 @@
 import {CROC, JUNGLE, LAKE, MONKEY, PAINT, WORLD} from "../config";
 import {bananaSprite, crocSprite, monkeySprite, type Pose} from "../art/monkey";
 import type {Party} from "./particles";
-import type {Jungle, Tree} from "../world/jungle";
+import type {Jungle, Tree, Vine} from "../world/jungle";
 import type {Monkey} from "../entities/monkey";
 import type {Screen} from "./screen";
 
@@ -66,11 +66,10 @@ export function paint(
   // The vines, and the monkey among them: the vine being held is drawn after
   // the others so the monkey is never behind the thing it is holding.
   for (const vine of jungle.vines) {
-    const x = Math.round(vine.x - camera);
-    if (x < -80 || x > w + 80) {
+    if (vine.x - camera < -90 || vine.x - camera > w + 90) {
       continue;
     }
-    rope(g, x, vine.y, vine.angle, vine.long, vine === monkey.vine);
+    rope(g, vine, camera, vine === monkey.vine);
   }
 
   bananas(g, jungle, camera, w);
@@ -260,35 +259,43 @@ function bananas(
   }
 }
 
-/** One vine. Drawn as a line of short segments so it bends like a rope
- *  rather than hanging like a stick. */
+/**
+ * One vine, drawn along its knots.
+ *
+ * Nothing is faked here any more. The old one drew a straight line with a
+ * sine added to suggest a sag; this walks the rope the physics produced,
+ * filling the gaps between knots so that a bend is a bend and a whip is a
+ * whip. The knots are eight pixels apart and the picture is 180 tall, so
+ * the line between two of them is a handful of squares.
+ */
 function rope(
   g: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  angle: number,
-  long: number,
+  vine: Vine,
+  camera: number,
   held: boolean,
 ): void {
-  // One step a pixel, so the rope is a rope and not a dotted line. At this
-  // size that is eighty little squares, which is nothing.
-  const steps = Math.max(8, Math.round(long));
   g.fillStyle = held ? PAINT.vine : PAINT.vineDark;
-  for (let i = 0; i <= steps; i++) {
-    const at = i / steps;
-    // A rope sags: the lower it hangs the further it has swung, which is
-    // near enough true for a thing eighty pixels long and reads as rope.
-    const bend = Math.sin(at * Math.PI) * 1.6;
-    const px = Math.round(
-      x + Math.sin(angle) * long * at + bend * Math.cos(angle),
-    );
-    const py = Math.round(y + Math.cos(angle) * long * at);
-    g.fillRect(px, py, 2, 2);
+  const knots = vine.knots;
+  for (let i = 0; i < knots.length - 1; i++) {
+    const ax = knots[i].x - camera;
+    const ay = knots[i].y;
+    const bx = knots[i + 1].x - camera;
+    const by = knots[i + 1].y;
+    const steps = Math.max(1, Math.round(Math.hypot(bx - ax, by - ay)));
+    for (let k = 0; k <= steps; k++) {
+      const t = k / steps;
+      g.fillRect(
+        Math.round(ax + (bx - ax) * t),
+        Math.round(ay + (by - ay) * t),
+        2,
+        2,
+      );
+    }
   }
   // A leafy knot at the top, so a vine starts somewhere rather than
   // appearing out of the canopy.
   g.fillStyle = PAINT.canopyLight;
-  g.fillRect(Math.round(x) - 3, Math.round(y) - 2, 7, 4);
+  g.fillRect(Math.round(vine.x - camera) - 3, Math.round(vine.y) - 2, 7, 4);
 }
 
 function drawMonkey(
