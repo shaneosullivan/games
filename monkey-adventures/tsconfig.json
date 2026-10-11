@@ -1,0 +1,31 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedIndexedAccess": false,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "types": ["vite/client"],
+    /*
+     * Where `three` comes from, for TypeScript. Files in the repo's shared/
+     * folder import it from above this one, where the only node_modules is the
+     * repo root's — which a deploy never installs. Pointing it at this game's
+     * own typings settles it wherever the build runs; the runtime half is the
+     * alias in vite.config.ts.
+     */
+    "baseUrl": ".",
+    "paths": {
+      "three": ["./node_modules/@types/three"],
+      "three/*": ["./node_modules/@types/three/*"]
+    }
+  },
+  "include": ["src"]
+}
