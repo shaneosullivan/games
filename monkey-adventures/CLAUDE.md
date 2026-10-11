@@ -1,9 +1,24 @@
 # Working on Monkey adventures
 
-A self-contained 3D web game in this repo of games. TypeScript + Three.js +
-Vite, built to one `index.html` that the gallery in the repo root publishes.
-This file is how to work on it; see the root `README.md` and the `bee` game for
-the wider patterns.
+A self-contained **2D pixel** web game in this repo of games. TypeScript +
+Vite and a plain 2D canvas — no three.js, which is the one way this game
+differs from its neighbours, because the plan asks for pixel art and a 3D
+engine has nothing to offer it. Built to one `index.html` that the gallery in
+the repo root publishes. This file is how to work on it; see the root
+`README.md` for the wider patterns.
+
+## How the picture works
+
+Everything is drawn once, small — `SCREEN.tall` is 180 pixels — and then
+blown up by CSS with `image-rendering: pixelated`. That is the whole look: a
+pixel is a thing you can count. Two rules follow from it and both matter.
+
+- **Every coordinate is in picture pixels**, never screen pixels. A monkey is
+  fifteen pixels tall on a phone and on an iPad, so the game is the same game
+  on both. `render/screen.ts` is the only file that has heard of a device.
+- **Snap to whole pixels before drawing.** Half a pixel of scroll turns one
+  crisp trunk into two grey ones, and the shimmer while scrolling is the
+  thing that makes pixel art look broken.
 
 ## Commands
 
@@ -40,9 +55,11 @@ columns, braces on every `if`, and `Array<T>` over `T[]`. The configs
 (`.prettierrc.cjs`, `eslint.config.js`) live at the repo root and cover this
 folder automatically.
 
-- **Prefer generating 3D assets in code** — merged primitives with vertex
-  colours, toon-shaded, one draw call per assembly — the way the bee game does.
-  Model files are the exception, for the few things worth them.
+- **The art is written down, not imported.** Sprites are letter maps in
+  `art/`, baked once into little canvases. At thirteen pixels across that is
+  the only honest way to do it: shapes rounded to a grid this small come out
+  as mush, and the point of the look is that every pixel was placed on
+  purpose.
 - **Comments explain why, not what.** Record a constraint or a decision that
   isn't visible from the code.
 - Keep tunable numbers together and named, not as magic numbers at the call
@@ -52,10 +69,18 @@ folder automatically.
 
 ```
 src/
-  main.ts        the game
-  assets/        images and models (imported by Vite; empty to start)
+  config.ts      every tunable number, grouped, with the reason beside it
+  main.ts        the way in
+  game.ts        the clock, the camera, and keeping the monkey on screen
+  core/input.ts  a stick on the left half, a jump on the right
+  render/        the pixel screen, and the painting of the jungle
+  art/           the sprites, as letter maps
+  entities/      the monkey: running, climbing, flying, swinging
+  world/         the jungle: vines, trees, dapples, home
+docs/
+  plan-for-app.md  what the game is meant to be
 index.html       the entry point; the app mounts into #app
-vite.config.ts   single-file build, relative base, .glb treated as an asset
+vite.config.ts   single-file build, relative base, dev server on 5174
 card.png         the gallery thumbnail — replace the solid colour with real art
 game.json        title, description and status, read by site/build.mjs
 ```

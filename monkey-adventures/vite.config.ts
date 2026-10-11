@@ -37,7 +37,7 @@ export default defineConfig({
     // refuses to serve anything outside it unless told to.
     fs: {allow: [".", ".."]},
     host: true,
-    port: 5173,
+    port: 5174,
   },
 
   build: {

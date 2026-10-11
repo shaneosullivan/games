@@ -1,9 +1,12 @@
 # Monkey adventures
 
-A new game.
+Swing from vine to vine through the jungle, climb the trees, and get home.
 
-A touch-native 3D web game. TypeScript + Three.js + Vite, built to one
-self-contained `index.html` and published by the gallery in the repo root.
+A touch-native 2D pixel game: TypeScript, Vite and a plain canvas, built to
+one self-contained `index.html` and published by the gallery in the repo
+root. The picture is drawn 180 pixels tall and blown up to fit the glass, so
+a pixel is a thing you can count — see `CLAUDE.md` for what follows from
+that.
 
 ## Running it
 
@@ -19,14 +22,22 @@ icon.
 
 ## Controls
 
-The starter scene is a red ball on a green field:
+Two thumbs, and nothing that needs a keyboard.
 
-- **Finger / mouse** — hold and the ball heads for where you are pointing.
-- **Arrow keys or WASD** — move.
-- **Space** — jump.
+- **Left half of the screen** is a stick, wherever your thumb goes down.
+  Left and right runs along the ground; up and down climbs a tree you are
+  holding; while swinging, pushing the way you are already going pumps the
+  swing higher.
+- **Right half** is a tap: jump from the ground, let go of a vine, or leap
+  off a tree.
 
-Replace all of this with the real game — it exists only so a fresh project runs
-and shows something.
+A vine is caught for you the moment you touch one — the skill is in choosing
+when to let go. A tree is climbed only when you ask for it, by pushing up at
+the trunk, because trees are everywhere and grabbing them by accident would
+end every swing.
+
+The arrow keys or WASD and the space bar do the same jobs on a laptop, which
+is how it gets built; the iPad is what it is for.
 
 ## Commands
 
