@@ -77,7 +77,7 @@ export class Monkey {
     } else if (this.doing === "ground") {
       this.onGround(dt, lean, up, tapped, jungle);
     } else {
-      this.inAir(dt, up, jungle);
+      this.inAir(dt, jungle);
     }
 
     if (this.doing !== "swing" && this.doing !== "climb") {
@@ -127,7 +127,7 @@ export class Monkey {
   }
 
   /** Thrown, and waiting to land or to catch something. */
-  private inAir(dt: number, up: number, jungle: Jungle): void {
+  private inAir(dt: number, jungle: Jungle): void {
     this.vy += WORLD.gravity * dt;
     const slow = Math.exp(-MONKEY.drag * dt);
     this.vx *= slow;
@@ -140,20 +140,18 @@ export class Monkey {
       this.doing = "ground";
       return;
     }
-    // A trunk is taken in mid-air only if it is asked for, unlike a vine.
+    // Nothing in the air takes hold of a tree. A tree is climbed from the
+    // ground, by walking up to it and pushing up.
     //
     // Catching them automatically was the first try and it ate the game:
     // there is a tree every ninety pixels, so every swing ended a quarter of
-    // a second later stuck to the next trunk, and the monkey never got from
-    // one vine to another at all. Measured over a minute of play — no vine
-    // was ever reached twice. A vine is the thing you are aiming at and is
-    // caught for you; a tree is a thing you decide to climb.
-    if (this.waitForTree <= 0 && up < -0.3) {
-      const tree = jungle.trunkAt(this.x, this.handY);
-      if (tree) {
-        this.takeTree(tree);
-      }
-    }
+    // a second later stuck to the next trunk, and no vine was ever reached
+    // twice. Asking for it with the stick was the second, and that was
+    // nearly as bad — the same thumb pumps the swing, so a child holding it
+    // up and forwards through a release was snatched out of the flight by
+    // the next trunk along. A flight should end where it was aimed: at a
+    // vine, or on the floor.
+    void jungle;
   }
 
   /**
