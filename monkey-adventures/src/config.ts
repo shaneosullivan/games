@@ -93,6 +93,40 @@ export const LAKE = {
   watchFor: 0.9,
 } as const;
 
+/**
+ * The crocodiles in the lake.
+ *
+ * All menace and no teeth, on purpose. They swim about in the water with
+ * their eyes above the surface, and they open and shut their jaws when the
+ * monkey goes over them — which is the whole of what they do. They cannot
+ * catch anybody: the lowest a swing gets over the lake is forty-odd pixels
+ * above the water, measured, so there is nothing for a crocodile to reach.
+ * And falling in beside one is no worse than falling in anywhere, because
+ * being eaten is not a thing that happens in this game.
+ *
+ * That is not a fudge, it is the point. A small child wants the jungle to
+ * have crocodiles in it; a small child does not want to be eaten by one.
+ * The fright is free and the cost is nothing.
+ */
+export const CROC = {
+  /** How many, spread along the lake. Few enough to swim between. */
+  count: 4,
+  /** How fast they swim, in pixels a second, and how far they wander from
+   *  where they started before turning round. Slow, so a child can watch
+   *  one and know where it will be. */
+  speed: 13,
+  roams: 48,
+  /** How near overhead the monkey has to be before one notices, in pixels. */
+  notices: 46,
+  /** How quickly the jaws work once they have noticed, in radians a second,
+   *  and the widest they open, in pixels of drop. Three pixels is a lot of
+   *  mouth when the whole animal is five tall. */
+  snaps: 5.5,
+  opens: 3,
+  /** How quickly the jaws shut again once nobody is overhead. */
+  closes: 7,
+} as const;
+
 /** The monkey. */
 export const MONKEY = {
   /** How big the sprite is, in picture pixels. */
@@ -358,6 +392,9 @@ export const PAINT = {
   dapple: "#fff3b0",
   home: "#b5793f",
   homeDark: "#8a5a2d",
+  croc: "#3f7b3f",
+  crocDark: "#2d5a2e",
+  crocMouth: "#8c3a4a",
   water: "#4aa3c7",
   waterDark: "#2f7fa3",
   waterLight: "#8fd6ea",

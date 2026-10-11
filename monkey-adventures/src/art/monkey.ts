@@ -21,6 +21,9 @@ const PALETTE: Record<string, string> = {
   t: "#8a5a32",
   y: "#ffd257",
   b: "#c98f2a",
+  g: "#3f7b3f",
+  G: "#2d5a2e",
+  w: "#f2efe6",
 };
 
 /** Arms up: hanging from a vine, and in the air, which look the same and
@@ -132,7 +135,40 @@ const BANANA = [
   "...bb..",
 ];
 
+/**
+ * A crocodile, mostly under the water.
+ *
+ * Two pieces, because the jaw has to move: the body carries the eyes, the
+ * back and the upper jaw, and the lower jaw is drawn under it and dropped
+ * by a pixel or three to open the mouth. Facing right, which is the way the
+ * jungle goes; swimming the other way flips it.
+ */
+const CROC_BODY = [
+  "..........yy......",
+  "....GG..GGggGG....",
+  "..GGGGGGgggggggggg",
+  "GGgggggggggggggggg",
+  "..gggggggggg......",
+];
+
+/** The lower jaw, drawn under the snout. */
+const CROC_JAW = ["..............GGGG", "..............wwww"];
+
 const baked = new Map<string, HTMLCanvasElement>();
+
+/** The crocodile, body and jaw, each baked facing both ways. */
+export function crocSprite(
+  part: "body" | "jaw",
+  facingLeft: boolean,
+): HTMLCanvasElement {
+  const key = `croc-${part}${facingLeft ? "<" : ">"}`;
+  let had = baked.get(key);
+  if (!had) {
+    had = bake(part === "body" ? CROC_BODY : CROC_JAW, facingLeft);
+    baked.set(key, had);
+  }
+  return had;
+}
 
 /** The banana, baked like the monkey is. */
 export function bananaSprite(): HTMLCanvasElement {

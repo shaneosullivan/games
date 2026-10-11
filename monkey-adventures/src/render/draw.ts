@@ -1,5 +1,5 @@
-import {JUNGLE, LAKE, MONKEY, PAINT, WORLD} from "../config";
-import {bananaSprite, monkeySprite, type Pose} from "../art/monkey";
+import {CROC, JUNGLE, LAKE, MONKEY, PAINT, WORLD} from "../config";
+import {bananaSprite, crocSprite, monkeySprite, type Pose} from "../art/monkey";
 import type {Party} from "./particles";
 import type {Jungle, Tree} from "../world/jungle";
 import type {Monkey} from "../entities/monkey";
@@ -31,6 +31,11 @@ export function paint(
 
   // Two layers of trees at different speeds. The far ones are lighter and
   // hazier, which is most of what makes them look far away.
+  // The far trees are kept off the water. They are a backdrop at a
+  // parallax, so there is no fixed place they "are": a tree behind the lake
+  // slides across it as the camera moves, and one standing in the water is
+  // wrong however faint it is. Clipped to the land, so behind the lake
+  // there is open sky — which is what is behind a lake.
   layer(
     g,
     jungle.farTrees,
@@ -39,6 +44,10 @@ export function paint(
     PAINT.trunkDark,
     w,
     0.72,
+    {
+      from: Math.round(LAKE.from - camera),
+      to: Math.round(LAKE.from + LAKE.wide - camera),
+    },
   );
   layer(
     g,
@@ -52,6 +61,7 @@ export function paint(
 
   ground(g, w, h, camera);
   lake(g, w, camera, time);
+  crocs(g, jungle, camera, w);
 
   // The vines, and the monkey among them: the vine being held is drawn after
   // the others so the monkey is never behind the thing it is holding.
@@ -108,11 +118,17 @@ function layer(
   bark: string,
   w: number,
   solid: number,
+  /** A stretch of screen to leave empty — the lake, for the layer that
+   *  would otherwise paddle in it. */
+  notBetween?: {from: number; to: number},
 ): void {
   g.globalAlpha = solid;
   for (const tree of trees) {
     const x = Math.round(tree.x - shift);
     if (x < -tree.wide * 2 || x > w + tree.wide * 2) {
+      continue;
+    }
+    if (notBetween && x > notBetween.from - 6 && x < notBetween.to + 6) {
       continue;
     }
     const base = WORLD.floor;
@@ -187,6 +203,40 @@ function lake(
       continue;
     }
     g.fillRect(from + x, top - 4 + Math.round(bob), 4, 1);
+  }
+}
+
+/**
+ * The crocodiles, lying at the waterline.
+ *
+ * Drawn after the water and before everything else in the lake, so they
+ * read as being *in* it: the body sits with its belly below the surface and
+ * only the back, the eyes and the snout above. The lower jaw is a separate
+ * piece dropped by up to three pixels, with the mouth painted in behind it
+ * — three pixels is a wide open mouth on an animal five pixels tall.
+ */
+function crocs(
+  g: CanvasRenderingContext2D,
+  jungle: Jungle,
+  camera: number,
+  w: number,
+): void {
+  const line = WORLD.floor + LAKE.deep - 7;
+  for (const croc of jungle.crocs) {
+    const x = Math.round(croc.x - camera);
+    if (x < -24 || x > w + 24) {
+      continue;
+    }
+    const left = croc.dir < 0;
+    const drop = Math.round(croc.jaw * CROC.opens);
+    // The mouth behind the jaw, so an open one is dark inside rather than a
+    // gap you can see the lake through.
+    if (drop > 0) {
+      g.fillStyle = PAINT.crocMouth;
+      g.fillRect(x + (left ? -9 : 9), line + 3, 9, drop + 1);
+    }
+    g.drawImage(crocSprite("jaw", left), x - 9, line + 3 + drop);
+    g.drawImage(crocSprite("body", left), x - 9, line);
   }
 }
 

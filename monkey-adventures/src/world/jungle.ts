@@ -1,4 +1,4 @@
-import {CLIMB, JUNGLE, LAKE, SWING, WIND, WORLD} from "../config";
+import {CLIMB, CROC, JUNGLE, LAKE, SWING, WIND, WORLD} from "../config";
 
 /** A vine hanging from the canopy, with a swing of its own. */
 export interface Vine {
@@ -30,6 +30,18 @@ export interface Banana {
   taken: boolean;
 }
 
+/** A crocodile in the lake: swims, watches, and snaps at nothing. */
+export interface Croc {
+  x: number;
+  /** Where it started, so it wanders about that rather than drifting off. */
+  from: number;
+  /** Which way it is swimming, and how open its jaws are, 0 to 1. */
+  dir: number;
+  jaw: number;
+  /** Its own clock, so four of them do not snap in time with each other. */
+  phase: number;
+}
+
 export interface Dapple {
   x: number;
   y: number;
@@ -50,6 +62,7 @@ export class Jungle {
   readonly farTrees: Array<Tree> = [];
   readonly dapples: Array<Dapple> = [];
   readonly bananas: Array<Banana> = [];
+  readonly crocs: Array<Croc> = [];
   /** Where home is: the end of the jungle. */
   readonly homeX = WORLD.far;
   /** The water, halfway along. */
@@ -104,12 +117,20 @@ export class Jungle {
       });
     }
     for (let x = -60; x < WORLD.far + 200; x += JUNGLE.treeEvery) {
-      // Nothing grows in the lake.
-      if (this.overWater(x)) {
+      // Nothing grows in the lake — tested against where the tree actually
+      // ends up, not against the spacing it started from. Jittering first
+      // and asking afterwards put trees up to twenty pixels into the water,
+      // which is exactly far enough to look like a mistake.
+      const at = x + (rng() - 0.5) * 40;
+      if (
+        this.overWater(at) ||
+        this.overWater(at - 16) ||
+        this.overWater(at + 16)
+      ) {
         continue;
       }
       this.nearTrees.push({
-        x: x + (rng() - 0.5) * 40,
+        x: at,
         tall: 70 + rng() * 50,
         wide: 26 + rng() * 16,
       });
@@ -119,6 +140,18 @@ export class Jungle {
         x: x + (rng() - 0.5) * 50,
         tall: 56 + rng() * 40,
         wide: 20 + rng() * 14,
+      });
+    }
+    // Crocodiles, spread along the water with room to swim between them.
+    for (let i = 0; i < CROC.count; i++) {
+      const at =
+        LAKE.from + ((i + 0.5) / CROC.count) * LAKE.wide + (rng() - 0.5) * 30;
+      this.crocs.push({
+        x: at,
+        from: at,
+        dir: rng() < 0.5 ? -1 : 1,
+        jaw: 0,
+        phase: rng() * Math.PI * 2,
       });
     }
     for (let i = 0; i < JUNGLE.dapples; i++) {
@@ -133,7 +166,30 @@ export class Jungle {
   /** The idle sway of every vine nobody is on. Ticked rather than drawn from
    *  the clock so that a vine the monkey lets go of carries on from where it
    *  was, instead of snapping back to wherever the clock says it should be. */
-  update(dt: number, time: number, held: Vine | null): void {
+  update(dt: number, time: number, held: Vine | null, monkeyX = -1e9): void {
+    for (const croc of this.crocs) {
+      croc.x += croc.dir * CROC.speed * dt;
+      // Turning at the end of its beat, and never out of the water.
+      if (
+        Math.abs(croc.x - croc.from) > CROC.roams ||
+        croc.x < LAKE.from + 10 ||
+        croc.x > LAKE.from + LAKE.wide - 10
+      ) {
+        croc.dir = -croc.dir;
+        croc.x += croc.dir * CROC.speed * dt;
+      }
+      // Jaws: working while somebody is overhead, shut again once they are
+      // not. It has nothing to bite — see `CROC` — so this is pure theatre,
+      // which is the whole job.
+      const overhead = Math.abs(monkeyX - croc.x) < CROC.notices;
+      if (overhead) {
+        const open = (Math.sin(time * CROC.snaps + croc.phase) + 1) / 2;
+        croc.jaw = open;
+      } else {
+        croc.jaw += (0 - croc.jaw) * (1 - Math.exp(-CROC.closes * dt));
+      }
+    }
+
     for (const vine of this.vines) {
       if (vine === held) {
         continue;

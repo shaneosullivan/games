@@ -100,7 +100,7 @@ export class Game {
       tapped,
       this.jungle,
     );
-    this.jungle.update(dt, this.time, this.monkey.vine);
+    this.jungle.update(dt, this.time, this.monkey.vine, this.monkey.x);
     this.takeBananas();
     this.checkTheWater();
 
