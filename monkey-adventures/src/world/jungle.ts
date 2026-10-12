@@ -1,4 +1,15 @@
-import {CLIMB, CROC, HOME, JUNGLE, LAKE, ROPE, WIND, WORLD} from "../config";
+import {
+  CLIMB,
+  CROC,
+  HOME,
+  MONKEY,
+  JUNGLE,
+  LAKE,
+  ROPE,
+  VOLCANO,
+  WIND,
+  WORLD,
+} from "../config";
 
 /**
  * One knot of a rope.
@@ -8,6 +19,10 @@ import {CLIMB, CROC, HOME, JUNGLE, LAKE, ROPE, WIND, WORLD} from "../config";
  * fights its own constraints — move a knot and it has, by definition, been
  * moving.
  */
+/** How far below its hands the middle of the monkey is, which is the part
+ *  a banana is measured against. */
+const MONKEY_MIDDLE = MONKEY.tall / 2 - 2;
+
 export interface Knot {
   x: number;
   y: number;
@@ -82,6 +97,17 @@ export interface Croc {
   phase: number;
 }
 
+/** A vent in the crater, which fires on its own beat. */
+export interface Vent {
+  x: number;
+  /** Where it is in its cycle, in seconds. */
+  at: number;
+  /** How far the column is up, 0 to 1, and whether it is still only
+   *  grumbling. */
+  up: number;
+  warning: boolean;
+}
+
 /** One of the monkeys waiting at home. */
 export interface Family {
   x: number;
@@ -114,6 +140,9 @@ export class Jungle {
   readonly bananas: Array<Banana> = [];
   readonly crocs: Array<Croc> = [];
   readonly family: Array<Family> = [];
+  readonly vents: Array<Vent> = [];
+  readonly volcanoFrom = VOLCANO.from;
+  readonly volcanoTo = VOLCANO.from + VOLCANO.wide;
   /** Where home is: the end of the jungle. */
   readonly homeX = WORLD.far;
   /** The water, halfway along. */
@@ -130,17 +159,14 @@ export class Jungle {
     for (
       let x = JUNGLE.vineEvery;
       x < WORLD.far - JUNGLE.vineEvery;
-      x +=
-        (this.overWater(x + JUNGLE.vineEvery)
-          ? JUNGLE.vineEveryLake
-          : JUNGLE.vineEvery) +
-        (rng() - 0.5) *
-          2 *
-          (this.overWater(x + JUNGLE.vineEvery)
-            ? JUNGLE.vineVariesLake
-            : JUNGLE.vineVaries)
+      x += this.vineGap(x + JUNGLE.vineEvery, rng)
     ) {
-      const long = JUNGLE.vineLong + (rng() - 0.5) * 2 * JUNGLE.vineVaries2;
+      // Over the crater the vines are the long ones, and they are the same
+      // length as each other: a crossing where every vine is a different
+      // height is a crossing nobody can learn.
+      const long = this.overCrater(x)
+        ? VOLCANO.vineLong
+        : JUNGLE.vineLong + (rng() - 0.5) * 2 * JUNGLE.vineVaries2;
       const many = Math.max(4, Math.round((long / 100) * ROPE.knotsPer100));
       const link = long / (many - 1);
       const knots: Array<Knot> = [];
@@ -162,24 +188,31 @@ export class Jungle {
         phase: rng() * Math.PI * 2,
       });
     }
-    // Bananas between the vines, not on them: hung in the gap, at about the
-    // height a monkey passes through at the bottom of a swing. That is the
-    // point of them — they are not a detour, they are a reason to swing low
-    // and long instead of letting go early and safe.
-    for (let i = 0; i + 1 < this.vines.length; i++) {
+    // Bananas on the arcs the vines swing through.
+    //
+    // On a vine's arc rather than in the gap between two, because the gap
+    // is the one place a swing never reaches — over the midpoint the
+    // monkey is at the bottom of its swing and low, and by the time it is
+    // high it is past. The high ones sit far enough round that only a
+    // properly pumped swing sweeps them, and far too high for a jump.
+    for (const vine of this.vines) {
       if (rng() > JUNGLE.bananaOdds) {
         continue;
       }
-      const left = this.vines[i];
-      const right = this.vines[i + 1];
-      const mid = (left.x + right.x) / 2;
-      const hang = Math.max(left.long, right.long);
+      const high = rng() < JUNGLE.bananaHighOdds;
+      const angle =
+        (high ? JUNGLE.bananaHighAt2 : JUNGLE.bananaAt) *
+        (rng() < 0.5 ? -1 : 1);
+      // Where the monkey's middle is when it passes through that part of
+      // the arc: hanging by its hands, so half a body below the rope's end.
+      const reach = vine.long;
       this.bananas.push({
-        x: mid,
-        y: JUNGLE.canopy + hang * JUNGLE.bananaHigh + rng() * 10,
+        x: vine.x + Math.sin(angle) * reach,
+        y: JUNGLE.canopy + Math.cos(angle) * reach + MONKEY_MIDDLE,
         taken: false,
       });
     }
+
     for (let x = -60; x < WORLD.far + 200; x += JUNGLE.treeEvery) {
       // Nothing grows in the lake — tested against where the tree actually
       // ends up, not against the spacing it started from. Jittering first
@@ -212,6 +245,19 @@ export class Jungle {
         wide: 20 + rng() * 14,
       });
     }
+    // The vents, spread across the crater.
+    const craterFrom = VOLCANO.from + VOLCANO.wide * VOLCANO.slope;
+    const craterWide = VOLCANO.wide * (1 - VOLCANO.slope * 2);
+    for (let i = 0; i < VOLCANO.vents; i++) {
+      this.vents.push({
+        x: craterFrom + ((i + 0.5) / VOLCANO.vents) * craterWide,
+        // Spread round the cycle so they do not all go off together.
+        at: (i / VOLCANO.vents) * VOLCANO.every + rng() * 0.3,
+        up: 0,
+        warning: false,
+      });
+    }
+
     // The ones waiting at home, either side of the hut.
     for (let i = 0; i < HOME.family; i++) {
       const at =
@@ -312,6 +358,25 @@ export class Jungle {
       // about exactly once rather than every frame it is up.
       if (wasUp <= 0.25 && croc.rise > 0.25) {
         croc.rose = true;
+      }
+    }
+
+    for (const vent of this.vents) {
+      vent.at = (vent.at + dt) % VOLCANO.every;
+      const firing = VOLCANO.warns + VOLCANO.spurts;
+      if (vent.at < VOLCANO.warns) {
+        // Grumbling: glowing, bubbling, not yet dangerous. A hazard a
+        // child cannot see coming is a trick rather than a hazard.
+        vent.warning = true;
+        vent.up = 0;
+      } else if (vent.at < firing) {
+        vent.warning = false;
+        // Up fast and down slower, the way a thrown thing goes.
+        const t = (vent.at - VOLCANO.warns) / VOLCANO.spurts;
+        vent.up = Math.sin(t * Math.PI);
+      } else {
+        vent.warning = false;
+        vent.up = 0;
       }
     }
 
@@ -441,7 +506,53 @@ export class Jungle {
   /** How low anything may hang at this point: the ground, or the top of the
    *  water where there is water. */
   surfaceAt(x: number): number {
-    return this.overWater(x) ? WORLD.floor + LAKE.deep - 5 : WORLD.floor;
+    if (this.overWater(x)) {
+      return WORLD.floor + LAKE.deep - 5;
+    }
+    return this.floorAt(x);
+  }
+
+  /** How far apart the next vine should be, which depends on what is under
+   *  it: close over the water, closer still over the lava. */
+  private vineGap(x: number, rng: () => number): number {
+    if (this.overCrater(x)) {
+      return VOLCANO.vineEvery;
+    }
+    if (this.overWater(x)) {
+      return JUNGLE.vineEveryLake + (rng() - 0.5) * 2 * JUNGLE.vineVariesLake;
+    }
+    return JUNGLE.vineEvery + (rng() - 0.5) * 2 * JUNGLE.vineVaries;
+  }
+
+  /**
+   * How high the ground is here.
+   *
+   * Flat jungle, except where the volcano lifts it: up one slope, across
+   * the crater, down the other. Eased rather than ramped, so the hill has
+   * shoulders instead of corners.
+   */
+  floorAt(x: number): number {
+    return WORLD.floor - this.hillAt(x);
+  }
+
+  /** How far the volcano lifts the ground at this point. */
+  hillAt(x: number): number {
+    if (x <= VOLCANO.from || x >= VOLCANO.from + VOLCANO.wide) {
+      return 0;
+    }
+    const along = (x - VOLCANO.from) / VOLCANO.wide;
+    const up = Math.min(along / VOLCANO.slope, (1 - along) / VOLCANO.slope, 1);
+    // Eased, so the slopes meet the flat without a crease.
+    const eased = up * up * (3 - 2 * up);
+    return VOLCANO.hill * eased;
+  }
+
+  /** Whether a point is over the lava in the crater. */
+  overCrater(x: number): boolean {
+    return (
+      x > VOLCANO.from + VOLCANO.wide * VOLCANO.slope &&
+      x < VOLCANO.from + VOLCANO.wide * (1 - VOLCANO.slope)
+    );
   }
 
   /** Whether a point is over the water. A little inside the banks, so the
@@ -463,8 +574,8 @@ export class Jungle {
       if (Math.abs(x - tree.x) > CLIMB.reach) {
         continue;
       }
-      const top = WORLD.floor - tree.tall + CLIMB.stopsBelow;
-      if (y >= top && y <= WORLD.floor) {
+      const top = this.floorAt(tree.x) - tree.tall + CLIMB.stopsBelow;
+      if (y >= top && y <= this.floorAt(tree.x)) {
         return tree;
       }
     }
@@ -473,7 +584,7 @@ export class Jungle {
 
   /** How high up a trunk a monkey may go. */
   topOf(tree: Tree): number {
-    return WORLD.floor - tree.tall + CLIMB.stopsBelow;
+    return this.floorAt(tree.x) - tree.tall + CLIMB.stopsBelow;
   }
 
   /** Where the far end of a vine is. */

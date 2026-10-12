@@ -1,4 +1,13 @@
-import {CROC, HOME, JUNGLE, LAKE, MONKEY, PAINT, WORLD} from "../config";
+import {
+  CROC,
+  HOME,
+  JUNGLE,
+  LAKE,
+  MONKEY,
+  PAINT,
+  VOLCANO,
+  WORLD,
+} from "../config";
 import {bananaSprite, crocSprite, monkeySprite, type Pose} from "../art/monkey";
 import type {Party} from "./particles";
 import type {Jungle, Tree, Vine} from "../world/jungle";
@@ -60,11 +69,14 @@ export function paint(
     PAINT.trunk,
     w,
     1,
+    undefined,
+    x => jungle.floorAt(x),
   );
 
-  ground(g, w, h, camera);
+  ground(g, jungle, w, h, camera);
   lake(g, w, camera, time);
   crocs(g, jungle, camera, w);
+  lava(g, jungle, camera, w, time);
 
   // The vines, and the monkey among them: the vine being held is drawn after
   // the others so the monkey is never behind the thing it is holding.
@@ -124,6 +136,9 @@ function layer(
   /** A stretch of screen to leave empty — the lake, for the layer that
    *  would otherwise paddle in it. */
   notBetween?: {from: number; to: number},
+  /** Where the ground is under a tree, so the near ones stand on the
+   *  volcano rather than hanging over it. */
+  baseAt: (x: number) => number = () => WORLD.floor,
 ): void {
   g.globalAlpha = solid;
   for (const tree of trees) {
@@ -134,10 +149,12 @@ function layer(
     if (notBetween && x > notBetween.from - 6 && x < notBetween.to + 6) {
       continue;
     }
-    const base = WORLD.floor;
+    const base = Math.round(baseAt(tree.x));
     const top = Math.round(base - tree.tall);
     g.fillStyle = bark;
-    g.fillRect(x - 3, top + 8, 6, base - top - 8);
+    // Trunks a little thicker than they were: six pixels read as saplings
+    // in a jungle of this density.
+    g.fillRect(x - 4, top + 8, 9, base - top - 8);
     g.fillStyle = leaf;
     // Three overlapping blocks rather than a circle: a circle at this size
     // has to be drawn as blocks anyway, and choosing them is better than
@@ -153,22 +170,37 @@ function layer(
 /** The jungle floor. */
 function ground(
   g: CanvasRenderingContext2D,
+  jungle: Jungle,
   w: number,
   h: number,
   camera: number,
 ): void {
-  g.fillStyle = PAINT.earth;
-  g.fillRect(0, WORLD.floor, w, h - WORLD.floor);
-  g.fillStyle = PAINT.ground;
-  g.fillRect(0, WORLD.floor, w, 5);
+  // A column at a time, because the ground is not flat any more: the
+  // volcano lifts it and the line has to follow.
+  for (let sx = 0; sx < w; sx++) {
+    const world = sx + camera;
+    const top = Math.round(jungle.floorAt(world));
+    g.fillStyle = PAINT.earth;
+    g.fillRect(sx, top, 1, h - top);
+    if (jungle.overCrater(world)) {
+      // The crater is a hole in this earth, not a stripe on it: `lava()`
+      // fills the column from here down, so leave it alone.
+      continue;
+    }
+    g.fillStyle = PAINT.ground;
+    g.fillRect(sx, top, 1, 5);
+  }
   g.fillStyle = PAINT.groundDark;
   // Tufts, placed off the world rather than off the screen so they scroll
   // with the ground instead of swimming across it.
   const first = Math.floor(camera / 11) * 11;
   for (let x = first; x < first + w + 22; x += 11) {
     const at = Math.round(x - camera);
+    if (jungle.overCrater(x) || jungle.overWater(x)) {
+      continue;
+    }
     const tall = 2 + ((x / 11) % 3);
-    g.fillRect(at, WORLD.floor - tall + 1, 2, tall);
+    g.fillRect(at, Math.round(jungle.floorAt(x)) - tall + 1, 2, tall);
   }
 }
 
@@ -242,6 +274,76 @@ function crocs(
     }
     g.drawImage(crocSprite("jaw", left), x - 11, line + 4 - up + drop);
     g.drawImage(crocSprite("body", left), x - 11, line - up);
+  }
+}
+
+/**
+ * The lava in the crater, and what comes out of it.
+ *
+ * The surface bubbles slowly; a vent glows and spits before it fires, and
+ * then throws a column up past the bottom of a swing. The warning is the
+ * point of the whole thing — a hazard that cannot be seen coming is not a
+ * hazard, it is a trick, and this game is for a child.
+ */
+function lava(
+  g: CanvasRenderingContext2D,
+  jungle: Jungle,
+  camera: number,
+  w: number,
+  time: number,
+): void {
+  for (let sx = 0; sx < w; sx++) {
+    const world = sx + camera;
+    if (!jungle.overCrater(world)) {
+      continue;
+    }
+    const top = Math.round(jungle.floorAt(world));
+    // Slow bubbling, two waves so it never reads as a repeating pattern.
+    const bob =
+      Math.sin(world * 0.09 + time * 1.3) + Math.sin(world * 0.21 - time * 0.8);
+    // Down the column: a bright, moving surface, then lava, then the dark
+    // cooler stuff at the bottom. Three bands and nothing cleverer, which
+    // is how the lake is painted too.
+    g.fillStyle = bob > 0.9 ? PAINT.lavaBright : PAINT.lava;
+    g.fillRect(sx, top, 1, 4);
+    g.fillStyle = PAINT.lava;
+    g.fillRect(sx, top + 4, 1, VOLCANO.deep - 11);
+    g.fillStyle = PAINT.lavaDeep;
+    g.fillRect(sx, top + VOLCANO.deep - 7, 1, 7);
+    // The walls of the pool, where the earth it was cut out of ends. Drawn
+    // from the edge inwards so a wall is on the lava side of the line and
+    // the rim above it stays the hill's own colour.
+    const edge = !jungle.overCrater(world - 2) || !jungle.overCrater(world + 2);
+    if (edge) {
+      g.fillStyle = PAINT.lavaCrust;
+      g.fillRect(sx, top, 1, VOLCANO.deep);
+      g.fillStyle = bob > 0.9 ? PAINT.lavaBright : PAINT.lava;
+      g.fillRect(sx, top, 1, 2);
+    }
+  }
+  for (const vent of jungle.vents) {
+    const x = Math.round(vent.x - camera);
+    if (x < -20 || x > w + 20) {
+      continue;
+    }
+    const base = Math.round(jungle.floorAt(vent.x));
+    if (vent.warning) {
+      // Glowing and spitting: something is about to happen here.
+      g.fillStyle = PAINT.lavaBright;
+      g.fillRect(x - 4, base - 1, 9, 3);
+      const spit = Math.round(Math.abs(Math.sin(time * 9)) * 4);
+      g.fillRect(x - 1, base - 2 - spit, 2, 2);
+    }
+    if (vent.up > 0) {
+      const tall = Math.round(vent.up * VOLCANO.reaches);
+      const half = Math.floor(VOLCANO.wide2 / 2);
+      g.fillStyle = PAINT.lava;
+      g.fillRect(x - half, base - tall, VOLCANO.wide2, tall);
+      g.fillStyle = PAINT.lavaBright;
+      g.fillRect(x - half + 2, base - tall, VOLCANO.wide2 - 4, tall);
+      // A cap of brighter stuff at the top, which is where the eye goes.
+      g.fillRect(x - half - 1, base - tall - 2, VOLCANO.wide2 + 2, 3);
+    }
   }
 }
 

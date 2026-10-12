@@ -44,8 +44,9 @@ export const WORLD = {
   gravity: 520,
   /** Where the ground is, as a distance down from the top of the picture. */
   floor: 150,
-  /** How long the jungle is, in pixels. About a minute of swinging. */
-  far: 3600,
+  /** How long the jungle is, in pixels. Jungle, then the lake, then the
+   *  volcano, then home — long enough that getting there is a journey. */
+  far: 6400,
 } as const;
 
 /**
@@ -81,12 +82,14 @@ export const LAKE = {
   /** Where it starts and how wide it is, in pixels. Halfway along, and wide
    *  enough that it plainly cannot be jumped — it has to be swung. */
   from: 1500,
-  wide: 620,
+  wide: 640,
   /** How far below the floor the water sits, so there is a bank to fall
    *  down rather than a blue stripe painted on the ground. */
   deep: 16,
-  /** How far back from the water the monkey is put after a splash. Enough
-   *  room to get running again before the bank. */
+  /** How far back from the edge the monkey is put after a splash. Enough
+   *  room to get running again before the bank. It is put down on whichever
+   *  side it fell nearest: most of a crossing lost to the last tap of it is
+   *  the same discouragement as losing the whole jungle, only quieter. */
   backBy: 70,
   /** How long the splash is watched before the monkey is put back, in
    *  seconds. Long enough to see what happened and understand it. */
@@ -147,6 +150,56 @@ export const CROC = {
   rises: 9,
   /** How quickly the jaws shut again once nobody is overhead. */
   closes: 7,
+} as const;
+
+/**
+ * The volcano, three quarters of the way along.
+ *
+ * A hill with lava on top of it. The lake asks you to cross water that is
+ * simply there; this asks you to cross something that is doing something,
+ * and the difference is the spurts — a vent that fires on a beat, so the
+ * crossing is a question of when and not only of how hard you swung.
+ *
+ * The ground rises into it and falls away after, because a volcano that is
+ * flat is a puddle. The slopes are rock and can be run up; only the crater
+ * in the middle is lava.
+ */
+export const VOLCANO = {
+  from: 4100,
+  wide: 1180,
+  /** How high the hill stands above the jungle floor, in pixels. Chosen
+   *  against the vines, not picked: the vines over the crater hang to a
+   *  hundred and seventeen and the lava sits at a hundred and thirty, so
+   *  there is a clear thirteen pixels at the bottom of a swing — close
+   *  enough to be frightening, far enough to be fair. */
+  hill: 20,
+  /** How much of each end is slope rather than crater, as a fraction. */
+  slope: 0.26,
+  /** How long a vine is over the crater. The length of the one in the
+   *  picture: these are the long ones. */
+  vineLong: 88,
+  vineEvery: 96,
+  /** The vents, and what they do.
+   *
+   *  `every` is how often one fires and `warns` is how long it glows and
+   *  grumbles first — a hazard a child cannot see coming is not a hazard,
+   *  it is a trick. `reaches` is how far the column climbs, which is over
+   *  the bottom of a swing: the spurt is the thing you time, and the lava
+   *  underneath is only the floor. */
+  vents: 5,
+  every: 2.6,
+  warns: 0.7,
+  spurts: 0.55,
+  reaches: 34,
+  /** How wide a column is, and how wide it counts as when it catches you. */
+  wide2: 7,
+  catches: 7,
+  /** How far down the lava goes. It is drawn as a pool cut into the hill
+   *  rather than a coat of paint on top of it, for the same reason the lake
+   *  is cut into the floor: a hazard you can see the depth of reads as
+   *  something you could fall into. Deeper than the lake's sixteen, because
+   *  it sits higher up and there is hill underneath it to spare. */
+  deep: 22,
 } as const;
 
 /** The monkey. */
@@ -368,7 +421,33 @@ export const JUNGLE = {
    *  a regular pleasure rather than a rare event — and low, at the height
    *  the monkey passes through at the bottom of a swing. */
   bananaOdds: 0.6,
-  bananaHigh: 0.92,
+  /**
+   * Where on a vine's arc a banana hangs, in radians from straight down.
+   *
+   * Bananas sit on the path a swinging monkey actually sweeps, which is an
+   * arc about a vine — not in the gap between two vines, which is where
+   * they were first put and is the one place a swing never reaches: by the
+   * time the monkey is over the midpoint it is at the bottom of its arc and
+   * low, and by the time it is high it is past it. Twelve of them hung
+   * there were collected exactly none times in a minute and a half of
+   * play.
+   *
+   * The ordinary ones sit a little off the bottom, where any swing goes.
+   * The high ones sit most of the way out, where only a swing that has been
+   * pumped up properly reaches — and nowhere near a jump, which is the
+   * point of them.
+   */
+  bananaAt: 0.5,
+  bananaHighAt2: 1.15,
+  /**
+   * And how many of them hang high instead, up where only a swing reaches.
+   *
+   * A banana on the ground is a thing you walk into. These are hung at the
+   * height of the top of a swing, so the only way to one is to be on a vine
+   * and swinging properly — which makes them the first thing in the game
+   * that asks for the skill rather than rewarding the walk.
+   */
+  bananaHighOdds: 0.45,
   /** How close the monkey has to be to take one. Generous: a banana you
    *  swung through and did not get is just annoying. */
   bananaReach: 11,
@@ -399,9 +478,11 @@ export const JUNGLE = {
   giants: 0.3,
   giantInto: 8,
   /** Trees behind, and how far apart. Two layers, the far one moving slower,
-   *  which is the cheapest depth there is. */
-  treeEvery: 90,
-  farTreeEvery: 130,
+   *  which is the cheapest depth there is. Close together, because a jungle
+   *  is crowded — an open wood with a tree every ninety pixels read as a
+   *  park. */
+  treeEvery: 54,
+  farTreeEvery: 76,
   /**
    * How much slower the far things move than the near ones.
    *
@@ -456,6 +537,9 @@ export const PARTY = {
   /** A splash is the same machinery in blues, thrown up out of the water. */
   splashBits: 18,
   splashColours: ["#bfe9ff", "#86cdf0", "#ffffff", "#5fb0d8"],
+  /** And lava, for the volcano, which throws the same way in hotter
+   *  colours. */
+  lavaColours: ["#ffd257", "#ff8a3d", "#e8452b", "#fff3b0"],
 } as const;
 
 /** The colours. Warm and friendly, as the plan asks: nothing in here is pure
@@ -480,6 +564,13 @@ export const PAINT = {
   croc: "#3f7b3f",
   crocDark: "#2d5a2e",
   crocMouth: "#8c3a4a",
+  lava: "#e8562b",
+  lavaBright: "#ffb03a",
+  /** The bottom of the pool. Darker and browner than the surface: lava
+   *  cools as it goes down, and the fall-off is what makes the hole look
+   *  like a hole instead of a stripe. */
+  lavaDeep: "#9c2d1c",
+  lavaCrust: "#6b3a2e",
   water: "#4aa3c7",
   waterDark: "#2f7fa3",
   waterLight: "#8fd6ea",

@@ -1,4 +1,4 @@
-import {EDGE, JUNGLE, LAKE, MONKEY, PARTY, SIM, WORLD} from "./config";
+import {EDGE, JUNGLE, LAKE, MONKEY, PARTY, SIM, VOLCANO, WORLD} from "./config";
 import {Input} from "./core/input";
 import {Sound} from "./core/sound";
 import {Monkey} from "./entities/monkey";
@@ -31,6 +31,12 @@ export class Game {
   /** While this is counting down the monkey is in the water and the game is
    *  letting the player see it before putting them back. */
   private sinking = 0;
+  /** Whether the dunking was lava rather than water, which decides where
+   *  the monkey is put back. */
+  private burnt = false;
+  /** Where the monkey went in, so it can be put down on the side of the
+   *  water or the crater it was nearest to. */
+  private fellAt = 0;
   private partyIn = 0;
   private time = 0;
   private behind = 0;
@@ -115,6 +121,7 @@ export class Game {
     this.snapping();
     this.takeBananas();
     this.checkTheWater();
+    this.checkTheLava();
 
     // The camera sits the monkey a third of the way across, so there is
     // twice as much jungle ahead as behind — which is where the next vine
@@ -202,6 +209,7 @@ export class Game {
       return;
     }
     this.sinking = LAKE.watchFor;
+    this.fellAt = this.monkey.x;
     this.sound.splash();
     this.monkey.vx = 0;
     this.monkey.vy = 0;
@@ -214,14 +222,71 @@ export class Game {
     );
   }
 
-  /** Back to the bank, facing the water, to go again. */
+  /**
+   * The lava, and the spurts out of it.
+   *
+   * The same bargain as the lake: it costs the crossing and not the
+   * jungle. Standing on the crater floor burns, and so does being caught by
+   * a column on its way up — which is the thing to time, and the reason the
+   * vents grumble before they fire.
+   */
+  private checkTheLava(): void {
+    const monkey = this.monkey;
+    if (monkey.doing === "climb") {
+      return;
+    }
+    const onTheLava =
+      this.jungle.overCrater(monkey.x) &&
+      monkey.y >= this.jungle.floorAt(monkey.x) - 1;
+    let caught = false;
+    if (!onTheLava) {
+      for (const vent of this.jungle.vents) {
+        if (vent.up <= 0 || Math.abs(vent.x - monkey.x) > VOLCANO.catches) {
+          continue;
+        }
+        const top = this.jungle.floorAt(vent.x) - vent.up * VOLCANO.reaches;
+        // Caught if the monkey is inside the column: below its top and
+        // above the ground it came out of.
+        if (
+          monkey.y - MONKEY.tall < this.jungle.floorAt(vent.x) &&
+          monkey.y > top
+        ) {
+          caught = true;
+          break;
+        }
+      }
+    }
+    if (!onTheLava && !caught) {
+      return;
+    }
+    this.sinking = LAKE.watchFor * 0.6;
+    this.fellAt = monkey.x;
+    this.burnt = true;
+    this.sound.splash();
+    this.party.burst(monkey.x, monkey.y - 4, 16, PARTY.lavaColours, true);
+    monkey.vx = 0;
+    monkey.vy = 0;
+  }
+
+  /**
+   * Back on dry land beside whatever it fell into, to go again.
+   *
+   * Whichever side it was nearest: fall in with the far bank in reach and
+   * you come up on the far bank. Most of a crossing taken away by its last
+   * tap discourages a child as surely as losing the whole jungle does, and
+   * the half it already swung is not in doubt.
+   */
   private toTheBank(): void {
     const monkey = this.monkey;
     monkey.vine = null;
     monkey.tree = null;
     monkey.doing = "ground";
-    monkey.x = this.jungle.lakeFrom - LAKE.backBy;
-    monkey.y = WORLD.floor;
+    const from = this.burnt ? this.jungle.volcanoFrom : this.jungle.lakeFrom;
+    const to = this.burnt ? this.jungle.volcanoTo : this.jungle.lakeTo;
+    const past = this.fellAt > (from + to) / 2;
+    monkey.x = past ? to + LAKE.backBy : from - LAKE.backBy;
+    this.burnt = false;
+    monkey.y = this.jungle.floorAt(monkey.x);
     monkey.wasX = monkey.x;
     monkey.wasY = monkey.y;
     monkey.vx = 0;

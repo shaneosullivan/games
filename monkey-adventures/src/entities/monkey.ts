@@ -124,6 +124,9 @@ export class Monkey {
     const by = MONKEY.quickens * dt;
     this.vx += Math.max(-by, Math.min(by, want - this.vx));
     this.x += this.vx * dt;
+    // Walking up and down the volcano: the ground is not flat any more, so
+    // standing on it means being wherever it is.
+    this.y = jungle.floorAt(this.x);
     this.stride += Math.abs(this.vx) * dt;
     if (tapped) {
       this.vy = -MONKEY.jump;
@@ -149,8 +152,9 @@ export class Monkey {
     this.vy *= slow;
     this.x += this.vx * dt;
     this.y += this.vy * dt;
-    if (this.y >= WORLD.floor) {
-      this.y = WORLD.floor;
+    const ground = jungle.floorAt(this.x);
+    if (this.y >= ground) {
+      this.y = ground;
       this.vy = 0;
       this.doing = "ground";
       return;
@@ -193,9 +197,9 @@ export class Monkey {
     this.vy = 0;
     this.y += up * CLIMB.speed * dt;
     const top = jungle.topOf(tree) + MONKEY.tall;
-    this.y = Math.max(top, Math.min(WORLD.floor, this.y));
+    this.y = Math.max(top, Math.min(jungle.floorAt(tree.x), this.y));
     this.stride += Math.abs(up) * CLIMB.speed * dt;
-    if (this.y >= WORLD.floor) {
+    if (this.y >= jungle.floorAt(tree.x)) {
       this.leaveTree();
       this.doing = "ground";
       return;
