@@ -100,7 +100,26 @@ const DRAWN: Record<Pose, Array<string>> = {
   climbB: CLIMB_B,
 };
 
-function bake(rows: Array<string>, flip: boolean): HTMLCanvasElement {
+/**
+ * The other monkeys at home are the same monkey in a different coat.
+ *
+ * Three fur colours swapped into the palette rather than three more sets of
+ * letters: a family should look like a family, and redrawing the same
+ * thirteen-pixel animal three times would give three subtly different
+ * animals and no more information.
+ */
+export const COATS: ReadonlyArray<Record<string, string>> = [
+  {},
+  {f: "#a3703c", d: "#7a4e23", l: "#e0b67c"},
+  {f: "#6f4526", d: "#4f3119", l: "#bb8d58"},
+  {f: "#b98a52", d: "#8a5f32", l: "#ecd0a0"},
+];
+
+function bake(
+  rows: Array<string>,
+  flip: boolean,
+  coat: Record<string, string> = {},
+): HTMLCanvasElement {
   const wide = rows[0].length;
   const tall = rows.length;
   const canvas = document.createElement("canvas");
@@ -113,7 +132,7 @@ function bake(rows: Array<string>, flip: boolean): HTMLCanvasElement {
   for (let y = 0; y < tall; y++) {
     for (let x = 0; x < wide; x++) {
       const key = rows[y][flip ? wide - 1 - x : x];
-      const colour = PALETTE[key];
+      const colour = coat[key] ?? PALETTE[key];
       if (!colour) {
         continue;
       }
@@ -190,11 +209,12 @@ export function bananaSprite(): HTMLCanvasElement {
 export function monkeySprite(
   pose: Pose,
   facingLeft: boolean,
+  coat = 0,
 ): HTMLCanvasElement {
-  const key = `${pose}${facingLeft ? "<" : ">"}`;
+  const key = `${pose}${facingLeft ? "<" : ">"}${coat}`;
   let had = baked.get(key);
   if (!had) {
-    had = bake(DRAWN[pose], facingLeft);
+    had = bake(DRAWN[pose], facingLeft, COATS[coat % COATS.length]);
     baked.set(key, had);
   }
   return had;

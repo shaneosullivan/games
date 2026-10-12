@@ -1,4 +1,4 @@
-import {CROC, JUNGLE, LAKE, MONKEY, PAINT, WORLD} from "../config";
+import {CROC, HOME, JUNGLE, LAKE, MONKEY, PAINT, WORLD} from "../config";
 import {bananaSprite, crocSprite, monkeySprite, type Pose} from "../art/monkey";
 import type {Party} from "./particles";
 import type {Jungle, Tree, Vine} from "../world/jungle";
@@ -21,6 +21,9 @@ export function paint(
   time: number,
   alpha: number,
   party: Party,
+  /** Whether the monkey has got home, which is when the family stops
+   *  waiting and starts jumping. */
+  cheering: boolean,
 ): void {
   const g = screen.ctx;
   const w = screen.wide;
@@ -74,6 +77,7 @@ export function paint(
 
   bananas(g, jungle, camera, w);
   home(g, Math.round(jungle.homeX - camera), h);
+  family(g, jungle, camera, w, time, cheering);
   drawMonkey(g, monkey, camera, alpha);
   party.draw(g, camera);
   dapples(g, jungle, camera, time, w, h);
@@ -348,6 +352,45 @@ function home(g: CanvasRenderingContext2D, x: number, h: number): void {
   g.fillRect(x - 17, base - 32, 34, 7);
   g.fillRect(x - 13, base - 36, 26, 6);
   void h;
+}
+
+/**
+ * The monkeys waiting at home.
+ *
+ * Milling about while you are away — a pixel or two either way, which is
+ * enough to say "alive" at this size — and jumping with their arms up once
+ * you arrive. The same sprite as the monkey being played, in other coats,
+ * because they are the same animal and a family should look like one.
+ */
+function family(
+  g: CanvasRenderingContext2D,
+  jungle: Jungle,
+  camera: number,
+  w: number,
+  time: number,
+  cheering: boolean,
+): void {
+  for (const one of jungle.family) {
+    const x = Math.round(one.x - camera);
+    if (x < -20 || x > w + 20) {
+      continue;
+    }
+    const beat = Math.sin(time * HOME.jumps + one.phase);
+    const hop = cheering ? Math.max(0, beat) * HOME.jumpBy : 0;
+    const shift = cheering
+      ? 0
+      : Math.round(Math.sin(time * HOME.fidgets + one.phase) * HOME.fidgetBy);
+    const sprite = monkeySprite(
+      cheering ? "hang" : "stand",
+      one.facingLeft,
+      one.coat,
+    );
+    g.drawImage(
+      sprite,
+      x - Math.round(MONKEY.wide / 2) + shift,
+      Math.round(WORLD.floor - MONKEY.tall - hop),
+    );
+  }
 }
 
 /** The light coming through the canopy. */

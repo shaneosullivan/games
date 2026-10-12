@@ -485,6 +485,29 @@ export const PAINT = {
   waterLight: "#8fd6ea",
 } as const;
 
+/**
+ * The monkeys at home.
+ *
+ * Somebody to arrive *at*. The hut on its own is a destination; a family
+ * outside it waiting is a reason, and it costs three sprites and a sine.
+ * They mill about while you are away and jump up with their arms in the air
+ * when you get there, which is the whole of the ending as far as they are
+ * concerned.
+ */
+export const HOME = {
+  /** How many, and how far either side of the hut they stand. */
+  family: 3,
+  spread: 34,
+  /** How fast they shift about while waiting, and how far — a pixel or
+   *  two, so the end of the jungle is alive without anybody doing
+   *  anything. */
+  fidgets: 1.6,
+  fidgetBy: 1.4,
+  /** And how they jump once you are home: how high and how fast. */
+  jumps: 7,
+  jumpBy: 9,
+} as const;
+
 /** The fixed step the world is worked out in. The drawing interpolates
  *  between two of these, so the picture is smooth however the device is
  *  feeling. */

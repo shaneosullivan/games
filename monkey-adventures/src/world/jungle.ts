@@ -1,4 +1,4 @@
-import {CLIMB, CROC, JUNGLE, LAKE, ROPE, WIND, WORLD} from "../config";
+import {CLIMB, CROC, HOME, JUNGLE, LAKE, ROPE, WIND, WORLD} from "../config";
 
 /**
  * One knot of a rope.
@@ -82,6 +82,16 @@ export interface Croc {
   phase: number;
 }
 
+/** One of the monkeys waiting at home. */
+export interface Family {
+  x: number;
+  /** Which coat it is wearing, and its own clock so three of them do not
+   *  fidget in step. */
+  coat: number;
+  phase: number;
+  facingLeft: boolean;
+}
+
 export interface Dapple {
   x: number;
   y: number;
@@ -103,6 +113,7 @@ export class Jungle {
   readonly dapples: Array<Dapple> = [];
   readonly bananas: Array<Banana> = [];
   readonly crocs: Array<Croc> = [];
+  readonly family: Array<Family> = [];
   /** Where home is: the end of the jungle. */
   readonly homeX = WORLD.far;
   /** The water, halfway along. */
@@ -201,6 +212,21 @@ export class Jungle {
         wide: 20 + rng() * 14,
       });
     }
+    // The ones waiting at home, either side of the hut.
+    for (let i = 0; i < HOME.family; i++) {
+      const at =
+        WORLD.far +
+        ((i + 0.5) / HOME.family - 0.5) * 2 * HOME.spread +
+        (rng() - 0.5) * 8;
+      this.family.push({
+        x: at,
+        coat: 1 + Math.floor(rng() * 3),
+        phase: rng() * Math.PI * 2,
+        // Looking back down the jungle, which is where you are coming from.
+        facingLeft: at > WORLD.far,
+      });
+    }
+
     // Crocodiles, spread along the water with room to swim between them.
     for (let i = 0; i < CROC.count; i++) {
       const at =

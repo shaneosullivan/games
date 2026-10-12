@@ -290,6 +290,7 @@ export class Game {
       this.time,
       alpha,
       this.party,
+      this.finished,
     );
   }
 
