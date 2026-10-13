@@ -1,3 +1,4 @@
+import {PARTS} from "../config";
 import {ProgressBar} from "../../../shared/progressBar";
 import {SoundButton} from "../../../shared/soundButton";
 
@@ -19,12 +20,14 @@ export class Hud {
   private readonly score: HTMLDivElement;
   private readonly done: HTMLDivElement;
   private readonly again: HTMLButtonElement;
+  private readonly start: HTMLDivElement;
   readonly root: HTMLDivElement;
 
   constructor(
     into: HTMLElement,
     onRestart: () => void,
     onMute: (muted: boolean) => void,
+    onBegin: (at: number) => void,
   ) {
     inject();
 
@@ -55,8 +58,35 @@ export class Hud {
     this.again.addEventListener("click", onRestart);
     this.done.append(words, this.again);
 
-    this.root.append(top, this.done);
+    // The chooser the game opens on. One button a part, in order, and the
+    // first of them is where the game starts if nobody cares — so a child
+    // who taps the big obvious thing gets the beginning of the jungle.
+    this.start = document.createElement("div");
+    this.start.className = "hud-done hud-start";
+    const asks = document.createElement("div");
+    asks.className = "hud-words";
+    asks.textContent = "Start where?";
+    const row = document.createElement("div");
+    row.className = "hud-parts";
+    for (const part of PARTS) {
+      const button = document.createElement("button");
+      button.className = "hud-again hud-part";
+      button.textContent = part.name;
+      button.addEventListener("click", () => {
+        this.setChoosing(false);
+        onBegin(part.at);
+      });
+      row.append(button);
+    }
+    this.start.append(asks, row);
+
+    this.root.append(top, this.done, this.start);
     into.append(this.root);
+  }
+
+  /** Shows or hides the chooser. The game stands still behind it. */
+  setChoosing(choosing: boolean): void {
+    this.start.classList.toggle("hud-gone", !choosing);
   }
 
   /** How far along the jungle, 0 to 1. */
@@ -136,6 +166,17 @@ function inject(): void {
 }
 .hud-done.hud-gone {
   display: none;
+}
+.hud-parts {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  max-width: 92vw;
+}
+.hud-part {
+  font-size: clamp(15px, 3vw, 20px);
+  padding: 12px 22px;
 }
 .hud-tap {
   pointer-events: auto;

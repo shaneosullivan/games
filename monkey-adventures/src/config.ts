@@ -659,3 +659,23 @@ export const SIM = {
    *  has been flung across the jungle. */
   most: 0.25,
 } as const;
+
+/**
+ * The parts of the course, for the chooser the game opens on.
+ *
+ * The jungle is one long run rather than a set of levels, but it plainly
+ * has parts, and while the game is being built nobody wants to swing for
+ * four minutes to look at the volcano. Each one puts the monkey down a
+ * little before the thing it is named after, on the flat and facing it,
+ * with room to get running.
+ *
+ * It is a start screen as much as a dev tool, which is why it says "The
+ * lake" and not "level 2": a child picking the volcano because they like
+ * the volcano is the same button.
+ */
+export const PARTS: ReadonlyArray<{name: string; at: number}> = [
+  {name: "The jungle", at: 40},
+  {name: "The lake", at: LAKE.from - 170},
+  {name: "The volcano", at: VOLCANO.from - 170},
+  {name: "Home", at: WORLD.far - 300},
+];

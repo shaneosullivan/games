@@ -20,6 +20,15 @@ address (`ipconfig getifaddr en0`) with the same port.
 For the installed-app feel, **Share → Add to Home Screen** and launch from the
 icon.
 
+## Starting
+
+The game opens on a chooser: **the jungle, the lake, the volcano, home**.
+It is a start screen and a level skip in the same four buttons — while the
+game is being built nobody wants to swing for four minutes to look at the
+volcano, and a child who likes the volcano presses the same thing. The
+parts live in `PARTS` in `src/config.ts`; the finish button comes back here
+rather than straight into the jungle.
+
 ## Controls
 
 Two thumbs, and nothing that needs a keyboard.

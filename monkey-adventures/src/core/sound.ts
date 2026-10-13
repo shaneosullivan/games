@@ -50,16 +50,58 @@ export class Sound {
   }
 
   /**
-   * A banana.
+   * A banana: a munch.
    *
-   * Two notes a fifth apart, the second a little shorter than the first:
-   * up, which is the shape of every "you got it" noise ever made, and over
-   * in a sixth of a second so that taking three bananas in one swing is
-   * three sounds rather than a chord.
+   * Two bites rather than two notes. A bite is a short burst of noise
+   * squeezed through a band that falls as it goes — which is what a crunch
+   * is, physically: a lot of frequencies at once, the high ones dying
+   * first. A little note under it gives the mouth a size; without it the
+   * bites are a rustle rather than a monkey.
+   *
+   * Over in a fifth of a second, so three bananas in one swing are three
+   * munches and not a mouthful.
    */
   banana(): void {
-    this.blip(760, 0.07, "triangle", 0);
-    this.blip(1140, 0.1, "triangle", 0.06);
+    // Loud for a bite, because a band this narrow throws most of the noise
+    // away: measured against the splash, these levels land in the same
+    // place the old two-note version did.
+    this.bite(0, 1500, 2.6);
+    this.bite(0.11, 1100, 2.2);
+    this.blip(190, 0.09, "triangle", 0.02, 0.35);
+  }
+
+  /** One bite: noise through a band that falls away as it decays. */
+  private bite(after: number, from: number, level: number): void {
+    const ctx = this.ctx;
+    const out = this.out;
+    if (!ctx || !out || this.muted) {
+      return;
+    }
+    const at = ctx.currentTime + after;
+    const seconds = 0.09;
+    const length = Math.floor(ctx.sampleRate * seconds);
+    const buffer = ctx.createBuffer(1, length, ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < length; i++) {
+      // Noise that dies quickly, and dies faster than it starts: a bite is
+      // a snap and then a crumble, not a hiss.
+      data[i] = (Math.random() * 2 - 1) * (1 - i / length) ** 1.6;
+    }
+    const source = ctx.createBufferSource();
+    source.buffer = buffer;
+    const band = ctx.createBiquadFilter();
+    band.type = "bandpass";
+    // Narrow enough to have a pitch to it, wide enough to stay a crunch.
+    band.Q.value = 1.2;
+    band.frequency.setValueAtTime(from, at);
+    band.frequency.exponentialRampToValueAtTime(from * 0.35, at + seconds);
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(level, at);
+    gain.gain.exponentialRampToValueAtTime(0.0001, at + seconds);
+    source.connect(band);
+    band.connect(gain);
+    gain.connect(out);
+    source.start(at);
   }
 
   /** The splash, for the lake: noise through a falling filter, which is

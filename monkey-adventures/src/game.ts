@@ -42,6 +42,8 @@ export class Game {
   private behind = 0;
   private last = 0;
   private stopped = false;
+  /** True while the chooser is up: the world is drawn but does not run. */
+  private choosing = true;
 
   constructor(into: HTMLElement) {
     this.screen = new Screen(into);
@@ -50,7 +52,9 @@ export class Game {
       into,
       () => this.restart(),
       muted => this.sound.setMuted(muted),
+      at => this.beginAt(at),
     );
+    this.hud.setChoosing(true);
     // A browser will not make a noise until the page has been touched, so
     // the audio is built on the first touch and not on load.
     const wake = (): void => this.sound.wake();
@@ -81,6 +85,14 @@ export class Game {
   private step(dt: number, tapped: boolean): void {
     this.time += dt;
     this.party.update(dt);
+
+    if (this.choosing) {
+      // The chooser is up. The jungle breathes behind it — the wind in the
+      // vines is what tells you the thing is alive and waiting for you —
+      // but nothing is asked of the monkey and no tap reaches it.
+      this.jungle.update(dt, this.time, null);
+      return;
+    }
 
     if (this.finished) {
       // Home. The jungle carries on breathing and the party keeps going up
@@ -348,7 +360,13 @@ export class Game {
     }
   }
 
-  /** Everything back to the beginning, from the button at the end. */
+  /**
+   * Everything back to the beginning, from the button at the end.
+   *
+   * Back to the chooser rather than straight into the jungle, so the part
+   * you want is one tap away every time round instead of only on the first
+   * run of the page.
+   */
   private restart(): void {
     this.jungle = new Jungle();
     this.monkey = new Monkey();
@@ -360,6 +378,31 @@ export class Game {
     this.hud.setFinished(false);
     this.hud.setScore(0);
     this.hud.setProgress(0);
+    this.choosing = true;
+    this.hud.setChoosing(true);
+  }
+
+  /**
+   * Starts the run at one of the parts of the course.
+   *
+   * On the ground and standing, wherever it is put: the parts are chosen to
+   * land on the flat with room to get running, so nobody begins the volcano
+   * already falling down the hill.
+   */
+  private beginAt(at: number): void {
+    const monkey = this.monkey;
+    monkey.vine = null;
+    monkey.tree = null;
+    monkey.doing = "ground";
+    monkey.x = at;
+    monkey.y = this.jungle.floorAt(at);
+    monkey.wasX = monkey.x;
+    monkey.wasY = monkey.y;
+    monkey.vx = 0;
+    monkey.vy = 0;
+    monkey.facingLeft = false;
+    this.camera = Math.max(0, at - this.screen.wide / 3);
+    this.choosing = false;
   }
 
   private draw(alpha: number): void {
