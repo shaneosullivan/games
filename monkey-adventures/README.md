@@ -33,20 +33,25 @@ rather than straight into the jungle.
 
 Two thumbs, and nothing that needs a keyboard.
 
-- **Left half of the screen** is a stick, wherever your thumb goes down.
-  Left and right runs along the ground; up and down climbs a tree you are
-  holding; while swinging, pushing the way you are already going pumps the
-  swing higher.
-- **Right half** is a tap: jump from the ground, let go of a vine, or leap
-  off a tree.
+- **The stick, bottom left.** It is drawn on the screen so a child can see
+  it, but your thumb does not have to land on it: a drag anywhere in the
+  left half works, measured from wherever it went down, and the knob shows
+  it. Left and right runs along the ground and pumps a swing; up and down
+  climbs — a tree, or the vine you are hanging from, hand over hand.
+- **The button, bottom right.** Jump from the ground, let go of a vine, or
+  leap off a tree. The whole right half does the same thing; the button is
+  where a child looks for it.
+
+A shorter vine swings faster and reaches higher, a longer one swings slower
+and further, so climbing the rope is a choice and not only tidiness.
 
 A vine is caught for you the moment you touch one — the skill is in choosing
 when to let go. A tree is climbed only when you ask for it, by pushing up at
 the trunk, because trees are everywhere and grabbing them by accident would
 end every swing.
 
-The arrow keys or WASD and the space bar do the same jobs on a laptop, which
-is how it gets built; the iPad is what it is for.
+The arrow keys (or WASD) are the stick and the space bar is the button, which
+is how it gets built on a laptop; the iPad is what it is for.
 
 ## Commands
 

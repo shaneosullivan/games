@@ -44,7 +44,7 @@ export class Hud {
     // every game here. A game that makes a noise and cannot be hushed is a
     // game that gets played with the iPad face down.
     const sound = new SoundButton({onToggle: onMute});
-    sound.root.classList.add("hud-tap");
+    sound.root.classList.add("hud-tap", "ui-interactive");
     top.append(this.bar.root, this.score, sound.root);
 
     this.done = document.createElement("div");
@@ -53,7 +53,7 @@ export class Hud {
     words.className = "hud-words";
     words.textContent = "Home!";
     this.again = document.createElement("button");
-    this.again.className = "hud-again";
+    this.again.className = "hud-again ui-interactive";
     this.again.textContent = "Restart?";
     this.again.addEventListener("click", onRestart);
     this.done.append(words, this.again);
@@ -70,7 +70,7 @@ export class Hud {
     row.className = "hud-parts";
     for (const part of PARTS) {
       const button = document.createElement("button");
-      button.className = "hud-again hud-part";
+      button.className = "hud-again hud-part ui-interactive";
       button.textContent = part.name;
       button.addEventListener("click", () => {
         this.setChoosing(false);

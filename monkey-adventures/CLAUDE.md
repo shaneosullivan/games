@@ -72,7 +72,7 @@ src/
   config.ts      every tunable number, grouped, with the reason beside it
   main.ts        the way in
   game.ts        the clock, the camera, and keeping the monkey on screen
-  core/input.ts  a stick on the left half, a jump on the right
+  core/input.ts  the shared thumbstick and jump button, wired to the game
   render/        the pixel screen, and the painting of the jungle
   art/           the sprites, as letter maps
   entities/      the monkey: running, climbing, flying, swinging

@@ -85,7 +85,7 @@ export class Monkey {
     this.waitForTree = Math.max(0, this.waitForTree - dt);
 
     if (this.doing === "swing" && this.vine) {
-      this.swing(dt, lean, tapped);
+      this.swing(dt, lean, up, tapped);
     } else if (this.doing === "climb" && this.tree) {
       this.onTree(dt, lean, up, tapped, jungle);
     } else if (this.doing === "ground") {
@@ -248,11 +248,14 @@ export class Monkey {
    * going, which is how pumping works — push with the swing and it grows,
    * push against it and it dies.
    */
-  private swing(dt: number, lean: number, tapped: boolean): void {
+  private swing(dt: number, lean: number, up: number, tapped: boolean): void {
     const vine = this.vine;
     const knot = this.knot;
     if (!vine || !knot) {
       return;
+    }
+    if (up !== 0) {
+      this.climbTheVine(vine, up, dt);
     }
     // A pendulum, in the angle. Leaning pushes in whichever direction the
     // swing is already going, which is how pumping works — push with the
@@ -289,6 +292,36 @@ export class Monkey {
 
     if (tapped) {
       this.letGo();
+    }
+  }
+
+  /**
+   * Hand over hand, up or down the rope it is already on.
+   *
+   * Only the radius moves: the angle and the rate of turn are left exactly
+   * where they were, so climbing does not kick the swing one way or the
+   * other. A shorter rope then swings faster of its own accord, which is
+   * the physics doing the interesting part — the same `g/L` that makes a
+   * short pendulum tick quickly.
+   *
+   * The heavy knot moves with the hand, or the rope goes on sagging from
+   * where the monkey used to be.
+   */
+  private climbTheVine(vine: Vine, up: number, dt: number): void {
+    const shortest = Math.max(8, vine.long * SWING.climbsTo);
+    this.radius = Math.max(
+      shortest,
+      Math.min(vine.long, this.radius + up * SWING.climbs * dt),
+    );
+    this.grip = this.radius / vine.long;
+    const was = this.knot;
+    const now = vine.knots[this.gripAt(vine)];
+    if (now !== was) {
+      if (was) {
+        was.mass = 1;
+      }
+      now.mass = ROPE.heavy;
+      this.knot = now;
     }
   }
 

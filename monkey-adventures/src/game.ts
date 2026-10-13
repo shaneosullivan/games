@@ -47,7 +47,7 @@ export class Game {
 
   constructor(into: HTMLElement) {
     this.screen = new Screen(into);
-    this.input = new Input(this.screen.canvas);
+    this.input = new Input(this.screen.canvas, into);
     this.hud = new Hud(
       into,
       () => this.restart(),

@@ -379,6 +379,22 @@ export const SWING = {
    *  wherever on the vine it happened. */
   grabLow: 0.45,
   /**
+   * Climbing the vine itself, in pixels a second, and how far up it may go
+   * as a fraction of the rope's length.
+   *
+   * The same push on the stick that takes the monkey up a tree takes it up
+   * the rope it is hanging from — one gesture in all three places rather
+   * than three to learn. It is worth doing and not only tidy: a short rope
+   * swings fast and reaches high, a long one swings slow and far, and
+   * choosing between them mid-air is the first thing in the game that asks
+   * a question rather than timing.
+   *
+   * It may not climb into the canopy: the top quarter is where the vine is
+   * tied, and hanging from the knot it is tied with is not swinging.
+   */
+  climbs: 46,
+  climbsTo: 0.25,
+  /**
    * How far round a swing may get, in radians, and how fast.
    *
    * A rope is not a rod: past about level with where it is tied, it goes
@@ -438,9 +454,11 @@ export const TOUCH = {
    */
   stickSide: 0.5,
   /** How far the thumb must travel from where it went down before the stick
-   *  reads as fully over, in screen pixels. A short throw: a child's thumb
-   *  does not travel far, and a long one feels like dragging. */
-  throw: 46,
+   *  reads as fully over, in screen pixels — and, because the stick is drawn
+   *  now, the radius of the ring it is drawn as. A short throw: a child's
+   *  thumb does not travel far, and a long one feels like dragging. Big
+   *  enough all the same to be a thing you can see and aim at. */
+  throw: 62,
   /** Inside this, the stick reads as centred — so resting a thumb on the
    *  glass is not a command. */
   deadZone: 6,

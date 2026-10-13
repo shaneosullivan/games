@@ -17,6 +17,7 @@ bee/            Bee Quest. Self-contained npm project, own deps, own dev server.
 shared/         the few things the games have in common. No build of its own.
   progressBar.ts    the filling bar, used by both games
   soundButton.ts    the round sound switch, used by both games
+  touchControls.ts  the thumbstick and its matching round button
   fadeInFront.ts    the shader that dissolves whatever blocks the shot
   particles.ts      the instanced motes: pollen puffs and fireworks
 site/           the gallery. Zero dependencies, no build step of its own.
@@ -30,8 +31,10 @@ deps and its own dev server, and that is the default. `shared/` is the
 exception, and something earns a place in it one of two ways:
 
 - **Furniture** — a widget a child should meet in the same form in every game,
-  like the progress bar and the sound switch. Two copies would drift the moment
-  one was touched.
+  like the progress bar, the sound switch and the thumbstick. Two copies would
+  drift the moment one was touched. The stick carries a second argument too:
+  it and the button beside it have to match _each other_, and they cannot if
+  they live in different games.
 - **One piece of machinery with fiddly parts**, like the near-fade shader. Its
   cone, its instance matrix and its discard all have to be right together, and
   a second copy is a second thing to get wrong — which is exactly what had

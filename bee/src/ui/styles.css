@@ -340,41 +340,11 @@ body {
 
 /* ---------- Joystick ---------- */
 
-.stick {
-  position: absolute;
-  left: 0;
-  top: 0;
-  width: 0;
-  height: 0;
-  opacity: 0;
-  transition: opacity 130ms ease-out;
-  pointer-events: none;
-}
-
-.stick.active {
-  opacity: 1;
-}
-
-.stick-ring {
-  position: absolute;
-  width: 136px;
-  height: 136px;
-  margin: -68px 0 0 -68px;
-  border-radius: 50%;
-  border: 3px solid rgba(255, 255, 255, 0.45);
-  background: rgba(255, 255, 255, 0.08);
-  backdrop-filter: blur(2px);
-}
-
-.stick-knob {
-  position: absolute;
-  width: 58px;
-  height: 58px;
-  margin: -29px 0 0 -29px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.92);
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
-}
+/*
+ * The stick itself is a shared widget now (`shared/touchControls.ts`) and
+ * brings its own rules with it; what stays here is only what this game says
+ * about it, which is where it may not appear.
+ */
 
 /* ---------- Altitude slider ---------- */
 
