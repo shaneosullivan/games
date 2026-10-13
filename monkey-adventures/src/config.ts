@@ -98,10 +98,11 @@ export const LAKE = {
   /** How far below the floor the water sits, so there is a bank to fall
    *  down rather than a blue stripe painted on the ground. */
   deep: 16,
-  /** How far back from the edge the monkey is put after a splash. Enough
-   *  room to get running again before the bank. It is put down on whichever
-   *  side it fell nearest: most of a crossing lost to the last tap of it is
-   *  the same discouragement as losing the whole jungle, only quieter. */
+  /** How far back from the near bank the monkey is put after a splash.
+   *  Enough room to get running again before the edge. The near bank
+   *  however far across it got: the crossing is the thing being asked for,
+   *  and a fall that put you down on the far side would have handed you
+   *  the half of it you did not swing. */
   backBy: 70,
   /** How long the splash is watched before the monkey is put back, in
    *  seconds. Long enough to see what happened and understand it. */
@@ -236,9 +237,10 @@ export const VOLCANO = {
    */
   bounces: 158,
   watchFor: 0.78,
-  /** Where you come back: on the rim, this far clear of the lava. Close
-   *  enough that the crossing is not re-started, far enough that you are
-   *  not put down inside your own mistake. */
+  /** Where you come back: on the near rim, this far clear of the lava —
+   *  the near one however far across you got, as with the lake. Close
+   *  enough to the edge that the hill is not climbed again, far enough
+   *  that you are not put down inside your own mistake. */
   backBy: 14,
   /** How far down the lava goes. It is drawn as a pool cut into the hill
    *  rather than a coat of paint on top of it, for the same reason the lake
@@ -406,6 +408,10 @@ export const SWING = {
    * to be a climb; below it, it is a swing.
    */
   climbsOver: 1.5,
+  /** How fast the monkey must be going along before a swing turns it
+   *  round, in pixels a second. At the top of an arc it hangs still for a
+   *  moment, and without a floor under this it spins on the spot there. */
+  facesOver: 8,
   /**
    * How far round a swing may get, in radians, and how fast.
    *

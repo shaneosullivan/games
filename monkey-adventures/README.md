@@ -29,6 +29,14 @@ volcano, and a child who likes the volcano presses the same thing. The
 parts live in `PARTS` in `src/config.ts`; the finish button comes back here
 rather than straight into the jungle.
 
+## The two crossings
+
+The lake and the crater are the same bargain: swing across, and a fall
+costs the crossing and nothing else. The monkey comes back on the **near**
+edge every time, however far over it got — the crossing is the thing being
+asked for, and putting it down on the far side would hand it the half it
+did not swing. The jungle behind it is never in doubt.
+
 ## Controls
 
 Two thumbs, and nothing that needs a keyboard.

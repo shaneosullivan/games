@@ -34,9 +34,6 @@ export class Game {
   /** Whether the dunking was lava rather than water, which decides where
    *  the monkey is put back. */
   private burnt = false;
-  /** Where the monkey went in, so it can be put down on the side of the
-   *  water or the crater it was nearest to. */
-  private fellAt = 0;
   private partyIn = 0;
   private time = 0;
   private behind = 0;
@@ -231,7 +228,6 @@ export class Game {
       return;
     }
     this.sinking = LAKE.watchFor;
-    this.fellAt = this.monkey.x;
     this.sound.splash();
     this.monkey.vx = 0;
     this.monkey.vy = 0;
@@ -282,7 +278,6 @@ export class Game {
       return;
     }
     this.sinking = VOLCANO.watchFor;
-    this.fellAt = monkey.x;
     this.burnt = true;
     this.sound.splash();
     this.party.burst(monkey.x, monkey.y - 4, 16, PARTY.lavaColours, true);
@@ -296,26 +291,26 @@ export class Game {
   }
 
   /**
-   * Back on dry land beside whatever it fell into, to go again.
+   * Back on dry land at the near edge of whatever it fell into, to go
+   * again.
    *
-   * Whichever side it was nearest: fall in with the far bank in reach and
-   * you come up on the far bank. Most of a crossing taken away by its last
-   * tap discourages a child as surely as losing the whole jungle does, and
-   * the half it already swung is not in doubt.
+   * The near edge every time, however far across it got. The crossing is
+   * the thing being asked for — swing the lake, swing the crater, reach
+   * the other side — and a fall that puts you down on the far bank has
+   * handed you the half you did not swing. It costs the crossing and never
+   * more than the crossing: the jungle behind it is not in doubt.
    */
   private toTheBank(): void {
     const monkey = this.monkey;
     monkey.vine = null;
     monkey.tree = null;
     monkey.doing = "ground";
-    const from = this.burnt ? this.jungle.craterFrom : this.jungle.lakeFrom;
-    const to = this.burnt ? this.jungle.craterTo : this.jungle.lakeTo;
     // The lava puts you back on its own rim rather than at the foot of the
     // hill: the climb up is not the thing you got wrong, and walking it
     // again five times in a row is how a hazard turns into a chore.
+    const from = this.burnt ? this.jungle.craterFrom : this.jungle.lakeFrom;
     const backBy = this.burnt ? VOLCANO.backBy : LAKE.backBy;
-    const past = this.fellAt > (from + to) / 2;
-    monkey.x = past ? to + backBy : from - backBy;
+    monkey.x = from - backBy;
     this.burnt = false;
     monkey.y = this.jungle.floorAt(monkey.x);
     monkey.wasX = monkey.x;

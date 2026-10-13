@@ -106,9 +106,17 @@ export class Monkey {
       this.facingLeft = lean < 0;
     } else if (lean !== 0 && this.doing !== "swing") {
       this.facingLeft = lean < 0;
-    } else if (this.doing === "swing" && this.knot) {
-      // Facing the way the rope is carrying it.
-      this.facingLeft = this.knot.x - this.knot.px < 0;
+    } else if (this.doing === "swing") {
+      // Facing the way it is actually travelling, which on a rope is the
+      // way the arc is taking it rather than wherever the stick is held.
+      // Taken from the monkey's own speed and not from the rope's: the
+      // rope whips about on its own and had the monkey turning its back on
+      // the vine it was swinging towards. Below a crawl the facing is left
+      // alone, or it flips about at the top of every arc, where the
+      // monkey hangs still for a moment before coming back.
+      if (Math.abs(this.vx) > SWING.facesOver) {
+        this.facingLeft = this.vx < 0;
+      }
     }
   }
 
