@@ -47,9 +47,11 @@ export class Game {
 
   constructor(into: HTMLElement) {
     this.screen = new Screen(into);
-    this.input = new Input(this.screen.canvas, into);
+    // The controls and the HUD hang off the picture rather than the
+    // window, so they are never stranded in the black beside it.
+    this.input = new Input(this.screen.canvas, this.screen.frame);
     this.hud = new Hud(
-      into,
+      this.screen.frame,
       () => this.restart(),
       muted => this.sound.setMuted(muted),
       at => this.beginAt(at),

@@ -15,6 +15,17 @@ import {SCREEN} from "../config";
  */
 export class Screen {
   readonly canvas = document.createElement("canvas");
+  /**
+   * A box exactly the size of the picture on the glass.
+   *
+   * Everything that is not the jungle hangs off this rather than off the
+   * window: the bar, the sound switch, the stick and the jump button. The
+   * picture fills the window in one direction and is centred in the other,
+   * so a control pinned to the window would sit in the black beside the
+   * game — which is where the stick ended up, half of it off the bottom of
+   * the screen.
+   */
+  readonly frame = document.createElement("div");
   readonly ctx: CanvasRenderingContext2D;
   /** The picture's size, in its own pixels. */
   wide: number = SCREEN.narrowest;
@@ -29,7 +40,9 @@ export class Screen {
     this.canvas.style.display = "block";
     this.canvas.style.margin = "0 auto";
     this.canvas.style.imageRendering = "pixelated";
-    into.append(this.canvas);
+    this.frame.style.position = "relative";
+    this.frame.append(this.canvas);
+    into.append(this.frame);
     this.fit();
     window.addEventListener("resize", this.fit);
     // An iPad turned on its side fires this rather than resize, sometimes
@@ -48,12 +61,34 @@ export class Screen {
    * at rather than a bigger monkey, and every device agrees about how big a
    * monkey is. That is what keeps the game the same game on a phone and on an
    * iPad.
+   *
+   * It fills the window. The magnification used to be rounded down to a
+   * whole number of screen pixels per picture pixel, which left a band of
+   * black along the bottom — on a laptop a sixth of the window, with the
+   * stick and the jump button stranded in it, because they are fixed to the
+   * window and not to the picture. So the height is filled exactly and the
+   * width follows from it. The backing store is two canvas pixels to the
+   * picture pixel (`SCREEN.fine`), which halves what the fraction costs,
+   * and `image-rendering: pixelated` keeps every edge hard: a block may come
+   * out a screen pixel wider than its neighbour, but no block is ever blurred
+   * across two.
    */
   fit = (): void => {
     const w = window.innerWidth;
     const h = window.innerHeight;
-    const want = Math.round(this.tall * (w / Math.max(1, h)));
-    this.wide = Math.max(SCREEN.narrowest, Math.min(SCREEN.widest, want));
+    // Screen pixels to the picture pixel is a fraction now, and the picture
+    // is as many columns wide as that fraction leaves room for. A window
+    // shaped past what `narrowest` allows is the one case the height cannot
+    // set the scale: there the width does, and the picture is letterboxed
+    // top and bottom rather than run off the sides of the glass.
+    let scale = h / this.tall;
+    const want = Math.round(w / scale);
+    if (want < SCREEN.narrowest) {
+      this.wide = SCREEN.narrowest;
+      scale = w / this.wide;
+    } else {
+      this.wide = Math.min(SCREEN.widest, want);
+    }
     // The backing store is `SCREEN.fine` canvas pixels to each picture
     // pixel, and the context is scaled to match, so every drawing call in
     // the game stays in picture pixels and lands on the same blocks it
@@ -67,15 +102,17 @@ export class Screen {
       this.canvas.height = this.tall * fine;
     }
     this.ctx.setTransform(fine, 0, 0, fine, 0, 0);
-    // Whole numbers of screen pixels per picture pixel wherever it fits,
-    // because a pixel and a half is a pixel with a blurred edge and the eye
-    // picks it up as shimmer the moment anything scrolls. Below one, the
-    // window is smaller than the picture and there is nothing to be done but
-    // take the fraction.
-    const fits = Math.min(w / this.wide, h / this.tall);
-    const scale = fits >= 1 ? Math.floor(fits) : fits;
-    this.canvas.style.width = `${this.wide * scale}px`;
-    this.canvas.style.height = `${this.tall * scale}px`;
+    // The picture at that scale, which fills the window in whichever
+    // direction the shape of it allows. Letterboxed in the other, never
+    // stretched and never run off the edge: a stretched pixel is the one
+    // thing this look cannot survive, and a cropped one takes the jungle
+    // with it.
+    const onGlass = Math.round(this.wide * scale);
+    const tallOnGlass = Math.round(this.tall * scale);
+    this.canvas.style.width = `${onGlass}px`;
+    this.canvas.style.height = `${tallOnGlass}px`;
+    this.frame.style.width = `${onGlass}px`;
+    this.frame.style.height = `${tallOnGlass}px`;
     this.ctx.imageSmoothingEnabled = false;
   };
 

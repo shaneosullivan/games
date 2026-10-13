@@ -55,7 +55,10 @@ export class Hud {
     this.again = document.createElement("button");
     this.again.className = "hud-again ui-interactive";
     this.again.textContent = "Restart?";
-    this.again.addEventListener("click", onRestart);
+    this.again.addEventListener("click", () => {
+      this.again.blur();
+      onRestart();
+    });
     this.done.append(words, this.again);
 
     // The chooser the game opens on. One button a part, in order, and the
@@ -73,6 +76,9 @@ export class Hud {
       button.className = "hud-again hud-part ui-interactive";
       button.textContent = part.name;
       button.addEventListener("click", () => {
+        // Handing the focus back, or the space bar presses this button
+        // again instead of jumping for the rest of the game.
+        button.blur();
         this.setChoosing(false);
         onBegin(part.at);
       });
@@ -131,7 +137,7 @@ function inject(): void {
   const style = document.createElement("style");
   style.textContent = `
 .hud {
-  position: fixed;
+  position: absolute;
   inset: 0;
   pointer-events: none;
   display: flex;

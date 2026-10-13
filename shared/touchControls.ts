@@ -89,6 +89,13 @@ export class Joystick {
     // the knob can travel, so a knob against the edge of the ring means a
     // full push and not eighty per cent of one.
     size(ring, this.knob, this.radius);
+    if (this.always) {
+      // Pinned a ring's width in from the corner of whatever it was given,
+      // which is the picture and not the window: the root is a point and
+      // the ring is drawn around it, so the inset has to carry the radius
+      // or half the stick hangs off the bottom of the glass.
+      place(this.root, options.side ?? "left", this.radius);
+    }
     this.root.append(ring, this.knob);
     host.appendChild(this.root);
 
@@ -233,6 +240,20 @@ export class Joystick {
   };
 }
 
+/**
+ * Puts a control in a bottom corner of its host, clear of the rounded
+ * corners of a tablet and of whatever the system has put along the edge.
+ */
+function place(
+  root: HTMLDivElement,
+  side: "left" | "right",
+  radius: number,
+): void {
+  const inset = Math.round(radius * 0.42);
+  root.style.bottom = `calc(${radius + inset}px + env(safe-area-inset-bottom))`;
+  root.style[side] = `calc(${radius + inset}px + env(safe-area-inset-${side}))`;
+}
+
 /** Sizes a ring, and the knob inside it, from the stick's travel. */
 function size(
   ring: HTMLDivElement,
@@ -275,12 +296,13 @@ export class TouchButton {
   constructor(host: HTMLElement, options: TouchButtonOptions) {
     style();
     this.root = document.createElement("div");
-    this.root.className = `tapper ui-interactive tapper-${
-      options.side ?? "right"
-    }`;
+    const side = options.side ?? "right";
+    const radius = options.radius ?? RADIUS;
+    this.root.className = `tapper ui-interactive tapper-${side}`;
     const ring = document.createElement("div");
     ring.className = "stick-ring";
-    size(ring, null, options.radius ?? RADIUS);
+    size(ring, null, radius);
+    place(this.root, side, radius);
     this.root.append(ring);
     if (options.label) {
       const word = document.createElement("div");
@@ -342,17 +364,10 @@ function style(): void {
   opacity: 1;
 }
 .stick-home {
-  position: fixed;
+  position: absolute;
   top: auto;
-  bottom: calc(26px + env(safe-area-inset-bottom));
-  opacity: 0.72;
-}
-.stick-home.stick-left {
-  left: calc(94px + env(safe-area-inset-left));
-}
-.stick-home.stick-right {
   left: auto;
-  right: calc(94px + env(safe-area-inset-right));
+  opacity: 0.72;
 }
 .stick-ring {
   position: absolute;
@@ -374,19 +389,12 @@ function style(): void {
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
 }
 .tapper {
-  position: fixed;
-  bottom: calc(26px + env(safe-area-inset-bottom));
+  position: absolute;
   width: 0;
   height: 0;
   opacity: 0.72;
   transition: opacity 90ms ease-out, transform 90ms ease-out;
   touch-action: none;
-}
-.tapper-right {
-  right: calc(94px + env(safe-area-inset-right));
-}
-.tapper-left {
-  left: calc(94px + env(safe-area-inset-left));
 }
 .tapper.pressed {
   opacity: 1;

@@ -15,6 +15,15 @@
         overflow: hidden;
         background: #000;
       }
+      /* The picture in the middle of the glass. It fills the window in one
+         direction and is centred in the other, so whatever black there is
+         sits evenly either side of the game rather than all below it with
+         the controls stranded in it. */
+      #app {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
       canvas {
         display: block;
       }

@@ -395,6 +395,18 @@ export const SWING = {
   climbs: 46,
   climbsTo: 0.25,
   /**
+   * How much more up than sideways the stick must be before it climbs
+   * rather than pumps.
+   *
+   * On a vine the stick does one thing at a time. Pumping is a waggle left
+   * and right and a thumb waggling is never perfectly level, so a stick
+   * that climbed on any upward component at all would crawl the monkey up
+   * the rope the whole time it was being pumped — which is not what
+   * anybody asked it to do. Over one, so a push has to be plainly upward
+   * to be a climb; below it, it is a swing.
+   */
+  climbsOver: 1.5,
+  /**
    * How far round a swing may get, in radians, and how fast.
    *
    * A rope is not a rod: past about level with where it is tied, it goes

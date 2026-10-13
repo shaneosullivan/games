@@ -42,6 +42,11 @@ Two thumbs, and nothing that needs a keyboard.
   leap off a tree. The whole right half does the same thing; the button is
   where a child looks for it.
 
+On a vine the stick does one thing at a time: plainly up or down climbs the
+rope, anything else pumps the swing. Pumping is a waggle and a waggling
+thumb is never level, so a stick that climbed on any upward component would
+crawl up the vine the whole time it was being swung.
+
 A shorter vine swings faster and reaches higher, a longer one swings slower
 and further, so climbing the rope is a choice and not only tidiness.
 
@@ -50,8 +55,14 @@ when to let go. A tree is climbed only when you ask for it, by pushing up at
 the trunk, because trees are everywhere and grabbing them by accident would
 end every swing.
 
-The arrow keys (or WASD) are the stick and the space bar is the button, which
-is how it gets built on a laptop; the iPad is what it is for.
+On a laptop it is the trackpad and the keyboard: drag in the left half to
+move the stick, and the arrow keys do the same job, with the space bar for
+the jump. The iPad is what it is for.
+
+The picture fills the window, and the bar, the stick and the button are
+pinned to the picture rather than to the window — so whatever black a
+badly-shaped window leaves is empty, and nothing you have to press is ever
+in it.
 
 ## Commands
 

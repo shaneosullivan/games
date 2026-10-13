@@ -254,15 +254,21 @@ export class Monkey {
     if (!vine || !knot) {
       return;
     }
-    if (up !== 0) {
+    // One thing at a time: a stick pushed plainly up or down climbs the
+    // rope, and anything else pumps. Pumping is a waggle and a waggling
+    // thumb is never level, so climbing on any upward component at all
+    // would take the monkey up the vine all the while it was being swung.
+    const climbing = Math.abs(up) > Math.abs(lean) * SWING.climbsOver;
+    if (climbing) {
       this.climbTheVine(vine, up, dt);
     }
+    const pump = climbing ? 0 : lean;
     // A pendulum, in the angle. Leaning pushes in whichever direction the
     // swing is already going, which is how pumping works — push with the
     // swing and it grows, push against it and it dies.
     this.spin +=
       (-(WORLD.gravity / this.radius) * Math.sin(this.angle) +
-        lean * SWING.pump) *
+        pump * SWING.pump) *
       dt;
     this.spin *= Math.exp(-SWING.slows * dt);
     this.spin = Math.max(-SWING.fastest, Math.min(SWING.fastest, this.spin));
