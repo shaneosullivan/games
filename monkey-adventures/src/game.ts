@@ -98,11 +98,19 @@ export class Game {
     }
 
     if (this.sinking > 0) {
-      // In the water: the monkey sinks where it fell while the player takes
-      // in what happened, and then it is put back on the near bank.
+      // Out of play for a moment, while the player takes in what happened.
+      // The water swallows the monkey, slowly; the lava spits it back out,
+      // which is what lava does to anybody who steps in it in a game, and
+      // is the difference between a hazard that is sad and one that is
+      // funny. A child is going to do this on purpose.
       this.sinking -= dt;
       this.monkey.wasY = this.monkey.y;
-      this.monkey.y += 26 * dt;
+      if (this.burnt) {
+        this.monkey.vy += WORLD.gravity * dt;
+        this.monkey.y += this.monkey.vy * dt;
+      } else {
+        this.monkey.y += 26 * dt;
+      }
       this.jungle.update(dt, this.time, null);
       if (this.sinking <= 0) {
         this.toTheBank();
@@ -259,13 +267,18 @@ export class Game {
     if (!onTheLava && !caught) {
       return;
     }
-    this.sinking = LAKE.watchFor * 0.6;
+    this.sinking = VOLCANO.watchFor;
     this.fellAt = monkey.x;
     this.burnt = true;
     this.sound.splash();
     this.party.burst(monkey.x, monkey.y - 4, 16, PARTY.lavaColours, true);
+    // Thrown straight back up out of it, and left to fall: the step above
+    // keeps the gravity on while `sinking` runs.
     monkey.vx = 0;
-    monkey.vy = 0;
+    monkey.vy = -VOLCANO.bounces;
+    monkey.vine = null;
+    monkey.tree = null;
+    monkey.doing = "air";
   }
 
   /**
@@ -281,10 +294,14 @@ export class Game {
     monkey.vine = null;
     monkey.tree = null;
     monkey.doing = "ground";
-    const from = this.burnt ? this.jungle.volcanoFrom : this.jungle.lakeFrom;
-    const to = this.burnt ? this.jungle.volcanoTo : this.jungle.lakeTo;
+    const from = this.burnt ? this.jungle.craterFrom : this.jungle.lakeFrom;
+    const to = this.burnt ? this.jungle.craterTo : this.jungle.lakeTo;
+    // The lava puts you back on its own rim rather than at the foot of the
+    // hill: the climb up is not the thing you got wrong, and walking it
+    // again five times in a row is how a hazard turns into a chore.
+    const backBy = this.burnt ? VOLCANO.backBy : LAKE.backBy;
     const past = this.fellAt > (from + to) / 2;
-    monkey.x = past ? to + LAKE.backBy : from - LAKE.backBy;
+    monkey.x = past ? to + backBy : from - backBy;
     this.burnt = false;
     monkey.y = this.jungle.floorAt(monkey.x);
     monkey.wasX = monkey.x;

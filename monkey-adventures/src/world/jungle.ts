@@ -143,6 +143,9 @@ export class Jungle {
   readonly vents: Array<Vent> = [];
   readonly volcanoFrom = VOLCANO.from;
   readonly volcanoTo = VOLCANO.from + VOLCANO.wide;
+  /** The lava itself, inside the two slopes: the rim is where it stops. */
+  readonly craterFrom = VOLCANO.from + VOLCANO.wide * VOLCANO.slope;
+  readonly craterTo = VOLCANO.from + VOLCANO.wide * (1 - VOLCANO.slope);
   /** Where home is: the end of the jungle. */
   readonly homeX = WORLD.far;
   /** The water, halfway along. */
@@ -246,8 +249,8 @@ export class Jungle {
       });
     }
     // The vents, spread across the crater.
-    const craterFrom = VOLCANO.from + VOLCANO.wide * VOLCANO.slope;
-    const craterWide = VOLCANO.wide * (1 - VOLCANO.slope * 2);
+    const craterFrom = this.craterFrom;
+    const craterWide = this.craterTo - this.craterFrom;
     for (let i = 0; i < VOLCANO.vents; i++) {
       this.vents.push({
         x: craterFrom + ((i + 0.5) / VOLCANO.vents) * craterWide,
@@ -549,10 +552,7 @@ export class Jungle {
 
   /** Whether a point is over the lava in the crater. */
   overCrater(x: number): boolean {
-    return (
-      x > VOLCANO.from + VOLCANO.wide * VOLCANO.slope &&
-      x < VOLCANO.from + VOLCANO.wide * (1 - VOLCANO.slope)
-    );
+    return x > this.craterFrom && x < this.craterTo;
   }
 
   /** Whether a point is over the water. A little inside the banks, so the

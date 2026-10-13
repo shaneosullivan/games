@@ -223,6 +223,23 @@ export const VOLCANO = {
   /** How far the edge of the column wavers either side, in pixels. One:
    *  enough to be a flame and not so much that it stops being a column. */
   wavers: 1,
+  /**
+   * How fast the monkey is thrown back up when the lava gets it, in pixels
+   * a second, and how long the bounce is watched before it is put back on
+   * the rim.
+   *
+   * The lava does not swallow you, it spits you out: against `WORLD.gravity`
+   * this is a hop of about twenty-four pixels, up and down in six tenths of
+   * a second, which is long enough to read as a bounce and short enough
+   * that nobody is waiting on it. The watch runs a little longer so the
+   * monkey is on its way back down when the picture cuts.
+   */
+  bounces: 158,
+  watchFor: 0.78,
+  /** Where you come back: on the rim, this far clear of the lava. Close
+   *  enough that the crossing is not re-started, far enough that you are
+   *  not put down inside your own mistake. */
+  backBy: 14,
   /** How far down the lava goes. It is drawn as a pool cut into the hill
    *  rather than a coat of paint on top of it, for the same reason the lake
    *  is cut into the floor: a hazard you can see the depth of reads as
