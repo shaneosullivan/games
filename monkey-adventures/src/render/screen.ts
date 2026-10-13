@@ -54,10 +54,19 @@ export class Screen {
     const h = window.innerHeight;
     const want = Math.round(this.tall * (w / Math.max(1, h)));
     this.wide = Math.max(SCREEN.narrowest, Math.min(SCREEN.widest, want));
-    if (this.canvas.width !== this.wide || this.canvas.height !== this.tall) {
-      this.canvas.width = this.wide;
-      this.canvas.height = this.tall;
+    // The backing store is `SCREEN.fine` canvas pixels to each picture
+    // pixel, and the context is scaled to match, so every drawing call in
+    // the game stays in picture pixels and lands on the same blocks it
+    // always did. The vines are the only thing that spends the extra.
+    const fine = SCREEN.fine;
+    if (
+      this.canvas.width !== this.wide * fine ||
+      this.canvas.height !== this.tall * fine
+    ) {
+      this.canvas.width = this.wide * fine;
+      this.canvas.height = this.tall * fine;
     }
+    this.ctx.setTransform(fine, 0, 0, fine, 0, 0);
     // Whole numbers of screen pixels per picture pixel wherever it fits,
     // because a pixel and a half is a pixel with a blurred edge and the eye
     // picks it up as shimmer the moment anything scrolls. Below one, the

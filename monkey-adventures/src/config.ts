@@ -29,6 +29,18 @@ export const SCREEN = {
   /** And the narrowest, so a tall thin window still shows the vine you are
    *  swinging towards. */
   narrowest: 240,
+  /**
+   * How many canvas pixels there are to a picture pixel.
+   *
+   * Everything is drawn in picture pixels and the canvas is scaled by this,
+   * so a one-pixel block still rasterises as a block this many across and
+   * the look does not change at all. What it buys is somewhere finer to go
+   * when something needs it: the vines step along in halves of a picture
+   * pixel, because a rope stamped in whole blocks is a staircase, and a
+   * staircase is the one place in this picture where the blocks read as a
+   * mistake rather than as the style.
+   */
+  fine: 2,
 } as const;
 
 /** The world, and what gravity does in it. */
@@ -194,6 +206,23 @@ export const VOLCANO = {
   /** How wide a column is, and how wide it counts as when it catches you. */
   wide2: 7,
   catches: 7,
+  /** The shape of a spurt, taken from the picture: a crown of tongues
+   *  splaying out of the ground, a column that narrows as it climbs with a
+   *  white-hot core up the middle, and lumps thrown off the top that arc
+   *  and fall back. A straight bar of orange is what it was before, and a
+   *  straight bar reads as a wall rather than as something thrown. */
+  tongues: 5,
+  /** How tall the crown stands, as a fraction of the column. */
+  crown: 0.34,
+  /** How far apart the tongues splay at their tips, in pixels. */
+  splays: 4,
+  /** How many lumps come off the tip, and how high the first one carries
+   *  above where the column reaches, as a fraction of it. */
+  blobs: 3,
+  blobsBy: 1.12,
+  /** How far the edge of the column wavers either side, in pixels. One:
+   *  enough to be a flame and not so much that it stops being a column. */
+  wavers: 1,
   /** How far down the lava goes. It is drawn as a pool cut into the hill
    *  rather than a coat of paint on top of it, for the same reason the lake
    *  is cut into the floor: a hazard you can see the depth of reads as
@@ -566,6 +595,10 @@ export const PAINT = {
   crocMouth: "#8c3a4a",
   lava: "#e8562b",
   lavaBright: "#ffb03a",
+  /** The core of a spurt, which in the picture is nearly white: the
+   *  hottest part is in the middle and at the tip, and without it a column
+   *  of one orange is a stick. */
+  lavaHot: "#fff3b0",
   /** The bottom of the pool. Darker and browner than the surface: lava
    *  cools as it goes down, and the fall-off is what makes the hole look
    *  like a hole instead of a stripe. */

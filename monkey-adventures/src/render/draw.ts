@@ -5,6 +5,7 @@ import {
   LAKE,
   MONKEY,
   PAINT,
+  SCREEN,
   VOLCANO,
   WORLD,
 } from "../config";
@@ -335,15 +336,113 @@ function lava(
       g.fillRect(x - 1, base - 2 - spit, 2, 2);
     }
     if (vent.up > 0) {
-      const tall = Math.round(vent.up * VOLCANO.reaches);
-      const half = Math.floor(VOLCANO.wide2 / 2);
-      g.fillStyle = PAINT.lava;
-      g.fillRect(x - half, base - tall, VOLCANO.wide2, tall);
-      g.fillStyle = PAINT.lavaBright;
-      g.fillRect(x - half + 2, base - tall, VOLCANO.wide2 - 4, tall);
-      // A cap of brighter stuff at the top, which is where the eye goes.
-      g.fillRect(x - half - 1, base - tall - 2, VOLCANO.wide2 + 2, 3);
+      // How far through the firing this vent is, which the shape needs and
+      // `up` cannot give: `up` is a sine, so it says the same thing on the
+      // way up as on the way down, and a lump thrown off the top has to
+      // keep climbing while the column underneath it is already falling.
+      const t = (vent.at - VOLCANO.warns) / VOLCANO.spurts;
+      spurt(g, x, base, vent.up, t, time);
     }
+  }
+}
+
+/**
+ * One column of lava, thrown.
+ *
+ * Three parts, which is what the picture is made of: a crown of tongues
+ * splaying out of the hole, a column that narrows as it climbs with a
+ * white-hot core, and lumps that come off the top and arc back down. The
+ * part that catches the monkey is still the column — the crown and the
+ * lumps are decoration and deliberately smaller than their hitbox, so
+ * nothing that looks like a near miss is a burn.
+ */
+function spurt(
+  g: CanvasRenderingContext2D,
+  x: number,
+  base: number,
+  up: number,
+  t: number,
+  time: number,
+): void {
+  const tall = Math.round(up * VOLCANO.reaches);
+  const wide = VOLCANO.wide2;
+
+  // The crown. It blooms early and is gone before the column is, the way a
+  // splash is over before the thing it threw comes down.
+  const crown = Math.max(0, 1 - Math.abs(t - 0.26) * 1.7);
+  if (crown > 0) {
+    const middle = (VOLCANO.tongues - 1) / 2;
+    for (let i = 0; i < VOLCANO.tongues; i++) {
+      const outBy = (i - middle) / middle;
+      const tongue = Math.round(
+        VOLCANO.reaches * VOLCANO.crown * crown * (1 - Math.abs(outBy) * 0.55),
+      );
+      if (tongue <= 0) {
+        continue;
+      }
+      const at = x + Math.round(outBy * VOLCANO.splays * (0.6 + crown * 0.4));
+      g.fillStyle = PAINT.lava;
+      g.fillRect(at - 1, base - tongue, 3, tongue + 2);
+      g.fillStyle = PAINT.lavaBright;
+      g.fillRect(at, base - tongue + 1, 1, tongue);
+    }
+  }
+
+  // The column, a row at a time so it can taper and waver. Three pixels
+  // across at the top and the full width at the bottom.
+  for (let ry = 0; ry < tall; ry++) {
+    const up2 = ry / Math.max(1, tall);
+    const half = Math.max(1, Math.round((wide / 2) * (1 - up2 * 0.72)));
+    const waver = Math.round(
+      Math.sin(ry * 0.55 + time * 11) * VOLCANO.wavers * up2,
+    );
+    const left = x - half + waver;
+    const y = base - ry;
+    g.fillStyle = PAINT.lava;
+    g.fillRect(left, y, half * 2 + 1, 1);
+    g.fillStyle = PAINT.lavaBright;
+    g.fillRect(left + 1, y, Math.max(1, half * 2 - 1), 1);
+    // The core, white-hot, which stops a third of the way short of the tip
+    // where the column has thinned to nothing much.
+    if (up2 < 0.66) {
+      g.fillStyle = PAINT.lavaHot;
+      g.fillRect(x + waver, y, 1, 1);
+    }
+  }
+  if (tall > 4) {
+    // A lump on the tip, where the next thing to come off is gathering.
+    const top = base - tall;
+    g.fillStyle = PAINT.lava;
+    g.fillRect(x - 1, top - 2, 3, 3);
+    g.fillStyle = PAINT.lavaBright;
+    g.fillRect(x - 1, top - 2, 2, 2);
+  }
+
+  // The lumps off the tip. Each is launched a little later than the last
+  // and carries a little less far; the arc is a plain parabola that starts
+  // and lands inside the firing, so none of them is cut off in mid-air.
+  for (let i = 0; i < VOLCANO.blobs; i++) {
+    const launch = 0.18 + i * 0.1;
+    const over = 1 - launch;
+    const u = (t - launch) / over;
+    if (u <= 0 || u >= 1) {
+      continue;
+    }
+    // Zero at both ends, one in the middle.
+    const arc = 4 * u * (1 - u);
+    const high = VOLCANO.reaches * VOLCANO.blobsBy * (1 - i * 0.22) * arc;
+    const size = i === 0 ? 2 : 1;
+    // Thrown out as well as up, each a different way, so three lumps are a
+    // scatter and not a stack of boxes going up the middle.
+    const aside = i === 1 ? -1 : i === 2 ? 1.6 : 0.6;
+    const at = x + Math.round(aside * 5 * u);
+    const y = Math.round(base - high);
+    g.fillStyle = PAINT.lava;
+    g.fillRect(at - 1, y - 1, size + 2, size + 2);
+    g.fillStyle = PAINT.lavaBright;
+    g.fillRect(at, y, size, size);
+    g.fillStyle = PAINT.lavaHot;
+    g.fillRect(at, y, 1, 1);
   }
 }
 
@@ -375,6 +474,12 @@ function bananas(
  * filling the gaps between knots so that a bend is a bend and a whip is a
  * whip. The knots are eight pixels apart and the picture is 180 tall, so
  * the line between two of them is a handful of squares.
+ *
+ * Those squares are half a picture pixel each, which is the one place in
+ * the game that draws finer than the grid (see `SCREEN.fine`). A rope is a
+ * long thin diagonal, and a long thin diagonal in whole blocks is a
+ * staircase — the only thing in this picture where the blocks look like a
+ * mistake instead of the style. Everything else still steps in whole ones.
  */
 function rope(
   g: CanvasRenderingContext2D,
@@ -384,19 +489,25 @@ function rope(
 ): void {
   g.fillStyle = held ? PAINT.vine : PAINT.vineDark;
   const knots = vine.knots;
+  // Half a picture pixel: the size of a block of rope, the distance the
+  // walk steps, and what positions are snapped to, all the same number so
+  // the rope lands on a grid of its own rather than between two.
+  const bit = 1 / SCREEN.fine;
+  const snap = (v: number): number => Math.round(v / bit) * bit;
   for (let i = 0; i < knots.length - 1; i++) {
     const ax = knots[i].x - camera;
     const ay = knots[i].y;
     const bx = knots[i + 1].x - camera;
     const by = knots[i + 1].y;
-    const steps = Math.max(1, Math.round(Math.hypot(bx - ax, by - ay)));
+    // Stepped at half a pixel so a steep diagonal has no gaps in it.
+    const steps = Math.max(1, Math.round(Math.hypot(bx - ax, by - ay) / bit));
     for (let k = 0; k <= steps; k++) {
       const t = k / steps;
       g.fillRect(
-        Math.round(ax + (bx - ax) * t),
-        Math.round(ay + (by - ay) * t),
-        2,
-        2,
+        snap(ax + (bx - ax) * t),
+        snap(ay + (by - ay) * t),
+        bit * 2,
+        bit * 2,
       );
     }
   }
