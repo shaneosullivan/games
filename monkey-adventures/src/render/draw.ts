@@ -462,7 +462,14 @@ function bananas(
     if (x < -10 || x > w + 10) {
       continue;
     }
-    g.drawImage(sprite, x - 3, Math.round(banana.y) - 3);
+    // Centred on the point the game thinks the banana is at, taken from
+    // the sprite rather than written down, so changing the drawing does
+    // not quietly move what you have to swing through.
+    g.drawImage(
+      sprite,
+      x - Math.round(sprite.width / 2),
+      Math.round(banana.y) - Math.round(sprite.height / 2),
+    );
   }
 }
 

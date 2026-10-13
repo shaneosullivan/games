@@ -21,6 +21,10 @@ const PALETTE: Record<string, string> = {
   t: "#8a5a32",
   y: "#ffd257",
   b: "#c98f2a",
+  /** The pale inside of a banana's curve, and the dark line round it.
+   *  A banana at this size needs three yellows and an outline or it is a
+   *  yellow smudge: the outline is what makes it an object. */
+  Y: "#ffeca8",
   g: "#5bb04a",
   G: "#3c8035",
   B: "#c9d98a",
@@ -143,16 +147,27 @@ function bake(
   return canvas;
 }
 
-/** A banana, hung between the vines to be swung through. Seven pixels of
- *  crescent: at this size the shape is the whole word. */
+/**
+ * A banana, hung by the vines to be swung through.
+ *
+ * Drawn from a reference rather than invented: a black outline the whole
+ * way round, the amber underside, the yellow body, the cream along the
+ * inside of the curve, and the stub of a stem at the fat end. The old one
+ * was a seven-pixel crescent of two yellows and it read as a moon.
+ *
+ * Twelve across and eight down: long rather than tall, which is the shape
+ * of the thing — a banana as wide as the monkey is too much fruit, but one
+ * that is only as long as it is deep is a croissant.
+ */
 const BANANA = [
-  "...bb..",
-  "..byy..",
-  ".byy...",
-  ".by....",
-  ".byy...",
-  "..byy..",
-  "...bb..",
+  "...ee.......",
+  "..edde......",
+  ".eeYYe......",
+  "ebyYYYe.....",
+  "ebyyYYYee...",
+  ".ebbyyYYYYe.",
+  "..eebbyyYYYe",
+  "....eeeeeeee",
 ];
 
 /**
