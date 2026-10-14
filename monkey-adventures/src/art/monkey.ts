@@ -31,67 +31,109 @@ const PALETTE: Record<string, string> = {
   w: "#f6f4ec",
 };
 
-/** Arms up: hanging from a vine, and in the air, which look the same and
- *  should — a monkey in flight is a monkey reaching for the next vine. */
+/**
+ * Hanging, and in the air, which look the same and should — a monkey in
+ * flight is a monkey reaching for the next vine.
+ *
+ * Both hands on the rope, one above the other the way anybody holds a rope,
+ * and the far arm a shade darker behind the near one. Two rows taller than
+ * the monkey is, because its arms are above its head: the drawing hangs
+ * from its own height so the fists meet the end of the vine.
+ */
 const HANG = [
-  ".ff.......ff.",
-  ".ff.ddddd.ff.",
-  ".ffdfffffdff.",
-  ".ffdllllllff.",
-  "..fdleleldf..",
-  "...dlmmmld...",
-  "....dmmmd....",
   ".....ddd.....",
-  "...fffffff...",
-  "..ffffffffft.",
-  "..fffffffftt.",
-  "..ffffffff.t.",
-  "...fff.fff...",
-  "...dd...dd...",
-  "....d...d....",
+  "....ddff.....",
+  "....ddff.....",
+  "...ddddfdd...",
+  "..dffffffdd..",
+  "..dfllllffd..",
+  "..dflellmmd..",
+  "..dfllllmmd..",
+  "...dfllmmd...",
+  "...dffffd....",
+  "..tdfffffd...",
+  ".ttdfffffd...",
+  "..tdfffffd...",
+  "...dfffffd...",
+  "...dff.ffd...",
+  "...dd..dd....",
 ];
 
-/** Standing on the ground, arms down. */
+/** Standing on the ground, side on, arms down. */
 const STAND = [
-  "....ddddd....",
-  "..dddfffddd..",
-  "..ddfffffdd..",
-  "...dlllllld..",
-  "...dleleld...",
-  "...dlmmmld...",
-  "....dmmmd....",
-  ".....ddd.....",
-  "...fffffff...",
-  "..ffffffffft.",
-  "..fffffffftt.",
-  "..ffffffff.t.",
-  "...fff.fff...",
-  "...dd...dd...",
-  "..ddd...ddd..",
+  ".....ddddd...",
+  "....dfffffd..",
+  "....dllllfd..",
+  "....dlellmd..",
+  "....dllllmmd.",
+  ".....dllmmd..",
+  ".....dffdd...",
+  "...dddffffd..",
+  "..tdffffffd..",
+  ".ttdffffffd..",
+  "..tdffffffd..",
+  "...dffffffd..",
+  "...dffffffd..",
+  "...dff.ffd...",
+  "...dd..dd....",
 ];
 
-/** Running: the same monkey with its legs somewhere else. Two frames is
- *  plenty at this size — the eye reads the change, not the drawing. */
+/** Running: the near arm thrown forward and the legs apart, then both
+ *  gathered under it. Two frames is all a run needs at this size. */
 const RUN_A = [
-  ...STAND.slice(0, 12),
-  "...fff.fff...",
-  "..dd......dd.",
-  ".ddd.........",
+  ".....ddddd...",
+  "....dfffffd..",
+  "....dllllfd..",
+  "....dlellmd..",
+  "....dllllmmd.",
+  ".....dllmmd..",
+  ".....dffdd...",
+  "..dddffffd...",
+  ".tdffffffdf..",
+  "ttdffffffdff.",
+  ".tdffffffd...",
+  "..dffffffd...",
+  "..dffffffd...",
+  "..df..dffd...",
+  "..dd...dd....",
 ];
 const RUN_B = [
-  ...STAND.slice(0, 12),
-  "...fff.fff...",
-  "....dd.dd....",
+  ".....ddddd...",
+  "....dfffffd..",
+  "....dllllfd..",
+  "....dlellmd..",
+  "....dllllmmd.",
+  ".....dllmmd..",
+  ".....dffdd...",
+  "...ddffffdd..",
+  ".ttdffffffd..",
+  "t..dffffffd..",
+  "...dffffffd..",
+  "...dffffffd..",
+  "...dffffffd..",
+  "...dffffd....",
   "...ddd.ddd...",
 ];
 
-/** The other half of a climb: the same reach with the legs swapped, so a
- *  monkey going up a trunk is plainly working at it. */
+/** Climbing: the hang with the legs working, and the arms reaching a little
+ *  to the side of the trunk rather than straight up a rope. */
 const CLIMB_B = [
-  ...HANG.slice(0, 12),
-  "...fff.fff...",
-  "....dd..d....",
-  "...dd....d...",
+  ".....ddd.....",
+  "....ddff.....",
+  "...ddff......",
+  "..ddddfdd....",
+  "..dffffffdd..",
+  "..dfllllffd..",
+  "..dflellmmd..",
+  "..dfllllmmd..",
+  "...dfllmmd...",
+  "...dffffd....",
+  "..tdfffffd...",
+  ".ttdfffffd...",
+  "..tdfffffd...",
+  "...dfffffd...",
+  "...dffdffd...",
+  "...dd...dd...",
 ];
 
 export type Pose = "hang" | "stand" | "runA" | "runB" | "climbB";

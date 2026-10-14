@@ -551,7 +551,10 @@ function drawMonkey(
   g.drawImage(
     sprite,
     Math.round(x - camera - MONKEY.wide / 2),
-    Math.round(y - MONKEY.tall),
+    // Hung from the sprite's own height rather than the monkey's: the
+    // hanging pose is taller than the monkey is, because its arms are
+    // above its head, and its hands have to meet the rope.
+    Math.round(y - sprite.height),
   );
 }
 
