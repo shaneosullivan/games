@@ -341,7 +341,7 @@ function lava(
       // way up as on the way down, and a lump thrown off the top has to
       // keep climbing while the column underneath it is already falling.
       const t = (vent.at - VOLCANO.warns) / VOLCANO.spurts;
-      spurt(g, x, base, vent.up, t, time);
+      spurt(g, x, base, t, time);
     }
   }
 }
@@ -360,11 +360,9 @@ function spurt(
   g: CanvasRenderingContext2D,
   x: number,
   base: number,
-  up: number,
   t: number,
   time: number,
 ): void {
-  const tall = Math.round(up * VOLCANO.reaches);
   const wide = VOLCANO.wide2;
 
   // The crown. It blooms early and is gone before the column is, the way a
@@ -388,61 +386,60 @@ function spurt(
     }
   }
 
-  // The column, a row at a time so it can taper and waver. Three pixels
-  // across at the top and the full width at the bottom.
-  for (let ry = 0; ry < tall; ry++) {
-    const up2 = ry / Math.max(1, tall);
-    const half = Math.max(1, Math.round((wide / 2) * (1 - up2 * 0.72)));
-    const waver = Math.round(
-      Math.sin(ry * 0.55 + time * 11) * VOLCANO.wavers * up2,
-    );
-    const left = x - half + waver;
-    const y = base - ry;
-    g.fillStyle = PAINT.lava;
-    g.fillRect(left, y, half * 2 + 1, 1);
-    g.fillStyle = PAINT.lavaBright;
-    g.fillRect(left + 1, y, Math.max(1, half * 2 - 1), 1);
-    // The core, white-hot, which stops a third of the way short of the tip
-    // where the column has thinned to nothing much.
-    if (up2 < 0.66) {
-      g.fillStyle = PAINT.lavaHot;
-      g.fillRect(x + waver, y, 1, 1);
-    }
-  }
-  if (tall > 4) {
-    // A lump on the tip, where the next thing to come off is gathering.
-    const top = base - tall;
-    g.fillStyle = PAINT.lava;
-    g.fillRect(x - 1, top - 2, 3, 3);
-    g.fillStyle = PAINT.lavaBright;
-    g.fillRect(x - 1, top - 2, 2, 2);
-  }
-
-  // The lumps off the tip. Each is launched a little later than the last
-  // and carries a little less far; the arc is a plain parabola that starts
-  // and lands inside the firing, so none of them is cut off in mid-air.
-  for (let i = 0; i < VOLCANO.blobs; i++) {
-    const launch = 0.18 + i * 0.1;
-    const over = 1 - launch;
-    const u = (t - launch) / over;
-    if (u <= 0 || u >= 1) {
+  // The jet, as parcels of lava rather than as a column.
+  //
+  // Each one leaves the vent a little after the one before and a little
+  // slower, and from then on it is on its own arc. Early on they are close
+  // enough together to read as one thick jet; as they come down they
+  // separate into drops, land at their own times, and the last of them are
+  // still in the air when the first are back in the lava. That is the whole
+  // trick: nothing here draws a break-up, the break-up is what eleven
+  // parabolas look like.
+  const firing = VOLCANO.spurts;
+  const since = t * firing;
+  // Chosen rather than tuned: this gravity and this launch speed put the
+  // lead parcel at `reaches` exactly at the top of its arc and back in the
+  // lava exactly as the firing ends.
+  const falls = (8 * VOLCANO.reaches) / (firing * firing);
+  const thrown = (falls * firing) / 2;
+  for (let i = 0; i < VOLCANO.drops; i++) {
+    const u = since - i * VOLCANO.dropEvery;
+    if (u <= 0) {
       continue;
     }
-    // Zero at both ends, one in the middle.
-    const arc = 4 * u * (1 - u);
-    const high = VOLCANO.reaches * VOLCANO.blobsBy * (1 - i * 0.22) * arc;
-    const size = i === 0 ? 2 : 1;
-    // Thrown out as well as up, each a different way, so three lumps are a
-    // scatter and not a stack of boxes going up the middle.
-    const aside = i === 1 ? -1 : i === 2 ? 1.6 : 0.6;
-    const at = x + Math.round(aside * 5 * u);
+    const core = i < VOLCANO.jet;
+    const speed = thrown * (1 - i * VOLCANO.thins);
+    const high = speed * u - 0.5 * falls * u * u;
+    const lands = (2 * speed) / falls;
+    // Thrown outwards as well as up, the further back in the queue the
+    // wider — so the jet goes up as one thing and comes down as a fan.
+    const out = core ? 0 : ((i % 2 === 0 ? 1 : -1) * (i - VOLCANO.jet + 1)) / 5;
+    const by = Math.round(out * VOLCANO.fans * u);
+    if (high <= 0) {
+      // Back in the lava: a flat splash where it went in, for a moment.
+      if (u < lands + 0.09) {
+        g.fillStyle = PAINT.lavaBright;
+        g.fillRect(x + by - 2, base - 1, 5, 2);
+      }
+      continue;
+    }
+    const at =
+      x + by + Math.round(Math.sin(i * 1.7 + time * 9) * VOLCANO.wavers);
     const y = Math.round(base - high);
+    // The jet is thick and the spray is thin: a drop at this size is a
+    // streak a pixel or two across and three tall, brightest at its tail,
+    // which is what falling lava looks like and what a square does not.
+    const fat = core ? Math.min(wide, 3 + i) : i % 3 === 0 ? 2 : 1;
+    const long = core ? 4 : 3;
+    const half = Math.floor(fat / 2);
     g.fillStyle = PAINT.lava;
-    g.fillRect(at - 1, y - 1, size + 2, size + 2);
+    g.fillRect(at - half - 1, y - 1, fat + 2, long + 2);
     g.fillStyle = PAINT.lavaBright;
-    g.fillRect(at, y, size, size);
-    g.fillStyle = PAINT.lavaHot;
-    g.fillRect(at, y, 1, 1);
+    g.fillRect(at - half, y, fat, long);
+    if (fat > 3) {
+      g.fillStyle = PAINT.lavaHot;
+      g.fillRect(at, y, 1, long);
+    }
   }
 }
 

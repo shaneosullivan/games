@@ -213,6 +213,33 @@ export const VOLCANO = {
    *  and fall back. A straight bar of orange is what it was before, and a
    *  straight bar reads as a wall rather than as something thrown. */
   tongues: 5,
+  /**
+   * How a spurt is made of lava rather than of column.
+   *
+   * `drops` parcels leave the vent, one every `dropEvery` seconds, each one
+   * `thins` slower than the one before. They climb together — close enough
+   * to read as one jet — and because each is on its own arc they come apart
+   * on the way down into drops that fall at their own speeds and land at
+   * their own times. The break-up is the arithmetic and not a drawing of a
+   * break-up, which is why it reads as liquid: a column that simply got
+   * shorter looked like a shutter closing.
+   *
+   * The gravity and the launch speed are not here. They follow from
+   * `reaches` and `spurts`, so a spurt told to go higher or to last longer
+   * still lands back in the lava exactly as it finishes.
+   */
+  drops: 16,
+  dropEvery: 0.012,
+  thins: 0.03,
+  /** How many of them are the jet rather than the spray. The first few go
+   *  straight up, fat and close together, and read as one column; the rest
+   *  are thrown outwards and come down as a fan, which is what the picture
+   *  does when it comes apart. */
+  jet: 5,
+  /** How fast the spray is thrown sideways, in pixels a second, counted
+   *  from the middle outwards: the further back in the queue a parcel is,
+   *  the wider it goes. */
+  fans: 30,
   /** How tall the crown stands, as a fraction of the column. */
   crown: 0.34,
   /** How far apart the tongues splay at their tips, in pixels. */
