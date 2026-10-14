@@ -32,108 +32,73 @@ const PALETTE: Record<string, string> = {
 };
 
 /**
- * Hanging, and in the air, which look the same and should — a monkey in
- * flight is a monkey reaching for the next vine.
+ * Hanging from a vine, and in the air, which look the same and should — a
+ * monkey in flight is a monkey reaching for the next vine.
  *
- * Both hands on the rope, one above the other the way anybody holds a rope,
- * and the far arm a shade darker behind the near one. Two rows taller than
- * the monkey is, because its arms are above its head: the drawing hangs
- * from its own height so the fists meet the end of the vine.
+ * Both hands on the rope, side by side with it running down between them.
+ * The arms used to be out at either side like a child on monkey bars, and
+ * a vine is not monkey bars: nothing was holding it. The hands are where
+ * the rope ends, so the grip is a grip and not a coincidence.
  */
 const HANG = [
-  ".....ddd.....",
-  "....ddff.....",
-  "....ddff.....",
-  "...ddddfdd...",
-  "..dffffffdd..",
-  "..dfllllffd..",
-  "..dflellmmd..",
-  "..dfllllmmd..",
-  "...dfllmmd...",
-  "...dffffd....",
-  "..tdfffffd...",
-  ".ttdfffffd...",
-  "..tdfffffd...",
-  "...dfffffd...",
-  "...dff.ffd...",
-  "...dd..dd....",
+  "....ff.ff....",
+  "....ff.ff....",
+  "....ff.ff....",
+  "...fdddddf...",
+  "..ffdfffffdf.",
+  "..fdllllllf..",
+  "...dleleld...",
+  "...dlmmmld...",
+  "....dmmmd....",
+  "...fffffff...",
+  "..ffffffffft.",
+  "..fffffffftt.",
+  "..ffffffff.t.",
+  "...fff.fff...",
+  "...dd...dd...",
 ];
 
-/** Standing on the ground, side on, arms down. */
+/** Standing on the ground, arms down. */
 const STAND = [
-  ".....ddddd...",
-  "....dfffffd..",
-  "....dllllfd..",
-  "....dlellmd..",
-  "....dllllmmd.",
-  ".....dllmmd..",
-  ".....dffdd...",
-  "...dddffffd..",
-  "..tdffffffd..",
-  ".ttdffffffd..",
-  "..tdffffffd..",
-  "...dffffffd..",
-  "...dffffffd..",
-  "...dff.ffd...",
-  "...dd..dd....",
+  "....ddddd....",
+  "..dddfffddd..",
+  "..ddfffffdd..",
+  "...dlllllld..",
+  "...dleleld...",
+  "...dlmmmld...",
+  "....dmmmd....",
+  ".....ddd.....",
+  "...fffffff...",
+  "..ffffffffft.",
+  "..fffffffftt.",
+  "..ffffffff.t.",
+  "...fff.fff...",
+  "...dd...dd...",
+  "..ddd...ddd..",
 ];
 
-/** Running: the near arm thrown forward and the legs apart, then both
- *  gathered under it. Two frames is all a run needs at this size. */
+/** Running: the same monkey with its legs somewhere else. Two frames is
+ *  plenty at this size — the eye reads the change, not the drawing. */
 const RUN_A = [
-  ".....ddddd...",
-  "....dfffffd..",
-  "....dllllfd..",
-  "....dlellmd..",
-  "....dllllmmd.",
-  ".....dllmmd..",
-  ".....dffdd...",
-  "..dddffffd...",
-  ".tdffffffdf..",
-  "ttdffffffdff.",
-  ".tdffffffd...",
-  "..dffffffd...",
-  "..dffffffd...",
-  "..df..dffd...",
-  "..dd...dd....",
+  ...STAND.slice(0, 12),
+  "...fff.fff...",
+  "..dd......dd.",
+  ".ddd.........",
 ];
 const RUN_B = [
-  ".....ddddd...",
-  "....dfffffd..",
-  "....dllllfd..",
-  "....dlellmd..",
-  "....dllllmmd.",
-  ".....dllmmd..",
-  ".....dffdd...",
-  "...ddffffdd..",
-  ".ttdffffffd..",
-  "t..dffffffd..",
-  "...dffffffd..",
-  "...dffffffd..",
-  "...dffffffd..",
-  "...dffffd....",
+  ...STAND.slice(0, 12),
+  "...fff.fff...",
+  "....dd.dd....",
   "...ddd.ddd...",
 ];
 
-/** Climbing: the hang with the legs working, and the arms reaching a little
- *  to the side of the trunk rather than straight up a rope. */
+/** The other half of a climb: the same reach with the legs swapped, so a
+ *  monkey going up a trunk is plainly working at it. */
 const CLIMB_B = [
-  ".....ddd.....",
-  "....ddff.....",
-  "...ddff......",
-  "..ddddfdd....",
-  "..dffffffdd..",
-  "..dfllllffd..",
-  "..dflellmmd..",
-  "..dfllllmmd..",
-  "...dfllmmd...",
-  "...dffffd....",
-  "..tdfffffd...",
-  ".ttdfffffd...",
-  "..tdfffffd...",
-  "...dfffffd...",
-  "...dffdffd...",
-  "...dd...dd...",
+  ...HANG.slice(0, 12),
+  "...fff.fff...",
+  "....dd..d....",
+  "...dd....d...",
 ];
 
 export type Pose = "hang" | "stand" | "runA" | "runB" | "climbB";
