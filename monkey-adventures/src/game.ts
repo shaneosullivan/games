@@ -281,13 +281,17 @@ export class Game {
     this.burnt = true;
     this.sound.splash();
     this.party.burst(monkey.x, monkey.y - 4, 16, PARTY.lavaColours, true);
+    // Let go of properly rather than simply forgotten. Clearing the vine
+    // off the monkey leaves the rope pinned to the hand that is no longer
+    // there, and it hangs in the air at the angle of the moment it went
+    // wrong — which is what it did. `letGo` releases the pin, and the vine
+    // swings back the way it would if the monkey had dropped off it.
+    monkey.letGo();
     // Thrown straight back up out of it, and left to fall: the step above
     // keeps the gravity on while `sinking` runs.
     monkey.vx = 0;
     monkey.vy = -VOLCANO.bounces;
-    monkey.vine = null;
     monkey.tree = null;
-    monkey.doing = "air";
   }
 
   /**
