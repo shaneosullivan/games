@@ -84,31 +84,28 @@ export class Hud {
     row.className = "hud-parts";
     for (const part of PARTS) {
       const button = document.createElement("button");
+      // Each button wears the colour of the place it goes to; the rule
+      // reads them off these three custom properties, so the pressed
+      // state keeps the right shadow without five more rules.
       button.className = "hud-again hud-part ui-interactive";
+      button.style.setProperty("--face", part.tint.face);
+      button.style.setProperty("--under", part.tint.under);
+      button.style.setProperty("--ink", part.tint.ink);
       button.textContent = part.name;
       button.addEventListener("click", () => {
         // Handing the focus back, or the space bar presses this button
         // again instead of jumping for the rest of the game.
         button.blur();
         this.setChoosing(false);
-        onBegin(part.at);
+        if (part.rain) {
+          onRain();
+        } else {
+          onBegin(part.at);
+        }
       });
       row.append(button);
     }
-    // The other level, on a line of its own under the parts of the first
-    // one: it is not a part of the jungle, it is somewhere else.
-    const other = document.createElement("div");
-    other.className = "hud-parts";
-    const wet = document.createElement("button");
-    wet.className = "hud-again hud-part hud-rain ui-interactive";
-    wet.textContent = "The rain";
-    wet.addEventListener("click", () => {
-      wet.blur();
-      this.setChoosing(false);
-      onRain();
-    });
-    other.append(wet);
-    this.start.append(asks, row, other);
+    this.start.append(asks, row);
 
     this.root.append(top, this.done, this.start);
     into.append(this.root);
@@ -258,10 +255,6 @@ function inject(): void {
   gap: 10px;
   max-width: 92vw;
 }
-.hud-part {
-  font-size: clamp(15px, 3vw, 20px);
-  padding: 12px 22px;
-}
 
 .hud-tap {
   pointer-events: auto;
@@ -287,18 +280,21 @@ function inject(): void {
   transform: translateY(3px);
   box-shadow: 0 1px 0 #c98f2a;
 }
-/* The other level, told apart from the parts of the first one by its
-   colour: a child who cannot read yet still knows this button is not one
-   of those. Written with both classes, and after the yellow it overrides,
-   or the yellow wins on source order and the rain button is a part. */
-.hud-again.hud-rain {
-  background: #8fb6d8;
-  box-shadow: 0 4px 0 #5d82a4;
-  color: #12202c;
+/* A part of the course wears its own colour, set on the button as three
+   custom properties. Written after the gold and not before it: the two
+   rules have the same weight, so whichever is last is the one that
+   counts, and the gold would otherwise paint every button again. */
+.hud-part {
+  font-size: clamp(15px, 3vw, 20px);
+  padding: 12px 22px;
+  background: var(--face);
+  box-shadow: 0 4px 0 var(--under);
+  color: var(--ink);
 }
-.hud-again.hud-rain:active {
-  box-shadow: 0 1px 0 #5d82a4;
+.hud-part:active {
+  box-shadow: 0 1px 0 var(--under);
 }
+
 `;
   document.head.append(style);
 }

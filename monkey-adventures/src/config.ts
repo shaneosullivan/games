@@ -739,26 +739,6 @@ export const SIM = {
 } as const;
 
 /**
- * The parts of the course, for the chooser the game opens on.
- *
- * The jungle is one long run rather than a set of levels, but it plainly
- * has parts, and while the game is being built nobody wants to swing for
- * four minutes to look at the volcano. Each one puts the monkey down a
- * little before the thing it is named after, on the flat and facing it,
- * with room to get running.
- *
- * It is a start screen as much as a dev tool, which is why it says "The
- * lake" and not "level 2": a child picking the volcano because they like
- * the volcano is the same button.
- */
-export const PARTS: ReadonlyArray<{name: string; at: number}> = [
-  {name: "The jungle", at: 40},
-  {name: "The lake", at: LAKE.from - 170},
-  {name: "The volcano", at: VOLCANO.from - 170},
-  {name: "Home", at: WORLD.far - 300},
-];
-
-/**
  * The rain level.
  *
  * The second course rather than another stretch of the first one: a child
@@ -841,3 +821,66 @@ export const MUSHROOM = {
   /** How close you have to pass to light one up. */
   notices: 12,
 } as const;
+
+/**
+ * Everywhere the game will start you, in the order it all happens.
+ *
+ * The jungle is one long run rather than a set of levels, but it plainly
+ * has parts, and the rain is a level of its own: the chooser does not
+ * distinguish them, because to a child picking one they are the same
+ * question. Nobody wants to swing for four minutes to look at the volcano
+ * while the game is being built, and a child who likes the volcano presses
+ * the same button.
+ *
+ * In order, which is the only order that makes sense of a row of buttons:
+ * the jungle, then the rain, then the lake, the volcano and home. Each of
+ * the jungle's parts puts the monkey down a little before the thing it is
+ * named after, on the flat with room to get running.
+ */
+export const PARTS: ReadonlyArray<{
+  name: string;
+  /** Where in the jungle it starts you. Ignored for a level of its own,
+   *  which builds its own world and starts at the beginning of it. */
+  at: number;
+  /** True for the rain level, which is not a part of the jungle at all. */
+  rain?: boolean;
+  /**
+   * What colour the button is: the face, the shadow under it, and the
+   * ink on it.
+   *
+   * Each one is the colour of the thing it is named after: the jungle
+   * green, the rain the brown of the mud it makes, the lake blue, the
+   * volcano the red of its lava, and home the gold that every other
+   * button in the game already is. A child who cannot read the words
+   * can still tell five buttons apart, and will learn which is which the
+   * first time they press one.
+   */
+  tint: {face: string; under: string; ink: string};
+}> = [
+  {
+    name: "The jungle",
+    at: 40,
+    tint: {face: "#7ec850", under: "#4e8f32", ink: "#15280f"},
+  },
+  {
+    name: "The rain",
+    at: RAIN.backTo,
+    rain: true,
+    tint: {face: "#a9754a", under: "#74492a", ink: "#2a1708"},
+  },
+  {
+    name: "The lake",
+    at: LAKE.from - 170,
+    tint: {face: "#63b8d8", under: "#3d8099", ink: "#06242e"},
+  },
+  {
+    name: "The volcano",
+    at: VOLCANO.from - 170,
+    tint: {face: "#e8562b", under: "#a8331a", ink: "#2a0d06"},
+  },
+  {
+    name: "Home",
+    at: WORLD.far - 300,
+    tint: {face: "#ffd257", under: "#c98f2a", ink: "#2a1a10"},
+  },
+];
