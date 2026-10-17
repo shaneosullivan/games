@@ -783,6 +783,24 @@ export const RAIN = {
   /** How many lives you get. Two: enough that one coconut is a fright
    *  rather than the end of it, few enough that they are worth watching. */
   lives: 2,
+  /**
+   * Coming back to life at a mushroom.
+   *
+   * The view travels back to it rather than cutting, at `rewinds` pixels a
+   * second, and then the mushroom throws `sparkleBits` of light for
+   * `sparkles` seconds before the monkey is standing there again. It costs
+   * a second and a half and it is worth it twice over: a child who is put
+   * back somewhere by a cut has to work out where they are, and one who is
+   * carried back has watched it happen and knows.
+   *
+   * Only worth doing when there is somewhere to travel — under
+   * `rewindsOver` pixels the view is near enough already, and sliding it
+   * would be a twitch rather than a journey.
+   */
+  rewinds: 620,
+  rewindsOver: 60,
+  sparkles: 0.5,
+  sparkleBits: 26,
   /** How many mushrooms there are, spread evenly along. Three puts one at
    *  each quarter — a quarter, halfway, three quarters — and none at the
    *  very end, where a revive point would hand over the finish. */

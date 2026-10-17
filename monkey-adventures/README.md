@@ -46,7 +46,11 @@ grows back somewhere else along its stretch of canopy, so the walk back is
 never the walk you just learned.
 
 Sparkling mushrooms at each quarter of the way along are where you come
-back to. Nothing at the end: a revive point in sight of home would
+back to. The view travels back to the last one you passed rather than
+cutting to it, the mushroom throws its light about when the view arrives,
+and then the monkey is standing there — about two and a half seconds from
+the coconut to playing again. A child put somewhere by a cut has to work
+out where they are; one who is carried back has watched it happen. Nothing at the end: a revive point in sight of home would
 hand over the last of the level. Lose both hearts and the level starts
 again with both of them back.
 

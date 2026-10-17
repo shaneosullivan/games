@@ -53,6 +53,15 @@ export class Game {
   private backTo = 0;
   /** How many lives are left. Only the rain level has any. */
   private lives = 0;
+  /**
+   * The journey back to where the monkey will start again.
+   *
+   * The view travels there on its own while the monkey is out of play,
+   * and when it arrives the place it has arrived at makes a fuss — a
+   * mushroom throws sparkles — before the monkey is standing there. A cut
+   * would be cheaper and a child would have to work out where they were.
+   */
+  private reviving: {sparkling: number; burst: boolean} | null = null;
   private partyIn = 0;
   private time = 0;
   private behind = 0;
@@ -125,6 +134,11 @@ export class Game {
           WORLD.floor - 30 - Math.random() * 20,
         );
       }
+      return;
+    }
+
+    if (this.reviving) {
+      this.travelBack(dt);
       return;
     }
 
@@ -411,26 +425,92 @@ export class Game {
    * more than the crossing: the jungle behind it is not in doubt.
    */
   private toTheBank(): void {
+    this.burnt = false;
+    // Far enough away to be a journey? Then the view makes it, and the
+    // monkey appears at the end of it. Near enough and it is put straight
+    // down, because sliding the view forty pixels is a twitch.
+    const wantCamera = this.wantCamera(this.backTo);
+    if (Math.abs(wantCamera - this.camera) > RAIN.rewindsOver) {
+      this.monkey.doing = "air";
+      this.monkey.vine = null;
+      this.monkey.tree = null;
+      this.reviving = {sparkling: RAIN.sparkles, burst: false};
+      return;
+    }
+    this.putDown(this.backTo);
+  }
+
+  /**
+   * The view travelling back to where the monkey will start again, and
+   * the fuss when it gets there.
+   *
+   * The monkey is nowhere during this: it is off being dead, and putting
+   * it down at the end is what brings it back. The jungle carries on
+   * breathing, because a jungle that stops while you are not in it is a
+   * jungle made of cardboard.
+   */
+  private travelBack(dt: number): void {
+    const back = this.reviving;
+    if (!back) {
+      return;
+    }
+    this.jungle.update(dt, this.time, null);
+    const want = this.wantCamera(this.backTo);
+    const by = RAIN.rewinds * dt;
+    if (Math.abs(want - this.camera) > by) {
+      this.camera += Math.sign(want - this.camera) * by;
+      return;
+    }
+    this.camera = want;
+    if (!back.burst) {
+      // Arrived. Whatever is here says so — a mushroom throws its light
+      // about, and anywhere else gets the same handful of sparks, which
+      // is the game saying "here, this is where you are".
+      back.burst = true;
+      const spot = this.jungle.mushrooms.find(
+        one => Math.abs(one.x - this.backTo) < 2,
+      );
+      this.party.burst(
+        this.backTo,
+        this.jungle.floorAt(this.backTo) - (spot ? 8 : 6),
+        RAIN.sparkleBits,
+      );
+      this.sound.banana();
+    }
+    back.sparkling -= dt;
+    if (back.sparkling <= 0) {
+      this.reviving = null;
+      this.putDown(this.backTo);
+    }
+  }
+
+  /** Where the view sits when the monkey is at a point. */
+  private wantCamera(at: number): number {
+    return Math.max(
+      0,
+      Math.min(
+        this.jungle.far - this.screen.wide + 40,
+        at - this.screen.wide / 3,
+      ),
+    );
+  }
+
+  /** The monkey, standing at a point, facing the way it was going. */
+  private putDown(at: number): void {
     const monkey = this.monkey;
     monkey.vine = null;
     monkey.tree = null;
     monkey.doing = "ground";
-    // Wherever the thing that got you decided: the near edge of the water
-    // or of the crater, or the last mushroom passed in the rain. Worked
-    // out at the moment it happened, because by now the monkey has been
-    // thrown about and is no longer anywhere useful.
-    monkey.x = this.backTo;
-    this.burnt = false;
-    monkey.y = this.jungle.floorAt(monkey.x);
+    monkey.x = at;
+    monkey.y = this.jungle.floorAt(at);
     monkey.wasX = monkey.x;
     monkey.wasY = monkey.y;
     monkey.vx = 0;
     monkey.vy = 0;
     monkey.facingLeft = false;
-    // The camera goes with it. Without this the monkey is put on the bank
-    // and then dragged straight back off it by the rule that keeps it on
-    // screen, because the view is still out over the water.
-    this.camera = monkey.x - this.screen.wide / 3;
+    // The view goes with it, or the rule that keeps the monkey on screen
+    // drags it straight back off the spot it was put on.
+    this.camera = this.wantCamera(at);
   }
 
   /**
@@ -481,6 +561,7 @@ export class Game {
     this.bananas = 0;
     this.finished = false;
     this.sinking = 0;
+    this.reviving = null;
     this.party.clear();
     this.hud.setFinished(false);
     this.hud.setScore(0);
@@ -504,6 +585,7 @@ export class Game {
     this.finished = false;
     this.sinking = 0;
     this.burnt = false;
+    this.reviving = null;
     this.lives = RAIN.lives;
     this.hud.setScore(0);
     this.hud.setProgress(0);
