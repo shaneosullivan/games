@@ -178,6 +178,7 @@ export class Game {
     if (this.jungle.raining) {
       this.lightTheWay();
       this.checkTheCoconuts();
+      this.thudding();
     }
 
     // The camera sits the monkey a third of the way across, so there is
@@ -380,6 +381,25 @@ export class Game {
     }
   }
 
+  /**
+   * The noise a coconut makes when it lands.
+   *
+   * Only the ones on screen, for the same reason the crocodiles only snap
+   * on screen: a thud from something a child cannot see is a mystery
+   * noise, and a mystery noise in a game for a child is a worry.
+   */
+  private thudding(): void {
+    for (const nut of this.jungle.coconuts) {
+      if (!nut.landed) {
+        continue;
+      }
+      const at = nut.x - this.camera;
+      if (at > -20 && at < this.screen.wide + 20) {
+        this.sound.thud();
+      }
+    }
+  }
+
   /** A coconut on the head: a life, a bounce, and back to the mushroom. */
   private bonked(): void {
     const monkey = this.monkey;
@@ -555,6 +575,7 @@ export class Game {
    */
   private restart(): void {
     this.jungle = new Jungle();
+    this.sound.rain(false);
     this.hud.setLives(0, 0);
     this.monkey = new Monkey();
     this.camera = 0;
@@ -591,6 +612,7 @@ export class Game {
     this.hud.setProgress(0);
     this.hud.setFinished(false);
     this.hud.setLives(this.lives);
+    this.sound.rain(true);
     this.beginAt(RAIN.backTo);
   }
 
@@ -603,6 +625,7 @@ export class Game {
    */
   private beginAt(at: number): void {
     const monkey = this.monkey;
+    this.sound.rain(this.jungle.raining);
     if (!this.jungle.raining) {
       // No lives in the dry jungle, so no hearts: nothing there can be
       // lost, and a row of hearts that never changes is furniture.

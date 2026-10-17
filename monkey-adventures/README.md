@@ -38,6 +38,12 @@ on the dry jungle and the jump is a little lower — only a little, measured
 against the vines: every vine in the level is still catchable with a
 running jump, which is the number that matters.
 
+It sounds like rain the whole way: a quiet bed of pitter-patter that
+fades in with the level and out again when you leave it, and goes with
+the sound switch like everything else. A coconut lands with a thud and a
+splat — a low note for the weight and a lowpassed burst for the mud,
+which is what stops it sounding like a drum.
+
 Coconuts hang in the canopy and the monkey is what shakes them loose. One
 shakes on its stalk for half a second before it lets go, which is the whole
 hazard — a thing that drops with no warning is a trap. They cost a life,

@@ -117,6 +117,10 @@ export interface Coconut {
   from: number;
   falling: boolean;
   vy: number;
+  /** True on the one frame it hits the ground, for whoever makes the
+   *  noise. The jungle has no sound of its own — it says what happened
+   *  and the game says it out loud. */
+  landed: boolean;
   /** Seconds of shaking left before it lets go, and of splat left after it
    *  lands; `back` is the wait before the next one grows. */
   wobble: number;
@@ -377,6 +381,7 @@ export class Jungle {
           from: JUNGLE.canopy + 4,
           falling: false,
           vy: 0,
+          landed: false,
           wobble: 0,
           splat: 0,
           back: 0,
@@ -404,6 +409,7 @@ export class Jungle {
    */
   private shakeTheCanopy(dt: number, monkeyX: number): void {
     for (const nut of this.coconuts) {
+      nut.landed = false;
       if (nut.splat > 0) {
         nut.splat = Math.max(0, nut.splat - dt);
         continue;
@@ -429,6 +435,7 @@ export class Jungle {
         if (nut.y >= this.floorAt(nut.x)) {
           nut.y = this.floorAt(nut.x);
           nut.falling = false;
+          nut.landed = true;
           nut.splat = COCONUT.splats;
           nut.back = COCONUT.rests;
         }
