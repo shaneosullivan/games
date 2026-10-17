@@ -1,4 +1,16 @@
-import {EDGE, JUNGLE, LAKE, MONKEY, PARTY, SIM, VOLCANO, WORLD} from "./config";
+import {
+  COCONUT,
+  EDGE,
+  JUNGLE,
+  LAKE,
+  MONKEY,
+  MUSHROOM,
+  PARTY,
+  RAIN,
+  SIM,
+  VOLCANO,
+  WORLD,
+} from "./config";
 import {Input} from "./core/input";
 import {Sound} from "./core/sound";
 import {Monkey} from "./entities/monkey";
@@ -33,7 +45,14 @@ export class Game {
   private sinking = 0;
   /** Whether the dunking was lava rather than water, which decides where
    *  the monkey is put back. */
+  /** True while the monkey is being thrown back out of something rather
+   *  than sinking into it: the lava does it, and so does a coconut. */
   private burnt = false;
+  /** Where the monkey is put down when the pause is over, worked out at
+   *  the moment it went wrong rather than afterwards. */
+  private backTo = 0;
+  /** How many lives are left. Only the rain level has any. */
+  private lives = 0;
   private partyIn = 0;
   private time = 0;
   private behind = 0;
@@ -52,6 +71,7 @@ export class Game {
       () => this.restart(),
       muted => this.sound.setMuted(muted),
       at => this.beginAt(at),
+      () => this.beginRain(),
     );
     this.hud.setChoosing(true);
     // A browser will not make a noise until the page has been touched, so
@@ -141,6 +161,10 @@ export class Game {
     this.takeBananas();
     this.checkTheWater();
     this.checkTheLava();
+    if (this.jungle.raining) {
+      this.lightTheWay();
+      this.checkTheCoconuts();
+    }
 
     // The camera sits the monkey a third of the way across, so there is
     // twice as much jungle ahead as behind — which is where the next vine
@@ -228,6 +252,7 @@ export class Game {
       return;
     }
     this.sinking = LAKE.watchFor;
+    this.backTo = this.jungle.lakeFrom - LAKE.backBy;
     this.sound.splash();
     this.monkey.vx = 0;
     this.monkey.vy = 0;
@@ -278,6 +303,7 @@ export class Game {
       return;
     }
     this.sinking = VOLCANO.watchFor;
+    this.backTo = this.jungle.craterFrom - VOLCANO.backBy;
     this.burnt = true;
     this.sound.splash();
     this.party.burst(monkey.x, monkey.y - 4, 16, PARTY.lavaColours, true);
@@ -291,6 +317,86 @@ export class Game {
     // keeps the gravity on while `sinking` runs.
     monkey.vx = 0;
     monkey.vy = -VOLCANO.bounces;
+    monkey.tree = null;
+  }
+
+  /**
+   * Lighting the mushrooms as they are passed.
+   *
+   * Passed rather than touched: a revive point you can miss by jumping
+   * over it is a revive point a child will miss, and then lose the level
+   * to. Walking, swinging or flying past it all count.
+   */
+  private lightTheWay(): void {
+    for (const one of this.jungle.mushrooms) {
+      if (!one.lit && this.monkey.x > one.x - MUSHROOM.notices) {
+        one.lit = true;
+        this.party.burst(one.x, this.jungle.floorAt(one.x) - 8, 10);
+      }
+    }
+  }
+
+  /**
+   * The coconuts, and what one costs.
+   *
+   * A life, and the walk back to the last mushroom — not to the start of
+   * the level, which would be the whole rain level for one mistake. When
+   * the last life goes the level begins again with both hearts back, which
+   * is the only thing in this game that takes real progress away, and it
+   * is what makes the hearts in the corner worth watching.
+   */
+  private checkTheCoconuts(): void {
+    const monkey = this.monkey;
+    for (const nut of this.jungle.coconuts) {
+      if (!nut.falling) {
+        continue;
+      }
+      if (Math.abs(nut.x - monkey.x) > COCONUT.catches) {
+        continue;
+      }
+      if (nut.y < monkey.y - MONKEY.tall || nut.y > monkey.y) {
+        continue;
+      }
+      // Burst on the monkey rather than on the ground, and gone.
+      nut.falling = false;
+      nut.splat = COCONUT.splats;
+      nut.back = COCONUT.rests;
+      this.bonked();
+      return;
+    }
+  }
+
+  /** A coconut on the head: a life, a bounce, and back to the mushroom. */
+  private bonked(): void {
+    const monkey = this.monkey;
+    this.lives = Math.max(0, this.lives - 1);
+    this.hud.setLives(this.lives);
+    this.sound.chomp();
+    this.party.burst(monkey.x, monkey.y - MONKEY.tall, 14);
+    // The last mushroom passed, or the start of the level if none has
+    // been. Out of lives and it is the start either way.
+    let post: number = RAIN.backTo;
+    if (this.lives > 0) {
+      for (const one of this.jungle.mushrooms) {
+        if (one.lit) {
+          post = Math.max(post, one.x);
+        }
+      }
+    } else {
+      for (const one of this.jungle.mushrooms) {
+        one.lit = false;
+      }
+      this.lives = RAIN.lives;
+      this.hud.setLives(this.lives);
+      this.bananas = 0;
+      this.hud.setScore(0);
+    }
+    this.backTo = post;
+    this.sinking = VOLCANO.watchFor;
+    this.burnt = true;
+    monkey.letGo();
+    monkey.vx = 0;
+    monkey.vy = -VOLCANO.bounces * 0.7;
     monkey.tree = null;
   }
 
@@ -309,12 +415,11 @@ export class Game {
     monkey.vine = null;
     monkey.tree = null;
     monkey.doing = "ground";
-    // The lava puts you back on its own rim rather than at the foot of the
-    // hill: the climb up is not the thing you got wrong, and walking it
-    // again five times in a row is how a hazard turns into a chore.
-    const from = this.burnt ? this.jungle.craterFrom : this.jungle.lakeFrom;
-    const backBy = this.burnt ? VOLCANO.backBy : LAKE.backBy;
-    monkey.x = from - backBy;
+    // Wherever the thing that got you decided: the near edge of the water
+    // or of the crater, or the last mushroom passed in the rain. Worked
+    // out at the moment it happened, because by now the monkey has been
+    // thrown about and is no longer anywhere useful.
+    monkey.x = this.backTo;
     this.burnt = false;
     monkey.y = this.jungle.floorAt(monkey.x);
     monkey.wasX = monkey.x;
@@ -370,6 +475,7 @@ export class Game {
    */
   private restart(): void {
     this.jungle = new Jungle();
+    this.hud.setLives(0, 0);
     this.monkey = new Monkey();
     this.camera = 0;
     this.bananas = 0;
@@ -384,6 +490,29 @@ export class Game {
   }
 
   /**
+   * The rain level, from its beginning.
+   *
+   * A second jungle rather than a second game: the same class with the
+   * weather turned on, so everything that was true of swinging is still
+   * true. Its own seed, so it is not the dry jungle with rain over it.
+   */
+  private beginRain(): void {
+    this.jungle = new Jungle(7, true);
+    this.monkey = new Monkey();
+    this.party.clear();
+    this.bananas = 0;
+    this.finished = false;
+    this.sinking = 0;
+    this.burnt = false;
+    this.lives = RAIN.lives;
+    this.hud.setScore(0);
+    this.hud.setProgress(0);
+    this.hud.setFinished(false);
+    this.hud.setLives(this.lives);
+    this.beginAt(RAIN.backTo);
+  }
+
+  /**
    * Starts the run at one of the parts of the course.
    *
    * On the ground and standing, wherever it is put: the parts are chosen to
@@ -392,6 +521,11 @@ export class Game {
    */
   private beginAt(at: number): void {
     const monkey = this.monkey;
+    if (!this.jungle.raining) {
+      // No lives in the dry jungle, so no hearts: nothing there can be
+      // lost, and a row of hearts that never changes is furniture.
+      this.hud.setLives(0, 0);
+    }
     monkey.vine = null;
     monkey.tree = null;
     monkey.doing = "ground";
@@ -404,6 +538,7 @@ export class Game {
     monkey.facingLeft = false;
     this.camera = Math.max(0, at - this.screen.wide / 3);
     this.choosing = false;
+    this.hud.setChoosing(false);
   }
 
   private draw(alpha: number): void {

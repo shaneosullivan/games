@@ -25,6 +25,19 @@ const PALETTE: Record<string, string> = {
    *  A banana at this size needs three yellows and an outline or it is a
    *  yellow smudge: the outline is what makes it an object. */
   Y: "#ffeca8",
+  /** The coconut: a dark shell with the husk showing lighter where the
+   *  light is, the way the one in the picture is mottled rather than
+   *  flat. */
+  n: "#4a2d14",
+  N: "#6d4420",
+  H: "#9a6a36",
+  /** A mushroom's cap and its stalk, and the spots on it. */
+  c: "#d6453c",
+  C: "#a32e28",
+  s: "#f1e0c0",
+  /** A heart: the red, the shade down its right side, and the glint. */
+  r: "#ed1c24",
+  R: "#b10f14",
   g: "#5bb04a",
   G: "#3c8035",
   B: "#c9d98a",
@@ -213,6 +226,93 @@ export function crocSprite(
   if (!had) {
     had = bake(part === "body" ? CROC_BODY : CROC_JAW, facingLeft);
     baked.set(key, had);
+  }
+  return had;
+}
+
+/**
+ * A coconut, drawn from the reference: a dark outline all the way round, a
+ * shell that is browner at the bottom than at the top, and the husk showing
+ * through lighter in patches. Mottled on purpose — a flat brown egg at this
+ * size reads as a stone.
+ */
+const COCONUT_NUT = [
+  "..eeee..",
+  ".eHHNHe.",
+  "eHHNHHNe",
+  "eNHHNHNe",
+  "eNNHNNHe",
+  "enNNHNNe",
+  "ennNNnNe",
+  ".ennNne.",
+  "..eeee..",
+];
+
+/** What is left of one, for a moment, after it has hit the mud. */
+const COCONUT_SPLAT = ["..e..e..", ".eNnnNe.", "eNnnnnNe", ".eeeeee."];
+
+/**
+ * A mushroom: the thing you come back to life at.
+ *
+ * Big spots and a fat stalk, because at seven pixels across the only way to
+ * say "mushroom" is to say it loudly. The sparkle is drawn around it in
+ * code rather than here: it turns, and a turning thing cannot be a letter
+ * map.
+ */
+const MUSHROOM_CAP = [
+  "..eee..",
+  ".ecsce.",
+  "ecsccce",
+  "ecccsce",
+  "eCCCCCe",
+  ".essse.",
+  ".essse.",
+  "..eee..",
+];
+
+/**
+ * A heart, for the lives in the corner.
+ *
+ * The one from the reference: a black border the whole way round, the
+ * shade down its right-hand side, and the white glint top left that is
+ * what makes a flat red shape read as something shiny.
+ */
+const HEART = [
+  ".ee.ee.",
+  "ewrrrRe",
+  "errrrRe",
+  "errrrRe",
+  ".errRe.",
+  "..eRe..",
+  "...e...",
+];
+
+/** A heart with the life gone out of it: the same shape, dark. */
+const HEART_GONE = [
+  ".ee.ee.",
+  "eeeeeee",
+  "eeeeeee",
+  "eeeeeee",
+  ".eeeee.",
+  "..eee..",
+  "...e...",
+];
+
+/** The coconut, the mushroom and the hearts, baked like everything else. */
+export function propSprite(
+  which: "coconut" | "splat" | "mushroom" | "heart" | "heartGone",
+): HTMLCanvasElement {
+  let had = baked.get(which);
+  if (!had) {
+    const maps = {
+      coconut: COCONUT_NUT,
+      splat: COCONUT_SPLAT,
+      mushroom: MUSHROOM_CAP,
+      heart: HEART,
+      heartGone: HEART_GONE,
+    };
+    had = bake(maps[which], false);
+    baked.set(which, had);
   }
   return had;
 }

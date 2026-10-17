@@ -4,12 +4,20 @@ import {
   JUNGLE,
   LAKE,
   MONKEY,
+  MUSHROOM,
   PAINT,
+  RAIN,
   SCREEN,
   VOLCANO,
   WORLD,
 } from "../config";
-import {bananaSprite, crocSprite, monkeySprite, type Pose} from "../art/monkey";
+import {
+  bananaSprite,
+  crocSprite,
+  monkeySprite,
+  propSprite,
+  type Pose,
+} from "../art/monkey";
 import type {Party} from "./particles";
 import type {Jungle, Tree, Vine} from "../world/jungle";
 import type {Monkey} from "../entities/monkey";
@@ -39,7 +47,7 @@ export function paint(
   const w = screen.wide;
   const h = screen.tall;
 
-  sky(g, w, h);
+  sky(g, w, h, jungle.raining);
   canopy(g, w, camera);
 
   // Two layers of trees at different speeds. The far ones are lighter and
@@ -75,9 +83,13 @@ export function paint(
   );
 
   ground(g, jungle, w, h, camera);
-  lake(g, w, camera, time);
-  crocs(g, jungle, camera, w);
-  lava(g, jungle, camera, w, time);
+  if (!jungle.raining) {
+    lake(g, w, camera, time);
+    crocs(g, jungle, camera, w);
+    lava(g, jungle, camera, w, time);
+  } else {
+    mushrooms(g, jungle, camera, w, time);
+  }
 
   // The vines, and the monkey among them: the vine being held is drawn after
   // the others so the monkey is never behind the thing it is holding.
@@ -88,11 +100,18 @@ export function paint(
     rope(g, vine, camera, vine === monkey.vine);
   }
 
+  if (jungle.raining) {
+    coconuts(g, jungle, camera, w);
+  }
   bananas(g, jungle, camera, w);
   home(g, Math.round(jungle.homeX - camera), h);
   family(g, jungle, camera, w, time, cheering);
   drawMonkey(g, monkey, camera, alpha);
   party.draw(g, camera);
+  if (jungle.raining) {
+    // In front of everything, because rain is between you and the jungle.
+    rain(g, w, h, camera, time);
+  }
   dapples(g, jungle, camera, time, w, h);
 }
 
@@ -117,10 +136,15 @@ function canopy(g: CanvasRenderingContext2D, w: number, camera: number): void {
   }
 }
 
-function sky(g: CanvasRenderingContext2D, w: number, h: number): void {
+function sky(
+  g: CanvasRenderingContext2D,
+  w: number,
+  h: number,
+  wet: boolean,
+): void {
   const grad = g.createLinearGradient(0, 0, 0, h);
-  grad.addColorStop(0, PAINT.skyHigh);
-  grad.addColorStop(1, PAINT.skyLow);
+  grad.addColorStop(0, wet ? PAINT.wetSkyHigh : PAINT.skyHigh);
+  grad.addColorStop(1, wet ? PAINT.wetSkyLow : PAINT.skyLow);
   g.fillStyle = grad;
   g.fillRect(0, 0, w, h);
 }
@@ -168,6 +192,47 @@ function layer(
   g.globalAlpha = 1;
 }
 
+/**
+ * The rain, which never stops.
+ *
+ * Vertical strokes a pixel across, in two shades and a spread of lengths,
+ * which is what the reference is: slanting it or softening it turns rain
+ * into weather effects, and this picture does not have the pixels for
+ * weather effects. Drawn in screen space off a hash of the drop's number
+ * rather than off a list of drops — there is no state to keep, every drop
+ * is wherever the clock says it is, and a hundred of them cost one loop.
+ *
+ * It drifts a little against the camera so the rain is in the world rather
+ * than painted on the glass, but only a little: rain does not scroll with
+ * the jungle, it falls through it.
+ */
+function rain(
+  g: CanvasRenderingContext2D,
+  w: number,
+  h: number,
+  camera: number,
+  time: number,
+): void {
+  const down = h + RAIN.long * 3;
+  for (let i = 0; i < RAIN.drops; i++) {
+    // A hash, so every drop keeps its own column, speed and length for as
+    // long as the level lasts.
+    const hash = Math.sin(i * 12.9898) * 43758.5453;
+    const own = hash - Math.floor(hash);
+    const hash2 = Math.sin(i * 78.233) * 12345.6789;
+    const own2 = hash2 - Math.floor(hash2);
+    const speed = RAIN.falls * (0.7 + own2 * 0.6);
+    const long = 2 + Math.round(own2 * RAIN.long);
+    const x = Math.round(
+      ((own * (w + 40) - camera * 0.25 + i * 37) % (w + 40)) - 20,
+    );
+    const fell = (own * down + time * speed) % down;
+    const y = Math.round(fell) - RAIN.long;
+    g.fillStyle = own2 > 0.55 ? PAINT.rain : PAINT.rainDark;
+    g.fillRect(x, y, 1, long);
+  }
+}
+
 /** The jungle floor. */
 function ground(
   g: CanvasRenderingContext2D,
@@ -183,6 +248,30 @@ function ground(
     const top = Math.round(jungle.floorAt(world));
     g.fillStyle = PAINT.earth;
     g.fillRect(sx, top, 1, h - top);
+    if (jungle.raining) {
+      // Mud all the way along, the way the reference is mud: a dark band
+      // with the lighter husk of it showing through in lumps and a wet
+      // shine standing on the top. The lumps are taken off the world
+      // position and not off the screen, so they scroll with the ground
+      // instead of swimming across it.
+      const lump = Math.sin(world * 0.7) + Math.sin(world * 0.23 + 2);
+      const deep = 5 + Math.round(lump);
+      g.fillStyle = PAINT.mud;
+      g.fillRect(sx, top, 1, deep);
+      g.fillStyle = PAINT.mudDark;
+      g.fillRect(sx, top + deep - 2, 1, 2);
+      if (lump > 1.1) {
+        g.fillStyle = PAINT.mudLight;
+        g.fillRect(sx, top + 1, 1, 2);
+      }
+      // Standing water, in the dips. A puddle at this size is two pixels
+      // of something paler than the mud under it.
+      if (lump < -1.3) {
+        g.fillStyle = PAINT.mudWet;
+        g.fillRect(sx, top, 1, 1);
+      }
+      continue;
+    }
     if (jungle.overCrater(world)) {
       // The crater is a hole in this earth, not a stripe on it: `lava()`
       // fills the column from here down, so leave it alone.
@@ -197,7 +286,10 @@ function ground(
   const first = Math.floor(camera / 11) * 11;
   for (let x = first; x < first + w + 22; x += 11) {
     const at = Math.round(x - camera);
-    if (jungle.overCrater(x) || jungle.overWater(x)) {
+    // Nothing grows out of the lava, the water, or the mud: in the rain
+    // the floor is churned up, and a tuft of grass standing in it is the
+    // dry jungle showing through.
+    if (jungle.raining || jungle.overCrater(x) || jungle.overWater(x)) {
       continue;
     }
     const tall = 2 + ((x / 11) % 3);
@@ -439,6 +531,89 @@ function spurt(
     if (fat > 3) {
       g.fillStyle = PAINT.lavaHot;
       g.fillRect(at, y, 1, long);
+    }
+  }
+}
+
+/**
+ * The coconuts: hanging, shaking, falling, and what is left of one.
+ *
+ * The shake is drawn as a sideways jitter of a pixel or two, fast, which
+ * at this size is the loudest way to say "this one is about to go" without
+ * drawing anything that is not the coconut itself.
+ */
+function coconuts(
+  g: CanvasRenderingContext2D,
+  jungle: Jungle,
+  camera: number,
+  w: number,
+): void {
+  const nut = propSprite("coconut");
+  const burst = propSprite("splat");
+  for (const one of jungle.coconuts) {
+    const x = Math.round(one.x - camera);
+    if (x < -20 || x > w + 20) {
+      continue;
+    }
+    if (one.splat > 0) {
+      g.drawImage(
+        burst,
+        x - Math.round(burst.width / 2),
+        Math.round(jungle.floorAt(one.x)) - burst.height + 2,
+      );
+      continue;
+    }
+    if (one.back > 0) {
+      continue;
+    }
+    // Shaking on its stalk: a jitter either side, and the stalk above it so
+    // the thing is hanging from the canopy rather than floating under it.
+    const shake =
+      one.wobble > 0 ? (Math.round(one.wobble * 40) % 2 === 0 ? 1 : -1) : 0;
+    const at = x + shake;
+    if (!one.falling) {
+      g.fillStyle = PAINT.vineDark;
+      g.fillRect(at, Math.round(one.y) - 4, 1, 4);
+    }
+    g.drawImage(
+      nut,
+      at - Math.round(nut.width / 2),
+      Math.round(one.y) - Math.round(nut.height / 2),
+    );
+  }
+}
+
+/**
+ * The mushrooms you come back to life at, with the sparkle that says so.
+ *
+ * Four motes going round it rather than a glow: a glow at this size is a
+ * smudge, and four pixels turning is unmistakably something magic. They
+ * turn faster and sit wider once the mushroom has been passed, which is
+ * the only way the picture says "this is the one you will come back to".
+ */
+function mushrooms(
+  g: CanvasRenderingContext2D,
+  jungle: Jungle,
+  camera: number,
+  w: number,
+  time: number,
+): void {
+  const cap = propSprite("mushroom");
+  for (const one of jungle.mushrooms) {
+    const x = Math.round(one.x - camera);
+    if (x < -20 || x > w + 20) {
+      continue;
+    }
+    const foot = Math.round(jungle.floorAt(one.x));
+    g.drawImage(cap, x - Math.round(cap.width / 2), foot - cap.height + 1);
+    const spin = time * Math.PI * 2 * MUSHROOM.sparkles * (one.lit ? 1.6 : 1);
+    const out = MUSHROOM.sparkleBy * (one.lit ? 1.3 : 1);
+    for (let i = 0; i < 4; i++) {
+      const turn = spin + (i / 4) * Math.PI * 2;
+      const sx = x + Math.round(Math.cos(turn) * out);
+      const sy = foot - 6 + Math.round(Math.sin(turn) * out * 0.6);
+      g.fillStyle = i % 2 === 0 ? PAINT.dapple : PAINT.lavaHot;
+      g.fillRect(sx, sy, 1, 1);
     }
   }
 }

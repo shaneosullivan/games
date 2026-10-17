@@ -29,6 +29,27 @@ volcano, and a child who likes the volcano presses the same thing. The
 parts live in `PARTS` in `src/config.ts`; the finish button comes back here
 rather than straight into the jungle.
 
+## The rain level
+
+The other course, picked from the chooser. The same jungle with the weather
+turned against it: constant rain, no lake and no volcano, because here the
+hazard is the sky. The floor is mud the whole way, so running is well down
+on the dry jungle and the jump is a little lower — only a little, measured
+against the vines: every vine in the level is still catchable with a
+running jump, which is the number that matters.
+
+Coconuts hang in the canopy and the monkey is what shakes them loose. One
+shakes on its stalk for half a second before it lets go, which is the whole
+hazard — a thing that drops with no warning is a trap. They cost a life,
+and you have two, up in the top right as hearts. A coconut that has burst
+grows back somewhere else along its stretch of canopy, so the walk back is
+never the walk you just learned.
+
+Sparkling mushrooms a third and two thirds of the way along are where you
+come back to. Nothing at the end: a revive point in sight of home would
+hand over the last of the level. Lose both hearts and the level starts
+again with both of them back.
+
 ## The two crossings
 
 The lake and the crater are the same bargain: swing across, and a fall

@@ -656,6 +656,21 @@ export const PARTY = {
 export const PAINT = {
   skyHigh: "#8fd0c8",
   skyLow: "#cfe8b6",
+  /** The rain level's sky: the same sky with the light taken out of it,
+   *  rather than a grey one. A child should still know where they are. */
+  wetSkyHigh: "#6f8f9b",
+  wetSkyLow: "#9db9a4",
+  /** The rain, in two shades. The reference is vertical strokes of bright
+   *  blue and near-black mixed together — the dark ones are what stop it
+   *  looking like tinsel. */
+  rain: "#2b49c8",
+  rainDark: "#1a2340",
+  /** Mud: dark, wet and lumpy, with the husk of lighter earth showing
+   *  through it in patches and a shine where the rain is standing. */
+  mud: "#5f4126",
+  mudDark: "#432c17",
+  mudLight: "#7d5631",
+  mudWet: "#8e7a5a",
   canopy: "#2f6b34",
   canopyLight: "#488a3f",
   farTree: "#5d8f52",
@@ -742,3 +757,87 @@ export const PARTS: ReadonlyArray<{name: string; at: number}> = [
   {name: "The volcano", at: VOLCANO.from - 170},
   {name: "Home", at: WORLD.far - 300},
 ];
+
+/**
+ * The rain level.
+ *
+ * The second course rather than another stretch of the first one: a child
+ * who wants the rain picks it from the chooser and gets it from the start.
+ * It is the jungle with the weather turned against it — no lake and no
+ * volcano, because the hazard here is the sky — and it asks for a different
+ * kind of care: the ground is mud, so running and jumping are both a little
+ * worse than you remember, and coconuts come down out of the canopy.
+ *
+ * Shorter than the jungle, because everything in it is slower.
+ */
+export const RAIN = {
+  /** How long the level is, in pixels. */
+  far: 3900,
+  /** How many drops are in the air at once, and how they fall: `slants` is
+   *  sideways pixels per pixel down, `falls` is pixels a second and `long`
+   *  is how many pixels of streak each drop leaves. Rain at this size is
+   *  not drops, it is strokes. */
+  drops: 110,
+  slants: 0.34,
+  falls: 260,
+  long: 5,
+  /**
+   * What mud does to a monkey, as a fraction of what it does on dry ground.
+   *
+   * Slower is most of the feeling: `runs` takes a good deal off the top
+   * speed, which is what makes the level read as heavy. The jump is barely
+   * touched on purpose — the vines hang where they hang, and a jump that
+   * could no longer reach them would not be a harder level, it would be a
+   * broken one. Nine tenths is enough to feel and not enough to strand
+   * anybody; the reach is measured in the running game.
+   */
+  runs: 0.62,
+  /** How high a jump goes, as a fraction of a dry one. A *height*, not a
+   *  speed: height goes with the square of the speed, so taking a tenth
+   *  off the speed takes a fifth off the height, which is the difference
+   *  between heavy going and not reaching the vines at all. */
+  jumps: 0.88,
+  /** Where the level starts, and where you come back to before the first
+   *  mushroom has been passed. */
+  backTo: 40,
+  /** How many lives you get. Two: enough that one coconut is a fright
+   *  rather than the end of it, few enough that they are worth watching. */
+  lives: 2,
+  /** How many mushrooms there are, spread evenly along. Two puts them a
+   *  third and two thirds of the way over, which is what was asked for —
+   *  and nothing at the very end, where a revive would be a free finish. */
+  posts: 2,
+} as const;
+
+/** The coconuts that come out of the canopy in the rain. */
+export const COCONUT = {
+  /** How far apart they hang, in pixels. Close enough that the canopy is
+   *  something to watch the whole way along rather than now and then. */
+  every: 86,
+  /** How close the monkey has to be before one lets go. It is the monkey
+   *  that shakes them loose, so an empty stretch of jungle stays quiet. */
+  notices: 64,
+  /** How long it shakes on its stalk first, in seconds. The warning is the
+   *  whole hazard: a thing that drops with no notice is a trap. */
+  wobbles: 0.5,
+  /** How fast it falls, in pixels a second squared. Heavier than the
+   *  monkey's own gravity — a coconut does not float. */
+  falls: 680,
+  /** How wide it counts as when it hits you, in pixels. */
+  catches: 7,
+  /** How long the splat shows, and how long before another one grows in
+   *  its place, in seconds. */
+  splats: 0.35,
+  rests: 2.4,
+} as const;
+
+/** The mushrooms you come back to life at. */
+export const MUSHROOM = {
+  /** How fast the sparkle goes round, in turns a second, and how far out
+   *  it sits. A mushroom that sparkles is a mushroom a child will walk
+   *  into on purpose, which is the whole job. */
+  sparkles: 0.9,
+  sparkleBy: 7,
+  /** How close you have to pass to light one up. */
+  notices: 12,
+} as const;

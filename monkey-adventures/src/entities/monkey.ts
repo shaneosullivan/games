@@ -1,4 +1,4 @@
-import {CLIMB, MONKEY, ROPE, SWING, WORLD} from "../config";
+import {CLIMB, MONKEY, RAIN, ROPE, SWING, WORLD} from "../config";
 import type {Jungle, Knot, Tree, Vine} from "../world/jungle";
 
 /** What the monkey is doing. Three things, and the whole game is the moving
@@ -128,7 +128,11 @@ export class Monkey {
     tapped: boolean,
     jungle: Jungle,
   ): void {
-    const want = lean * MONKEY.run;
+    // Mud is slow going, and it is the whole feeling of the rain level: a
+    // top speed well down on the dry jungle, so the same gap between two
+    // trees is a longer run. The jump it barely touches — see `RAIN.jumps`.
+    const heavy = jungle.raining;
+    const want = lean * MONKEY.run * (heavy ? RAIN.runs : 1);
     const by = MONKEY.quickens * dt;
     this.vx += Math.max(-by, Math.min(by, want - this.vx));
     this.x += this.vx * dt;
@@ -137,7 +141,9 @@ export class Monkey {
     this.y = jungle.floorAt(this.x);
     this.stride += Math.abs(this.vx) * dt;
     if (tapped) {
-      this.vy = -MONKEY.jump;
+      // The square root, because `RAIN.jumps` is how high it goes and
+      // this is how fast it leaves the ground.
+      this.vy = -MONKEY.jump * (heavy ? Math.sqrt(RAIN.jumps) : 1);
       this.doing = "air";
       return;
     }

@@ -1,10 +1,12 @@
 import {
   CLIMB,
+  COCONUT,
   CROC,
   HOME,
   MONKEY,
   JUNGLE,
   LAKE,
+  RAIN,
   ROPE,
   VOLCANO,
   WIND,
@@ -97,6 +99,40 @@ export interface Croc {
   phase: number;
 }
 
+/**
+ * A coconut in the canopy, and what it does when somebody walks underneath.
+ *
+ * It hangs until the monkey is near, shakes on its stalk for a warning, and
+ * then falls. Once it has burst on the mud another grows in its place, so
+ * the walk back after a mistake is the same walk and not an easier one.
+ */
+export interface Coconut {
+  x: number;
+  /** The middle of the stretch of canopy this one belongs to. The next one
+   *  grows somewhere else along the same stretch, so the level is never
+   *  twice the same walk. */
+  slot: number;
+  /** Where it is now, and where it hangs. */
+  y: number;
+  from: number;
+  falling: boolean;
+  vy: number;
+  /** Seconds of shaking left before it lets go, and of splat left after it
+   *  lands; `back` is the wait before the next one grows. */
+  wobble: number;
+  splat: number;
+  back: number;
+}
+
+/** A mushroom: where the rain level puts you back when a coconut gets you. */
+export interface Mushroom {
+  x: number;
+  /** True once it has been passed, which is what makes it the one you come
+   *  back to. It sparkles either way — a revive point nobody can see is not
+   *  a kindness. */
+  lit: boolean;
+}
+
 /** A vent in the crater, which fires on its own beat. */
 export interface Vent {
   x: number;
@@ -141,19 +177,43 @@ export class Jungle {
   readonly crocs: Array<Croc> = [];
   readonly family: Array<Family> = [];
   readonly vents: Array<Vent> = [];
+  readonly coconuts: Array<Coconut> = [];
+  readonly mushrooms: Array<Mushroom> = [];
+  /**
+   * Whether this is the rain level.
+   *
+   * One class for both courses rather than two, because they are the same
+   * jungle: the same vines, the same trees, the same way home. What the
+   * rain changes is the weather, the floor and what falls out of the sky,
+   * and all three are better as answers this one jungle gives than as a
+   * second copy of it that would drift.
+   */
+  readonly raining: boolean;
+  /** How long this level is. The rain one is shorter: everything in it is
+   *  slower, so the same length would be a longer walk. */
+  readonly far: number;
   readonly volcanoFrom = VOLCANO.from;
   readonly volcanoTo = VOLCANO.from + VOLCANO.wide;
   /** The lava itself, inside the two slopes: the rim is where it stops. */
   readonly craterFrom = VOLCANO.from + VOLCANO.wide * VOLCANO.slope;
   readonly craterTo = VOLCANO.from + VOLCANO.wide * (1 - VOLCANO.slope);
-  /** Where home is: the end of the jungle. */
-  readonly homeX = WORLD.far;
+  /** Where home is: the end of the level. */
+  readonly homeX: number;
   /** The water, halfway along. */
   readonly lakeFrom = LAKE.from;
   readonly lakeTo = LAKE.from + LAKE.wide;
 
-  constructor(seed = 1) {
+  /** Kept for the things that go on happening: a coconut grows back
+   *  somewhere new, and "somewhere new" needs a number at the time rather
+   *  than at the beginning. */
+  private readonly rng: () => number;
+
+  constructor(seed = 1, raining = false) {
     const rng = made(seed);
+    this.rng = rng;
+    this.raining = raining;
+    this.far = raining ? RAIN.far : WORLD.far;
+    this.homeX = this.far;
     // Walked along rather than stepped by a fixed amount, because the gap
     // changes over the water: the vines bunch up where falling costs the
     // crossing. The step is taken from where the *next* vine would land, so
@@ -161,7 +221,7 @@ export class Jungle {
     // there is no use in a close vine you had to make a long swing to reach.
     for (
       let x = JUNGLE.vineEvery;
-      x < WORLD.far - JUNGLE.vineEvery;
+      x < this.far - JUNGLE.vineEvery;
       x += this.vineGap(x + JUNGLE.vineEvery, rng)
     ) {
       // Over the crater the vines are the long ones, and they are the same
@@ -216,7 +276,7 @@ export class Jungle {
       });
     }
 
-    for (let x = -60; x < WORLD.far + 200; x += JUNGLE.treeEvery) {
+    for (let x = -60; x < this.far + 200; x += JUNGLE.treeEvery) {
       // Nothing grows in the lake — tested against where the tree actually
       // ends up, not against the spacing it started from. Jittering first
       // and asking afterwards put trees up to twenty pixels into the water,
@@ -241,17 +301,18 @@ export class Jungle {
         wide: giant ? 30 + rng() * 14 : 26 + rng() * 16,
       });
     }
-    for (let x = -60; x < WORLD.far + 200; x += JUNGLE.farTreeEvery) {
+    for (let x = -60; x < this.far + 200; x += JUNGLE.farTreeEvery) {
       this.farTrees.push({
         x: x + (rng() - 0.5) * 50,
         tall: 56 + rng() * 40,
         wide: 20 + rng() * 14,
       });
     }
-    // The vents, spread across the crater.
+    // The vents, spread across the crater. None of this in the rain: that
+    // level has no volcano and no lake, because its hazard is the sky.
     const craterFrom = this.craterFrom;
     const craterWide = this.craterTo - this.craterFrom;
-    for (let i = 0; i < VOLCANO.vents; i++) {
+    for (let i = 0; raining ? false : i < VOLCANO.vents; i++) {
       this.vents.push({
         x: craterFrom + ((i + 0.5) / VOLCANO.vents) * craterWide,
         // Spread round the cycle so they do not all go off together.
@@ -264,7 +325,7 @@ export class Jungle {
     // The ones waiting at home, either side of the hut.
     for (let i = 0; i < HOME.family; i++) {
       const at =
-        WORLD.far +
+        this.far +
         ((i + 0.5) / HOME.family - 0.5) * 2 * HOME.spread +
         (rng() - 0.5) * 8;
       this.family.push({
@@ -272,12 +333,12 @@ export class Jungle {
         coat: 1 + Math.floor(rng() * 3),
         phase: rng() * Math.PI * 2,
         // Looking back down the jungle, which is where you are coming from.
-        facingLeft: at > WORLD.far,
+        facingLeft: at > this.far,
       });
     }
 
     // Crocodiles, spread along the water with room to swim between them.
-    for (let i = 0; i < CROC.count; i++) {
+    for (let i = 0; raining ? false : i < CROC.count; i++) {
       const at =
         LAKE.from + ((i + 0.5) / CROC.count) * LAKE.wide + (rng() - 0.5) * 30;
       this.crocs.push({
@@ -292,12 +353,97 @@ export class Jungle {
         phase: rng() * Math.PI * 2,
       });
     }
-    for (let i = 0; i < JUNGLE.dapples; i++) {
+    // Dapples are sunlight through the leaves, and there is no sun in the
+    // rain level. The rain itself is drawn instead, and the canopy gives it
+    // coconuts and the ground gives it mushrooms.
+    for (let i = 0; raining ? false : i < JUNGLE.dapples; i++) {
       this.dapples.push({
-        x: rng() * WORLD.far,
+        x: rng() * this.far,
         y: 10 + rng() * (WORLD.floor - 10),
         size: JUNGLE.dappleSize * (0.5 + rng()),
       });
+    }
+    if (raining) {
+      for (
+        let x = COCONUT.every;
+        x < this.far - COCONUT.every;
+        x += COCONUT.every
+      ) {
+        const at = x + (rng() - 0.5) * 40;
+        this.coconuts.push({
+          x: at,
+          slot: x,
+          y: JUNGLE.canopy + 4,
+          from: JUNGLE.canopy + 4,
+          falling: false,
+          vy: 0,
+          wobble: 0,
+          splat: 0,
+          back: 0,
+        });
+      }
+      // Spread evenly, and never at the end: a revive point in sight of
+      // home would hand over the last of the level.
+      for (let i = 1; i <= RAIN.posts; i++) {
+        this.mushrooms.push({
+          x: (this.far * i) / (RAIN.posts + 1),
+          lit: false,
+        });
+      }
+    }
+  }
+
+  /**
+   * The coconuts: hanging, shaking, falling, bursting, growing back.
+   *
+   * The monkey is what shakes them loose, so a stretch of jungle nobody is
+   * under stays quiet and the level has as many hazards as there are
+   * places you have walked. The shake is the warning and the warning is
+   * the hazard: a coconut that simply dropped would be a trap, and this is
+   * a game for a child.
+   */
+  private shakeTheCanopy(dt: number, monkeyX: number): void {
+    for (const nut of this.coconuts) {
+      if (nut.splat > 0) {
+        nut.splat = Math.max(0, nut.splat - dt);
+        continue;
+      }
+      if (nut.back > 0) {
+        nut.back -= dt;
+        if (nut.back <= 0) {
+          // Grown again, back on its stalk — and somewhere else along its
+          // stretch of canopy. A coconut that always fell from the same
+          // place would be learned once and never looked at again, and
+          // the walk back after a mistake would be the easy walk.
+          nut.x = nut.slot + (this.rng() - 0.5) * COCONUT.every * 0.8;
+          nut.y = nut.from;
+          nut.vy = 0;
+          nut.wobble = 0;
+          nut.falling = false;
+        }
+        continue;
+      }
+      if (nut.falling) {
+        nut.vy += COCONUT.falls * dt;
+        nut.y += nut.vy * dt;
+        if (nut.y >= this.floorAt(nut.x)) {
+          nut.y = this.floorAt(nut.x);
+          nut.falling = false;
+          nut.splat = COCONUT.splats;
+          nut.back = COCONUT.rests;
+        }
+        continue;
+      }
+      if (nut.wobble > 0) {
+        nut.wobble -= dt;
+        if (nut.wobble <= 0) {
+          nut.falling = true;
+        }
+        continue;
+      }
+      if (Math.abs(monkeyX - nut.x) < COCONUT.notices) {
+        nut.wobble = COCONUT.wobbles;
+      }
     }
   }
 
@@ -305,6 +451,7 @@ export class Jungle {
    *  the clock so that a vine the monkey lets go of carries on from where it
    *  was, instead of snapping back to wherever the clock says it should be. */
   update(dt: number, time: number, held: Vine | null, monkeyX = -1e9): void {
+    this.shakeTheCanopy(dt, monkeyX);
     for (const croc of this.crocs) {
       croc.x += croc.dir * CROC.speed * dt;
       // Turning at the end of its beat, and never out of the water.
@@ -540,7 +687,7 @@ export class Jungle {
 
   /** How far the volcano lifts the ground at this point. */
   hillAt(x: number): number {
-    if (x <= VOLCANO.from || x >= VOLCANO.from + VOLCANO.wide) {
+    if (this.raining || x <= VOLCANO.from || x >= VOLCANO.from + VOLCANO.wide) {
       return 0;
     }
     const along = (x - VOLCANO.from) / VOLCANO.wide;
@@ -552,13 +699,13 @@ export class Jungle {
 
   /** Whether a point is over the lava in the crater. */
   overCrater(x: number): boolean {
-    return x > this.craterFrom && x < this.craterTo;
+    return !this.raining && x > this.craterFrom && x < this.craterTo;
   }
 
   /** Whether a point is over the water. A little inside the banks, so the
    *  edge of the lake is a bank to stand on rather than a line to fall off. */
   overWater(x: number): boolean {
-    return x > LAKE.from && x < LAKE.from + LAKE.wide;
+    return !this.raining && x > LAKE.from && x < LAKE.from + LAKE.wide;
   }
 
   /**

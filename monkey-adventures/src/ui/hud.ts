@@ -1,4 +1,5 @@
-import {PARTS} from "../config";
+import {PARTS, RAIN} from "../config";
+import {propSprite} from "../art/monkey";
 import {ProgressBar} from "../../../shared/progressBar";
 import {SoundButton} from "../../../shared/soundButton";
 
@@ -21,6 +22,7 @@ export class Hud {
   private readonly done: HTMLDivElement;
   private readonly again: HTMLButtonElement;
   private readonly start: HTMLDivElement;
+  private readonly lives: HTMLDivElement;
   readonly root: HTMLDivElement;
 
   constructor(
@@ -28,6 +30,7 @@ export class Hud {
     onRestart: () => void,
     onMute: (muted: boolean) => void,
     onBegin: (at: number) => void,
+    onRain: () => void,
   ) {
     inject();
 
@@ -46,6 +49,14 @@ export class Hud {
     const sound = new SoundButton({onToggle: onMute});
     sound.root.classList.add("hud-tap", "ui-interactive");
     top.append(this.bar.root, this.score, sound.root);
+
+    // The lives, in the top right, which is where a child who has played
+    // anything else will look for them. Hearts drawn from the game's own
+    // sprites and blown up, rather than an emoji or a number: the rest of
+    // the picture is made of pixels and so is this.
+    this.lives = document.createElement("div");
+    this.lives.className = "hud-lives hud-gone";
+    this.root.append(this.lives);
 
     this.done = document.createElement("div");
     this.done.className = "hud-done hud-gone";
@@ -84,10 +95,62 @@ export class Hud {
       });
       row.append(button);
     }
-    this.start.append(asks, row);
+    // The other level, on a line of its own under the parts of the first
+    // one: it is not a part of the jungle, it is somewhere else.
+    const other = document.createElement("div");
+    other.className = "hud-parts";
+    const wet = document.createElement("button");
+    wet.className = "hud-again hud-part hud-rain ui-interactive";
+    wet.textContent = "The rain";
+    wet.addEventListener("click", () => {
+      wet.blur();
+      this.setChoosing(false);
+      onRain();
+    });
+    other.append(wet);
+    this.start.append(asks, row, other);
 
     this.root.append(top, this.done, this.start);
     into.append(this.root);
+  }
+
+  /**
+   * The hearts in the corner: how many are left of how many.
+   *
+   * Hidden altogether outside the rain level — the jungle has no lives to
+   * lose, and a row of hearts that never changes is furniture a child
+   * learns to ignore, which is the last thing you want of the one thing
+   * that says how much trouble they are in.
+   */
+  setLives(left: number, of: number = RAIN.lives): void {
+    this.lives.classList.toggle("hud-gone", of <= 0);
+    if (of <= 0) {
+      return;
+    }
+    if (this.lives.childElementCount !== of) {
+      this.lives.replaceChildren();
+      for (let i = 0; i < of; i++) {
+        this.lives.append(document.createElement("canvas"));
+      }
+    }
+    const hearts = Array.from(this.lives.children) as Array<HTMLCanvasElement>;
+    hearts.forEach((canvas, i) => {
+      const sprite = propSprite(i < left ? "heart" : "heartGone");
+      const scale = 4;
+      if (canvas.width !== sprite.width * scale) {
+        canvas.width = sprite.width * scale;
+        canvas.height = sprite.height * scale;
+        canvas.style.width = `${canvas.width}px`;
+        canvas.style.height = `${canvas.height}px`;
+      }
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        return;
+      }
+      ctx.imageSmoothingEnabled = false;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(sprite, 0, 0, canvas.width, canvas.height);
+    });
   }
 
   /** Shows or hides the chooser. The game stands still behind it. */
@@ -173,6 +236,21 @@ function inject(): void {
 .hud-done.hud-gone {
   display: none;
 }
+.hud-lives {
+  position: absolute;
+  top: max(10px, env(safe-area-inset-top));
+  right: max(10px, env(safe-area-inset-right));
+  display: flex;
+  gap: 4px;
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.4));
+}
+.hud-lives.hud-gone {
+  display: none;
+}
+.hud-lives canvas {
+  display: block;
+  image-rendering: pixelated;
+}
 .hud-parts {
   display: flex;
   flex-wrap: wrap;
@@ -184,6 +262,7 @@ function inject(): void {
   font-size: clamp(15px, 3vw, 20px);
   padding: 12px 22px;
 }
+
 .hud-tap {
   pointer-events: auto;
 }
@@ -207,6 +286,18 @@ function inject(): void {
 .hud-again:active {
   transform: translateY(3px);
   box-shadow: 0 1px 0 #c98f2a;
+}
+/* The other level, told apart from the parts of the first one by its
+   colour: a child who cannot read yet still knows this button is not one
+   of those. Written with both classes, and after the yellow it overrides,
+   or the yellow wins on source order and the rain button is a part. */
+.hud-again.hud-rain {
+  background: #8fb6d8;
+  box-shadow: 0 4px 0 #5d82a4;
+  color: #12202c;
+}
+.hud-again.hud-rain:active {
+  box-shadow: 0 1px 0 #5d82a4;
 }
 `;
   document.head.append(style);

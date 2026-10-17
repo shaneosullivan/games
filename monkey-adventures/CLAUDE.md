@@ -76,7 +76,8 @@ src/
   render/        the pixel screen, and the painting of the jungle
   art/           the sprites, as letter maps
   entities/      the monkey: running, climbing, flying, swinging
-  world/         the jungle: vines, trees, dapples, home
+  world/         the jungle: vines, trees, dapples, home — and, with the
+                 weather turned on, the rain level: mud, coconuts, mushrooms
 docs/
   plan-for-app.md  what the game is meant to be
 index.html       the entry point; the app mounts into #app
