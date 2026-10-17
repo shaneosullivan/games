@@ -783,10 +783,10 @@ export const RAIN = {
   /** How many lives you get. Two: enough that one coconut is a fright
    *  rather than the end of it, few enough that they are worth watching. */
   lives: 2,
-  /** How many mushrooms there are, spread evenly along. Two puts them a
-   *  third and two thirds of the way over, which is what was asked for —
-   *  and nothing at the very end, where a revive would be a free finish. */
-  posts: 2,
+  /** How many mushrooms there are, spread evenly along. Three puts one at
+   *  each quarter — a quarter, halfway, three quarters — and none at the
+   *  very end, where a revive point would hand over the finish. */
+  posts: 3,
 } as const;
 
 /** The coconuts that come out of the canopy in the rain. */

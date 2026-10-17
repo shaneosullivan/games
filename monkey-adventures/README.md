@@ -45,8 +45,8 @@ and you have two, up in the top right as hearts. A coconut that has burst
 grows back somewhere else along its stretch of canopy, so the walk back is
 never the walk you just learned.
 
-Sparkling mushrooms a third and two thirds of the way along are where you
-come back to. Nothing at the end: a revive point in sight of home would
+Sparkling mushrooms at each quarter of the way along are where you come
+back to. Nothing at the end: a revive point in sight of home would
 hand over the last of the level. Lose both hearts and the level starts
 again with both of them back.
 
