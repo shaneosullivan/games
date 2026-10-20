@@ -7,6 +7,7 @@ import {
   MUSHROOM,
   PARTY,
   RAIN,
+  RIVER,
   SIM,
   VOLCANO,
   WORLD,
@@ -81,6 +82,7 @@ export class Game {
       muted => this.sound.setMuted(muted),
       at => this.beginAt(at),
       () => this.beginRain(),
+      () => this.beginRiver(),
     );
     this.hud.setChoosing(true);
     // A browser will not make a noise until the page has been touched, so
@@ -173,6 +175,14 @@ export class Game {
     this.jungle.update(dt, this.time, this.monkey.vine, this.monkey.x);
     this.snapping();
     this.takeBananas();
+    if (this.jungle.river) {
+      // Before the water, and that order is the whole crossing: a monkey
+      // coming down fast is over an elephant's back and under the
+      // waterline in the same step, and whichever is asked first wins.
+      // Asked the other way round it drowned on top of the elephant.
+      this.checkTheElephants();
+      this.checkTheSnakes();
+    }
     this.checkTheWater();
     this.checkTheLava();
     if (this.jungle.raining) {
@@ -267,7 +277,11 @@ export class Game {
       return;
     }
     this.sinking = LAKE.watchFor;
-    this.backTo = this.jungle.lakeFrom - LAKE.backBy;
+    // The near bank, in the river as in the lake: the crossing is the
+    // thing being asked for, and being put back out in the middle of it
+    // on the elephant you last stood on handed over the half of it you
+    // had not crossed.
+    this.backTo = this.jungle.waterFrom - LAKE.backBy;
     this.sound.splash();
     this.monkey.vx = 0;
     this.monkey.vy = 0;
@@ -397,6 +411,87 @@ export class Game {
       if (at > -20 && at < this.screen.wide + 20) {
         this.sound.thud();
       }
+    }
+  }
+
+  /**
+   * The elephants, and what landing on one does.
+   *
+   * It throws you: a back is not a ledge to stand on, it is a spring, and
+   * the spout out of the trunk is the elephant doing the throwing. That
+   * is the whole crossing — you do not hop the river, you are fired
+   * across it, and a child who can press jump at all gets over.
+   *
+   * Only on the way down, so that going up through one does not bounce
+   * you a second time, and generously wide: a near miss should be a
+   * landing in a level like this.
+   */
+  private checkTheElephants(): void {
+    const monkey = this.monkey;
+    if (monkey.doing === "swing" || monkey.doing === "climb") {
+      return;
+    }
+    if (monkey.vy < 0) {
+      return;
+    }
+    for (const one of this.jungle.elephants) {
+      if (Math.abs(one.x - monkey.x) > RIVER.lands) {
+        continue;
+      }
+      const back = this.jungle.backOf(one);
+      // Landing on it: at or just past the back, having come down to it.
+      if (monkey.y < back - 2 || monkey.y > back + 10) {
+        continue;
+      }
+      monkey.y = back;
+      monkey.wasY = back;
+      monkey.vy = -MONKEY.jump * RIVER.bounces;
+      // Thrown along as well as up, the way it is already going — or the
+      // way it is looking, if it is not going anywhere. Nothing steers in
+      // the air in this game, so without this a monkey put back on a back
+      // standing still bounces on the spot until somebody turns the iPad
+      // off.
+      const way =
+        monkey.vx > 6 ? 1 : monkey.vx < -6 ? -1 : monkey.facingLeft ? -1 : 1;
+      monkey.vx = way * Math.max(Math.abs(monkey.vx), RIVER.throws);
+      monkey.doing = "air";
+      one.spurt = RIVER.spurts;
+      this.sound.splash();
+      this.party.burst(one.x, back - 2, 10, PARTY.splashColours, true);
+      return;
+    }
+  }
+
+  /**
+   * The snakes among the vines.
+   *
+   * Caught like a vine, because that is the trick of them, and let go of
+   * at once with a life gone. No fall and no journey back: the monkey is
+   * dropped where it was and carries on, which in a level aimed at a
+   * child is punishment enough. Running out of lives starts the level
+   * again with all three back.
+   */
+  private checkTheSnakes(): void {
+    const monkey = this.monkey;
+    if (monkey.doing !== "swing" || !monkey.vine?.snake) {
+      return;
+    }
+    this.lives = Math.max(0, this.lives - 1);
+    this.hud.setLives(this.lives, RIVER.lives);
+    this.sound.hiss();
+    this.party.burst(monkey.x, monkey.y - MONKEY.tall, 12);
+    // Thrown off it rather than dropped: a recoil says the snake did
+    // something, and the wait stops the same snake being caught again on
+    // the way down.
+    monkey.thrownOff(MONKEY.jump * 0.5, RIVER.bites);
+    if (this.lives <= 0) {
+      this.lives = RIVER.lives;
+      this.hud.setLives(this.lives, RIVER.lives);
+      this.bananas = 0;
+      this.hud.setScore(0);
+      this.backTo = RIVER.backTo;
+      this.sinking = VOLCANO.watchFor;
+      this.burnt = true;
     }
   }
 
@@ -599,7 +694,7 @@ export class Game {
    * true. Its own seed, so it is not the dry jungle with rain over it.
    */
   private beginRain(): void {
-    this.jungle = new Jungle(7, true);
+    this.jungle = new Jungle(7, "rain");
     this.monkey = new Monkey();
     this.party.clear();
     this.bananas = 0;
@@ -614,6 +709,29 @@ export class Game {
     this.hud.setLives(this.lives);
     this.sound.rain(true);
     this.beginAt(RAIN.backTo);
+  }
+
+  /**
+   * The river level, from its beginning.
+   *
+   * Three lives, because this one is for a child who is still learning
+   * which end of a snake is which.
+   */
+  private beginRiver(): void {
+    this.jungle = new Jungle(3, "river");
+    this.monkey = new Monkey();
+    this.party.clear();
+    this.bananas = 0;
+    this.finished = false;
+    this.sinking = 0;
+    this.burnt = false;
+    this.reviving = null;
+    this.lives = RIVER.lives;
+    this.hud.setScore(0);
+    this.hud.setProgress(0);
+    this.hud.setFinished(false);
+    this.hud.setLives(this.lives, RIVER.lives);
+    this.beginAt(RIVER.backTo);
   }
 
   /**

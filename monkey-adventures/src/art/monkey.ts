@@ -35,6 +35,15 @@ const PALETTE: Record<string, string> = {
   c: "#d6453c",
   C: "#a32e28",
   s: "#f1e0c0",
+  /** An elephant: the grey-green of the reference rather than a blue
+   *  grey, a darker underside, and the white of a tusk. */
+  p: "#68786b",
+  P: "#4a5950",
+  q: "#e8efe6",
+  /** A snake: green, with darker bands and a yellow eye. */
+  k: "#4f9440",
+  K: "#2f6b34",
+  j: "#ffd257",
   /** A heart: the red, the shade down its right side, and the glint. */
   r: "#ed1c24",
   R: "#b10f14",
@@ -298,11 +307,67 @@ const HEART_GONE = [
   "...e...",
 ];
 
+/**
+ * An elephant, side on, standing in the river.
+ *
+ * Drawn from the reference: one heavy block of a body with the back
+ * stepping up to the head, the ear outlined on the head rather than
+ * shaded, a dark eye, a white tusk and a fat trunk down the front. Legs
+ * and all, even though the river covers the bottom third of it — an
+ * elephant drawn from the knees up looks like an elephant with no legs
+ * the moment the water moves.
+ *
+ * Facing right, which is the way the jungle goes.
+ */
+const ELEPHANT = [
+  ".........eeeee......",
+  "......eeepppppee....",
+  "...eeeppppppppppe...",
+  "..eppppppeppppppppe.",
+  ".eppppppppepppppppee",
+  "eppppppppepppppppppe",
+  "eppppppppeppppeppqqe",
+  "eppppppppeepppppeppe",
+  "epppppppppppppppeppe",
+  "ePPPPPPPPPPPPPPeeppe",
+  ".eppeeeeeeppppe.eppe",
+  ".eppe....eppppe..ppe",
+  ".eppe....eppppe.eppe",
+  ".eeee....eeeeee.eee.",
+];
+
+/**
+ * A snake's head, at the bottom end of the thing that is not a vine.
+ *
+ * Eyes and a tongue, which at seven pixels across is the whole argument:
+ * a child has to be able to tell this from a vine at a glance and from
+ * the far side of the screen, so it is the one green thing in the game
+ * with a face.
+ */
+const SNAKE_HEAD = [
+  "..KKK..",
+  ".KkkkK.",
+  "KkjkjkK",
+  "KkkkkkK",
+  ".KkkkK.",
+  "..KeK..",
+  "...e...",
+];
+
 /** The coconut, the mushroom and the hearts, baked like everything else. */
 export function propSprite(
-  which: "coconut" | "splat" | "mushroom" | "heart" | "heartGone",
+  which:
+    | "coconut"
+    | "splat"
+    | "mushroom"
+    | "heart"
+    | "heartGone"
+    | "elephant"
+    | "snake",
+  facingLeft = false,
 ): HTMLCanvasElement {
-  let had = baked.get(which);
+  const key = `${which}${facingLeft ? "<" : ">"}`;
+  let had = baked.get(key);
   if (!had) {
     const maps = {
       coconut: COCONUT_NUT,
@@ -310,9 +375,11 @@ export function propSprite(
       mushroom: MUSHROOM_CAP,
       heart: HEART,
       heartGone: HEART_GONE,
+      elephant: ELEPHANT,
+      snake: SNAKE_HEAD,
     };
-    had = bake(maps[which], false);
-    baked.set(which, had);
+    had = bake(maps[which], facingLeft);
+    baked.set(key, had);
   }
   return had;
 }

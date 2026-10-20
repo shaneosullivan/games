@@ -7,6 +7,7 @@ import {
   JUNGLE,
   LAKE,
   RAIN,
+  RIVER,
   ROPE,
   VOLCANO,
   WIND,
@@ -38,6 +39,10 @@ export interface Knot {
 
 /** A vine: a line of knots, the first tied to the branch. */
 export interface Vine {
+  /** True if this is not a vine at all. It hangs like one and it is caught
+   *  like one, which is the point: in the river level a few of them are
+   *  snakes, and taking hold of one costs a life. */
+  snake?: boolean;
   /** Where it is tied on. */
   x: number;
   y: number;
@@ -128,6 +133,22 @@ export interface Coconut {
   back: number;
 }
 
+/**
+ * An elephant, standing in the river to be jumped on.
+ *
+ * Its back is above the water and the rest of it is in: a stepping stone
+ * with a trunk. Landing on one sets it spouting, and the spout is what
+ * throws the monkey on to the next one.
+ */
+export interface Elephant {
+  x: number;
+  /** Seconds of spouting left, and the bob that keeps it alive while it
+   *  waits. */
+  spurt: number;
+  phase: number;
+  facingLeft: boolean;
+}
+
 /** A mushroom: where the rain level puts you back when a coconut gets you. */
 export interface Mushroom {
   x: number;
@@ -193,6 +214,14 @@ export class Jungle {
    * second copy of it that would drift.
    */
   readonly raining: boolean;
+  /** And whether this is the river one. */
+  readonly river: boolean;
+  readonly elephants: Array<Elephant> = [];
+  /** Where the water is in this level, if it has any. One pair of numbers
+   *  rather than three constants read in six places: the dry jungle's
+   *  lake, the river, or nothing at all. */
+  readonly waterFrom: number;
+  readonly waterTo: number;
   /** How long this level is. The rain one is shorter: everything in it is
    *  slower, so the same length would be a longer walk. */
   readonly far: number;
@@ -212,12 +241,21 @@ export class Jungle {
    *  than at the beginning. */
   private readonly rng: () => number;
 
-  constructor(seed = 1, raining = false) {
+  constructor(seed = 1, kind: "jungle" | "rain" | "river" = "jungle") {
     const rng = made(seed);
     this.rng = rng;
+    const raining = kind === "rain";
+    const river = kind === "river";
     this.raining = raining;
-    this.far = raining ? RAIN.far : WORLD.far;
+    this.river = river;
+    this.far = raining ? RAIN.far : river ? RIVER.far : WORLD.far;
     this.homeX = this.far;
+    this.waterFrom = river ? RIVER.from : raining ? 0 : LAKE.from;
+    this.waterTo = river
+      ? RIVER.from + RIVER.wide
+      : raining
+        ? 0
+        : LAKE.from + LAKE.wide;
     // Walked along rather than stepped by a fixed amount, because the gap
     // changes over the water: the vines bunch up where falling costs the
     // crossing. The step is taken from where the *next* vine would land, so
@@ -316,7 +354,7 @@ export class Jungle {
     // level has no volcano and no lake, because its hazard is the sky.
     const craterFrom = this.craterFrom;
     const craterWide = this.craterTo - this.craterFrom;
-    for (let i = 0; raining ? false : i < VOLCANO.vents; i++) {
+    for (let i = 0; raining || river ? false : i < VOLCANO.vents; i++) {
       this.vents.push({
         x: craterFrom + ((i + 0.5) / VOLCANO.vents) * craterWide,
         // Spread round the cycle so they do not all go off together.
@@ -342,7 +380,7 @@ export class Jungle {
     }
 
     // Crocodiles, spread along the water with room to swim between them.
-    for (let i = 0; raining ? false : i < CROC.count; i++) {
+    for (let i = 0; raining || river ? false : i < CROC.count; i++) {
       const at =
         LAKE.from + ((i + 0.5) / CROC.count) * LAKE.wide + (rng() - 0.5) * 30;
       this.crocs.push({
@@ -366,6 +404,34 @@ export class Jungle {
         y: 10 + rng() * (WORLD.floor - 10),
         size: JUNGLE.dappleSize * (0.5 + rng()),
       });
+    }
+    if (river) {
+      // The stepping stones: elephants standing in the water, the first
+      // one a short hop off the bank and the rest evenly across. Counted
+      // out of the width rather than written down, so moving the river
+      // or widening it does not leave a gap nobody can jump.
+      for (
+        let x = this.waterFrom + RIVER.firstBy;
+        x < this.waterTo - RIVER.firstBy / 2;
+        x += RIVER.every
+      ) {
+        this.elephants.push({
+          x,
+          spurt: 0,
+          phase: rng() * Math.PI * 2,
+          // The far ones look back the way you came, which is where you
+          // are coming from.
+          facingLeft: x > (this.waterFrom + this.waterTo) / 2,
+        });
+      }
+      // A few of the vines are snakes — but never over the water, where
+      // there is nothing else to take hold of, and never two in a row.
+      let wasSnake = false;
+      for (const vine of this.vines) {
+        const over = this.overWater(vine.x);
+        vine.snake = !over && !wasSnake && rng() < RIVER.snakes;
+        wasSnake = vine.snake;
+      }
     }
     if (raining) {
       for (
@@ -407,6 +473,15 @@ export class Jungle {
    * the hazard: a coconut that simply dropped would be a trap, and this is
    * a game for a child.
    */
+  /** The elephants: the bob that keeps them alive, and the spout running
+   *  down after somebody has bounced off one. */
+  private standInTheRiver(dt: number): void {
+    for (const one of this.elephants) {
+      one.phase += dt;
+      one.spurt = Math.max(0, one.spurt - dt);
+    }
+  }
+
   private shakeTheCanopy(dt: number, monkeyX: number): void {
     for (const nut of this.coconuts) {
       nut.landed = false;
@@ -459,6 +534,7 @@ export class Jungle {
    *  was, instead of snapping back to wherever the clock says it should be. */
   update(dt: number, time: number, held: Vine | null, monkeyX = -1e9): void {
     this.shakeTheCanopy(dt, monkeyX);
+    this.standInTheRiver(dt);
     for (const croc of this.crocs) {
       croc.x += croc.dir * CROC.speed * dt;
       // Turning at the end of its beat, and never out of the water.
@@ -660,6 +736,12 @@ export class Jungle {
     }
   }
 
+  /** How high an elephant's back is. One answer for the drawing and for
+   *  the landing, with the bob in it, or the monkey stands in the air. */
+  backOf(one: Elephant): number {
+    return WORLD.floor - RIVER.backs + Math.round(Math.sin(one.phase) * 1.4);
+  }
+
   /** How low anything may hang at this point: the ground, or the top of the
    *  water where there is water. */
   surfaceAt(x: number): number {
@@ -676,6 +758,15 @@ export class Jungle {
       return VOLCANO.vineEvery;
     }
     if (this.overWater(x)) {
+      // The lake is crossed by swinging, so its vines bunch up. The river
+      // is crossed on elephants, so its do the opposite: a vine every
+      // other elephant or so, there to be caught if you fancy it rather
+      // than to be relied on. Bunched vines over the river caught the
+      // monkey at the top of every bounce and the elephants never got a
+      // second turn.
+      if (this.river) {
+        return JUNGLE.vineEvery * 1.7;
+      }
       return JUNGLE.vineEveryLake + (rng() - 0.5) * 2 * JUNGLE.vineVariesLake;
     }
     return JUNGLE.vineEvery + (rng() - 0.5) * 2 * JUNGLE.vineVaries;
@@ -694,7 +785,12 @@ export class Jungle {
 
   /** How far the volcano lifts the ground at this point. */
   hillAt(x: number): number {
-    if (this.raining || x <= VOLCANO.from || x >= VOLCANO.from + VOLCANO.wide) {
+    if (
+      this.raining ||
+      this.river ||
+      x <= VOLCANO.from ||
+      x >= VOLCANO.from + VOLCANO.wide
+    ) {
       return 0;
     }
     const along = (x - VOLCANO.from) / VOLCANO.wide;
@@ -706,13 +802,15 @@ export class Jungle {
 
   /** Whether a point is over the lava in the crater. */
   overCrater(x: number): boolean {
-    return !this.raining && x > this.craterFrom && x < this.craterTo;
+    return (
+      !this.raining && !this.river && x > this.craterFrom && x < this.craterTo
+    );
   }
 
   /** Whether a point is over the water. A little inside the banks, so the
    *  edge of the lake is a bank to stand on rather than a line to fall off. */
   overWater(x: number): boolean {
-    return !this.raining && x > LAKE.from && x < LAKE.from + LAKE.wide;
+    return x > this.waterFrom && x < this.waterTo;
   }
 
   /**

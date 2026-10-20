@@ -682,6 +682,10 @@ export const PAINT = {
   earth: "#8a6239",
   vine: "#4f9440",
   vineDark: "#3b7030",
+  /** A snake, which hangs where a vine would: a colder green than any
+   *  vine, so the difference is a difference of kind and not of light. */
+  snake: "#57903f",
+  snakeDark: "#2f6b34",
   dapple: "#fff3b0",
   home: "#b5793f",
   homeDark: "#8a5a2d",
@@ -829,6 +833,73 @@ export const COCONUT = {
   rests: 2.4,
 } as const;
 
+/**
+ * The river level: elephants to cross it on, and snakes among the vines.
+ *
+ * The third course, and the gentlest. A wide river with elephants standing
+ * in it as stepping stones — land on a back and it spouts and throws you
+ * on, so the crossing carries you rather than testing you — and vines
+ * through the trees of which a few are snakes, which cost a life if you
+ * take hold of one. Three lives, and nothing in it is quick.
+ *
+ * Aimed at a child, which here means: the stepping stones are closer
+ * together than a jump needs, the bounce does the work, and the thing
+ * that can hurt you looks nothing like the thing that cannot.
+ */
+export const RIVER = {
+  /** How long the level is, and where the water sits in it. */
+  far: 3400,
+  from: 980,
+  wide: 1180,
+  /** How far apart the elephants stand, in pixels, and how far the first
+   *  one is out from the bank. Both well inside a plain running jump —
+   *  measured at about sixty-five pixels — because the crossing is meant
+   *  to be a pleasure and not a test. */
+  every: 78,
+  firstBy: 52,
+  /** How far an elephant's back stands above the jungle floor line. The
+   *  water surface is below that, so a back is a dry thing to land on. */
+  backs: 7,
+  /**
+   * How hard a back throws you, as a multiple of a jump.
+   *
+   * Measured from both ends. At 1.7 it threw the monkey a hundred and
+   * twenty pixels up in a picture a hundred and eighty tall, which is
+   * into the canopy and off the top of the screen. Below about 1.35 the
+   * arc no longer carries the seventy-eight pixels to the next elephant.
+   * 1.4 is the window: eighty pixels up, eighty-three along.
+   */
+  bounces: 1.4,
+  /**
+   * How fast a back throws you along, in pixels a second.
+   *
+   * Along and not only up, and this is the number that makes the level
+   * work at all: there is no steering in the air in this game, so a
+   * monkey put back on an elephant standing still would bounce on the
+   * spot for ever — measured, thirty-three times without moving. The
+   * spout throws it the way it is looking, at eighty-four, which carries
+   * ninety-odd pixels in the time it is up: comfortably the seventy-eight
+   * to the next elephant, with the air drag taken off.
+   */
+  throws: 84,
+  /** How long the trunk spouts for after it throws you, in seconds. */
+  spurts: 0.8,
+  /** How high the water goes out of the trunk, in pixels. */
+  spouts: 26,
+  /** How much of an elephant counts as its back, either side of the
+   *  middle, in pixels. Generous: a near miss should be a landing. */
+  lands: 13,
+  /** How many of the vines are snakes, as a fraction, and how long after
+   *  one bites before anything can be grabbed again. Low odds, and never
+   *  over the water, where there is nothing else to take hold of. */
+  snakes: 0.26,
+  bites: 0.7,
+  /** How many lives. Three, and the level is not hard. */
+  lives: 3,
+  /** Where the level starts. */
+  backTo: 40,
+} as const;
+
 /** The mushrooms you come back to life at. */
 export const MUSHROOM = {
   /** How fast the sparkle goes round, in turns a second, and how far out
@@ -862,6 +933,8 @@ export const PARTS: ReadonlyArray<{
   at: number;
   /** True for the rain level, which is not a part of the jungle at all. */
   rain?: boolean;
+  /** And for the river level, which is not either. */
+  river?: boolean;
   /**
    * What colour the button is: the face, the shadow under it, and the
    * ink on it.
@@ -885,6 +958,12 @@ export const PARTS: ReadonlyArray<{
     at: RAIN.backTo,
     rain: true,
     tint: {face: "#a9754a", under: "#74492a", ink: "#2a1708"},
+  },
+  {
+    name: "The river",
+    at: RIVER.backTo,
+    river: true,
+    tint: {face: "#5fb6a8", under: "#3b857a", ink: "#062a26"},
   },
   {
     name: "The lake",

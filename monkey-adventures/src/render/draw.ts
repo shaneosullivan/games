@@ -7,6 +7,7 @@ import {
   MUSHROOM,
   PAINT,
   RAIN,
+  RIVER,
   SCREEN,
   VOLCANO,
   WORLD,
@@ -66,8 +67,8 @@ export function paint(
     w,
     0.72,
     {
-      from: Math.round(LAKE.from - camera),
-      to: Math.round(LAKE.from + LAKE.wide - camera),
+      from: Math.round(jungle.waterFrom - camera),
+      to: Math.round(jungle.waterTo - camera),
     },
   );
   layer(
@@ -84,8 +85,9 @@ export function paint(
 
   ground(g, jungle, w, h, camera);
   if (!jungle.raining) {
-    lake(g, w, camera, time);
+    lake(g, jungle, w, camera, time);
     crocs(g, jungle, camera, w);
+    elephants(g, jungle, camera, w);
     lava(g, jungle, camera, w, time);
   } else {
     mushrooms(g, jungle, camera, w, time);
@@ -307,12 +309,16 @@ function ground(
  */
 function lake(
   g: CanvasRenderingContext2D,
+  jungle: Jungle,
   w: number,
   camera: number,
   time: number,
 ): void {
-  const from = Math.round(LAKE.from - camera);
-  const wide = LAKE.wide;
+  if (jungle.waterTo <= jungle.waterFrom) {
+    return;
+  }
+  const from = Math.round(jungle.waterFrom - camera);
+  const wide = jungle.waterTo - jungle.waterFrom;
   if (from > w || from + wide < 0) {
     return;
   }
@@ -536,6 +542,50 @@ function spurt(
 }
 
 /**
+ * The elephants standing in the river, and the water out of their trunks.
+ *
+ * Drawn after the water and not before it, so they are standing in the
+ * river rather than on it: the sprite is the top half of an elephant and
+ * the river covers the rest. The spout is drawn in code because it moves
+ * — a column out of the trunk that rises and falls away, which is the
+ * thing that just threw the monkey and should look like it.
+ */
+function elephants(
+  g: CanvasRenderingContext2D,
+  jungle: Jungle,
+  camera: number,
+  w: number,
+): void {
+  for (const one of jungle.elephants) {
+    const x = Math.round(one.x - camera);
+    if (x < -30 || x > w + 30) {
+      continue;
+    }
+    const sprite = propSprite("elephant", one.facingLeft);
+    const back = jungle.backOf(one);
+    // Hung from its back and not from its feet: the back is the thing the
+    // monkey lands on, and `backOf` is where the game says it is. The
+    // rest of the animal goes down into the water from there.
+    g.drawImage(sprite, x - Math.round(sprite.width / 2), back - 1);
+    if (one.spurt <= 0) {
+      continue;
+    }
+    // Up out of the trunk and over: full height as it goes off, falling
+    // away over the rest of the second.
+    const gone = 1 - one.spurt / RIVER.spurts;
+    const tall = Math.round(RIVER.spouts * Math.sin(one.spurt * 3.2));
+    // The trunk is at the front, which is whichever way it is looking.
+    const nose = x + (one.facingLeft ? -8 : 8);
+    g.fillStyle = PAINT.waterLight;
+    for (let up = 0; up < tall; up++) {
+      // Leaning over as it rises, the way water does once it is out.
+      const lean = Math.round((up / 6) * (one.facingLeft ? -1 : 1) * gone);
+      g.fillRect(nose + lean, back - up - 1, up > tall - 4 ? 2 : 1, 1);
+    }
+  }
+}
+
+/**
  * The coconuts: hanging, shaking, falling, and what is left of one.
  *
  * The shake is drawn as a sideways jitter of a pixel or two, fast, which
@@ -666,7 +716,11 @@ function rope(
   camera: number,
   held: boolean,
 ): void {
-  g.fillStyle = held ? PAINT.vine : PAINT.vineDark;
+  // A snake is drawn with the same walk as a vine and nothing else the
+  // same: darker green, banded along its length, and a head on the end
+  // of it. A child has to be able to tell it from a vine across the
+  // screen, before they are anywhere near it.
+  g.fillStyle = vine.snake ? PAINT.snake : held ? PAINT.vine : PAINT.vineDark;
   const knots = vine.knots;
   // Half a picture pixel: the size of a block of rope, the distance the
   // walk steps, and what positions are snapped to, all the same number so
@@ -689,6 +743,21 @@ function rope(
         bit * 2,
       );
     }
+  }
+  if (vine.snake) {
+    // Bands down its back, and the head where the tip would be.
+    for (let i = 1; i < knots.length; i += 2) {
+      const knot = knots[i];
+      g.fillStyle = PAINT.snakeDark;
+      g.fillRect(Math.round(knot.x - camera) - 1, Math.round(knot.y), 3, 2);
+    }
+    const end = knots[knots.length - 1];
+    const head = propSprite("snake");
+    g.drawImage(
+      head,
+      Math.round(end.x - camera) - Math.round(head.width / 2),
+      Math.round(end.y) - 1,
+    );
   }
   // A leafy knot at the top, so a vine starts somewhere rather than
   // appearing out of the canopy.

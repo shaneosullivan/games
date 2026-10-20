@@ -60,6 +60,24 @@ out where they are; one who is carried back has watched it happen. Nothing at th
 hand over the last of the level. Lose both hearts and the level starts
 again with both of them back.
 
+## The river level
+
+The third course, and the gentlest. A wide river with **elephants** standing
+in it as stepping stones: land on a back and the trunk spouts and throws
+you on, up and along, so the crossing carries you rather than testing you.
+They stand seventy-eight pixels apart and the throw is good for ninety —
+there is no steering in the air in this game, so the elephant does the
+steering.
+
+Some of the vines are **snakes**. They hang where a vine hangs and they are
+caught like one, which is the trick of them; take hold and it costs a life
+and throws you off. Never over the water, never two in a row, and about one
+vine in four. You have **three hearts** here.
+
+Falling in the river costs nothing but the crossing: back to the near bank,
+as in the lake. Running out of hearts starts the level again with all three
+back.
+
 ## The two crossings
 
 The lake and the crater are the same bargain: swing across, and a fall

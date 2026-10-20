@@ -31,6 +31,7 @@ export class Hud {
     onMute: (muted: boolean) => void,
     onBegin: (at: number) => void,
     onRain: () => void,
+    onRiver: () => void,
   ) {
     inject();
 
@@ -99,6 +100,8 @@ export class Hud {
         this.setChoosing(false);
         if (part.rain) {
           onRain();
+        } else if (part.river) {
+          onRiver();
         } else {
           onBegin(part.at);
         }

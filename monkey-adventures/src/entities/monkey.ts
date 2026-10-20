@@ -356,6 +356,19 @@ export class Monkey {
     );
   }
 
+  /**
+   * Thrown off whatever it was holding, and kept off it for a moment.
+   *
+   * The wait is the point: without it the monkey catches the same thing
+   * again on the way down, and a snake that bit you once would bite you
+   * for every life you had in the space of a second.
+   */
+  thrownOff(up: number, waitFor: number): void {
+    this.letGo();
+    this.vy = -up;
+    this.waitFor = waitFor;
+  }
+
   /** Lets go, keeping the speed the swing had built up. */
   letGo(): void {
     if (this.vine) {

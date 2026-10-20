@@ -254,6 +254,44 @@ export class Sound {
     this.raining.gain.setTargetAtTime(on ? 0.3 : 0, ctx.currentTime, 0.25);
   }
 
+  /**
+   * A snake: a hiss.
+   *
+   * Noise with everything below two kilohertz taken off, swelling and
+   * stopping. No pitch in it at all, which is what tells it apart from
+   * every other sound in the game — a hiss is the one noise here that is
+   * not a note.
+   */
+  hiss(): void {
+    const ctx = this.ctx;
+    const out = this.out;
+    if (!ctx || !out || this.muted) {
+      return;
+    }
+    const now = ctx.currentTime;
+    const seconds = 0.42;
+    const length = Math.floor(ctx.sampleRate * seconds);
+    const buffer = ctx.createBuffer(1, length, ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < length; i++) {
+      data[i] = Math.random() * 2 - 1;
+    }
+    const source = ctx.createBufferSource();
+    source.buffer = buffer;
+    const sharp = ctx.createBiquadFilter();
+    sharp.type = "highpass";
+    sharp.frequency.value = 2200;
+    const gain = ctx.createGain();
+    // In quickly and out slowly, which is the shape of a breath out.
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.exponentialRampToValueAtTime(0.5, now + 0.06);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + seconds);
+    source.connect(sharp);
+    sharp.connect(gain);
+    gain.connect(out);
+    source.start(now);
+  }
+
   /** The crocodile's jaws coming together: a short, dry knock. */
   chomp(): void {
     this.blip(150, 0.06, "square", 0, 0.5);
