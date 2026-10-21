@@ -350,6 +350,16 @@ function style(): void {
   styled = true;
   const sheet = document.createElement("style");
   sheet.textContent = `
+.stick,
+.tapper {
+  /* Held down for whole seconds at a time, which on a touch screen is
+     the gesture that selects things and raises the copy callout. Neither
+     belongs over a game. */
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
 .stick {
   position: absolute;
   left: 0;

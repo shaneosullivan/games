@@ -104,6 +104,10 @@ rope, anything else pumps the swing. Pumping is a waggle and a waggling
 thumb is never level, so a stick that climbed on any upward component would
 crawl up the vine the whole time it was being swung.
 
+The **‹** in the top left goes back to the chooser from the middle of a
+level, so picking the volcano and wanting the river is one press rather
+than a page reload.
+
 A shorter vine swings faster and reaches higher, a longer one swings slower
 and further, so climbing the rope is a choice and not only tidiness.
 

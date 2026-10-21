@@ -23,6 +23,7 @@ export class Hud {
   private readonly again: HTMLButtonElement;
   private readonly start: HTMLDivElement;
   private readonly lives: HTMLDivElement;
+  private readonly back: HTMLButtonElement;
   readonly root: HTMLDivElement;
 
   constructor(
@@ -32,6 +33,7 @@ export class Hud {
     onBegin: (at: number) => void,
     onRain: () => void,
     onRiver: () => void,
+    onMenu: () => void,
   ) {
     inject();
 
@@ -50,6 +52,20 @@ export class Hud {
     const sound = new SoundButton({onToggle: onMute});
     sound.root.classList.add("hud-tap", "ui-interactive");
     top.append(this.bar.root, this.score, sound.root);
+
+    // The way out, in the top left. A child who has started the volcano
+    // and wanted the river should not have to reload the page, and there
+    // is nothing else on this screen that goes anywhere: without it the
+    // only way back to the chooser is to get home or to die.
+    this.back = document.createElement("button");
+    this.back.className = "hud-back ui-interactive hud-gone";
+    this.back.textContent = "‹";
+    this.back.setAttribute("aria-label", "Back to the chooser");
+    this.back.addEventListener("click", () => {
+      this.back.blur();
+      onMenu();
+    });
+    this.root.append(this.back);
 
     // The lives, in the top right, which is where a child who has played
     // anything else will look for them. Hearts drawn from the game's own
@@ -153,9 +169,16 @@ export class Hud {
     });
   }
 
-  /** Shows or hides the chooser. The game stands still behind it. */
+  /**
+   * Shows or hides the chooser. The game stands still behind it.
+   *
+   * The way out goes the other way: there is no use for it while the
+   * chooser is up, and a button that takes you to where you already are
+   * is a button a child will press and learn nothing from.
+   */
   setChoosing(choosing: boolean): void {
     this.start.classList.toggle("hud-gone", !choosing);
+    this.back.classList.toggle("hud-gone", choosing);
   }
 
   /** How far along the jungle, 0 to 1. */
@@ -202,6 +225,12 @@ function inject(): void {
 .hud {
   position: absolute;
   inset: 0;
+  /* A child holds things. Every one of these stops a long press turning
+     into a selection, a highlight or a copy callout over the game. */
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
   pointer-events: none;
   display: flex;
   flex-direction: column;
@@ -235,6 +264,28 @@ function inject(): void {
 }
 .hud-done.hud-gone {
   display: none;
+}
+.hud-back {
+  position: absolute;
+  top: max(10px, env(safe-area-inset-top));
+  left: max(10px, env(safe-area-inset-left));
+  width: 38px;
+  height: 38px;
+  padding: 0 0 4px 0;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 999px;
+  background: rgba(20, 26, 20, 0.55);
+  backdrop-filter: blur(8px);
+  color: #fff;
+  font: 700 26px/1 system-ui, -apple-system, sans-serif;
+  pointer-events: auto;
+  cursor: pointer;
+}
+.hud-back.hud-gone {
+  display: none;
+}
+.hud-back:active {
+  transform: scale(0.94);
 }
 .hud-lives {
   position: absolute;

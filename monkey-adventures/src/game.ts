@@ -83,6 +83,7 @@ export class Game {
       at => this.beginAt(at),
       () => this.beginRain(),
       () => this.beginRiver(),
+      () => this.toTheChooser(),
     );
     this.hud.setChoosing(true);
     // A browser will not make a noise until the page has been touched, so
@@ -270,7 +271,7 @@ export class Game {
     if (this.monkey.doing === "swing" || this.monkey.doing === "climb") {
       return;
     }
-    if (!this.jungle.overWater(this.monkey.x)) {
+    if (!this.jungle.inTheWater(this.monkey.x)) {
       return;
     }
     if (this.monkey.y < WORLD.floor) {
@@ -684,6 +685,20 @@ export class Game {
     this.hud.setProgress(0);
     this.choosing = true;
     this.hud.setChoosing(true);
+  }
+
+  /**
+   * Back to the chooser, from the middle of whatever is being played.
+   *
+   * The world is left exactly as it is behind the card — it goes on
+   * breathing, and the monkey stands where it was — because picking
+   * anything starts that place afresh anyway, and because a jungle that
+   * freezes solid behind a menu looks broken.
+   */
+  private toTheChooser(): void {
+    this.choosing = true;
+    this.hud.setChoosing(true);
+    this.sound.rain(false);
   }
 
   /**

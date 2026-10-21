@@ -807,10 +807,26 @@ export class Jungle {
     );
   }
 
-  /** Whether a point is over the water. A little inside the banks, so the
-   *  edge of the lake is a bank to stand on rather than a line to fall off. */
+  /** Whether a point is over the water. The true edges: this is what the
+   *  ground, the trees and the vines are laid out against. */
   overWater(x: number): boolean {
     return x > this.waterFrom && x < this.waterTo;
+  }
+
+  /**
+   * Whether a monkey standing here is in the water rather than on the
+   * bank.
+   *
+   * Half a body further in on each side than the water really goes, and
+   * that half body is the whole point: the monkey is a sprite thirteen
+   * pixels wide standing on a point, so with its middle a pixel past the
+   * edge it is still mostly over dry land, and sinking there feels like
+   * being pushed in. The edge of the water should be a bank you can
+   * stand on, not a line you fall off.
+   */
+  inTheWater(x: number): boolean {
+    const forgive = MONKEY.wide / 2;
+    return x > this.waterFrom + forgive && x < this.waterTo - forgive;
   }
 
   /**

@@ -15,6 +15,23 @@
         overflow: hidden;
         background: #000;
       }
+      /* Nothing here is text to be selected, and a game you hold a finger
+         on is all long presses. Without these, holding the jump button
+         blue-selects the whole page on an iPad and pops up the copy
+         callout over the top of the jungle. */
+      html {
+        -webkit-text-size-adjust: 100%;
+        -webkit-tap-highlight-color: transparent;
+      }
+      body,
+      #app,
+      canvas {
+        user-select: none;
+        -webkit-user-select: none;
+        -webkit-touch-callout: none;
+        touch-action: none;
+        overscroll-behavior: none;
+      }
       /* The picture in the middle of the glass. It fills the window in one
          direction and is centred in the other, so whatever black there is
          sits evenly either side of the game rather than all below it with
