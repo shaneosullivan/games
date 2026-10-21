@@ -40,10 +40,10 @@ const PALETTE: Record<string, string> = {
   p: "#68786b",
   P: "#4a5950",
   q: "#e8efe6",
-  /** A snake: green, with darker bands and a yellow eye. */
-  k: "#4f9440",
-  K: "#2f6b34",
-  j: "#ffd257",
+  /** A snake: three greens and a black eye, from the reference. */
+  k: "#2faa3f",
+  K: "#1d7a2c",
+  L: "#7fd45a",
   /** A heart: the red, the shade down its right side, and the glint. */
   r: "#ed1c24",
   R: "#b10f14",
@@ -339,18 +339,20 @@ const ELEPHANT = [
 /**
  * A snake's head, at the bottom end of the thing that is not a vine.
  *
- * Eyes and a tongue, which at seven pixels across is the whole argument:
- * a child has to be able to tell this from a vine at a glance and from
+ * From the reference, in its greens rather than its yellows: a blunt
+ * wedge of a head, the lighter stripe carrying on over the top of it,
+ * two black eyes and a tongue out. The eyes and the tongue are the
+ * argument — a child has to tell this from a vine at a glance and from
  * the far side of the screen, so it is the one green thing in the game
  * with a face.
  */
 const SNAKE_HEAD = [
-  "..KKK..",
   ".KkkkK.",
-  "KkjkjkK",
+  "KkLLkkK",
+  "KekkekK",
   "KkkkkkK",
   ".KkkkK.",
-  "..KeK..",
+  "..KkK..",
   "...e...",
 ];
 

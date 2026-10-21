@@ -682,10 +682,13 @@ export const PAINT = {
   earth: "#8a6239",
   vine: "#4f9440",
   vineDark: "#3b7030",
-  /** A snake, which hangs where a vine would: a colder green than any
-   *  vine, so the difference is a difference of kind and not of light. */
-  snake: "#57903f",
-  snakeDark: "#2f6b34",
+  /** A snake, which hangs where a vine would. Three greens from the
+   *  reference — the picture has a yellow stripe and this one is green
+   *  instead, but the stripe is the thing that makes it a snake and not
+   *  a rope, so it is kept and only the colour of it changes. */
+  snake: "#2faa3f",
+  snakeDark: "#1d7a2c",
+  snakeLight: "#7fd45a",
   dapple: "#fff3b0",
   home: "#b5793f",
   homeDark: "#8a5a2d",

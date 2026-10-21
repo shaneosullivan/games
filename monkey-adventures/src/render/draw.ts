@@ -99,7 +99,7 @@ export function paint(
     if (vine.x - camera < -90 || vine.x - camera > w + 90) {
       continue;
     }
-    rope(g, vine, camera, vine === monkey.vine);
+    rope(g, vine, camera, vine === monkey.vine, time);
   }
 
   if (jungle.raining) {
@@ -715,12 +715,13 @@ function rope(
   vine: Vine,
   camera: number,
   held: boolean,
+  time: number,
 ): void {
-  // A snake is drawn with the same walk as a vine and nothing else the
-  // same: darker green, banded along its length, and a head on the end
-  // of it. A child has to be able to tell it from a vine across the
-  // screen, before they are anywhere near it.
-  g.fillStyle = vine.snake ? PAINT.snake : held ? PAINT.vine : PAINT.vineDark;
+  if (vine.snake) {
+    snake(g, vine, camera, time);
+    return;
+  }
+  g.fillStyle = held ? PAINT.vine : PAINT.vineDark;
   const knots = vine.knots;
   // Half a picture pixel: the size of a block of rope, the distance the
   // walk steps, and what positions are snapped to, all the same number so
@@ -744,25 +745,62 @@ function rope(
       );
     }
   }
-  if (vine.snake) {
-    // Bands down its back, and the head where the tip would be.
-    for (let i = 1; i < knots.length; i += 2) {
-      const knot = knots[i];
-      g.fillStyle = PAINT.snakeDark;
-      g.fillRect(Math.round(knot.x - camera) - 1, Math.round(knot.y), 3, 2);
-    }
-    const end = knots[knots.length - 1];
-    const head = propSprite("snake");
-    g.drawImage(
-      head,
-      Math.round(end.x - camera) - Math.round(head.width / 2),
-      Math.round(end.y) - 1,
-    );
-  }
   // A leafy knot at the top, so a vine starts somewhere rather than
   // appearing out of the canopy.
   g.fillStyle = PAINT.canopyLight;
   g.fillRect(Math.round(vine.x - camera) - 3, Math.round(vine.y) - 2, 7, 4);
+}
+
+/**
+ * A snake, hanging where a vine would.
+ *
+ * Three pixels across against a vine's one, two greens with a lighter
+ * stripe down it, and a head with eyes and a tongue on the end: a child
+ * must be able to tell this from a vine across the screen, long before
+ * they are near enough to take hold of one. The reference has the stripe
+ * in yellow and this one keeps the stripe and makes it green, because
+ * the stripe is what makes it a snake rather than a rope.
+ *
+ * And it waves as it hangs, a pixel or so either way. That is drawing
+ * only — the thing the game catches you on is where the physics says it
+ * is — but a snake that hung perfectly still would be a rope painted
+ * green.
+ */
+function snake(
+  g: CanvasRenderingContext2D,
+  vine: Vine,
+  camera: number,
+  time: number,
+): void {
+  const knots = vine.knots;
+  const waveAt = (y: number): number =>
+    Math.sin(y * 0.22 + vine.phase + time * 1.6) * 1.4;
+  let along = 0;
+  for (let i = 0; i < knots.length - 1; i++) {
+    const ax = knots[i].x - camera;
+    const ay = knots[i].y;
+    const bx = knots[i + 1].x - camera;
+    const by = knots[i + 1].y;
+    const steps = Math.max(1, Math.round(Math.hypot(bx - ax, by - ay)));
+    for (let k = 0; k <= steps; k++) {
+      const t = k / steps;
+      const y = ay + (by - ay) * t;
+      const x = Math.round(ax + (bx - ax) * t + waveAt(y));
+      const row = Math.round(y);
+      along += 1;
+      g.fillStyle = PAINT.snakeDark;
+      g.fillRect(x - 1, row, 3, 1);
+      g.fillStyle = along % 3 === 0 ? PAINT.snakeLight : PAINT.snake;
+      g.fillRect(x, row, 1, 1);
+    }
+  }
+  const end = knots[knots.length - 1];
+  const head = propSprite("snake");
+  g.drawImage(
+    head,
+    Math.round(end.x - camera + waveAt(end.y)) - Math.round(head.width / 2),
+    Math.round(end.y) - 2,
+  );
 }
 
 function drawMonkey(
