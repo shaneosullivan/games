@@ -141,6 +141,10 @@ export class Hud {
   setLives(left: number, of: number = RAIN.lives): void {
     this.lives.classList.toggle("hud-gone", of <= 0);
     if (of <= 0) {
+      // Emptied as well as hidden. A hidden row still holding three
+      // hearts is a row that flashes the last level's lives for a frame
+      // the next time one is shown.
+      this.lives.replaceChildren();
       return;
     }
     if (this.lives.childElementCount !== of) {

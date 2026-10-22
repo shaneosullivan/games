@@ -723,7 +723,7 @@ export class Game {
     this.hud.setFinished(false);
     this.hud.setLives(this.lives);
     this.sound.rain(true);
-    this.beginAt(RAIN.backTo);
+    this.standAt(RAIN.backTo);
   }
 
   /**
@@ -746,7 +746,7 @@ export class Game {
     this.hud.setProgress(0);
     this.hud.setFinished(false);
     this.hud.setLives(this.lives, RIVER.lives);
-    this.beginAt(RIVER.backTo);
+    this.standAt(RIVER.backTo);
   }
 
   /**
@@ -757,13 +757,34 @@ export class Game {
    * already falling down the hill.
    */
   private beginAt(at: number): void {
-    const monkey = this.monkey;
-    this.sound.rain(this.jungle.raining);
-    if (!this.jungle.raining) {
-      // No lives in the dry jungle, so no hearts: nothing there can be
-      // lost, and a row of hearts that never changes is furniture.
-      this.hud.setLives(0, 0);
+    // The parts of the course are places in the *dry* jungle, so if the
+    // rain or the river is loaded it has to go first. Without this,
+    // picking "The lake" after playing the river put the monkey down at
+    // the lake's distance along the river — which is in the water, a
+    // thousand pixels from either bank.
+    if (this.jungle.raining || this.jungle.river) {
+      this.jungle = new Jungle();
+      this.monkey = new Monkey();
+      this.party.clear();
+      this.bananas = 0;
+      this.finished = false;
+      this.sinking = 0;
+      this.burnt = false;
+      this.reviving = null;
+      this.lives = 0;
+      this.hud.setScore(0);
+      this.hud.setFinished(false);
     }
+    this.sound.rain(false);
+    // No lives in the dry jungle, so no hearts: nothing there can be
+    // lost, and a row of hearts that never changes is furniture.
+    this.hud.setLives(0, 0);
+    this.standAt(at);
+  }
+
+  /** Puts the monkey down in whatever level is loaded, and starts it. */
+  private standAt(at: number): void {
+    const monkey = this.monkey;
     monkey.vine = null;
     monkey.tree = null;
     monkey.doing = "ground";
