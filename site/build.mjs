@@ -52,6 +52,22 @@ const APP = {
   backgroundColor: "#fdf7ec",
 };
 
+/**
+ * Where the site is served. Link previews (X, iMessage, Slack…) only follow
+ * absolute URLs, so the share tags need it spelled out.
+ */
+const SITE_URL = "https://games.chofter.com";
+
+/**
+ * The picture a link to the gallery unfurls with — 1200×630, the shape X and
+ * friends draw a large card at. Without one they grab the first image on the
+ * page, the logo, and crop it to the middle of the word.
+ *
+ * Copied to a stable name rather than content-stamped: a post keeps the URL it
+ * was shared with, and a stamped one would 404 the next time the image changed.
+ */
+const SHARE_IMAGE = "share.png";
+
 /** Bumped every build, so an installed copy picks up new games. */
 const BUILD_ID = new Date().toISOString().replace(/[-:T]/g, "").slice(0, 14);
 
@@ -256,6 +272,10 @@ function stageGame(game) {
   // Content-hashed like the game's own images, so a card that hasn't been
   // redrawn isn't downloaded again on the next deploy.
   game.cardFile = game.card ? stampAsset(game.card, target) : null;
+  // …and once more under a fixed name for link previews; see SHARE_IMAGE.
+  if (game.card) {
+    fs.copyFileSync(game.card, path.join(target, SHARE_IMAGE));
+  }
   return true;
 }
 
@@ -283,11 +303,26 @@ function installGame(game) {
     }),
   );
 
-  const head = renderInstallHead({
+  const pageUrl = `${SITE_URL}/games/${game.name}/`;
+  // A game with no card unfurls with the gallery's picture rather than none.
+  const image = game.card
+    ? {url: `${pageUrl}${SHARE_IMAGE}`, file: game.card}
+    : {
+        url: `${SITE_URL}/${SHARE_IMAGE}`,
+        file: path.join(SITE_DIR, "assets", SHARE_IMAGE),
+      };
+  const head = `${renderInstallHead({
     title,
     manifest: "manifest.webmanifest",
     up: "../../",
-  });
+  })}
+${renderShareHead({
+  title: `${title} · ${APP.name}`,
+  description: game.description || APP.description,
+  url: pageUrl,
+  image,
+  alt: `A picture of ${title}`,
+})}`;
 
   const html = fs
     .readFileSync(indexPath, "utf8")
@@ -397,6 +432,38 @@ function renderManifest({name, shortName, description, start = "./", up = ""}) {
     null,
     2,
   );
+}
+
+/** A PNG's pixel size, read from its header. */
+function pngSize(file) {
+  const header = Buffer.alloc(24);
+  const fd = fs.openSync(file, "r");
+  fs.readSync(fd, header, 0, 24, 0);
+  fs.closeSync(fd);
+  return {width: header.readUInt32BE(16), height: header.readUInt32BE(20)};
+}
+
+/**
+ * The head tags that decide how a shared link unfurls. Open Graph is read by
+ * nearly everyone; X wants its own `twitter:card` to draw the large picture
+ * instead of a thumbnail, and falls back to the og: tags for the rest.
+ *
+ * @param image `url` is what's published, `file` the source it's measured from
+ */
+function renderShareHead({title, description, url, image, alt}) {
+  const {width, height} = pngSize(image.file);
+  return `    <meta name="description" content="${escapeHtml(description)}" />
+    <link rel="canonical" href="${url}" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="${escapeHtml(APP.name)}" />
+    <meta property="og:url" content="${url}" />
+    <meta property="og:title" content="${escapeHtml(title)}" />
+    <meta property="og:description" content="${escapeHtml(description)}" />
+    <meta property="og:image" content="${image.url}" />
+    <meta property="og:image:width" content="${width}" />
+    <meta property="og:image:height" content="${height}" />
+    <meta property="og:image:alt" content="${escapeHtml(alt)}" />
+    <meta name="twitter:card" content="summary_large_image" />`;
 }
 
 /**
@@ -730,8 +797,17 @@ ${development.map(renderCard).join("\n")}
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>${escapeHtml(APP.name)}</title>
-    <meta name="description" content="${escapeHtml(APP.description)}" />
 ${renderInstallHead({title: APP.name, manifest: "manifest.webmanifest"})}
+${renderShareHead({
+  title: APP.name,
+  description: `${APP.description} Best on a tablet.`,
+  url: `${SITE_URL}/`,
+  image: {
+    url: `${SITE_URL}/${SHARE_IMAGE}`,
+    file: path.join(SITE_DIR, "assets", SHARE_IMAGE),
+  },
+  alt: "The Chofter logo beside pictures from four of the games",
+})}
     <link rel="stylesheet" href="styles.css" />
     <script>
 ${SW_REGISTER}
@@ -825,6 +901,10 @@ fs.writeFileSync(
   renderPage(staged, logoFile),
 );
 fs.cpSync(path.join(SITE_DIR, "styles.css"), path.join(OUT_DIR, "styles.css"));
+fs.cpSync(
+  path.join(SITE_DIR, "assets", SHARE_IMAGE),
+  path.join(OUT_DIR, SHARE_IMAGE),
+);
 
 // ---- installable bits -----------------------------------------------------
 
