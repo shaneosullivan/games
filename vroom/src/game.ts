@@ -421,7 +421,10 @@ export class Game {
     if (this.gone) {
       return;
     }
-    report(0.75, "Warming up the shaders\u2026");
+    report(
+      0.75,
+      LOADING.warming[Math.floor(Math.random() * LOADING.warming.length)],
+    );
     await frame();
     // The one that matters. Every material compiles the first time it is
     // drawn, and on a heavy level that is most of a second — which used to be

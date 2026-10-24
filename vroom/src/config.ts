@@ -450,6 +450,19 @@ export const LOADING = {
    *  eighty milliseconds on a fast machine reads as a glitch; a moment of
    *  "getting ready" reads as the game getting ready. */
   atLeast: 0.7,
+  /** What the card says while the shaders compile, one picked at random each
+   *  time. The step is the longest one on a slow machine, so it is the line a
+   *  child reads most — and "shaders" means nothing to them. */
+  warming: [
+    "Warming up the tires…",
+    "Revving the engines…",
+    "Polishing the paint…",
+    "Pumping up the tires…",
+    "Filling up the tanks…",
+    "Tightening the wheels…",
+    "Waving the flags…",
+    "Checking the mirrors…",
+  ],
 } as const;
 
 /**
