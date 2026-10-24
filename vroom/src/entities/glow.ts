@@ -45,7 +45,9 @@ export class Glow {
       // Decay two, which is how light really falls off, and the distance is
       // what stops each one being considered by every fragment in the scene.
       const light = new THREE.PointLight(0xffffff, 0, 100, 2);
-      light.visible = false;
+      // On from the start, so the shaders warmed up while the race loads are
+      // the ones it actually draws with. See `update` for why they stay on.
+      light.visible = i < settings().lights;
       this.lights.push(light);
       this.group.add(light);
     }
@@ -100,15 +102,22 @@ export class Glow {
     // How many are allowed to be on at all. Every point light is another
     // iteration inside every fragment of every lit surface in the scene, so
     // this is one of the biggest things a slower machine can give up.
+    //
+    // A spare light is turned down to nothing rather than switched off. How
+    // many lights are on is baked into every shader in the scene, so changing
+    // it recompiles all of them — a second and a half of frozen screen on a
+    // Mac and far longer on an iPad, every time the car drove into or out of
+    // reach of a lamp. That was the whole of why the neon tracks crawled. The
+    // count now changes only when the quality ladder gives lights up, once.
     const allowed = settings().lights;
     for (let i = 0; i < this.lights.length; i++) {
       const light = this.lights[i];
+      light.visible = i < allowed;
       const pick = i < allowed ? this.best[i] : undefined;
       if (!pick) {
-        light.visible = false;
+        light.intensity = 0;
         continue;
       }
-      light.visible = true;
       light.position.set(pick.at.x, pick.at.y, pick.at.z);
       light.color.set(pick.at.colour);
       light.intensity = pick.at.power;
