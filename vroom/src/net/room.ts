@@ -160,13 +160,15 @@ export class Room {
       reliable: true,
       serialization: "json",
     });
-    host.cars = peer.connect(PREFIX + code, {
-      label: CARS,
-      // Unordered, which is what `reliable: false` buys here. Head-of-line
-      // blocking is the one thing that would make a bump land late.
-      reliable: false,
-      serialization: "raw",
-    });
+    host.cars = lossy(() =>
+      peer.connect(PREFIX + code, {
+        label: CARS,
+        // Unordered, which is what `reliable: false` buys here. Head-of-line
+        // blocking is the one thing that would make a bump land late.
+        reliable: false,
+        serialization: "raw",
+      }),
+    );
     room.listen(PREFIX + code, host.words);
     room.listen(PREFIX + code, host.cars);
     // A code that leads nowhere has to *fail*, not hang: PeerJS reports "there
@@ -451,4 +453,31 @@ function opened(conn: DataConnection): Promise<void> {
     conn.once("error", fail);
     conn.once("close", () => fail(new Error("closed")));
   });
+}
+
+/**
+ * Opens a channel that never resends a lost packet.
+ *
+ * `reliable: false` in PeerJS only turns ordering off: the browser still
+ * resends anything that goes missing, so a lost car packet gets a second trip
+ * after the next one has already made it stale. For the cars that is wasted
+ * air at the moment the wi-fi is already struggling. PeerJS has no option for
+ * it (1.5.5 hard-codes `{ordered}`), so this sets it on the way past.
+ *
+ * Only the side that opens a channel decides this — the other end adopts it
+ * when the channel arrives — and here that is always the guest. `connect`
+ * makes its channel before it returns, so the wrapper is in place for exactly
+ * that one call and nothing else ever sees it.
+ */
+function lossy(open: () => DataConnection): DataConnection {
+  const proto = RTCPeerConnection.prototype;
+  const make = proto.createDataChannel;
+  proto.createDataChannel = function (label, options) {
+    return make.call(this, label, {...options, maxRetransmits: 0});
+  };
+  try {
+    return open();
+  } finally {
+    proto.createDataChannel = make;
+  }
 }
