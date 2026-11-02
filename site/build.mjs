@@ -846,7 +846,7 @@ ${inDevelopment}
     <script>
 ${UPDATE_WATCH}
     </script>
-    <script async src="https://scripts.simpleanalyticscdn.com/latest.js"></script>
+    <script defer src="https://chofterstats.com/cs.js" data-website-id="cd2d0762-aafe-4430-988b-eb208a43fdc2" data-domains="games.chofter.com"></script>
   </body>
 </html>
 `;
