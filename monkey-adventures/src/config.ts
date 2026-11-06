@@ -279,6 +279,23 @@ export const VOLCANO = {
 
 /** The monkey. */
 export const MONKEY = {
+  /**
+   * How the moving frames are chosen.
+   *
+   * A run frame for every `strideFrame` pixels travelled, so the legs keep
+   * pace with the ground: six frames to a stride makes a stride
+   * thirty-six pixels, two a second at a full run, which is a gallop and
+   * not a scurry. Tied to distance rather than to the clock, so a monkey
+   * slowing down slows its legs too, and one that stops stops them.
+   *
+   * In the air, rising faster than `rises` reaches up, falling faster
+   * than `falls` comes down, and between the two is the top of the jump
+   * with both arms up — which is the frame it will usually be in when it
+   * catches a vine, and is the right one to be in.
+   */
+  strideFrame: 6,
+  rises: -70,
+  falls: 70,
   /** How big the sprite is, in picture pixels. */
   wide: 13,
   tall: 15,

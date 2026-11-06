@@ -1,3 +1,5 @@
+import {JUMP, RUN} from "./motion";
+
 /**
  * The monkey, drawn a pixel at a time.
  *
@@ -99,21 +101,6 @@ const STAND = [
   "..ddd...ddd..",
 ];
 
-/** Running: the same monkey with its legs somewhere else. Two frames is
- *  plenty at this size — the eye reads the change, not the drawing. */
-const RUN_A = [
-  ...STAND.slice(0, 12),
-  "...fff.fff...",
-  "..dd......dd.",
-  ".ddd.........",
-];
-const RUN_B = [
-  ...STAND.slice(0, 12),
-  "...fff.fff...",
-  "....dd.dd....",
-  "...ddd.ddd...",
-];
-
 /** The other half of a climb: the same reach with the legs swapped, so a
  *  monkey going up a trunk is plainly working at it. */
 const CLIMB_B = [
@@ -123,13 +110,13 @@ const CLIMB_B = [
   "...dd....d...",
 ];
 
-export type Pose = "hang" | "stand" | "runA" | "runB" | "climbB";
+/** The poses that are written here. Running and jumping are in
+ *  `motion.ts`, made from the sprite sheets. */
+export type Pose = "hang" | "stand" | "climbB";
 
 const DRAWN: Record<Pose, Array<string>> = {
   hang: HANG,
   stand: STAND,
-  runA: RUN_A,
-  runB: RUN_B,
   climbB: CLIMB_B,
 };
 
@@ -149,7 +136,7 @@ export const COATS: ReadonlyArray<Record<string, string>> = [
 ];
 
 function bake(
-  rows: Array<string>,
+  rows: ReadonlyArray<string>,
   flip: boolean,
   coat: Record<string, string> = {},
 ): HTMLCanvasElement {
@@ -392,6 +379,29 @@ export function bananaSprite(): HTMLCanvasElement {
   if (!had) {
     had = bake(BANANA, false);
     baked.set("banana", had);
+  }
+  return had;
+}
+
+/**
+ * A frame of the monkey moving — running, or in the air — facing a way.
+ *
+ * From `motion.ts`, which is made from the sprite sheets rather than
+ * written here; baked and kept the same as every other pose.
+ */
+export function motionSprite(
+  kind: "run" | "jump",
+  frame: number,
+  facingLeft: boolean,
+  coat = 0,
+): HTMLCanvasElement {
+  const set = kind === "run" ? RUN : JUMP;
+  const i = ((frame % set.length) + set.length) % set.length;
+  const key = `${kind}${i}${facingLeft ? "<" : ">"}${coat}`;
+  let had = baked.get(key);
+  if (!had) {
+    had = bake(set[i], facingLeft, COATS[coat % COATS.length]);
+    baked.set(key, had);
   }
   return had;
 }

@@ -5,5 +5,7 @@ dist
 **/dist
 site/assets
 bee/src/assets
+# Sprite sheets from an outside tool, kept exactly as it gave them.
+monkey-adventures/src/assets
 bee/docs
 package-lock.json

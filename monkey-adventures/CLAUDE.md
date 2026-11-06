@@ -74,7 +74,12 @@ src/
   game.ts        the clock, the camera, and keeping the monkey on screen
   core/input.ts  the shared thumbstick and jump button, wired to the game
   render/        the pixel screen, and the painting of the jungle
-  art/           the sprites, as letter maps
+  art/           the sprites, as letter maps — motion.ts is the run and
+                 the jump, made by convert.ts from the sheets in
+                 assets/sprites; regenerate it, do not edit it
+  assets/        the sprite sheets those come from. Never imported: the
+                 game builds to one page, and importing them would inline
+                 two and a half megabytes of PNG into it
   entities/      the monkey: running, climbing, flying, swinging
   world/         the jungle: vines, trees, dapples, home — and the other
                  two levels, which are the same jungle with a flag on:

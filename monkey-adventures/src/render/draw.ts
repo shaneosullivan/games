@@ -16,6 +16,7 @@ import {
   bananaSprite,
   crocSprite,
   monkeySprite,
+  motionSprite,
   propSprite,
   type Pose,
 } from "../art/monkey";
@@ -813,24 +814,40 @@ function drawMonkey(
   // though the world is worked out sixty times a second.
   const x = monkey.wasX + (monkey.x - monkey.wasX) * alpha;
   const y = monkey.wasY + (monkey.y - monkey.wasY) * alpha;
-  let pose: Pose = "hang";
-  if (monkey.doing === "climb") {
-    // Arms up, legs working: the hanging pose with the run's legs is near
-    // enough a climb at this size, and the alternation sells it.
-    pose = Math.floor(monkey.stride / 7) % 2 === 0 ? "hang" : "climbB";
-  } else if (monkey.doing === "ground") {
-    pose =
-      Math.abs(monkey.vx) < 6
-        ? "stand"
-        : Math.floor(monkey.stride / 9) % 2 === 0
-          ? "runA"
-          : "runB";
+  let sprite: HTMLCanvasElement;
+  if (monkey.doing === "ground" && Math.abs(monkey.vx) >= 6) {
+    // Running, from the sheet: down on all fours, a frame per few pixels
+    // of ground so the legs keep pace with it.
+    sprite = motionSprite(
+      "run",
+      Math.floor(monkey.stride / MONKEY.strideFrame),
+      monkey.facingLeft,
+    );
+  } else if (monkey.doing === "air") {
+    // Jumping and flying, from the sheet: which of the three is down to
+    // which way it is going.
+    const frame =
+      monkey.vy < MONKEY.rises ? 0 : monkey.vy > MONKEY.falls ? 2 : 1;
+    sprite = motionSprite("jump", frame, monkey.facingLeft);
+  } else {
+    let pose: Pose = "hang";
+    if (monkey.doing === "climb") {
+      // Arms up, legs working: the hanging pose with the run's legs is
+      // near enough a climb at this size, and the alternation sells it.
+      pose = Math.floor(monkey.stride / 7) % 2 === 0 ? "hang" : "climbB";
+    } else if (monkey.doing === "ground") {
+      pose = "stand";
+    }
+    sprite = monkeySprite(pose, monkey.facingLeft);
   }
-  const sprite = monkeySprite(pose, monkey.facingLeft);
+  // Stood on its feet and centred on itself, whatever size it is: the
+  // frames from the sheets are not the monkey's own thirteen by fifteen,
+  // and placing them as if they were put a running monkey's feet a few
+  // pixels into the ground.
   g.drawImage(
     sprite,
-    Math.round(x - camera - MONKEY.wide / 2),
-    Math.round(y - MONKEY.tall),
+    Math.round(x - camera - sprite.width / 2),
+    Math.round(y - sprite.height),
   );
 }
 
