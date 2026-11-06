@@ -76,9 +76,20 @@ interface Sheet {
    *  the monkey, whose face is just its face; wrong where the face letter
    *  is the whole animal, which would lose every line drawn on it. */
   clearFace?: boolean;
+  /**
+   * Fire to leave out, as how far down a frame it starts: anything
+   * flame-coloured below this share of the cell's height is not there.
+   *
+   * Below a line and not anywhere, because the flame's reds are the same
+   * reds as the inside of the monkey's open mouth — measured, #c02010 in
+   * the flame and #c02020 in the mouth — and only where they are tells
+   * them apart: the flame is at its feet, the mouth is in its head.
+   */
+  fireBelow?: number;
 }
 
-type SheetName = "run" | "jump" | "stand" | "bored" | "climb" | "elephant";
+type SheetName =
+  "run" | "jump" | "stand" | "bored" | "climb" | "elephant" | "lava";
 
 const SHEETS: Record<SheetName, Sheet> = {
   /**
@@ -138,6 +149,33 @@ const SHEETS: Record<SheetName, Sheet> = {
     },
     scaleFrom: ["climb", 0],
     keep: {climb: [12, 15, 18, 21, 24, 27, 30, 33]},
+  },
+  /**
+   * Falling in the lava: side on, eyes wide and mouth open, up off the
+   * lava with its knees tucked and both hands on its bottom.
+   *
+   * The sheet starts with the monkey standing in a little fire, and the
+   * fire is left out (\`fireBelow\`): it is a bounce in this game, and
+   * nothing in it can hurt you. The game's bounce is three quarters of a
+   * second and the sheet over two, so it keeps the leap and the clutching
+   * from the first twenty-five frames and none of the landing, which
+   * would be a landing back in the lava.
+   */
+  lava: {
+    url: "/src/assets/sprites/lava/monkey_lava.png",
+    cell: [236, 370],
+    colours: {
+      // The body, #703010.
+      f: [0x70, 0x30, 0x10],
+      // The limbs, #503010 and #503020.
+      d: [0x50, 0x30, 0x14],
+      // The face and hands, #e0b070.
+      l: [0xe0, 0xb0, 0x74],
+      e: [0x08, 0x00, 0x00],
+    },
+    scaleFrom: ["lava", 0],
+    fireBelow: 0.6,
+    keep: {lava: [0, 2, 4, 6, 9, 13, 17, 21, 25]},
   },
   /**
    * The elephant in the river, spraying.
@@ -326,7 +364,19 @@ export async function convert(): Promise<string> {
       w,
       h,
     );
-    return {w, h, data: ctx.getImageData(0, 0, w, h).data};
+    const data = ctx.getImageData(0, 0, w, h).data;
+    const fire = SHEETS[name].fireBelow;
+    if (fire !== undefined) {
+      for (let y = Math.floor(h * fire); y < h; y++) {
+        for (let x = 0; x < w; x++) {
+          const k = (y * w + x) * 4;
+          if (isFlame(data[k], data[k + 1], data[k + 2])) {
+            data[k + 3] = 0;
+          }
+        }
+      }
+    }
+    return {w, h, data};
   };
 
   const made: Record<string, Made> = {};
@@ -438,6 +488,12 @@ ${frames("elephant")
   ],
 } as const satisfies Motion & {tall: number; middle: number};
 
+/** Up off the lava, holding its bottom. Played once, across the bounce:
+ *  see \`VOLCANO.watchFor\`. */
+export const LAVA: ReadonlyArray<ReadonlyArray<string>> = [
+${frames("lava")}
+];
+
 /** Standing still, front on, the tail swaying. A loop. */
 export const STAND: Motion = ${motion("stand", "")};
 
@@ -449,6 +505,15 @@ export const BORED = {
   cartwheel: ${motion("cartwheel", "  ")},
 } as const satisfies Record<string, Motion>;
 `;
+}
+
+/**
+ * Whether a colour is fire: strongly red or orange, or yellow, with next to
+ * no blue in it. The monkey's tan is warm too but has blue in it, #e0b070,
+ * and its browns are far too dark.
+ */
+function isFlame(r: number, g: number, b: number): boolean {
+  return r >= 150 && b <= 80 && (r - g >= 60 || g >= 150);
 }
 
 async function load(url: string): Promise<ImageBitmap> {

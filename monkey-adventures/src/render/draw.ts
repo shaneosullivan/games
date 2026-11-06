@@ -19,7 +19,7 @@ import {
   motionSprite,
   propSprite,
 } from "../art/monkey";
-import {BORED, ELEPHANT, STAND} from "../art/motion";
+import {BORED, ELEPHANT, LAVA, STAND} from "../art/motion";
 import {ELEPHANT_SPRAYS} from "../world/jungle";
 import type {Party} from "./particles";
 import type {Jungle, Tree, Vine} from "../world/jungle";
@@ -820,7 +820,16 @@ function drawMonkey(
   const x = monkey.wasX + (monkey.x - monkey.wasX) * alpha;
   const y = monkey.wasY + (monkey.y - monkey.wasY) * alpha;
   let sprite: HTMLCanvasElement;
-  if (monkey.doing === "ground" && Math.abs(monkey.vx) >= 6) {
+  if (monkey.burning !== null) {
+    // Thrown up off the lava, clutching its bottom: the lava sheet, played
+    // once across the bounce, from the leap to the last of the clutching.
+    const each = VOLCANO.watchFor / LAVA.length;
+    sprite = motionSprite(
+      "lava",
+      Math.min(LAVA.length - 1, Math.floor(monkey.burning / each)),
+      monkey.facingLeft,
+    );
+  } else if (monkey.doing === "ground" && Math.abs(monkey.vx) >= 6) {
     // Running, from the sheet: down on all fours, a frame per few pixels
     // of ground so the legs keep pace with it.
     sprite = motionSprite(

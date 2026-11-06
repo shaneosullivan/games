@@ -71,6 +71,10 @@ export class Monkey {
    */
   stillFor = 0;
   bored: {what: BoredWhat; for: number} | null = null;
+  /** How long ago it landed in the lava, while it is still being thrown
+   *  out of it; null the rest of the time. Only the lava: a coconut or a
+   *  snake throws the monkey the same way, but it is not on fire. */
+  burning: number | null = null;
   private lastBored: BoredWhat | null = null;
 
   /** Whether it has reached home. */

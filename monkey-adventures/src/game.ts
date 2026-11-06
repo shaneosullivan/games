@@ -153,6 +153,9 @@ export class Game {
       // funny. A child is going to do this on purpose.
       this.sinking -= dt;
       this.monkey.wasY = this.monkey.y;
+      if (this.monkey.burning !== null) {
+        this.monkey.burning += dt;
+      }
       if (this.burnt) {
         this.monkey.vy += WORLD.gravity * dt;
         this.monkey.y += this.monkey.vy * dt;
@@ -335,6 +338,7 @@ export class Game {
     this.sinking = VOLCANO.watchFor;
     this.backTo = this.jungle.craterFrom - VOLCANO.backBy;
     this.burnt = true;
+    this.monkey.burning = 0;
     this.sound.splash();
     this.party.burst(monkey.x, monkey.y - 4, 16, PARTY.lavaColours, true);
     // Let go of properly rather than simply forgotten. Clearing the vine
@@ -614,6 +618,7 @@ export class Game {
   /** The monkey, standing at a point, facing the way it was going. */
   private putDown(at: number): void {
     const monkey = this.monkey;
+    monkey.burning = null;
     monkey.vine = null;
     monkey.tree = null;
     monkey.doing = "ground";
@@ -785,6 +790,7 @@ export class Game {
   /** Puts the monkey down in whatever level is loaded, and starts it. */
   private standAt(at: number): void {
     const monkey = this.monkey;
+    monkey.burning = null;
     monkey.vine = null;
     monkey.tree = null;
     monkey.doing = "ground";

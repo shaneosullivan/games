@@ -1,4 +1,4 @@
-import {BORED, CLIMB, ELEPHANT, JUMP, RUN, STAND} from "./motion";
+import {BORED, CLIMB, ELEPHANT, JUMP, LAVA, RUN, STAND} from "./motion";
 
 /**
  * The monkey, drawn a pixel at a time.
@@ -322,7 +322,7 @@ export function bananaSprite(): HTMLCanvasElement {
 
 /** Every set of frames that came from the sprite sheets, by name. */
 export type MotionKind =
-  "run" | "jump" | "climb" | "stand" | keyof typeof BORED;
+  "run" | "jump" | "climb" | "lava" | "stand" | keyof typeof BORED;
 
 function framesOf(kind: MotionKind): ReadonlyArray<ReadonlyArray<string>> {
   if (kind === "run") {
@@ -333,6 +333,9 @@ function framesOf(kind: MotionKind): ReadonlyArray<ReadonlyArray<string>> {
   }
   if (kind === "climb") {
     return CLIMB;
+  }
+  if (kind === "lava") {
+    return LAVA;
   }
   if (kind === "stand") {
     return STAND.frames;
