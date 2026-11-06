@@ -1,4 +1,4 @@
-import {JUMP, RUN} from "./motion";
+import {BORED, JUMP, RUN, STAND} from "./motion";
 
 /**
  * The monkey, drawn a pixel at a time.
@@ -82,25 +82,6 @@ const HANG = [
   "...dd...dd...",
 ];
 
-/** Standing on the ground, arms down. */
-const STAND = [
-  "....ddddd....",
-  "..dddfffddd..",
-  "..ddfffffdd..",
-  "...dlllllld..",
-  "...dleleld...",
-  "...dlmmmld...",
-  "....dmmmd....",
-  ".....ddd.....",
-  "...fffffff...",
-  "..ffffffffft.",
-  "..fffffffftt.",
-  "..ffffffff.t.",
-  "...fff.fff...",
-  "...dd...dd...",
-  "..ddd...ddd..",
-];
-
 /** The other half of a climb: the same reach with the legs swapped, so a
  *  monkey going up a trunk is plainly working at it. */
 const CLIMB_B = [
@@ -110,13 +91,12 @@ const CLIMB_B = [
   "...dd....d...",
 ];
 
-/** The poses that are written here. Running and jumping are in
- *  `motion.ts`, made from the sprite sheets. */
-export type Pose = "hang" | "stand" | "climbB";
+/** The poses that are written here. Standing, running, jumping and
+ *  being bored are in `motion.ts`, made from the sprite sheets. */
+export type Pose = "hang" | "climbB";
 
 const DRAWN: Record<Pose, Array<string>> = {
   hang: HANG,
-  stand: STAND,
   climbB: CLIMB_B,
 };
 
@@ -383,19 +363,37 @@ export function bananaSprite(): HTMLCanvasElement {
   return had;
 }
 
+/** Every set of frames that came from the sprite sheets, by name. */
+export type MotionKind = "run" | "jump" | "stand" | keyof typeof BORED;
+
+function framesOf(kind: MotionKind): ReadonlyArray<ReadonlyArray<string>> {
+  if (kind === "run") {
+    return RUN;
+  }
+  if (kind === "jump") {
+    return JUMP;
+  }
+  if (kind === "stand") {
+    return STAND.frames;
+  }
+  return BORED[kind].frames;
+}
+
 /**
- * A frame of the monkey moving — running, or in the air — facing a way.
+ * A frame of the monkey from the sheets — running, jumping, standing or
+ * passing the time — facing a way.
  *
  * From `motion.ts`, which is made from the sprite sheets rather than
- * written here; baked and kept the same as every other pose.
+ * written here; baked and kept the same as every other pose. The frame
+ * number wraps, so a loop can simply count up.
  */
 export function motionSprite(
-  kind: "run" | "jump",
+  kind: MotionKind,
   frame: number,
   facingLeft: boolean,
   coat = 0,
 ): HTMLCanvasElement {
-  const set = kind === "run" ? RUN : JUMP;
+  const set = framesOf(kind);
   const i = ((frame % set.length) + set.length) % set.length;
   const key = `${kind}${i}${facingLeft ? "<" : ">"}${coat}`;
   let had = baked.get(key);

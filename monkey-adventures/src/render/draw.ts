@@ -20,6 +20,7 @@ import {
   propSprite,
   type Pose,
 } from "../art/monkey";
+import {BORED, STAND} from "../art/motion";
 import type {Party} from "./particles";
 import type {Jungle, Tree, Vine} from "../world/jungle";
 import type {Monkey} from "../entities/monkey";
@@ -829,15 +830,31 @@ function drawMonkey(
     const frame =
       monkey.vy < MONKEY.rises ? 0 : monkey.vy > MONKEY.falls ? 2 : 1;
     sprite = motionSprite("jump", frame, monkey.facingLeft);
+  } else if (monkey.doing === "ground" && monkey.bored) {
+    // Passing the time: one of the bored things, played through once.
+    const one = BORED[monkey.bored.what];
+    sprite = motionSprite(
+      monkey.bored.what,
+      Math.min(
+        one.frames.length - 1,
+        Math.floor((monkey.bored.for * 1000) / one.ms),
+      ),
+      monkey.facingLeft,
+    );
+  } else if (monkey.doing === "ground") {
+    // Standing about, the tail swaying, for as long as it has been still.
+    sprite = motionSprite(
+      "stand",
+      Math.floor((monkey.stillFor * 1000) / STAND.ms),
+      monkey.facingLeft,
+    );
   } else {
-    let pose: Pose = "hang";
-    if (monkey.doing === "climb") {
-      // Arms up, legs working: the hanging pose with the run's legs is
-      // near enough a climb at this size, and the alternation sells it.
-      pose = Math.floor(monkey.stride / 7) % 2 === 0 ? "hang" : "climbB";
-    } else if (monkey.doing === "ground") {
-      pose = "stand";
-    }
+    // Arms up, legs working: the hanging pose with the run's legs is near
+    // enough a climb at this size, and the alternation sells it.
+    const pose: Pose =
+      monkey.doing === "climb" && Math.floor(monkey.stride / 7) % 2 === 1
+        ? "climbB"
+        : "hang";
     sprite = monkeySprite(pose, monkey.facingLeft);
   }
   // Stood on its feet and centred on itself, whatever size it is: the
@@ -896,15 +913,21 @@ function family(
     const shift = cheering
       ? 0
       : Math.round(Math.sin(time * HOME.fidgets + one.phase) * HOME.fidgetBy);
-    const sprite = monkeySprite(
-      cheering ? "hang" : "stand",
-      one.facingLeft,
-      one.coat,
-    );
+    // Waiting, they stand the way the monkey stands, tail and all — each
+    // a little way round the loop from the others, or the three of them
+    // sway in step like a chorus line. Cheering, they throw their arms up.
+    const sprite = cheering
+      ? monkeySprite("hang", one.facingLeft, one.coat)
+      : motionSprite(
+          "stand",
+          Math.floor((time * 1000) / STAND.ms + one.phase * 3),
+          one.facingLeft,
+          one.coat,
+        );
     g.drawImage(
       sprite,
-      x - Math.round(MONKEY.wide / 2) + shift,
-      Math.round(WORLD.floor - MONKEY.tall - hop),
+      x - Math.round(sprite.width / 2) + shift,
+      Math.round(WORLD.floor - sprite.height - hop),
     );
   }
 }

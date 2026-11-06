@@ -86,6 +86,13 @@ edge every time, however far over it got — the crossing is the thing being
 asked for, and putting it down on the far side would hand it the half it
 did not swing. The jungle behind it is never in doubt.
 
+## Keeping still
+
+Leave the monkey standing on the ground for five seconds — no stick, no
+button — and it gets bored: it waves, juggles bananas, stretches or turns a
+cartwheel. Then five more seconds of standing, then something else, never
+the same thing twice in a row. Touch anything and it is off again at once.
+
 ## Controls
 
 Two thumbs, and nothing that needs a keyboard.

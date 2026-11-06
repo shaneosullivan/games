@@ -296,6 +296,17 @@ export const MONKEY = {
   strideFrame: 6,
   rises: -70,
   falls: 70,
+  /**
+   * How long the monkey stands about before it gets bored, in seconds.
+   *
+   * Five seconds of nothing on the ground — no stick, no jump, not
+   * moving — and it does something to pass the time: waves, juggles,
+   * stretches or turns a cartwheel. Then the same five seconds of
+   * standing again before the next, which is never the one it has just
+   * done. One number for both waits, because they are the same wait:
+   * how long a child can leave the game alone before it notices.
+   */
+  boredAfter: 5,
   /** How big the sprite is, in picture pixels. */
   wide: 13,
   tall: 15,

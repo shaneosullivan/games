@@ -1,9 +1,15 @@
 import {CLIMB, MONKEY, RAIN, ROPE, SWING, WORLD} from "../config";
+// How long each bored thing lasts is a fact about its frames, so it is
+// read from them rather than written down a second time here.
+import {BORED} from "../art/motion";
 import type {Jungle, Knot, Tree, Vine} from "../world/jungle";
 
 /** What the monkey is doing. Three things, and the whole game is the moving
  *  between them. */
 export type Doing = "ground" | "air" | "swing" | "climb";
+
+/** The things a bored monkey does, by name. */
+export type BoredWhat = keyof typeof BORED;
 
 /**
  * The monkey.
@@ -55,6 +61,17 @@ export class Monkey {
   stride = 0;
   wasX = 40;
   wasY: number = WORLD.floor;
+  /**
+   * For the drawing too: how long it has stood about doing nothing, and
+   * what it is doing about that.
+   *
+   * Kept here rather than in the drawing because it is a thing the monkey
+   * does and it lasts — a juggle is four seconds long, and the drawing is
+   * asked afresh sixty times a second and remembers nothing between.
+   */
+  stillFor = 0;
+  bored: {what: BoredWhat; for: number} | null = null;
+  private lastBored: BoredWhat | null = null;
 
   /** Whether it has reached home. */
   arrived = false;
@@ -100,6 +117,7 @@ export class Monkey {
     if (this.x >= jungle.homeX) {
       this.arrived = true;
     }
+    this.passTheTime(dt, lean, up, tapped);
     if (this.doing === "climb") {
       // On a trunk it faces the way it would leap: wherever the stick says,
       // and forwards when the stick says nothing.
@@ -117,6 +135,53 @@ export class Monkey {
       if (Math.abs(this.vx) > SWING.facesOver) {
         this.facingLeft = this.vx < 0;
       }
+    }
+  }
+
+  /**
+   * Standing about, and getting bored of it.
+   *
+   * Doing nothing is being on the ground, not moving, with nobody pushing
+   * the stick or the button; any of those and it is straight back to
+   * being a monkey with somewhere to go, mid-juggle or not. After
+   * `MONKEY.boredAfter` seconds of it, one of the bored things plays
+   * through once, and the clock starts again — so it is five seconds of
+   * standing between each, and the next is never the last one twice.
+   */
+  private passTheTime(
+    dt: number,
+    lean: number,
+    up: number,
+    tapped: boolean,
+  ): void {
+    const idle =
+      this.doing === "ground" &&
+      Math.abs(this.vx) < 6 &&
+      lean === 0 &&
+      up === 0 &&
+      !tapped;
+    if (!idle) {
+      this.stillFor = 0;
+      this.bored = null;
+      return;
+    }
+    if (this.bored) {
+      this.bored.for += dt;
+      const one = BORED[this.bored.what];
+      if (this.bored.for * 1000 >= one.ms * one.frames.length) {
+        this.bored = null;
+        this.stillFor = 0;
+      }
+      return;
+    }
+    this.stillFor += dt;
+    if (this.stillFor >= MONKEY.boredAfter) {
+      const choices = (Object.keys(BORED) as Array<BoredWhat>).filter(
+        what => what !== this.lastBored,
+      );
+      const what = choices[Math.floor(Math.random() * choices.length)];
+      this.bored = {what, for: 0};
+      this.lastBored = what;
     }
   }
 
