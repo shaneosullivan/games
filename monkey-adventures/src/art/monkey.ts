@@ -1,4 +1,4 @@
-import {BORED, JUMP, RUN, STAND} from "./motion";
+import {BORED, CLIMB, JUMP, RUN, STAND} from "./motion";
 
 /**
  * The monkey, drawn a pixel at a time.
@@ -82,22 +82,13 @@ const HANG = [
   "...dd...dd...",
 ];
 
-/** The other half of a climb: the same reach with the legs swapped, so a
- *  monkey going up a trunk is plainly working at it. */
-const CLIMB_B = [
-  ...HANG.slice(0, 12),
-  "...fff.fff...",
-  "....dd..d....",
-  "...dd....d...",
-];
-
-/** The poses that are written here. Standing, running, jumping and
- *  being bored are in `motion.ts`, made from the sprite sheets. */
-export type Pose = "hang" | "climbB";
+/** The poses that are written here. Standing, running, jumping,
+ *  climbing and being bored are in `motion.ts`, made from the sprite
+ *  sheets. */
+export type Pose = "hang";
 
 const DRAWN: Record<Pose, Array<string>> = {
   hang: HANG,
-  climbB: CLIMB_B,
 };
 
 /**
@@ -364,7 +355,8 @@ export function bananaSprite(): HTMLCanvasElement {
 }
 
 /** Every set of frames that came from the sprite sheets, by name. */
-export type MotionKind = "run" | "jump" | "stand" | keyof typeof BORED;
+export type MotionKind =
+  "run" | "jump" | "climb" | "stand" | keyof typeof BORED;
 
 function framesOf(kind: MotionKind): ReadonlyArray<ReadonlyArray<string>> {
   if (kind === "run") {
@@ -372,6 +364,9 @@ function framesOf(kind: MotionKind): ReadonlyArray<ReadonlyArray<string>> {
   }
   if (kind === "jump") {
     return JUMP;
+  }
+  if (kind === "climb") {
+    return CLIMB;
   }
   if (kind === "stand") {
     return STAND.frames;

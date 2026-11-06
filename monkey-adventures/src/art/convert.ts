@@ -61,7 +61,7 @@ interface Sheet {
   keep: Record<string, Array<number>>;
 }
 
-type SheetName = "run" | "jump" | "stand" | "bored";
+type SheetName = "run" | "jump" | "stand" | "bored" | "climb";
 
 const SHEETS: Record<SheetName, Sheet> = {
   /**
@@ -100,6 +100,27 @@ const SHEETS: Record<SheetName, Sheet> = {
     },
     scaleFrom: ["jump", 0],
     keep: {jump: [9, 13, 20]},
+  },
+  /**
+   * Climbing, side on: it starts from standing and settles into a climb,
+   * reaching up an arm at a time, that comes round again every
+   * twenty-two frames — measured, frames 33 to 35 are frame 12 again —
+   * so every third from 12 to 33 is one whole climb that loops.
+   */
+  climb: {
+    url: "/src/assets/sprites/climb/monkey_climb.png",
+    cell: [232, 288],
+    colours: {
+      // The body, #783018 and #783c18.
+      f: [0x72, 0x3c, 0x18],
+      // The limbs, #543018 and #483018.
+      d: [0x52, 0x2e, 0x14],
+      // The face and hands, #e4a878.
+      l: [0xe4, 0xac, 0x78],
+      e: [0x08, 0x00, 0x00],
+    },
+    scaleFrom: ["climb", 0],
+    keep: {climb: [12, 15, 18, 21, 24, 27, 30, 33]},
   },
   /**
    * Standing still, front on, with the tail swaying: one loop the whole
@@ -323,6 +344,12 @@ ${frames("run")}
  *  which way the monkey is going, not played. */
 export const JUMP: ReadonlyArray<ReadonlyArray<string>> = [
 ${frames("jump")}
+];
+
+/** Climbing a trunk, side on, an arm at a time. A loop, played by how far
+ *  it has climbed, not by time: see \`MONKEY.climbFrame\`. */
+export const CLIMB: ReadonlyArray<ReadonlyArray<string>> = [
+${frames("climb")}
 ];
 
 /** Standing still, front on, the tail swaying. A loop. */

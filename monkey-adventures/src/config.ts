@@ -294,6 +294,10 @@ export const MONKEY = {
    * catches a vine, and is the right one to be in.
    */
   strideFrame: 6,
+  /** And on a trunk, a climbing frame for every four pixels climbed: eight
+   *  to a climb makes one every thirty-two, under two a second at the
+   *  climbing speed, which reads as climbing and not as scrabbling. */
+  climbFrame: 4,
   rises: -70,
   falls: 70,
   /**

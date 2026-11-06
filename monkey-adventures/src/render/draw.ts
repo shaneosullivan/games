@@ -18,7 +18,6 @@ import {
   monkeySprite,
   motionSprite,
   propSprite,
-  type Pose,
 } from "../art/monkey";
 import {BORED, STAND} from "../art/motion";
 import type {Party} from "./particles";
@@ -849,14 +848,18 @@ function drawMonkey(
       Math.floor((monkey.stillFor * 1000) / STAND.ms),
       monkey.facingLeft,
     );
+  } else if (monkey.doing === "climb") {
+    // Up a trunk, from the sheet: an arm at a time, a frame for every few
+    // pixels climbed, so the arms keep pace with the climbing and stop
+    // when it does.
+    sprite = motionSprite(
+      "climb",
+      Math.floor(monkey.stride / MONKEY.climbFrame),
+      monkey.facingLeft,
+    );
   } else {
-    // Arms up, legs working: the hanging pose with the run's legs is near
-    // enough a climb at this size, and the alternation sells it.
-    const pose: Pose =
-      monkey.doing === "climb" && Math.floor(monkey.stride / 7) % 2 === 1
-        ? "climbB"
-        : "hang";
-    sprite = monkeySprite(pose, monkey.facingLeft);
+    // Hanging from a vine: the hand-drawn pose, both hands on the rope.
+    sprite = monkeySprite("hang", monkey.facingLeft);
     perPixel = 1;
   }
   standOnFeet(g, sprite, x - camera, y, perPixel);

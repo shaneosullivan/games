@@ -75,7 +75,8 @@ src/
   core/input.ts  the shared thumbstick and jump button, wired to the game
   render/        the pixel screen, and the painting of the jungle
   art/           the sprites, as letter maps — motion.ts is standing,
-                 running, jumping and the four bored things, made by
+                 running, jumping, climbing and the four bored things,
+                 made by
                  convert.ts from the sheets in assets/sprites;
                  regenerate it, do not edit it
   assets/        the sprite sheets those come from. Never imported: the
