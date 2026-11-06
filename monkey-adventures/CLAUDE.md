@@ -75,13 +75,16 @@ src/
   core/input.ts  the shared thumbstick and jump button, wired to the game
   render/        the pixel screen, and the painting of the jungle
   art/           the sprites, as letter maps — motion.ts is standing,
-                 running, jumping, climbing and the four bored things,
-                 made by
+                 running, jumping, climbing, the four bored things and
+                 the river's elephant, made by
                  convert.ts from the sheets in assets/sprites;
                  regenerate it, do not edit it
   assets/        the sprite sheets those come from. Never imported: the
                  game builds to one page, and importing them would inline
                  six megabytes of PNG into it
+  audio/         the one recorded sound, the elephant's spray, trimmed and
+                 squeezed to AAC (see Sound.spray). Imported, and copied
+                 beside index.html with a hash rather than inlined
   entities/      the monkey: running, climbing, flying, swinging
   world/         the jungle: vines, trees, dapples, home — and the other
                  two levels, which are the same jungle with a flag on:

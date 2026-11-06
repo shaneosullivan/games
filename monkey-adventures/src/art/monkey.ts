@@ -1,4 +1,4 @@
-import {BORED, CLIMB, JUMP, RUN, STAND} from "./motion";
+import {BORED, CLIMB, ELEPHANT, JUMP, RUN, STAND} from "./motion";
 
 /**
  * The monkey, drawn a pixel at a time.
@@ -37,11 +37,14 @@ const PALETTE: Record<string, string> = {
   c: "#d6453c",
   C: "#a32e28",
   s: "#f1e0c0",
-  /** An elephant: the grey-green of the reference rather than a blue
-   *  grey, a darker underside, and the white of a tusk. */
-  p: "#68786b",
-  P: "#4a5950",
-  q: "#e8efe6",
+  /** An elephant: the blue-grey of its sprite sheet, the shade on it, and
+   *  the white of its eye and its teeth. */
+  p: "#9898a8",
+  P: "#747484",
+  q: "#e8e6ee",
+  /** The water out of an elephant's trunk: the spray, and deeper in it. */
+  a: "#40b4ff",
+  A: "#0890e0",
   /** A snake: three greens and a black eye, from the reference. */
   k: "#2faa3f",
   K: "#1d7a2c",
@@ -266,35 +269,6 @@ const HEART_GONE = [
 ];
 
 /**
- * An elephant, side on, standing in the river.
- *
- * Drawn from the reference: one heavy block of a body with the back
- * stepping up to the head, the ear outlined on the head rather than
- * shaded, a dark eye, a white tusk and a fat trunk down the front. Legs
- * and all, even though the river covers the bottom third of it — an
- * elephant drawn from the knees up looks like an elephant with no legs
- * the moment the water moves.
- *
- * Facing right, which is the way the jungle goes.
- */
-const ELEPHANT = [
-  ".........eeeee......",
-  "......eeepppppee....",
-  "...eeeppppppppppe...",
-  "..eppppppeppppppppe.",
-  ".eppppppppepppppppee",
-  "eppppppppepppppppppe",
-  "eppppppppeppppeppqqe",
-  "eppppppppeepppppeppe",
-  "epppppppppppppppeppe",
-  "ePPPPPPPPPPPPPPeeppe",
-  ".eppeeeeeeppppe.eppe",
-  ".eppe....eppppe..ppe",
-  ".eppe....eppppe.eppe",
-  ".eeee....eeeeee.eee.",
-];
-
-/**
  * A snake's head, at the bottom end of the thing that is not a vine.
  *
  * From the reference, in its greens rather than its yellows: a blunt
@@ -316,14 +290,7 @@ const SNAKE_HEAD = [
 
 /** The coconut, the mushroom and the hearts, baked like everything else. */
 export function propSprite(
-  which:
-    | "coconut"
-    | "splat"
-    | "mushroom"
-    | "heart"
-    | "heartGone"
-    | "elephant"
-    | "snake",
+  which: "coconut" | "splat" | "mushroom" | "heart" | "heartGone" | "snake",
   facingLeft = false,
 ): HTMLCanvasElement {
   const key = `${which}${facingLeft ? "<" : ">"}`;
@@ -335,7 +302,6 @@ export function propSprite(
       mushroom: MUSHROOM_CAP,
       heart: HEART,
       heartGone: HEART_GONE,
-      elephant: ELEPHANT,
       snake: SNAKE_HEAD,
     };
     had = bake(maps[which], facingLeft);
@@ -394,6 +360,26 @@ export function motionSprite(
   let had = baked.get(key);
   if (!had) {
     had = bake(set[i], facingLeft, COATS[coat % COATS.length]);
+    baked.set(key, had);
+  }
+  return had;
+}
+
+/**
+ * The elephant, standing or a frame into its spray, facing a way.
+ *
+ * From the sheet by way of \`motion.ts\`, at \`MONKEY.detail\` letters to
+ * the pixel like the monkey; frame 0 is standing.
+ */
+export function elephantSprite(
+  frame: number,
+  facingLeft: boolean,
+): HTMLCanvasElement {
+  const i = Math.max(0, Math.min(ELEPHANT.frames.length - 1, frame));
+  const key = `elephant${i}${facingLeft ? "<" : ">"}`;
+  let had = baked.get(key);
+  if (!had) {
+    had = bake(ELEPHANT.frames[i], facingLeft);
     baked.set(key, had);
   }
   return had;

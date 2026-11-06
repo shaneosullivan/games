@@ -59,9 +59,26 @@ interface Sheet {
   scaleFrom: [SheetName, number];
   /** What is kept, by name, as frame numbers in the order they play. */
   keep: Record<string, Array<number>>;
+  /** How tall the \`scaleFrom\` frame's subject stands in the game, in
+   *  picture pixels: fifteen for the monkey, unless it says otherwise. */
+  tall?: number;
+  /** True if the sheet already faces right, the way every drawing in the
+   *  game does, and so must not be mirrored like the monkey's. */
+  facesRight?: boolean;
+  /** A frame whose feet are where every frame's box stops at the bottom —
+   *  for a sheet with things falling past its feet, which would otherwise
+   *  make the bottom of the box the bottom of a drop, not the ground. */
+  feetOf?: number;
+  /** Which letter is the face the eyes are found in: \`l\` for the
+   *  monkey's tan, unless it says otherwise. */
+  face?: string;
+  /** Whether the face is cleared of everything dark but the eyes. Right for
+   *  the monkey, whose face is just its face; wrong where the face letter
+   *  is the whole animal, which would lose every line drawn on it. */
+  clearFace?: boolean;
 }
 
-type SheetName = "run" | "jump" | "stand" | "bored" | "climb";
+type SheetName = "run" | "jump" | "stand" | "bored" | "climb" | "elephant";
 
 const SHEETS: Record<SheetName, Sheet> = {
   /**
@@ -123,6 +140,44 @@ const SHEETS: Record<SheetName, Sheet> = {
     keep: {climb: [12, 15, 18, 21, 24, 27, 30, 33]},
   },
   /**
+   * The elephant in the river, spraying.
+   *
+   * Frame 0 is the elephant standing, trunk down, and is what it does
+   * while it waits. The sheet then raises the trunk, sprays a fountain
+   * and lets it rain down round it — but its sound is silent for its first
+   * 850 milliseconds, frame 11 of the sheet, and that is where the water
+   * starts: the trunk-raising is the wind-up. In the game the spray is
+   * the monkey being thrown, and a fountain that arrived a second after
+   * the monkey had gone would be a fountain about nothing, so the spray
+   * starts at frame 10, trunk already up, and the sound at its 850.
+   *
+   * Every other frame from there, which is plenty for falling water at
+   * this size. Twenty pixels wide, as the old one was, so sixteen tall.
+   */
+  elephant: {
+    url: "/src/assets/sprites/elephant/elephant_spray.png",
+    cell: [470, 504],
+    colours: {
+      // The body, #a0a0b0 and #9090a0, and the pinkish grey of its ear.
+      p: [0x98, 0x98, 0xa8],
+      // The shading, #808090 and #707080.
+      P: [0x74, 0x74, 0x84],
+      // Its eye, its teeth, the light on it.
+      q: [0xe0, 0xdc, 0xe4],
+      e: [0x10, 0x10, 0x14],
+      // The water: #40b0ff and #50c0ff in the spray, #0090e0 deeper in.
+      a: [0x40, 0xb4, 0xff],
+      A: [0x08, 0x90, 0xe0],
+    },
+    scaleFrom: ["elephant", 0],
+    tall: 16,
+    facesRight: true,
+    feetOf: 0,
+    face: "p",
+    clearFace: false,
+    keep: {elephant: [0, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32, 34]},
+  },
+  /**
    * Standing still, front on, with the tail swaying: one loop the whole
    * sheet long, of which every fourth frame is plenty at this size.
    */
@@ -174,10 +229,6 @@ const SHEETS: Record<SheetName, Sheet> = {
     },
   },
 };
-
-/** How tall the standing monkey is, in letters: the game's fifteen
- *  pixels, at `MONKEY.detail` letters to the pixel. */
-const TALL = 15 * MONKEY.detail;
 
 /** Under this much opaque in a block, the block is empty. */
 const COVERS = 0.3;
@@ -242,6 +293,10 @@ interface Made {
   frames: Array<Array<string>>;
   /** How long each kept frame shows for, in milliseconds. */
   ms: number;
+  /** The first frame's body: how tall, and where its middle is across, in
+   *  letters. */
+  tall: number;
+  middle: number;
 }
 
 /** The whole of `motion.ts`, as TypeScript source. */
@@ -279,7 +334,8 @@ export async function convert(): Promise<string> {
     const sheet = SHEETS[name];
     const [from, frame] = sheet.scaleFrom;
     const standing = boxOf(cellOf(from, frame));
-    const scale = (standing.y1 - standing.y0 + 1) / TALL;
+    const scale =
+      (standing.y1 - standing.y0 + 1) / ((sheet.tall ?? 15) * MONKEY.detail);
     for (const [set, list] of Object.entries(sheet.keep)) {
       // One box for each set rather than one a frame: cropped one by one,
       // the monkey slides about as its tail swings, because the box does.
@@ -291,14 +347,22 @@ export async function convert(): Promise<string> {
           x1: Math.max(a.x1, b.x1),
           y1: Math.max(a.y1, b.y1),
         }));
+      if (sheet.feetOf !== undefined) {
+        box.y1 = boxOf(cellOf(name, sheet.feetOf)).y1;
+      }
       // Kept frames stand in for the ones between them, so each shows for
-      // as long as the stretch of the sheet it stands for.
-      const span = list[list.length - 1] - list[0] + 1;
+      // as long as the stretch of the sheet it stands for — counted from
+      // the second kept frame where the first is a pose of its own.
+      const playing = sheet.feetOf === list[0] ? list.slice(1) : list;
+      const span = playing[playing.length - 1] - playing[0] + 1;
+      // Where the standing frame's body is in the box, for a game that has
+      // to put a back exactly where it says the back is.
+      const body = boxOf(cellOf(name, list[0]));
       made[set] = {
-        frames: list.map(i =>
-          toMap(cellOf(name, i), box, scale, sheet.colours),
-        ),
-        ms: Math.round((durations[name] * span) / list.length),
+        frames: list.map(i => toMap(cellOf(name, i), box, scale, sheet)),
+        ms: Math.round((durations[name] * span) / playing.length),
+        tall: Math.round((body.y1 - body.y0 + 1) / scale),
+        middle: Math.round(((body.x0 + body.x1) / 2 - box.x0) / scale),
       };
     }
   }
@@ -351,6 +415,28 @@ ${frames("jump")}
 export const CLIMB: ReadonlyArray<ReadonlyArray<string>> = [
 ${frames("climb")}
 ];
+
+/**
+ * The elephant in the river: standing, and spraying.
+ *
+ * Frame 0 is it standing, which is what it does until somebody lands on
+ * it; the rest are the spray, played once from the top. Its feet are on
+ * the bottom row. \`tall\` is how tall the standing elephant is and
+ * \`middle\` where its body is across, both in letters, so the game can
+ * put its back exactly where it says the back is — the box is far wider
+ * and taller than the elephant, for the water.
+ */
+export const ELEPHANT = {
+  ms: ${made.elephant.ms},
+  tall: ${made.elephant.tall},
+  middle: ${made.elephant.middle},
+  frames: [
+${frames("elephant")
+  .split("\n")
+  .map(line => "  " + line)
+  .join("\n")}
+  ],
+} as const satisfies Motion & {tall: number; middle: number};
 
 /** Standing still, front on, the tail swaying. A loop. */
 export const STAND: Motion = ${motion("stand", "")};
@@ -410,9 +496,11 @@ function toMap(
   cell: Cell,
   box: Box,
   scale: number,
-  colours: Partial<Record<string, Rgb>>,
+  sheet: Sheet,
 ): Array<string> {
   const {w, data} = cell;
+  const colours = sheet.colours;
+  const faceLetter = sheet.face ?? "l";
   const wide = Math.ceil((box.x1 - box.x0 + 1) / scale);
   const tall = Math.ceil((box.y1 - box.y0 + 1) / scale);
   const top = box.y1 + 1 - tall * scale;
@@ -457,18 +545,23 @@ function toMap(
       const light = seen - (counts.e ?? 0);
       row.push({
         letter: Object.entries(votes).sort((a, b) => b[1] - a[1])[0][0],
-        face: light > 0 ? (counts.l ?? 0) / light : 0,
+        face: light > 0 ? (counts[faceLetter] ?? 0) / light : 0,
       });
     }
     grid.push(row);
   }
-  openTheEyes(grid, eyesOf(cell, colours, scale), box.x0, top, scale);
-  return grid.map(row =>
-    row
-      .map(cell => cell.letter)
-      .reverse()
-      .join(""),
+  openTheEyes(
+    grid,
+    eyesOf(cell, colours, scale, faceLetter),
+    box.x0,
+    top,
+    scale,
+    sheet.clearFace ?? true,
   );
+  return grid.map(row => {
+    const letters = row.map(one => one.letter);
+    return (sheet.facesRight ? letters : letters.reverse()).join("");
+  });
 }
 
 /** One letter of a frame, before it is written out. */
@@ -488,13 +581,15 @@ function eyesOf(
   {w, h, data}: Cell,
   colours: Partial<Record<string, Rgb>>,
   scale: number,
+  faceLetter: string,
 ): Array<[number, number]> {
   const dark = (i: number): boolean =>
     data[i * 4 + 3] >= 100 &&
     nearest(data[i * 4], data[i * 4 + 1], data[i * 4 + 2], colours) === "e";
   const isFace = (i: number): boolean =>
     data[i * 4 + 3] >= 100 &&
-    nearest(data[i * 4], data[i * 4 + 1], data[i * 4 + 2], colours) === "l";
+    nearest(data[i * 4], data[i * 4 + 1], data[i * 4 + 2], colours) ===
+      faceLetter;
   const seen = new Uint8Array(w * h);
   const eyes: Array<[number, number]> = [];
   for (let start = 0; start < w * h; start++) {
@@ -603,10 +698,11 @@ function openTheEyes(
   left: number,
   top: number,
   scale: number,
+  clear: boolean,
 ): void {
   for (const row of grid) {
     for (const letter of row) {
-      if (letter.letter === "e" && letter.face >= FACE) {
+      if (clear && letter.letter === "e" && letter.face >= FACE) {
         letter.letter = "l";
       }
     }

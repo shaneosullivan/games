@@ -19,7 +19,7 @@ import {paint} from "./render/draw";
 import {Party} from "./render/particles";
 import {Screen} from "./render/screen";
 import {Hud} from "./ui/hud";
-import {Jungle} from "./world/jungle";
+import {ELEPHANT_SPRAYS, Jungle} from "./world/jungle";
 
 /**
  * The game: a jungle, a monkey, and the clock that drives them.
@@ -456,8 +456,8 @@ export class Game {
         monkey.vx > 6 ? 1 : monkey.vx < -6 ? -1 : monkey.facingLeft ? -1 : 1;
       monkey.vx = way * Math.max(Math.abs(monkey.vx), RIVER.throws);
       monkey.doing = "air";
-      one.spurt = RIVER.spurts;
-      this.sound.splash();
+      one.spurt = ELEPHANT_SPRAYS;
+      this.sound.spray();
       this.party.burst(one.x, back - 2, 10, PARTY.splashColours, true);
       return;
     }

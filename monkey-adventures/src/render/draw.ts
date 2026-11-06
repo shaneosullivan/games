@@ -7,7 +7,6 @@ import {
   MUSHROOM,
   PAINT,
   RAIN,
-  RIVER,
   SCREEN,
   VOLCANO,
   WORLD,
@@ -15,11 +14,13 @@ import {
 import {
   bananaSprite,
   crocSprite,
+  elephantSprite,
   monkeySprite,
   motionSprite,
   propSprite,
 } from "../art/monkey";
-import {BORED, STAND} from "../art/motion";
+import {BORED, ELEPHANT, STAND} from "../art/motion";
+import {ELEPHANT_SPRAYS} from "../world/jungle";
 import type {Party} from "./particles";
 import type {Jungle, Tree, Vine} from "../world/jungle";
 import type {Monkey} from "../entities/monkey";
@@ -543,13 +544,18 @@ function spurt(
 }
 
 /**
- * The elephants standing in the river, and the water out of their trunks.
+ * The elephants standing in the river, and spraying.
  *
- * Drawn after the water and not before it, so they are standing in the
- * river rather than on it: the sprite is the top half of an elephant and
- * the river covers the rest. The spout is drawn in code because it moves
- * — a column out of the trunk that rises and falls away, which is the
- * thing that just threw the monkey and should look like it.
+ * From the sprite sheet: standing on its first frame, and once somebody
+ * has landed on it, the spray played through once from the top — the
+ * fountain and the drops raining round it are the sheet's own, not drawn
+ * here any more. Drawn after the water, so its feet are in the river.
+ *
+ * Placed by the body rather than by the box: the box is far wider and
+ * taller than the elephant, to hold the fountain, so the standing
+ * elephant's middle goes on \`one.x\` and its back on \`backOf\`, which is
+ * where the monkey lands. A box placed by its own middle put the back
+ * somewhere the game did not think it was.
  */
 function elephants(
   g: CanvasRenderingContext2D,
@@ -558,31 +564,30 @@ function elephants(
   w: number,
 ): void {
   for (const one of jungle.elephants) {
-    const x = Math.round(one.x - camera);
-    if (x < -30 || x > w + 30) {
+    const x = one.x - camera;
+    if (x < -60 || x > w + 60) {
       continue;
     }
-    const sprite = propSprite("elephant", one.facingLeft);
-    const back = jungle.backOf(one);
-    // Hung from its back and not from its feet: the back is the thing the
-    // monkey lands on, and `backOf` is where the game says it is. The
-    // rest of the animal goes down into the water from there.
-    g.drawImage(sprite, x - Math.round(sprite.width / 2), back - 1);
-    if (one.spurt <= 0) {
-      continue;
-    }
-    // Up out of the trunk and over: full height as it goes off, falling
-    // away over the rest of the second.
-    const gone = 1 - one.spurt / RIVER.spurts;
-    const tall = Math.round(RIVER.spouts * Math.sin(one.spurt * 3.2));
-    // The trunk is at the front, which is whichever way it is looking.
-    const nose = x + (one.facingLeft ? -8 : 8);
-    g.fillStyle = PAINT.waterLight;
-    for (let up = 0; up < tall; up++) {
-      // Leaning over as it rises, the way water does once it is out.
-      const lean = Math.round((up / 6) * (one.facingLeft ? -1 : 1) * gone);
-      g.fillRect(nose + lean, back - up - 1, up > tall - 4 ? 2 : 1, 1);
-    }
+    const frame =
+      one.spurt > 0
+        ? 1 + Math.floor(((ELEPHANT_SPRAYS - one.spurt) * 1000) / ELEPHANT.ms)
+        : 0;
+    const sprite = elephantSprite(frame, one.facingLeft);
+    const k = MONKEY.detail;
+    // Its middle across, measured from whichever side it is drawn from.
+    const middle = one.facingLeft
+      ? sprite.width - ELEPHANT.middle
+      : ELEPHANT.middle;
+    const feet = jungle.backOf(one) + ELEPHANT.tall / k;
+    const snap = (v: number): number =>
+      Math.round(v * SCREEN.fine) / SCREEN.fine;
+    g.drawImage(
+      sprite,
+      snap(x - middle / k),
+      snap(feet - sprite.height / k),
+      sprite.width / k,
+      sprite.height / k,
+    );
   }
 }
 

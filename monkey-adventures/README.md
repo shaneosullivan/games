@@ -63,8 +63,9 @@ again with both of them back.
 ## The river level
 
 The third course, and the gentlest. A wide river with **elephants** standing
-in it as stepping stones: land on a back and the trunk spouts and throws
-you on, up and along, so the crossing carries you rather than testing you.
+in it as stepping stones: land on a back and the elephant sprays a fountain
+from its trunk — with the sound of it — and throws you on, up and along, so
+the crossing carries you rather than testing you.
 They stand seventy-eight pixels apart and the throw is good for ninety —
 there is no steering in the air in this game, so the elephant does the
 steering.

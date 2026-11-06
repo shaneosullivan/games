@@ -1,3 +1,5 @@
+// The spray lasts as long as its frames do, so it is read from them.
+import {ELEPHANT} from "../art/motion";
 import {
   CLIMB,
   COCONUT,
@@ -134,6 +136,13 @@ export interface Coconut {
 }
 
 /**
+ * How long an elephant sprays for once something lands on it, in seconds:
+ * every frame of its spray in the sheet, which is where the time is.
+ */
+export const ELEPHANT_SPRAYS =
+  ((ELEPHANT.frames.length - 1) * ELEPHANT.ms) / 1000;
+
+/**
  * An elephant, standing in the river to be jumped on.
  *
  * Its back is above the water and the rest of it is in: a stepping stone
@@ -142,7 +151,7 @@ export interface Coconut {
  */
 export interface Elephant {
   x: number;
-  /** Seconds of spouting left, and the bob that keeps it alive while it
+  /** Seconds of spraying left, and the bob that keeps it alive while it
    *  waits. */
   spurt: number;
   phase: number;

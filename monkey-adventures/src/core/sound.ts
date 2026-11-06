@@ -1,10 +1,14 @@
+import sprayUrl from "../audio/elephant_spray.m4a";
+
 /**
- * The noises, made rather than loaded.
+ * The noises, nearly all made rather than loaded.
  *
- * Nothing here is a file. A banana is two short notes of a triangle wave and
- * a splash is filtered noise, which is a few lines each and costs the
- * download nothing — the same argument the other games in this repo make for
- * building their models in code instead of shipping them.
+ * A banana is two short notes of a triangle wave and a splash is filtered
+ * noise, which is a few lines each and costs the download nothing — the
+ * same argument the other games in this repo make for building their
+ * models in code instead of shipping them. The one exception is the
+ * elephant's spray, which came as a recording and is better than anything
+ * two oscillators would make of water through a trunk; see \`spray\`.
  *
  * Everything is built on the first touch and not before. A browser will not
  * let a page make a noise until somebody has touched it, and a game that
@@ -20,6 +24,8 @@ export class Sound {
    *  anything to play it with. */
   private raining: GainNode | null = null;
   private wantsRain = false;
+  /** The spray, decoded, once it has been fetched. */
+  private sprayed: AudioBuffer | null = null;
 
   /** Called from the first touch or key, when a browser will allow it. */
   wake(): void {
@@ -45,6 +51,52 @@ export class Sound {
       // Asked for while the page was still silent; now it can happen.
       this.rain(true);
     }
+    void this.loadTheSpray(this.ctx);
+  }
+
+  /** Fetches and decodes the spray, once. A spray before it has arrived is
+   *  a silent spray, which is better than a spray that waits for it. */
+  private async loadTheSpray(ctx: AudioContext): Promise<void> {
+    try {
+      const bytes = await (await fetch(sprayUrl)).arrayBuffer();
+      this.sprayed = await ctx.decodeAudioData(bytes);
+    } catch {
+      // Offline, or a browser that will not decode it: the elephant
+      // sprays in silence and nothing else is any different.
+    }
+  }
+
+  /**
+   * An elephant spraying.
+   *
+   * The recording that came with the elephant's sheet, made from
+   * \`assets/sprites/elephant/elephant_spray.wav\`. That file is
+   * half a megabyte of stereo for under three seconds, and the first 850
+   * milliseconds of it are silence — the sheet raising its trunk. In the
+   * game the spray starts the moment the monkey lands, so the silence is
+   * cut off the file itself and what is left is mixed to one channel and
+   * squeezed to AAC, which an iPad plays without help:
+   *
+   *   (trim the first 0.8 s, mix to mono)
+   *   afconvert -f m4af -d aac -b 48000 -c 1 trimmed.wav elephant_spray.m4a
+   *
+   * Sixteen kilobytes, against the five hundred and thirty-six it came as.
+   * It peaks at 0.16 of full scale, so it plays at three times to sit level
+   * with the splash and the munch rather than under them.
+   */
+  spray(): void {
+    const ctx = this.ctx;
+    const out = this.out;
+    if (!ctx || !out || this.muted || !this.sprayed) {
+      return;
+    }
+    const source = ctx.createBufferSource();
+    source.buffer = this.sprayed;
+    const gain = ctx.createGain();
+    gain.gain.value = 3;
+    source.connect(gain);
+    gain.connect(out);
+    source.start();
   }
 
   setMuted(muted: boolean): void {

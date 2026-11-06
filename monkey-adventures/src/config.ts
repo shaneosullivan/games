@@ -929,10 +929,6 @@ export const RIVER = {
    * to the next elephant, with the air drag taken off.
    */
   throws: 84,
-  /** How long the trunk spouts for after it throws you, in seconds. */
-  spurts: 0.8,
-  /** How high the water goes out of the trunk, in pixels. */
-  spouts: 26,
   /** How much of an elephant counts as its back, either side of the
    *  middle, in pixels. Generous: a near miss should be a landing. */
   lands: 13,
