@@ -815,7 +815,6 @@ function drawMonkey(
   const x = monkey.wasX + (monkey.x - monkey.wasX) * alpha;
   const y = monkey.wasY + (monkey.y - monkey.wasY) * alpha;
   let sprite: HTMLCanvasElement;
-  let perPixel: number = MONKEY.detail;
   if (monkey.doing === "ground" && Math.abs(monkey.vx) >= 6) {
     // Running, from the sheet: down on all fours, a frame per few pixels
     // of ground so the legs keep pace with it.
@@ -848,25 +847,20 @@ function drawMonkey(
       Math.floor((monkey.stillFor * 1000) / STAND.ms),
       monkey.facingLeft,
     );
-  } else if (
-    monkey.doing === "climb" ||
-    (monkey.doing === "swing" && monkey.climbingRope)
-  ) {
-    // Up a trunk or up a rope, from the sheet: an arm at a time, a frame
-    // for every few pixels climbed, so the arms keep pace with the
-    // climbing and stop when it does. The same climb in both places,
-    // because it is the same thing to do.
+  } else {
+    // On a trunk or on a rope — all that is left of what a monkey can be
+    // doing — from the climbing sheet: an arm at a time, a frame for every
+    // few pixels climbed, so the arms keep pace with the climbing. Stop
+    // climbing and the frame stops with it, since the count only moves
+    // while the monkey does, so a monkey just hanging, or swinging, hangs
+    // in the position it was in when it stopped.
     sprite = motionSprite(
       "climb",
       Math.floor(monkey.stride / MONKEY.climbFrame),
       monkey.facingLeft,
     );
-  } else {
-    // Hanging from a vine: the hand-drawn pose, both hands on the rope.
-    sprite = monkeySprite("hang", monkey.facingLeft);
-    perPixel = 1;
   }
-  standOnFeet(g, sprite, x - camera, y, perPixel);
+  standOnFeet(g, sprite, x - camera, y, MONKEY.detail);
 }
 
 /**

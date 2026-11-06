@@ -71,9 +71,6 @@ export class Monkey {
    */
   stillFor = 0;
   bored: {what: BoredWhat; for: number} | null = null;
-  /** True on a step when the monkey went up or down the rope it is
-   *  hanging from — the drawing climbs it then, and hangs otherwise. */
-  climbingRope = false;
   private lastBored: BoredWhat | null = null;
 
   /** Whether it has reached home. */
@@ -341,7 +338,6 @@ export class Monkey {
     // thumb is never level, so climbing on any upward component at all
     // would take the monkey up the vine all the while it was being swung.
     const climbing = Math.abs(up) > Math.abs(lean) * SWING.climbsOver;
-    this.climbingRope = false;
     if (climbing) {
       this.climbTheVine(vine, up, dt);
     }
@@ -405,11 +401,9 @@ export class Monkey {
     );
     // Counted the way a trunk is counted, so the climbing on a rope and
     // the climbing on a tree are the same climbing at the same pace — and
-    // only while it is actually going somewhere: held against the top or
-    // the bottom of the rope, it is hanging, not climbing.
-    const moved = Math.abs(this.radius - was);
-    this.stride += moved;
-    this.climbingRope = moved > 0;
+    // only by how far it actually went, so held against the top or the
+    // bottom of the rope it stays in the position it stopped in.
+    this.stride += Math.abs(this.radius - was);
     this.grip = this.radius / vine.long;
     const held = this.knot;
     const now = vine.knots[this.gripAt(vine)];
