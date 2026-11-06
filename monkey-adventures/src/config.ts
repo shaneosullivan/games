@@ -307,6 +307,18 @@ export const MONKEY = {
    * how long a child can leave the game alone before it notices.
    */
   boredAfter: 5,
+  /**
+   * How many letters of the sprite sheets' frames go to one picture pixel.
+   *
+   * Two: the frames in \`art/motion.ts\` are thirty letters tall for a
+   * monkey fifteen pixels tall, each letter drawn half a pixel across,
+   * so the monkey is the same size it always was with four times the
+   * pixels in it. That is what the canvas's second pixel is for — see
+   * \`SCREEN.fine\` — and it is the only thing besides the vines that uses
+   * it. It must be \`SCREEN.fine\`: any finer and the letters fall between
+   * the canvas's pixels and blur.
+   */
+  detail: SCREEN.fine,
   /** How big the sprite is, in picture pixels. */
   wide: 13,
   tall: 15,

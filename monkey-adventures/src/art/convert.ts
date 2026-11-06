@@ -1,11 +1,14 @@
+import {MONKEY} from "../config";
+
 /**
  * Turns the sprite sheets in `assets/sprites` into the letter maps in
  * `motion.ts`.
  *
  * The sheets are smooth cartoon art, a monkey a few hundred pixels tall,
- * and this game's monkey is fifteen. Shrunk the ordinary way it comes out
- * as a brown smudge — the reason the rest of the art here is written as
- * letters. So each frame is cut into blocks the size of one picture pixel,
+ * and this game's monkey is fifteen pixels, drawn at two letters to the
+ * pixel. Shrunk the ordinary way it comes out as a brown smudge — the
+ * reason the rest of the art here is written as letters. So each frame is
+ * cut into blocks the size of one letter,
  * and every block becomes whichever of the game's letters most of it
  * already is. A vote rather than an average: averaging a tan face against
  * a black outline gives a muddy brown that is neither, where a vote keeps
@@ -151,8 +154,9 @@ const SHEETS: Record<SheetName, Sheet> = {
   },
 };
 
-/** How tall the standing monkey is in the game, in picture pixels. */
-const TALL = 15;
+/** How tall the standing monkey is, in letters: the game's fifteen
+ *  pixels, at `MONKEY.detail` letters to the pixel. */
+const TALL = 15 * MONKEY.detail;
 
 /** Under this much opaque in a block, the block is empty. */
 const COVERS = 0.3;
@@ -160,6 +164,44 @@ const COVERS = 0.3;
 /** The outline is thin in the sheets and in every block at this size, so
  *  a block that is mostly fur with a line through it stays fur. */
 const OUTLINE_COUNTS = 0.45;
+
+/**
+ * What counts as an eye, in the sheets' own pixels.
+ *
+ * An eye is a black oval about twelve pixels across on a frame where a
+ * letter is eight or nine, so it straddles two letters, and which two
+ * depends on where the letter edges happen to fall: found letter by
+ * letter, one eye came out a dot and the other a blob, a row apart, and
+ * a different pair in every frame. So eyes are found before the frame is
+ * cut up — a patch of black that is roughly round and has face all
+ * round it — and each gets exactly one letter, at its middle.
+ *
+ * The outline is black but always runs along empty space, and an eye
+ * never touches any; a mouth is black and in the face but long and flat;
+ * nostrils are black and in the face but too small. Those are what the
+ * tests are for. Not "face all round": tried first, it lost most of the
+ * eyes, because in the standing sheet the eyes sit at the rim of the face
+ * against the brown of the head, and measured only a third to two thirds
+ * of what was round them was face.
+ */
+const EYE = {
+  /** How big, as a share of one letter's area: a nostril is less. */
+  smallest: 0.35,
+  /** And at most, so a dark patch of fur is never taken for one. */
+  biggest: 6,
+  /** How much wider than tall, at most: a mouth is far more. */
+  widest: 2.2,
+  /** How much of what is round it must be face: some, so a dark patch in
+   *  the fur is not an eye. */
+  faceRound: 0.2,
+  /** How much may be empty space: next to none, which is the test that
+   *  tells an eye from the outline. */
+  openRound: 0.05,
+};
+
+/** Of a letter's light pixels, how much face makes it a piece of face, in
+ *  which nothing may be dark but the eyes. */
+const FACE = 0.6;
 
 interface Cell {
   w: number;
@@ -261,7 +303,8 @@ export async function convert(): Promise<string> {
  * Made by \`convert.ts\` from the sprite sheets in \`assets/sprites\`, not
  * drawn here — change the sheets or what it keeps of them and run it
  * again, rather than editing these by hand, or the next run puts back
- * whatever was changed. Letters as in \`monkey.ts\`, facing right.
+ * whatever was changed. Letters as in \`monkey.ts\`, facing right, at
+ * \`MONKEY.detail\` letters to the pixel: drawn half a pixel a letter.
  */
 
 /** A set of frames played one after another, each for \`ms\`. */
@@ -337,19 +380,23 @@ function boxOf({w, h, data}: Cell): Box {
  * the side the old drawing had it.
  */
 function toMap(
-  {w, data}: Cell,
+  cell: Cell,
   box: Box,
   scale: number,
   colours: Partial<Record<string, Rgb>>,
 ): Array<string> {
+  const {w, data} = cell;
   const wide = Math.ceil((box.x1 - box.x0 + 1) / scale);
   const tall = Math.ceil((box.y1 - box.y0 + 1) / scale);
   const top = box.y1 + 1 - tall * scale;
-  const rows: Array<string> = [];
+  // Every letter's vote, and how much of an eye it would be if it were one.
+  const grid: Array<Array<Letter>> = [];
   for (let gy = 0; gy < tall; gy++) {
-    let row = "";
+    const row: Array<Letter> = [];
     for (let gx = 0; gx < wide; gx++) {
       const votes: Record<string, number> = {};
+      // The plain count, without the outline's discount, for the eyes.
+      const counts: Record<string, number> = {};
       let seen = 0;
       let total = 0;
       for (
@@ -371,17 +418,179 @@ function toMap(
           const colour = nearest(data[k], data[k + 1], data[k + 2], colours);
           votes[colour] =
             (votes[colour] ?? 0) + (colour === "e" ? OUTLINE_COUNTS : 1);
+          counts[colour] = (counts[colour] ?? 0) + 1;
         }
       }
       if (seen / Math.max(1, total) < COVERS) {
-        row += ".";
+        row.push({letter: ".", face: 0});
         continue;
       }
-      row += Object.entries(votes).sort((a, b) => b[1] - a[1])[0][0];
+      // Face as a share of the light pixels and not of all of them, so a
+      // letter that is mostly eye still knows it is in the face.
+      const light = seen - (counts.e ?? 0);
+      row.push({
+        letter: Object.entries(votes).sort((a, b) => b[1] - a[1])[0][0],
+        face: light > 0 ? (counts.l ?? 0) / light : 0,
+      });
     }
-    rows.push([...row].reverse().join(""));
+    grid.push(row);
   }
-  return rows;
+  openTheEyes(grid, eyesOf(cell, colours, scale), box.x0, top, scale);
+  return grid.map(row =>
+    row
+      .map(cell => cell.letter)
+      .reverse()
+      .join(""),
+  );
+}
+
+/** One letter of a frame, before it is written out. */
+interface Letter {
+  letter: string;
+  /** How much of its light part is face. */
+  face: number;
+}
+
+/**
+ * The middles of the eyes in a frame, in the sheet's own pixels.
+ *
+ * Every patch of near-black, then only the ones that pass all three of
+ * `EYE`'s tests: the right size, round enough, and face all round.
+ */
+function eyesOf(
+  {w, h, data}: Cell,
+  colours: Partial<Record<string, Rgb>>,
+  scale: number,
+): Array<[number, number]> {
+  const dark = (i: number): boolean =>
+    data[i * 4 + 3] >= 100 &&
+    nearest(data[i * 4], data[i * 4 + 1], data[i * 4 + 2], colours) === "e";
+  const isFace = (i: number): boolean =>
+    data[i * 4 + 3] >= 100 &&
+    nearest(data[i * 4], data[i * 4 + 1], data[i * 4 + 2], colours) === "l";
+  const seen = new Uint8Array(w * h);
+  const eyes: Array<[number, number]> = [];
+  for (let start = 0; start < w * h; start++) {
+    if (seen[start] || !dark(start)) {
+      continue;
+    }
+    const patch: Array<number> = [];
+    const queue = [start];
+    seen[start] = 1;
+    let round = 0;
+    let face = 0;
+    let open = 0;
+    while (queue.length > 0) {
+      const i = queue.pop() as number;
+      patch.push(i);
+      const x = i % w;
+      const y = Math.floor(i / w);
+      for (const [dx, dy] of [
+        [1, 0],
+        [-1, 0],
+        [0, 1],
+        [0, -1],
+      ]) {
+        const nx = x + dx;
+        const ny = y + dy;
+        if (nx < 0 || ny < 0 || nx >= w || ny >= h) {
+          round++;
+          open++;
+          continue;
+        }
+        const n = ny * w + nx;
+        if (dark(n)) {
+          if (!seen[n]) {
+            seen[n] = 1;
+            queue.push(n);
+          }
+          continue;
+        }
+        round++;
+        if (isFace(n)) {
+          face++;
+        } else if (data[n * 4 + 3] < 100) {
+          open++;
+        }
+      }
+    }
+    eyes.push(...(isAnEye(patch, w, round, face, open, scale) ?? []));
+  }
+  return eyes;
+}
+
+/** The middle of a patch, if the patch is an eye. */
+function isAnEye(
+  patch: Array<number>,
+  w: number,
+  round: number,
+  face: number,
+  open: number,
+  scale: number,
+): Array<[number, number]> | null {
+  // Measured in letters, so the tests mean the same at any `MONKEY.detail`.
+  const area = patch.length / (scale * scale);
+  if (area < EYE.smallest || area > EYE.biggest) {
+    return null;
+  }
+  if (
+    face / Math.max(1, round) < EYE.faceRound ||
+    open / Math.max(1, round) > EYE.openRound
+  ) {
+    return null;
+  }
+  let x0 = Infinity;
+  let x1 = -Infinity;
+  let y0 = Infinity;
+  let y1 = -Infinity;
+  let sx = 0;
+  let sy = 0;
+  for (const i of patch) {
+    const x = i % w;
+    const y = Math.floor(i / w);
+    x0 = Math.min(x0, x);
+    x1 = Math.max(x1, x);
+    y0 = Math.min(y0, y);
+    y1 = Math.max(y1, y);
+    sx += x;
+    sy += y;
+  }
+  if ((x1 - x0 + 1) / (y1 - y0 + 1) > EYE.widest) {
+    return null;
+  }
+  return [[sx / patch.length, sy / patch.length]];
+}
+
+/**
+ * Puts the eyes in, one letter each, and takes everything else dark out
+ * of the face.
+ *
+ * The face is cleared first — the mouth, the nostrils, the half of an eye
+ * that fell into the letter next door — and then each eye found in the
+ * sheet becomes the one letter its middle is in. Two dots front on, one
+ * side on, the same size every frame.
+ */
+function openTheEyes(
+  grid: Array<Array<Letter>>,
+  eyes: Array<[number, number]>,
+  left: number,
+  top: number,
+  scale: number,
+): void {
+  for (const row of grid) {
+    for (const letter of row) {
+      if (letter.letter === "e" && letter.face >= FACE) {
+        letter.letter = "l";
+      }
+    }
+  }
+  for (const [x, y] of eyes) {
+    const gx = Math.floor((x - left) / scale);
+    const gy = Math.floor((y - top) / scale);
+    if (grid[gy]?.[gx] && grid[gy][gx].letter !== ".") {
+      grid[gy][gx].letter = "e";
+    }
+  }
 }
 
 /** The letter whose colour in this sheet a pixel is closest to. */

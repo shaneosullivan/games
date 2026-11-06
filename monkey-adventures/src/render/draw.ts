@@ -816,6 +816,7 @@ function drawMonkey(
   const x = monkey.wasX + (monkey.x - monkey.wasX) * alpha;
   const y = monkey.wasY + (monkey.y - monkey.wasY) * alpha;
   let sprite: HTMLCanvasElement;
+  let perPixel: number = MONKEY.detail;
   if (monkey.doing === "ground" && Math.abs(monkey.vx) >= 6) {
     // Running, from the sheet: down on all fours, a frame per few pixels
     // of ground so the legs keep pace with it.
@@ -856,16 +857,37 @@ function drawMonkey(
         ? "climbB"
         : "hang";
     sprite = monkeySprite(pose, monkey.facingLeft);
+    perPixel = 1;
   }
-  // Stood on its feet and centred on itself, whatever size it is: the
-  // frames from the sheets are not the monkey's own thirteen by fifteen,
-  // and placing them as if they were put a running monkey's feet a few
-  // pixels into the ground.
-  g.drawImage(
-    sprite,
-    Math.round(x - camera - sprite.width / 2),
-    Math.round(y - sprite.height),
-  );
+  standOnFeet(g, sprite, x - camera, y, perPixel);
+}
+
+/**
+ * Draws a monkey standing on a point: feet on it, centred on it.
+ *
+ * Whatever size the drawing is — the frames from the sheets are not the
+ * monkey's own thirteen by fifteen, and placing them as if they were put
+ * a running monkey's feet a few pixels into the ground. `perPixel` is how
+ * many letters of it go to one picture pixel: the sheets' frames are
+ * drawn at `MONKEY.detail`, half a pixel a letter, which is where the
+ * extra detail comes from; the hand-drawn poses at one.
+ *
+ * Snapped to the canvas's own pixels rather than the picture's, so at two
+ * letters to the pixel the monkey moves in half-pixel steps and every
+ * letter still lands on exactly one canvas pixel — crisp, never smeared
+ * across two.
+ */
+function standOnFeet(
+  g: CanvasRenderingContext2D,
+  sprite: HTMLCanvasElement,
+  x: number,
+  y: number,
+  perPixel: number,
+): void {
+  const wide = sprite.width / perPixel;
+  const tall = sprite.height / perPixel;
+  const snap = (v: number): number => Math.round(v * SCREEN.fine) / SCREEN.fine;
+  g.drawImage(sprite, snap(x - wide / 2), snap(y - tall), wide, tall);
 }
 
 /** Home: a little hut in the trees at the end of the jungle. */
@@ -916,19 +938,28 @@ function family(
     // Waiting, they stand the way the monkey stands, tail and all — each
     // a little way round the loop from the others, or the three of them
     // sway in step like a chorus line. Cheering, they throw their arms up.
-    const sprite = cheering
-      ? monkeySprite("hang", one.facingLeft, one.coat)
-      : motionSprite(
+    if (cheering) {
+      standOnFeet(
+        g,
+        monkeySprite("hang", one.facingLeft, one.coat),
+        x + shift,
+        WORLD.floor - hop,
+        1,
+      );
+    } else {
+      standOnFeet(
+        g,
+        motionSprite(
           "stand",
           Math.floor((time * 1000) / STAND.ms + one.phase * 3),
           one.facingLeft,
           one.coat,
-        );
-    g.drawImage(
-      sprite,
-      x - Math.round(sprite.width / 2) + shift,
-      Math.round(WORLD.floor - sprite.height - hop),
-    );
+        ),
+        x + shift,
+        WORLD.floor,
+        MONKEY.detail,
+      );
+    }
   }
 }
 
