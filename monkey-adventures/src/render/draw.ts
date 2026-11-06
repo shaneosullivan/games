@@ -848,10 +848,14 @@ function drawMonkey(
       Math.floor((monkey.stillFor * 1000) / STAND.ms),
       monkey.facingLeft,
     );
-  } else if (monkey.doing === "climb") {
-    // Up a trunk, from the sheet: an arm at a time, a frame for every few
-    // pixels climbed, so the arms keep pace with the climbing and stop
-    // when it does.
+  } else if (
+    monkey.doing === "climb" ||
+    (monkey.doing === "swing" && monkey.climbingRope)
+  ) {
+    // Up a trunk or up a rope, from the sheet: an arm at a time, a frame
+    // for every few pixels climbed, so the arms keep pace with the
+    // climbing and stop when it does. The same climb in both places,
+    // because it is the same thing to do.
     sprite = motionSprite(
       "climb",
       Math.floor(monkey.stride / MONKEY.climbFrame),
