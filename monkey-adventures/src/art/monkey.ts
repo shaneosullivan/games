@@ -1,4 +1,13 @@
-import {BORED, CLIMB, ELEPHANT, JUMP, LAVA, RUN, STAND} from "./motion";
+import {
+  BORED,
+  CELEBRATE,
+  CLIMB,
+  ELEPHANT,
+  JUMP,
+  LAVA,
+  RUN,
+  STAND,
+} from "./motion";
 
 /**
  * The monkey, drawn a pixel at a time.
@@ -56,42 +65,6 @@ const PALETTE: Record<string, string> = {
   G: "#3c8035",
   B: "#c9d98a",
   w: "#f6f4ec",
-};
-
-/**
- * Hanging from a vine, and in the air, which look the same and should — a
- * monkey in flight is a monkey reaching for the next vine.
- *
- * Both hands on the rope, side by side with it running down between them.
- * The arms used to be out at either side like a child on monkey bars, and
- * a vine is not monkey bars: nothing was holding it. The hands are where
- * the rope ends, so the grip is a grip and not a coincidence.
- */
-const HANG = [
-  "....ff.ff....",
-  "....ff.ff....",
-  "....ff.ff....",
-  "...fdddddf...",
-  "..ffdfffffdf.",
-  "..fdllllllf..",
-  "...dleleld...",
-  "...dlmmmld...",
-  "....dmmmd....",
-  "...fffffff...",
-  "..ffffffffft.",
-  "..fffffffftt.",
-  "..ffffffff.t.",
-  "...fff.fff...",
-  "...dd...dd...",
-];
-
-/** The poses that are written here. Standing, running, jumping,
- *  climbing and being bored are in `motion.ts`, made from the sprite
- *  sheets. */
-export type Pose = "hang";
-
-const DRAWN: Record<Pose, Array<string>> = {
-  hang: HANG,
 };
 
 /**
@@ -322,7 +295,13 @@ export function bananaSprite(): HTMLCanvasElement {
 
 /** Every set of frames that came from the sprite sheets, by name. */
 export type MotionKind =
-  "run" | "jump" | "climb" | "lava" | "stand" | keyof typeof BORED;
+  | "run"
+  | "jump"
+  | "climb"
+  | "lava"
+  | "stand"
+  | "celebrate"
+  | keyof typeof BORED;
 
 function framesOf(kind: MotionKind): ReadonlyArray<ReadonlyArray<string>> {
   if (kind === "run") {
@@ -340,12 +319,15 @@ function framesOf(kind: MotionKind): ReadonlyArray<ReadonlyArray<string>> {
   if (kind === "stand") {
     return STAND.frames;
   }
+  if (kind === "celebrate") {
+    return CELEBRATE.frames;
+  }
   return BORED[kind].frames;
 }
 
 /**
- * A frame of the monkey from the sheets — running, jumping, standing or
- * passing the time — facing a way.
+ * A frame of the monkey from the sheets — running, jumping, standing,
+ * passing the time or cheering — facing a way.
  *
  * From `motion.ts`, which is made from the sprite sheets rather than
  * written here; baked and kept the same as every other pose. The frame
@@ -383,21 +365,6 @@ export function elephantSprite(
   let had = baked.get(key);
   if (!had) {
     had = bake(ELEPHANT.frames[i], facingLeft);
-    baked.set(key, had);
-  }
-  return had;
-}
-
-/** A pose, facing a way. Baked on first ask and kept. */
-export function monkeySprite(
-  pose: Pose,
-  facingLeft: boolean,
-  coat = 0,
-): HTMLCanvasElement {
-  const key = `${pose}${facingLeft ? "<" : ">"}${coat}`;
-  let had = baked.get(key);
-  if (!had) {
-    had = bake(DRAWN[pose], facingLeft, COATS[coat % COATS.length]);
     baked.set(key, had);
   }
   return had;

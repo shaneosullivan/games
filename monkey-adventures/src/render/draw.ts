@@ -15,11 +15,10 @@ import {
   bananaSprite,
   crocSprite,
   elephantSprite,
-  monkeySprite,
   motionSprite,
   propSprite,
 } from "../art/monkey";
-import {BORED, ELEPHANT, LAVA, STAND} from "../art/motion";
+import {BORED, CELEBRATE, ELEPHANT, LAVA, STAND} from "../art/motion";
 import {ELEPHANT_SPRAYS} from "../world/jungle";
 import type {Party} from "./particles";
 import type {Jungle, Tree, Vine} from "../world/jungle";
@@ -945,21 +944,25 @@ function family(
     if (x < -20 || x > w + 20) {
       continue;
     }
-    const beat = Math.sin(time * HOME.jumps + one.phase);
-    const hop = cheering ? Math.max(0, beat) * HOME.jumpBy : 0;
     const shift = cheering
       ? 0
       : Math.round(Math.sin(time * HOME.fidgets + one.phase) * HOME.fidgetBy);
     // Waiting, they stand the way the monkey stands, tail and all — each
     // a little way round the loop from the others, or the three of them
-    // sway in step like a chorus line. Cheering, they throw their arms up.
+    // sway in step like a chorus line. Cheering, they jump with their arms
+    // up, out of step for the same reason; the jump is in the sprite.
     if (cheering) {
       standOnFeet(
         g,
-        monkeySprite("hang", one.facingLeft, one.coat),
-        x + shift,
-        WORLD.floor - hop,
-        1,
+        motionSprite(
+          "celebrate",
+          Math.floor((time * 1000) / CELEBRATE.ms + one.phase * 3),
+          one.facingLeft,
+          one.coat,
+        ),
+        x,
+        WORLD.floor,
+        MONKEY.detail,
       );
     } else {
       standOnFeet(

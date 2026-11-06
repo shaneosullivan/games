@@ -773,9 +773,6 @@ export const HOME = {
    *  anything. */
   fidgets: 1.6,
   fidgetBy: 1.4,
-  /** And how they jump once you are home: how high and how fast. */
-  jumps: 7,
-  jumpBy: 9,
 } as const;
 
 /** The fixed step the world is worked out in. The drawing interpolates

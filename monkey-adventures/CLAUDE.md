@@ -76,8 +76,9 @@ src/
   render/        the pixel screen, and the painting of the jungle
   art/           the sprites, as letter maps — motion.ts is standing,
                  running, jumping, climbing, the four bored things,
-                 landing in the lava (its flames cut away) and the
-                 river's elephant, made by
+                 landing in the lava (its flames cut away), the
+                 family cheering at home and the river's
+                 elephant, made by
                  convert.ts from the sheets in assets/sprites;
                  regenerate it, do not edit it
   assets/        the sprite sheets those come from. Never imported: the

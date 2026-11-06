@@ -89,7 +89,14 @@ interface Sheet {
 }
 
 type SheetName =
-  "run" | "jump" | "stand" | "bored" | "climb" | "elephant" | "lava";
+  | "run"
+  | "jump"
+  | "stand"
+  | "bored"
+  | "climb"
+  | "elephant"
+  | "lava"
+  | "celebrate";
 
 const SHEETS: Record<SheetName, Sheet> = {
   /**
@@ -214,6 +221,34 @@ const SHEETS: Record<SheetName, Sheet> = {
     face: "p",
     clearFace: false,
     keep: {elephant: [0, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32, 34]},
+  },
+  /**
+   * The family at home, cheering: front on, arms up, jumping on the spot.
+   * The jump is in the sheet — the feet leave the ground and come back —
+   * so the set's shared box keeps it, and the bottom row is the ground.
+   *
+   * One loop the sheet long, every other frame. Scaled from frame 31, the
+   * one standing with its arms by its sides, so a cheering monkey is the
+   * same size as the one it is cheering.
+   */
+  celebrate: {
+    url: "/src/assets/sprites/celebrate/monkey_celebrate.png",
+    cell: [256, 368],
+    colours: {
+      // The body, #602000 and #603000.
+      f: [0x60, 0x28, 0x04],
+      // The shading, #301000.
+      d: [0x30, 0x10, 0x04],
+      // The face, belly and hands, #c09060.
+      l: [0xc0, 0x90, 0x60],
+      e: [0x04, 0x00, 0x00],
+    },
+    scaleFrom: ["celebrate", 31],
+    keep: {
+      celebrate: [
+        0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32, 34,
+      ],
+    },
   },
   /**
    * Standing still, front on, with the tail swaying: one loop the whole
@@ -496,6 +531,10 @@ ${frames("lava")}
 
 /** Standing still, front on, the tail swaying. A loop. */
 export const STAND: Motion = ${motion("stand", "")};
+
+/** The family cheering once you are home, jumping with their arms up.
+ *  A loop, and the jump is in it: the bottom row is the ground. */
+export const CELEBRATE: Motion = ${motion("celebrate", "")};
 
 /** The things a bored monkey does. Each plays once, start to end. */
 export const BORED = {
