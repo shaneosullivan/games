@@ -33,7 +33,7 @@ type Rgb = [number, number, number];
  * One sheet: where it is, how big its cells are, what its colours are,
  * and which of its frames are kept and under what names.
  *
- * Every sheet is six frames by six.
+ * Every sheet is six frames across, and all but the stand six down.
  */
 interface Sheet {
   url: string;
@@ -251,23 +251,26 @@ const SHEETS: Record<SheetName, Sheet> = {
     },
   },
   /**
-   * Standing still, front on, with the tail swaying: one loop the whole
-   * sheet long, of which every fourth frame is plenty at this size.
+   * Standing still, front on, swinging its tail right round from one side
+   * to the other and back: one loop the whole sheet long. The sheet came
+   * with a row of turning to face you at the top and one of turning away
+   * at the bottom, cropped off, so it is six frames by four. The tail
+   * travels a long way, so every other frame rather than every fourth.
    */
   stand: {
     url: "/src/assets/sprites/stand/monkey_stand.png",
-    cell: [324, 268],
+    cell: [308, 272],
     colours: {
-      // The body, #502000 and #502010.
-      f: [0x50, 0x20, 0x08],
-      // The shading round #302010.
-      d: [0x30, 0x14, 0x08],
-      // The face and belly, #c09060.
-      l: [0xc0, 0x90, 0x60],
+      // The body, #582810 and #502810.
+      f: [0x58, 0x28, 0x10],
+      // The shading round #482818.
+      d: [0x44, 0x24, 0x14],
+      // The face, belly and hands, #d8a868 to #e0a870.
+      l: [0xdc, 0xa8, 0x6c],
       e: [0x04, 0x00, 0x04],
     },
     scaleFrom: ["stand", 0],
-    keep: {stand: [0, 4, 8, 12, 16, 20, 24, 28, 32]},
+    keep: {stand: [0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22]},
   },
   /**
    * Bored: four things to do, one after another down the sheet. Read off
