@@ -101,9 +101,9 @@ export class Hud {
     const row = document.createElement("div");
     row.className = "hud-parts";
     for (const part of PARTS) {
-      // One button a part: its name on a pill, and under it a picture of
-      // the place, so a child who cannot read yet can still choose — and
-      // the picture is part of the button, so tapping it works too.
+      // One button a part: a picture of the place with its name on it, so
+      // a child who cannot read yet can still choose, and the whole card
+      // is the button.
       const button = document.createElement("button");
       button.className = "hud-choice ui-interactive";
       // Each wears the colour of the place it goes to; the rules read them
@@ -323,14 +323,12 @@ function inject(): void {
      window: the frame is letterboxed inside the window, and a chooser
      sized to the window spilled out of the picture on a phone held
      upright. The frame is never taller than it is wide, so three across
-     always fits; what runs out is height, so each column is as wide as
-     two rows of pictures, their names and the words above them leave
-     room for — about 250px of that is everything but the pictures, which
-     are three quarters as tall as they are wide. The column itself is
-     as wide as its name, where that is wider: on a phone the names were
-     wider than their pictures, and ran into each other. */
+     always fits; what runs out is height, so each picture is as wide as
+     two rows of them and the words above leave room for — about 150px of
+     that is the words and the bar, and the pictures are three quarters
+     as tall as they are wide. */
   grid-template-columns: repeat(3, auto);
-  gap: 10px 14px;
+  gap: 12px 14px;
 }
 .hud-start {
   gap: 10px;
@@ -340,28 +338,38 @@ function inject(): void {
 }
 .hud-choice {
   font: inherit;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
+  position: relative;
+  display: block;
   padding: 0;
   border: none;
   background: none;
   cursor: pointer;
 }
+.hud-choice:active {
+  transform: translateY(3px);
+}
 .hud-picture {
   display: block;
-  width: max(64px, min(27cqw, 66cqh - 165px));
+  width: max(64px, min(27cqw, 66cqh - 100px));
   height: auto;
   image-rendering: pixelated;
   border: 3px solid var(--face);
   border-radius: 10px;
   box-shadow: 0 4px 0 var(--under);
 }
-.hud-choice:active .hud-part,
 .hud-choice:active .hud-picture {
-  transform: translateY(3px);
   box-shadow: 0 1px 0 var(--under);
+}
+/* The name, on the middle of its picture. The whole card moves when it
+   is pressed, so the name must not move again on its own: written out
+   here, it outweighs the gold button's own pressed rule. */
+.hud-choice .hud-part,
+.hud-choice .hud-part:active {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 4px 0 var(--under);
 }
 
 .hud-tap {
@@ -393,8 +401,10 @@ function inject(): void {
    rules have the same weight, so whichever is last is the one that
    counts, and the gold would otherwise paint every button again. */
 .hud-part {
-  font-size: clamp(13px, 4.2cqh, 20px);
-  padding: 0.55em 1.1em;
+  /* By width as well as height: a name sits on its picture now, and on a
+     phone held upright "The volcano" was wider than the picture under it. */
+  font-size: clamp(11px, min(4.2cqh, 2.6cqw), 20px);
+  padding: 0.5em 1em;
   white-space: nowrap;
   background: var(--face);
   box-shadow: 0 4px 0 var(--under);

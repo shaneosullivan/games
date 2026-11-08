@@ -951,15 +951,24 @@ export const MUSHROOM = {
   notices: 12,
 } as const;
 
-/** The pictures under the chooser's buttons. */
+/** The pictures on the chooser's buttons. */
 export const PREVIEW = {
-  /** How wide each one is, in picture pixels: the narrowest the game
-   *  gets, so the monkey in it is as big as it can be and still has the
-   *  thing the part is named after beside it. */
+  /** How wide the whole picture is painted, in picture pixels: the
+   *  narrowest the game gets. */
   wide: SCREEN.narrowest,
-  /** Where the monkey stands in it, from the left: near the edge, with
-   *  the place in front of it. */
-  monkeyAt: 50,
+  /** How far it is then blown up, to a close-up of the monkey. Two, so a
+   *  picture pixel is a whole number of canvas pixels and stays sharp:
+   *  the close-up is 120 by 90, a monkey and the thing in front of it. */
+  zoom: 2,
+  /** Where the monkey stands in the close-up, from its left edge. */
+  monkeyAt: 15,
+  /** How far down the close-up the ground under the monkey is, as a
+   *  share of its height: near the bottom, with a little earth below. */
+  floor: 0.8,
+  /** Where a vent in the picture is caught in its spurt, as a share of
+   *  the way through it — the first near the top, the next past it, so
+   *  two in one picture are not twins. */
+  spurtsAt: [0.45, 0.7],
   /** The moment it is painted at, in seconds: any will do, but a fixed
    *  one paints the same picture every time. */
   time: 2,
@@ -985,9 +994,17 @@ export const PARTS: ReadonlyArray<{
   /** Where in the jungle it starts you. Ignored for a level of its own,
    *  which builds its own world and starts at the beginning of it. */
   at: number;
-  /** Where the picture under its button looks: the middle of the frame,
-   *  on whatever the part is named after. See `PREVIEW`. */
+  /** Where the picture on its button looks: the middle of the close-up,
+   *  just past the edge of whatever the part is named after, so the
+   *  monkey at its left is on dry land looking at it. See `PREVIEW`. */
   shows: number;
+  /**
+   * The sky in that picture, top and bottom, where it is not the level's
+   * own. A little different for each, so six pictures of one jungle read
+   * as six places: bluer over the water, warm over the volcano, the gold
+   * of the evening at home. The rain keeps its own grey: it is the sky.
+   */
+  sky?: {high: string; low: string};
   /** True for the rain level, which is not a part of the jungle at all. */
   rain?: boolean;
   /** And for the river level, which is not either. */
@@ -1009,6 +1026,7 @@ export const PARTS: ReadonlyArray<{
     name: "The jungle",
     at: 40,
     shows: 160,
+    sky: {high: "#94d6b6", low: "#d8ecae"},
     tint: {face: "#7ec850", under: "#4e8f32", ink: "#15280f"},
   },
   {
@@ -1021,26 +1039,30 @@ export const PARTS: ReadonlyArray<{
   {
     name: "The river",
     at: RIVER.backTo,
-    shows: RIVER.from + 70,
+    shows: RIVER.from + 40,
+    sky: {high: "#86c6dc", low: "#d0ead2"},
     river: true,
     tint: {face: "#5fb6a8", under: "#3b857a", ink: "#062a26"},
   },
   {
     name: "The lake",
     at: LAKE.from - 170,
-    shows: LAKE.from + 60,
+    shows: LAKE.from + 40,
+    sky: {high: "#7cbfe6", low: "#d6eeea"},
     tint: {face: "#63b8d8", under: "#3d8099", ink: "#06242e"},
   },
   {
     name: "The volcano",
     at: VOLCANO.from - 170,
-    shows: VOLCANO.from + 360,
+    shows: VOLCANO.from + 340,
+    sky: {high: "#e0875a", low: "#f4cf96"},
     tint: {face: "#e8562b", under: "#a8331a", ink: "#2a0d06"},
   },
   {
     name: "Home",
     at: WORLD.far - 300,
-    shows: WORLD.far - 80,
+    shows: WORLD.far - 10,
+    sky: {high: "#e8b98e", low: "#f8e6b6"},
     tint: {face: "#ffd257", under: "#c98f2a", ink: "#2a1a10"},
   },
 ];

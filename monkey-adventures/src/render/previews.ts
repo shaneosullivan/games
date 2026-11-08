@@ -1,4 +1,4 @@
-import {PARTS, PREVIEW, SCREEN} from "../config";
+import {PARTS, PREVIEW, SCREEN, VOLCANO} from "../config";
 import {Monkey} from "../entities/monkey";
 import {Jungle} from "../world/jungle";
 import {paint} from "./draw";
@@ -7,39 +7,63 @@ import {Party} from "./particles";
 type Part = (typeof PARTS)[number];
 
 /**
- * A still of each place the chooser can start you, for under its button.
+ * A still of each place the chooser can start you, for its button.
  *
  * Painted by the game's own painter from the game's own worlds rather than
  * kept as screenshots, so a picture can never show a jungle the game no
  * longer has: change a sprite or a level and its picture changes with it.
  * The same seeds as the levels themselves, so it is the actual place.
+ *
+ * Painted whole and then cut down to a close-up of the monkey and what is
+ * in front of it, rather than painted small: the sky, the canopy and the
+ * floor are all laid out for a picture `SCREEN.tall` high, and a shorter
+ * one would be a different jungle.
  */
 export function previewOf(part: Part): HTMLCanvasElement {
-  const canvas = document.createElement("canvas");
+  const fine = SCREEN.fine;
   const wide = PREVIEW.wide;
   const tall = SCREEN.tall;
-  canvas.width = wide * SCREEN.fine;
-  canvas.height = tall * SCREEN.fine;
-  const ctx = canvas.getContext("2d", {alpha: false});
-  if (!ctx) {
-    return canvas;
+  const cutWide = wide / PREVIEW.zoom;
+  const cutTall = tall / PREVIEW.zoom;
+
+  const out = document.createElement("canvas");
+  out.width = wide * fine;
+  out.height = tall * fine;
+  const whole = document.createElement("canvas");
+  whole.width = wide * fine;
+  whole.height = tall * fine;
+  const ctx = whole.getContext("2d", {alpha: false});
+  const g = out.getContext("2d", {alpha: false});
+  if (!ctx || !g) {
+    return out;
   }
-  ctx.setTransform(SCREEN.fine, 0, 0, SCREEN.fine, 0, 0);
+  ctx.setTransform(fine, 0, 0, fine, 0, 0);
   ctx.imageSmoothingEnabled = false;
+  g.imageSmoothingEnabled = false;
 
   const jungle = worldOf(part);
-  // Framed on the thing the part is named after, kept inside the world
-  // the same way the game's own camera is, with the monkey standing at
-  // the left of it looking on.
+  // The close-up is centred on what the part is named after, inside a
+  // whole picture kept within the world the way the game's own camera is.
   const camera = Math.round(
     Math.max(0, Math.min(jungle.far - wide + 40, part.shows - wide / 2)),
   );
+  const cutLeft = Math.round(
+    Math.max(0, Math.min(wide - cutWide, part.shows - cutWide / 2 - camera)),
+  );
+  // With the monkey on the ground at the left of it, looking on.
   const monkey = new Monkey();
   monkey.doing = "ground";
-  monkey.x = camera + PREVIEW.monkeyAt;
+  monkey.x = camera + cutLeft + PREVIEW.monkeyAt;
   monkey.y = jungle.floorAt(monkey.x);
   monkey.wasX = monkey.x;
   monkey.wasY = monkey.y;
+  // And the ground where the monkey stands a little way up from the
+  // bottom, wherever the ground is: on the volcano it is up a hill.
+  const cutTop = Math.round(
+    Math.max(0, Math.min(tall - cutTall, monkey.y - cutTall * PREVIEW.floor)),
+  );
+
+  spurting(jungle, camera + cutLeft, cutWide);
   paint(
     {ctx, wide, tall},
     jungle,
@@ -49,11 +73,46 @@ export function previewOf(part: Part): HTMLCanvasElement {
     1,
     new Party(),
     false,
+    part.sky,
   );
-  return canvas;
+  g.drawImage(
+    whole,
+    cutLeft * fine,
+    cutTop * fine,
+    cutWide * fine,
+    cutTall * fine,
+    0,
+    0,
+    out.width,
+    out.height,
+  );
+  return out;
 }
 
-/** The dry jungle is built once and shared: four of the parts are in it. */
+/**
+ * Catches the vents in the picture in the middle of throwing lava, each a
+ * different way through it.
+ *
+ * Left to their own clocks most of them are resting at any one moment, and
+ * a volcano with nothing coming out of it is a hill with a pond on top.
+ * Only the vents' state is set, the same way the jungle's own tick sets
+ * it: the painter draws a spurt from that and nothing else.
+ */
+function spurting(jungle: Jungle, from: number, wide: number): void {
+  const seen = jungle.vents.filter(
+    vent => vent.x >= from - 10 && vent.x <= from + wide + 10,
+  );
+  seen.forEach((vent, i) => {
+    const t = PREVIEW.spurtsAt[i % PREVIEW.spurtsAt.length];
+    vent.at = VOLCANO.warns + t * VOLCANO.spurts;
+    vent.up = Math.sin(t * Math.PI);
+    vent.warning = false;
+  });
+}
+
+/** The dry jungle is built once and shared: four of the parts are in it.
+ *  The pictures' own and not the game's, so stopping its vents mid-spurt
+ *  stops nothing in play. */
 let dry: Jungle | null = null;
 
 function worldOf(part: Part): Jungle {

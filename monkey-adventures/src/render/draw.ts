@@ -46,12 +46,14 @@ export function paint(
   /** Whether the monkey has got home, which is when the family stops
    *  waiting and starts jumping. */
   cheering: boolean,
+  /** A sky other than the level's own, for a picture of it: top, bottom. */
+  ownSky?: {high: string; low: string},
 ): void {
   const g = screen.ctx;
   const w = screen.wide;
   const h = screen.tall;
 
-  sky(g, w, h, jungle.raining);
+  sky(g, w, h, jungle.raining, ownSky);
   canopy(g, w, camera);
 
   // Two layers of trees at different speeds. The far ones are lighter and
@@ -146,10 +148,11 @@ function sky(
   w: number,
   h: number,
   wet: boolean,
+  own?: {high: string; low: string},
 ): void {
   const grad = g.createLinearGradient(0, 0, 0, h);
-  grad.addColorStop(0, wet ? PAINT.wetSkyHigh : PAINT.skyHigh);
-  grad.addColorStop(1, wet ? PAINT.wetSkyLow : PAINT.skyLow);
+  grad.addColorStop(0, own?.high ?? (wet ? PAINT.wetSkyHigh : PAINT.skyHigh));
+  grad.addColorStop(1, own?.low ?? (wet ? PAINT.wetSkyLow : PAINT.skyLow));
   g.fillStyle = grad;
   g.fillRect(0, 0, w, h);
 }
