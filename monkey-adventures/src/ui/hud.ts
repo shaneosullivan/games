@@ -1,5 +1,6 @@
 import {PARTS, RAIN} from "../config";
 import {propSprite} from "../art/monkey";
+import {previewOf} from "../render/previews";
 import {ProgressBar} from "../../../shared/progressBar";
 import {SoundButton} from "../../../shared/soundButton";
 
@@ -100,15 +101,23 @@ export class Hud {
     const row = document.createElement("div");
     row.className = "hud-parts";
     for (const part of PARTS) {
+      // One button a part: its name on a pill, and under it a picture of
+      // the place, so a child who cannot read yet can still choose — and
+      // the picture is part of the button, so tapping it works too.
       const button = document.createElement("button");
-      // Each button wears the colour of the place it goes to; the rule
-      // reads them off these three custom properties, so the pressed
-      // state keeps the right shadow without five more rules.
-      button.className = "hud-again hud-part ui-interactive";
+      button.className = "hud-choice ui-interactive";
+      // Each wears the colour of the place it goes to; the rules read them
+      // off these three custom properties, so the pressed state keeps the
+      // right shadow without five more rules.
       button.style.setProperty("--face", part.tint.face);
       button.style.setProperty("--under", part.tint.under);
       button.style.setProperty("--ink", part.tint.ink);
-      button.textContent = part.name;
+      const name = document.createElement("span");
+      name.className = "hud-again hud-part";
+      name.textContent = part.name;
+      const picture = previewOf(part);
+      picture.className = "hud-picture";
+      button.append(name, picture);
       button.addEventListener("click", () => {
         // Handing the focus back, or the space bar presses this button
         // again instead of jumping for the rest of the game.
@@ -241,6 +250,8 @@ function inject(): void {
   align-items: center;
   font-family: system-ui, -apple-system, sans-serif;
   color: #fff;
+  /* So the chooser can be sized off the frame it sits in: see below. */
+  container-type: size;
 }
 .hud-top {
   display: flex;
@@ -307,11 +318,50 @@ function inject(): void {
   image-rendering: pixelated;
 }
 .hud-parts {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
+  display: grid;
+  /* Three across and two down. Sized off the game's frame, not the
+     window: the frame is letterboxed inside the window, and a chooser
+     sized to the window spilled out of the picture on a phone held
+     upright. The frame is never taller than it is wide, so three across
+     always fits; what runs out is height, so each column is as wide as
+     two rows of pictures, their names and the words above them leave
+     room for — about 250px of that is everything but the pictures, which
+     are three quarters as tall as they are wide. The column itself is
+     as wide as its name, where that is wider: on a phone the names were
+     wider than their pictures, and ran into each other. */
+  grid-template-columns: repeat(3, auto);
+  gap: 10px 14px;
+}
+.hud-start {
   gap: 10px;
-  max-width: 92vw;
+}
+.hud-start .hud-words {
+  font-size: clamp(22px, 8cqh, 54px);
+}
+.hud-choice {
+  font: inherit;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+}
+.hud-picture {
+  display: block;
+  width: max(64px, min(27cqw, 66cqh - 165px));
+  height: auto;
+  image-rendering: pixelated;
+  border: 3px solid var(--face);
+  border-radius: 10px;
+  box-shadow: 0 4px 0 var(--under);
+}
+.hud-choice:active .hud-part,
+.hud-choice:active .hud-picture {
+  transform: translateY(3px);
+  box-shadow: 0 1px 0 var(--under);
 }
 
 .hud-tap {
@@ -343,14 +393,12 @@ function inject(): void {
    rules have the same weight, so whichever is last is the one that
    counts, and the gold would otherwise paint every button again. */
 .hud-part {
-  font-size: clamp(15px, 3vw, 20px);
-  padding: 12px 22px;
+  font-size: clamp(13px, 4.2cqh, 20px);
+  padding: 0.55em 1.1em;
+  white-space: nowrap;
   background: var(--face);
   box-shadow: 0 4px 0 var(--under);
   color: var(--ink);
-}
-.hud-part:active {
-  box-shadow: 0 1px 0 var(--under);
 }
 
 `;

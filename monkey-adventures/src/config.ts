@@ -951,6 +951,20 @@ export const MUSHROOM = {
   notices: 12,
 } as const;
 
+/** The pictures under the chooser's buttons. */
+export const PREVIEW = {
+  /** How wide each one is, in picture pixels: the narrowest the game
+   *  gets, so the monkey in it is as big as it can be and still has the
+   *  thing the part is named after beside it. */
+  wide: SCREEN.narrowest,
+  /** Where the monkey stands in it, from the left: near the edge, with
+   *  the place in front of it. */
+  monkeyAt: 50,
+  /** The moment it is painted at, in seconds: any will do, but a fixed
+   *  one paints the same picture every time. */
+  time: 2,
+} as const;
+
 /**
  * Everywhere the game will start you, in the order it all happens.
  *
@@ -971,6 +985,9 @@ export const PARTS: ReadonlyArray<{
   /** Where in the jungle it starts you. Ignored for a level of its own,
    *  which builds its own world and starts at the beginning of it. */
   at: number;
+  /** Where the picture under its button looks: the middle of the frame,
+   *  on whatever the part is named after. See `PREVIEW`. */
+  shows: number;
   /** True for the rain level, which is not a part of the jungle at all. */
   rain?: boolean;
   /** And for the river level, which is not either. */
@@ -991,33 +1008,39 @@ export const PARTS: ReadonlyArray<{
   {
     name: "The jungle",
     at: 40,
+    shows: 160,
     tint: {face: "#7ec850", under: "#4e8f32", ink: "#15280f"},
   },
   {
     name: "The rain",
     at: RAIN.backTo,
+    shows: RAIN.backTo + 130,
     rain: true,
     tint: {face: "#a9754a", under: "#74492a", ink: "#2a1708"},
   },
   {
     name: "The river",
     at: RIVER.backTo,
+    shows: RIVER.from + 70,
     river: true,
     tint: {face: "#5fb6a8", under: "#3b857a", ink: "#062a26"},
   },
   {
     name: "The lake",
     at: LAKE.from - 170,
+    shows: LAKE.from + 60,
     tint: {face: "#63b8d8", under: "#3d8099", ink: "#06242e"},
   },
   {
     name: "The volcano",
     at: VOLCANO.from - 170,
+    shows: VOLCANO.from + 360,
     tint: {face: "#e8562b", under: "#a8331a", ink: "#2a0d06"},
   },
   {
     name: "Home",
     at: WORLD.far - 300,
+    shows: WORLD.far - 80,
     tint: {face: "#ffd257", under: "#c98f2a", ink: "#2a1a10"},
   },
 ];

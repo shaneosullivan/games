@@ -73,7 +73,9 @@ src/
   main.ts        the way in
   game.ts        the clock, the camera, and keeping the monkey on screen
   core/input.ts  the shared thumbstick and jump button, wired to the game
-  render/        the pixel screen, and the painting of the jungle
+  render/        the pixel screen, the painting of the jungle, and the
+                 chooser's pictures of each part, painted by the same
+                 painter from the same worlds so they never go stale
   art/           the sprites, as letter maps — motion.ts is standing,
                  running, jumping, climbing, the four bored things,
                  landing in the lava (its flames cut away), the

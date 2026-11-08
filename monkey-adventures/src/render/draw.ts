@@ -34,7 +34,9 @@ import type {Screen} from "./screen";
  * looks broken in a way nobody can name.
  */
 export function paint(
-  screen: Screen,
+  /** The game's screen, or anything else with a context and a size —
+   *  the chooser's pictures are painted into canvases of their own. */
+  screen: Pick<Screen, "ctx" | "wide" | "tall">,
   jungle: Jungle,
   monkey: Monkey,
   camera: number,
