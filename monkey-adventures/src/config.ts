@@ -828,9 +828,11 @@ export const RAIN = {
   /** Where the level starts, and where you come back to before the first
    *  mushroom has been passed. */
   backTo: 40,
-  /** How many lives you get. Two: enough that one coconut is a fright
-   *  rather than the end of it, few enough that they are worth watching. */
-  lives: 2,
+  /** How many lives you get. Three, as the river has: enough that a
+   *  coconut is a fright rather than the end of it, few enough that they
+   *  are worth watching. Losing them all puts you back at the last
+   *  mushroom, not the start. */
+  lives: 3,
   /**
    * Coming back to life at a mushroom.
    *

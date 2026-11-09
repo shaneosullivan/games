@@ -508,22 +508,19 @@ export class Game {
     this.sound.chomp();
     this.party.burst(monkey.x, monkey.y - MONKEY.tall, 14);
     // The last mushroom passed, or the start of the level if none has
-    // been. Out of lives and it is the start either way.
+    // been — out of lives as well. Running out fills the hearts again but
+    // does not take the mushrooms back: sending a child to the start for
+    // a third coconut throws away a level they had nearly finished, which
+    // is not a gentle way to fail.
     let post: number = RAIN.backTo;
-    if (this.lives > 0) {
-      for (const one of this.jungle.mushrooms) {
-        if (one.lit) {
-          post = Math.max(post, one.x);
-        }
+    for (const one of this.jungle.mushrooms) {
+      if (one.lit) {
+        post = Math.max(post, one.x);
       }
-    } else {
-      for (const one of this.jungle.mushrooms) {
-        one.lit = false;
-      }
+    }
+    if (this.lives <= 0) {
       this.lives = RAIN.lives;
       this.hud.setLives(this.lives);
-      this.bananas = 0;
-      this.hud.setScore(0);
     }
     this.backTo = post;
     this.sinking = VOLCANO.watchFor;
