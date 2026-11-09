@@ -19,7 +19,13 @@ import {
   propSprite,
 } from "../art/monkey";
 import {BORED, CELEBRATE, ELEPHANT, LAVA, STAND} from "../art/motion";
-import {ELEPHANT_SPRAYS, branchTop} from "../world/jungle";
+import {
+  ELEPHANT_SPRAYS,
+  branchPath,
+  branchTop,
+  trunkMiddle,
+} from "../world/jungle";
+import type {Branch} from "../world/jungle";
 import type {Party} from "./particles";
 import type {Jungle, Tree, Vine} from "../world/jungle";
 import type {Monkey} from "../entities/monkey";
@@ -955,10 +961,15 @@ function standOnFeet(
  * trunk goes; it is when the camera stands back (`HOME.zoomTo`) that the
  * rest of it, and everybody standing in it, comes into view.
  *
- * In layers from the back: the cloud of leaves, the trunk up through it,
- * the branches out across it, the tufts on their ends, and the family on
- * top of the lot — nothing may ever be in front of a monkey, because a
- * monkey in this tree is the point of it.
+ * Not the same on both sides — the trunk leans and bends, the roots
+ * spread further one way, the branches are different each side and the
+ * leaves sit off the middle — because a tree drawn the same both ways is
+ * a drawing of a tree. Outlined, as the monkey is.
+ *
+ * In layers from the back: the cloud of leaves, the trunk and the two
+ * limbs it splits into, the branches across the leaves with their forks
+ * and twigs and leaves, and the family on top of the lot — nothing may be
+ * in front of a monkey, because a monkey in this tree is the point of it.
  */
 function tree(
   g: CanvasRenderingContext2D,
@@ -969,37 +980,66 @@ function tree(
   cheering: boolean,
 ): void {
   const x = Math.round(jungle.homeX - camera);
-  if (x < -HOME.leavesWide - 40 || x > w + HOME.leavesWide + 40) {
+  if (x + HOME.leavesRight < -40 || x + HOME.leavesLeft > w + 40) {
     return;
   }
-  const base = WORLD.floor;
 
   for (const one of puffs()) {
-    leafPuff(g, x + one.x, HOME.leavesAt + one.y, one.r);
+    leafPuff(g, x + one.x, one.y, one.r);
+  }
+  trunk(g, x);
+  // The two limbs the trunk splits into, up into the leaves, and a puff
+  // over the end of each: they go on up out of sight rather than stop.
+  const top = x + trunkMiddle(HOME.crown);
+  const strokes: Array<Stroke> = HOME.limbs.map(([lx, ly]) => ({
+    ax: top,
+    ay: HOME.crown + 6,
+    bx: x + lx,
+    by: ly,
+    from: 14,
+    to: 6,
+  }));
+  wood(g, strokes);
+  for (const [lx, ly] of HOME.limbs) {
+    leafPuff(g, x + lx, ly - 4, 18);
   }
 
-  // The trunk, tapering as it climbs, on roots that spread into the
-  // ground. A column of whole-pixel rows, so the taper is a staircase of
-  // single pixels and not a smear.
-  // It stops inside the leaves, and a puff over its end hides where:
-  // run up to the top of them, it stuck out above like a pole.
-  const crown = Math.round(HOME.leavesAt - HOME.leavesTall * 0.5);
-  for (let y = crown; y < base; y++) {
-    const up = (base - y) / (base - crown);
-    let half = HOME.trunk / 2 - up * (HOME.trunk / 4);
-    // The roots: the last dozen pixels flare out to `roots` wide.
-    const flare = Math.max(0, (y - (base - 12)) / 12);
-    half += flare * flare * (HOME.roots / 2 - HOME.trunk / 2);
-    const left = Math.round(x - half);
-    const wide = Math.round(half * 2);
+  for (const branch of HOME.branches) {
+    limb(g, x, branch);
+  }
+  for (const branch of HOME.branches) {
+    sprigs(g, x, branch);
+  }
+
+  family(g, jungle, camera, w, time, cheering);
+}
+
+/**
+ * The trunk, from its roots up to where it splits, leaning and bending as
+ * `trunkMiddle` says and narrowing as it climbs. A row of whole pixels at a
+ * time, so the edges are a staircase of single pixels and not a smear.
+ */
+function trunk(g: CanvasRenderingContext2D, x: number): void {
+  const base = WORLD.floor;
+  for (let y = HOME.crown; y < base; y++) {
+    const up = (base - y) / (base - HOME.crown);
+    const half = HOME.trunk / 2 - up * (HOME.trunk / 5);
+    // The roots: the last dozen pixels flare out, further to the left.
+    const flare = Math.max(0, (y - (base - 14)) / 14) ** 2;
+    const middle = x + trunkMiddle(y);
+    const left = Math.round(middle - half - flare * (HOME.rootsLeft - half));
+    const right = Math.round(middle + half + flare * (HOME.rootsRight - half));
+    const wide = right - left;
+    g.fillStyle = PAINT.barkLine;
+    g.fillRect(left - 1, y, wide + 2, 1);
     g.fillStyle = PAINT.bark;
     g.fillRect(left, y, wide, 1);
     // Lit down its left side, which is where the jungle's light comes
     // from, and dark down its right.
     g.fillStyle = PAINT.barkLight;
-    g.fillRect(left, y, 2, 1);
+    g.fillRect(left, y, 3, 1);
     g.fillStyle = PAINT.barkDark;
-    g.fillRect(left + wide - 3, y, 3, 1);
+    g.fillRect(right - 5, y, 5, 1);
     // Grooves in the bark, wandering a pixel either way as they climb.
     for (let k = 1; k < 5; k++) {
       const at =
@@ -1007,86 +1047,189 @@ function tree(
       g.fillRect(at, y, 1, 1);
     }
   }
-
-  leafPuff(g, x, crown + 2, 22);
-  leafPuff(g, x - 18, crown + 12, 14);
-  leafPuff(g, x + 20, crown + 10, 15);
-  for (const branch of HOME.branches) {
-    limb(g, x, branch);
-  }
-  for (const branch of HOME.branches) {
-    // Leaves along it, hanging under it between where the family stand,
-    // and a big tuft on the end, so a branch finishes in leaves the way a
-    // branch does rather than stopping like a plank.
-    const way = Math.sign(branch.reach);
-    const long = Math.abs(branch.reach);
-    for (let d = HOME.trunk; d < long - 10; d += HOME.tuftEvery) {
-      leafPuff(
-        g,
-        x + way * d,
-        branchTop(branch, d) + branch.thick + 5,
-        HOME.tuft,
-      );
-    }
-    const tip = branchTop(branch, long);
-    leafPuff(g, x + branch.reach, tip - 4, 14);
-    leafPuff(g, x + branch.reach - way * 12, tip - 10, 10);
-    leafPuff(g, x + branch.reach + way * 6, tip + 6, 9);
-  }
-
-  family(g, jungle, camera, w, time, cheering);
 }
 
 /**
- * One branch, from inside the trunk out to its reach, along the shape
- * `branchTop` gives it: thicker at the trunk, with twigs off it, up and
- * down by turns, each with a leaf or two on the end.
+ * One of the branches the family stand on, along its points, in columns:
+ * its top is exactly where `branchTop` says, which is where their feet
+ * go. Thick at the trunk and thin at the tip, lit along the top and dark
+ * underneath, with the outline round it.
  */
-function limb(
+function limb(g: CanvasRenderingContext2D, x: number, branch: Branch): void {
+  const path = branchPath(branch);
+  const from = path[0][0];
+  const to = path[path.length - 1][0];
+  const way = Math.sign(to - from);
+  const long = Math.abs(to - from);
+  for (let d = 0; d <= long; d++) {
+    const at = from + way * d;
+    const top = branchTop(branch, at);
+    if (top === null) {
+      continue;
+    }
+    const out = d / long;
+    const fat = Math.max(2, Math.round(branch.thick * (1 - out * 0.7)));
+    const sx = Math.round(x + at);
+    g.fillStyle = PAINT.barkLine;
+    g.fillRect(sx, top - 1, 1, fat + 2);
+    g.fillStyle = PAINT.bark;
+    g.fillRect(sx, top, 1, fat);
+    g.fillStyle = PAINT.barkLight;
+    g.fillRect(sx, top, 1, 1);
+    g.fillStyle = PAINT.barkDark;
+    g.fillRect(sx, top + Math.ceil(fat * 0.6), 1, Math.floor(fat * 0.4));
+  }
+}
+
+/** A straight piece of wood, `from` thick at its start and `to` at its
+ *  end. */
+interface Stroke {
+  ax: number;
+  ay: number;
+  bx: number;
+  by: number;
+  from: number;
+  to: number;
+}
+
+/**
+ * Pieces of wood at any angle — the forks, the twigs, the limbs at the top
+ * of the trunk — stamped along their length a square at a time. The
+ * outline goes down first for all of them and the wood over it, so where
+ * two meet they join rather than each being drawn round.
+ */
+function wood(g: CanvasRenderingContext2D, strokes: Array<Stroke>): void {
+  for (const pass of [0, 1]) {
+    for (const s of strokes) {
+      const long = Math.hypot(s.bx - s.ax, s.by - s.ay);
+      for (let i = 0; i <= long; i += 0.5) {
+        const t = i / long;
+        const fat = Math.max(1, Math.round(s.from + (s.to - s.from) * t));
+        const px = Math.round(s.ax + (s.bx - s.ax) * t - fat / 2);
+        const py = Math.round(s.ay + (s.by - s.ay) * t - fat / 2);
+        if (pass === 0) {
+          g.fillStyle = PAINT.barkLine;
+          g.fillRect(px - 1, py - 1, fat + 2, fat + 2);
+        } else {
+          g.fillStyle = fat > 2 ? PAINT.bark : PAINT.barkDark;
+          g.fillRect(px, py, fat, fat);
+        }
+      }
+    }
+  }
+}
+
+/**
+ * The forks off a branch, the twigs off them, and the leaves on all their
+ * ends.
+ *
+ * Every `forkEvery` or so along it, up and outwards mostly and now and
+ * then hanging down; never where one of the family stands, or it would
+ * come up through them. Scattered from a seed of the branch's own, so the
+ * tree is the same every time and no two branches are the same.
+ */
+function sprigs(g: CanvasRenderingContext2D, x: number, branch: Branch): void {
+  const path = branchPath(branch);
+  const from = path[0][0];
+  const to = path[path.length - 1][0];
+  const way = Math.sign(to - from);
+  let seed = Math.abs(Math.round(to * 31 + branch.y * 7)) + 1;
+  const rng = (): number => {
+    seed = (seed * 16807) % 2147483647;
+    return seed / 2147483647;
+  };
+  const strokes: Array<Stroke> = [];
+  const tips: Array<[number, number, number]> = [];
+  const standing = HOME.perches
+    .filter(p => HOME.branches[p.branch] === branch)
+    .map(p => p.at);
+  for (
+    let d = HOME.trunk / 2 + 6 + rng() * 8;
+    d < Math.abs(to - from) - 4;
+    d += HOME.forkEvery * (0.7 + rng() * 0.6)
+  ) {
+    const at = from + way * d;
+    if (standing.some(p => Math.abs(p - at) < 10)) {
+      continue;
+    }
+    const top = branchTop(branch, at);
+    if (top === null) {
+      continue;
+    }
+    const down = rng() < 0.25;
+    // Up, between straight up and well out to the side; or down and out.
+    const angle = down ? 0.3 + rng() * 0.5 : -(0.5 + rng() * 0.9);
+    const long = HOME.forkShort + rng() * (HOME.forkLong - HOME.forkShort);
+    const ax = x + at;
+    const ay = down ? top + 3 : top;
+    const bx = ax + way * Math.cos(angle) * long;
+    const by = ay + Math.sin(angle) * long;
+    strokes.push({ax, ay, bx, by, from: 3, to: 1});
+    tips.push([bx, by, way]);
+    // A twig off it, near its end, splaying the other way.
+    const k = 0.55 + rng() * 0.2;
+    const tx = ax + (bx - ax) * k;
+    const ty = ay + (by - ay) * k;
+    const turn = angle + (rng() < 0.5 ? -0.7 : 0.7);
+    const twig = HOME.twigLong * (0.6 + rng() * 0.4);
+    const ex = tx + way * Math.cos(turn) * twig;
+    const ey = ty + Math.sin(turn) * twig;
+    strokes.push({ax: tx, ay: ty, bx: ex, by: ey, from: 1, to: 1});
+    tips.push([ex, ey, way]);
+  }
+  // And at the very end of the branch, a spray of three.
+  const [ex, ey] = path[path.length - 1];
+  for (const turn of [-0.9, -0.3, 0.3]) {
+    const long = 8 + rng() * 8;
+    const bx = x + ex + way * Math.cos(turn) * long;
+    const by = ey + Math.sin(turn) * long;
+    strokes.push({ax: x + ex, ay: ey + 1, bx, by, from: 2, to: 1});
+    tips.push([bx, by, way]);
+  }
+  wood(g, strokes);
+  for (const [tx, ty, w] of tips) {
+    leaves(g, tx, ty, w);
+  }
+}
+
+/**
+ * A few leaves on the end of a twig: little pointed shapes, pixel by
+ * pixel, two greens, scattered round the tip and pointing out the way
+ * the twig was going.
+ */
+function leaves(
   g: CanvasRenderingContext2D,
   x: number,
-  branch: {y: number; reach: number; thick: number},
+  y: number,
+  way: number,
 ): void {
-  const way = Math.sign(branch.reach);
-  const long = Math.abs(branch.reach);
-  for (let d = HOME.trunk / 4; d <= long; d++) {
-    const out = d / long;
-    const top = branchTop(branch, d);
-    const near = out < 0.3 ? (1 - out / 0.3) * branch.thick : 0;
-    const fat = Math.max(
-      2,
-      Math.round(branch.thick * (1.4 - out * 0.8) + near),
-    );
-    const at = Math.round(x + way * d);
-    g.fillStyle = PAINT.bark;
-    g.fillRect(at, top, 1, fat);
-    g.fillStyle = PAINT.barkLight;
-    g.fillRect(at, top, 1, 1);
-    g.fillStyle = PAINT.barkDark;
-    g.fillRect(at, top + fat - 2, 1, 2);
+  const at: Array<[number, number]> = [
+    [0, -3],
+    [3 * way, 0],
+    [-2 * way, 1],
+  ];
+  for (const [dx, dy] of at) {
+    leaf(g, Math.round(x + dx), Math.round(y + dy), way);
   }
-  // The twigs, from the trunk out: up off the top or down off the
-  // bottom by turns, leaning outwards, each a little different.
-  let k = 0;
-  for (let d = HOME.trunk / 2 + 8; d < long - 6; d += HOME.twigEvery) {
-    k++;
-    const top = branchTop(branch, d);
-    const up = k % 2 === 0;
-    const long2 = 5 + ((k * 7 + Math.round(long)) % (HOME.twigLong - 4));
-    const startY = up ? top : top + branch.thick - 1;
-    g.fillStyle = PAINT.barkDark;
-    for (let i = 0; i < long2; i++) {
-      g.fillRect(
-        Math.round(x + way * (d + i * 0.7)),
-        startY + (up ? -i : i),
-        1,
-        1,
-      );
-    }
-    const endX = Math.round(x + way * (d + long2 * 0.7));
-    const endY = startY + (up ? -long2 : long2);
-    leafPuff(g, endX, endY, 4);
-  }
+}
+
+/** One leaf: a pointed shape five pixels long, its point outwards, in
+ *  greens lighter than the leaves behind it so it shows against them. */
+function leaf(
+  g: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  way: number,
+): void {
+  const tip = way > 0 ? x + 3 : x - 3;
+  g.fillStyle = PAINT.leafDark;
+  g.fillRect(x - 2, y - 1, 5, 3);
+  g.fillRect(tip, y, 1, 1);
+  g.fillStyle = PAINT.sprig;
+  g.fillRect(x - 1, y - 1, 3, 2);
+  g.fillRect(way > 0 ? x + 2 : x - 2, y, 1, 1);
+  g.fillStyle = PAINT.sprigLight;
+  g.fillRect(x - 1, y - 1, 2, 1);
 }
 
 /** One puff of leaves: its dark underside, itself, the light on top. */
@@ -1120,18 +1263,21 @@ function disc(
   const cy = Math.round(y);
   const rr = Math.round(r);
   for (let dy = -rr; dy <= rr; dy++) {
-    const half = Math.floor(Math.sqrt(r * r - dy * dy));
+    const half = Math.floor(Math.sqrt(Math.max(0, r * r - dy * dy)));
     g.fillRect(cx - half, cy + dy, half * 2 + 1, 1);
   }
 }
 
 /**
- * Where the puffs of the tree's leaves are, from the middle of its cloud.
+ * Where the puffs of the tree's leaves are, across from the middle of the
+ * trunk and down from the top of the picture.
  *
  * Scattered once from a fixed seed, so the tree is the same tree every
- * time, and in order from the top down: each puff is drawn over the one
- * above it, which puts every puff's lit top over the shadow of the last
- * and is what turns a heap of circles into a cloud.
+ * time, inside the lopsided outline `HOME.leaves*` gives — round at the
+ * ends, higher on the left — with a row of smaller ones hanging below it.
+ * In order from the top down: each puff is drawn over the one above it,
+ * which puts every puff's lit top over the shadow of the last and is
+ * what turns a heap of circles into a cloud.
  */
 let scattered: Array<{x: number; y: number; r: number}> | null = null;
 
@@ -1144,16 +1290,28 @@ function puffs(): Array<{x: number; y: number; r: number}> {
     seed = (seed * 16807) % 2147483647;
     return seed / 2147483647;
   };
+  const left = HOME.leavesLeft;
+  const right = HOME.leavesRight;
   const made: Array<{x: number; y: number; r: number}> = [];
   for (let i = 0; i < HOME.puffs; i++) {
-    // Inside an ellipse, flattened at the bottom the way a crown of
-    // leaves is.
-    const a = rng() * Math.PI * 2;
-    const d = Math.sqrt(rng());
     const r = HOME.puffSmall + rng() * (HOME.puffBig - HOME.puffSmall);
+    const along = rng();
+    const across = left + r + along * (right - left - 2 * r);
+    // Higher at the left, and rounder towards the ends.
+    const top = HOME.leavesTop + r * 0.6 + HOME.tilt * along;
+    const bottom = HOME.leavesBottom - r * 0.4;
+    const round = Math.sqrt(1 - (2 * along - 1) ** 2);
+    const middle = (top + bottom) / 2;
+    const half = ((bottom - top) / 2) * (0.35 + 0.65 * round);
+    made.push({x: across, y: middle + (rng() * 2 - 1) * half, r});
+  }
+  for (let i = 0; i < HOME.hangers; i++) {
+    const along = (i + rng()) / HOME.hangers;
+    const r = 8 + rng() * 6;
+    const round = Math.sqrt(1 - (2 * along - 1) ** 2);
     made.push({
-      x: Math.cos(a) * d * (HOME.leavesWide - r),
-      y: Math.min(0.55, Math.sin(a) * d) * (HOME.leavesTall - r * 0.6),
+      x: left + 20 + along * (right - left - 40),
+      y: HOME.leavesBottom - 20 * (1 - round) + rng() * HOME.hangBy,
       r,
     });
   }

@@ -147,8 +147,10 @@ export class Game {
       if (this.partyIn <= 0) {
         this.partyIn = PARTY.every;
         this.party.burst(
-          this.jungle.homeX + (Math.random() - 0.5) * 1.6 * HOME.leavesWide,
-          HOME.leavesAt - HOME.leavesTall + Math.random() * 40,
+          this.jungle.homeX +
+            HOME.leavesLeft +
+            Math.random() * (HOME.leavesRight - HOME.leavesLeft),
+          HOME.leavesTop + Math.random() * 40,
         );
       }
       return;

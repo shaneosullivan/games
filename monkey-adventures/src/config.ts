@@ -744,6 +744,12 @@ export const PAINT = {
   leafDark: "#1d4a2e",
   leaf: "#2d6f40",
   leafLight: "#4f9a50",
+  /** The leaves on the twigs, lighter than the cloud behind them so they
+   *  show against it: the leaf, and the light on it. */
+  sprig: "#6fbf5a",
+  sprigLight: "#a6e07a",
+  /** The line round the tree's wood, as the monkey has one round it. */
+  barkLine: "#33210f",
   croc: "#3f7b3f",
   crocDark: "#2d5a2e",
   crocMouth: "#8c3a4a",
@@ -784,56 +790,130 @@ export const HOME = {
    * the whole tree fits in that, ground to the top of the leaves.
    */
   trunk: 46,
-  /** How wide the roots spread where they meet the ground. */
-  roots: 86,
-  /** The cloud of leaves: its middle, how far it reaches either way and
-   *  up and down, and how many puffs it is made of, how big. */
-  leavesAt: -100,
-  leavesWide: 215,
-  leavesTall: 76,
-  puffs: 110,
-  puffSmall: 18,
-  puffBig: 34,
+  /** How far the roots spread where they meet the ground, either way
+   *  from the middle — further on the left, so the tree has a side it
+   *  leans away from. */
+  rootsLeft: 50,
+  rootsRight: 36,
+  /** How far the top of the trunk has leaned over to the right by the
+   *  time it reaches the leaves. A tree that stands dead straight with
+   *  the same on both sides looks like a drawing of a tree. */
+  lean: 14,
+  /** And how far it bends either way on the way up. */
+  bend: 6,
+  /** Where the trunk ends, up in the leaves: it splits there into two
+   *  great limbs that climb on up into them, to these points. */
+  crown: -112,
+  limbs: [
+    [-46, -150],
+    [52, -146],
+  ],
   /**
-   * The branches the family stands on, in front of the leaves: about how
-   * high the top of each is, how far out it reaches from the middle of
-   * the trunk (negative is to the left), and how thick. The shape along
-   * it is `branchTop`'s. The lowest pair are under the leaves, against
-   * the sky, the rest among them; the top pair are kept below the leaves
-   * overhead, which are the top of the picture.
+   * The cloud of leaves: from how far left to how far right, and from how
+   * high to how low, and how many puffs it is made of, how big. Further
+   * out to the left than the right, and higher on the left too (`tilt`,
+   * how much higher at its left end than its right), and low enough at
+   * the bottom to hang down round the lowest branches.
+   */
+  leavesLeft: -238,
+  leavesRight: 196,
+  leavesTop: -176,
+  leavesBottom: -16,
+  tilt: 18,
+  puffs: 130,
+  puffSmall: 16,
+  puffBig: 32,
+  /** Along the bottom of the leaves, a row of smaller puffs hanging lower
+   *  than the rest: how many, and how far below the bottom they reach. */
+  hangers: 22,
+  hangBy: 12,
+  /**
+   * The branches the family stand on, each from where it leaves the trunk
+   * (`y`, the height it leaves at) through the points it bends at — across
+   * from the middle of the trunk, and down from the top of the picture —
+   * to its tip. Kinked rather than curved, the way a branch drawn in
+   * pixels is, and climbing as they go out. Not the same on both sides:
+   * three to the left reaching further, three to the right higher up.
+   * The top of each is where its points are; the family stand on that.
    */
   branches: [
-    {y: -22, reach: -165, thick: 8},
-    {y: -22, reach: 168, thick: 8},
-    {y: -68, reach: -140, thick: 7},
-    {y: -62, reach: 136, thick: 7},
-    {y: -108, reach: -110, thick: 6},
-    {y: -114, reach: 104, thick: 6},
-    {y: -146, reach: -62, thick: 5},
-    {y: -146, reach: 66, thick: 5},
+    {
+      y: -14,
+      thick: 9,
+      points: [
+        [-62, -30],
+        [-130, -40],
+        [-212, -62],
+      ],
+    },
+    {
+      y: -64,
+      thick: 8,
+      points: [
+        [-52, -80],
+        [-112, -90],
+        [-170, -114],
+      ],
+    },
+    {
+      y: -116,
+      thick: 6,
+      points: [
+        [-44, -128],
+        [-100, -142],
+      ],
+    },
+    {
+      y: -40,
+      thick: 8,
+      points: [
+        [56, -48],
+        [116, -52],
+        [176, -72],
+      ],
+    },
+    {
+      y: -94,
+      thick: 7,
+      points: [
+        [48, -104],
+        [104, -114],
+        [142, -134],
+      ],
+    },
+    {
+      y: -134,
+      thick: 5,
+      points: [
+        [36, -140],
+        [74, -150],
+      ],
+    },
   ],
-  /** Twigs off the branches: how far apart, and how long at most. */
-  twigEvery: 13,
-  twigLong: 11,
-  /** Puffs of leaves along each branch as well as on its end: how far
-   *  apart, and how big. */
-  tuftEvery: 34,
-  tuft: 11,
-  /** Where the family stand: which branch, and how far along it from the
-   *  trunk, as a share of its reach. */
+  /**
+   * The forks off each branch, and the twigs off those, with leaves on
+   * the ends: how far apart the forks are along a branch, how long they
+   * are at most and at least, and how long a twig is. Placed from a seed,
+   * so the tree is the same tree every time.
+   */
+  forkEvery: 24,
+  forkLong: 34,
+  forkShort: 14,
+  twigLong: 9,
+  /** Where the family stand: which branch, and how far across from the
+   *  middle of the trunk. On the flatter stretches, so nobody is stood on
+   *  a slope. */
   perches: [
-    {branch: 0, along: 0.45},
-    {branch: 0, along: 0.82},
-    {branch: 1, along: 0.4},
-    {branch: 1, along: 0.8},
-    {branch: 2, along: 0.48},
-    {branch: 2, along: 0.85},
-    {branch: 3, along: 0.5},
-    {branch: 3, along: 0.86},
-    {branch: 4, along: 0.72},
-    {branch: 5, along: 0.72},
-    {branch: 6, along: 0.68},
-    {branch: 7, along: 0.66},
+    {branch: 0, at: -96},
+    {branch: 0, at: -170},
+    {branch: 1, at: -84},
+    {branch: 1, at: -140},
+    {branch: 2, at: -74},
+    {branch: 3, at: 86},
+    {branch: 3, at: 146},
+    {branch: 4, at: 76},
+    {branch: 4, at: 120},
+    {branch: 5, at: 56},
   ],
   /** How fast they shift about while waiting, and how far — a pixel or
    *  two, so the end of the jungle is alive without anybody doing

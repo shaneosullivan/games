@@ -179,27 +179,46 @@ export interface Vent {
 }
 
 /** One of the monkeys waiting at home. */
+/** One of the tree's branches at home: see `HOME.branches`. */
+export type Branch = (typeof HOME.branches)[number];
+
 /**
- * The top of one of the tree's branches, `d` out from the middle of the
- * trunk.
- *
- * It leaves the trunk lower down and climbs to its height over the first
- * third, lifts at the end the way a branch reaching for the light does,
- * and is bumpy all along: two slow waves, a different pair for every
- * branch. Here and not in the drawing, because the family stand on it —
- * their feet go wherever this says the wood is.
+ * Where the middle of the tree's trunk is at height `y`, across from the
+ * bottom of it: leaning over to the right as it climbs, more and more,
+ * with a bend one way and then the other.
  */
-export function branchTop(
-  branch: {y: number; reach: number; thick: number},
-  d: number,
-): number {
-  const out = d / Math.abs(branch.reach);
-  const climb = out < 0.3 ? (1 - out / 0.3) ** 2 * branch.thick * 2 : 0;
-  const lift = out > 0.85 ? (out - 0.85) * 50 : 0;
-  const own = branch.reach * 0.37 + branch.y;
-  const bumps =
-    Math.sin(d * 0.11 + own) * 1.6 + Math.sin(d * 0.043 + own * 2) * 2.4;
-  return Math.round(branch.y + climb - lift + bumps);
+export function trunkMiddle(y: number): number {
+  const up = Math.max(0, (WORLD.floor - y) / (WORLD.floor - HOME.leavesTop));
+  // And with a bend in it on the way: a trunk dead straight is a pole.
+  return up * up * HOME.lean + Math.sin(up * Math.PI * 1.6) * HOME.bend;
+}
+
+/** A branch's points from the trunk out, starting inside the trunk. */
+export function branchPath(branch: Branch): Array<readonly [number, number]> {
+  return [[trunkMiddle(branch.y), branch.y], ...branch.points];
+}
+
+/**
+ * The top of one of the tree's branches at `at` across from the middle
+ * of the trunk, or null past its tip.
+ *
+ * Straight between its points, which is what gives it its kinks, and
+ * bumpy along that by a pixel or two. Here and not in the drawing,
+ * because the family stand on it: their feet go wherever this says the
+ * wood is.
+ */
+export function branchTop(branch: Branch, at: number): number | null {
+  const path = branchPath(branch);
+  for (let i = 0; i < path.length - 1; i++) {
+    const [ax, ay] = path[i];
+    const [bx, by] = path[i + 1];
+    const t = (at - ax) / (bx - ax);
+    if (t >= 0 && t <= 1) {
+      const bumps = Math.sin(at * 0.19 + branch.y) * 0.8;
+      return Math.round(ay + (by - ay) * t + bumps);
+    }
+  }
+  return null;
 }
 
 export interface Family {
@@ -402,12 +421,12 @@ export class Jungle {
     for (const perch of HOME.perches) {
       const branch = HOME.branches[perch.branch];
       this.family.push({
-        x: this.homeX + branch.reach * perch.along,
-        y: branchTop(branch, Math.abs(branch.reach) * perch.along),
+        x: this.homeX + perch.at,
+        y: branchTop(branch, perch.at) ?? branch.y,
         coat: 1 + Math.floor(rng() * 3),
         phase: rng() * Math.PI * 2,
         // Looking in, at the trunk, which is where you will be.
-        facingLeft: branch.reach > 0,
+        facingLeft: perch.at > 0,
       });
     }
 
