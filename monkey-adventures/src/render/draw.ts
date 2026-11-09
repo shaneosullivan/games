@@ -19,11 +19,10 @@ import {
   propSprite,
 } from "../art/monkey";
 import {BORED, CELEBRATE, ELEPHANT, LAVA, STAND} from "../art/motion";
-import {ELEPHANT_SPRAYS} from "../world/jungle";
+import {ELEPHANT_SPRAYS, branchTop} from "../world/jungle";
 import type {Party} from "./particles";
 import type {Jungle, Tree, Vine} from "../world/jungle";
 import type {Monkey} from "../entities/monkey";
-import type {Screen} from "./screen";
 
 /**
  * The jungle, painted back to front.
@@ -36,7 +35,7 @@ import type {Screen} from "./screen";
 export function paint(
   /** The game's screen, or anything else with a context and a size —
    *  the chooser's pictures are painted into canvases of their own. */
-  screen: Pick<Screen, "ctx" | "wide" | "tall">,
+  screen: {ctx: CanvasRenderingContext2D; wide: number; tall: number},
   jungle: Jungle,
   monkey: Monkey,
   camera: number,
@@ -46,15 +45,33 @@ export function paint(
   /** Whether the monkey has got home, which is when the family stops
    *  waiting and starts jumping. */
   cheering: boolean,
-  /** A sky other than the level's own, for a picture of it: top, bottom. */
-  ownSky?: {high: string; low: string},
+  view: {
+    /** A sky other than the level's own, for a picture of it. */
+    sky?: {high: string; low: string};
+    /** How far the camera has stood back: 1 while playing, less once you
+     *  are home and it is showing you the tree. See `HOME.zoomTo`. */
+    zoom?: number;
+  } = {},
 ): void {
   const g = screen.ctx;
-  const w = screen.wide;
+  const zoom = view.zoom ?? 1;
+  // Stood back, the picture holds more world than it has pixels for: a
+  // wider stretch, and taller — upwards only, because the ground stays
+  // where it is along the bottom. `top` is where the top of the picture
+  // now is, in the world: zero while playing, above it once stood back.
+  const w = screen.wide / zoom;
   const h = screen.tall;
+  const top = screen.tall - screen.tall / zoom;
+  g.save();
+  g.scale(zoom, zoom);
+  g.translate(0, -top);
 
-  sky(g, w, h, jungle.raining, ownSky);
+  sky(g, w, h, top, jungle.raining, view.sky);
+  // The leaves overhead are the top of the picture, wherever that is.
+  g.save();
+  g.translate(0, top);
   canopy(g, w, camera);
+  g.restore();
 
   // Two layers of trees at different speeds. The far ones are lighter and
   // hazier, which is most of what makes them look far away.
@@ -104,22 +121,28 @@ export function paint(
     if (vine.x - camera < -90 || vine.x - camera > w + 90) {
       continue;
     }
-    rope(g, vine, camera, vine === monkey.vine, time);
+    rope(g, vine, camera, vine === monkey.vine, time, top);
   }
 
   if (jungle.raining) {
-    coconuts(g, jungle, camera, w);
+    coconuts(g, jungle, camera, w, top);
   }
   bananas(g, jungle, camera, w);
-  home(g, Math.round(jungle.homeX - camera), h);
-  family(g, jungle, camera, w, time, cheering);
+  tree(g, jungle, camera, w, time, cheering);
   drawMonkey(g, monkey, camera, alpha);
   party.draw(g, camera);
   if (jungle.raining) {
     // In front of everything, because rain is between you and the jungle.
-    rain(g, w, h, camera, time);
+    g.save();
+    g.translate(0, top);
+    rain(g, w, h - top, camera, time);
+    g.restore();
   }
-  dapples(g, jungle, camera, time, w, h);
+  g.save();
+  g.translate(0, top);
+  dapples(g, jungle, camera, time, w, h - top);
+  g.restore();
+  g.restore();
 }
 
 /**
@@ -147,14 +170,15 @@ function sky(
   g: CanvasRenderingContext2D,
   w: number,
   h: number,
+  top: number,
   wet: boolean,
   own?: {high: string; low: string},
 ): void {
-  const grad = g.createLinearGradient(0, 0, 0, h);
+  const grad = g.createLinearGradient(0, top, 0, h);
   grad.addColorStop(0, own?.high ?? (wet ? PAINT.wetSkyHigh : PAINT.skyHigh));
   grad.addColorStop(1, own?.low ?? (wet ? PAINT.wetSkyLow : PAINT.skyLow));
   g.fillStyle = grad;
-  g.fillRect(0, 0, w, h);
+  g.fillRect(0, top, w, h - top);
 }
 
 /** A row of trees: a trunk and a lumpy crown, all on whole pixels. */
@@ -607,6 +631,8 @@ function coconuts(
   jungle: Jungle,
   camera: number,
   w: number,
+  /** Where the top of the picture is: see `paint`. */
+  top: number,
 ): void {
   const nut = propSprite("coconut");
   const burst = propSprite("splat");
@@ -633,7 +659,10 @@ function coconuts(
     const at = x + shake;
     if (!one.falling) {
       g.fillStyle = PAINT.vineDark;
-      g.fillRect(at, Math.round(one.y) - 4, 1, 4);
+      // Up to the top of the picture, which is above the stalk's own
+      // four pixels once the camera has stood back.
+      const from = Math.min(Math.round(one.y) - 4, top);
+      g.fillRect(at, from, 1, Math.round(one.y) - from);
     }
     g.drawImage(
       nut,
@@ -726,7 +755,15 @@ function rope(
   camera: number,
   held: boolean,
   time: number,
+  top: number,
 ): void {
+  // Stood back at home, the leaves overhead are far above where the vine
+  // was tied, and a vine stopping in the open sky is a vine hanging from
+  // nothing: so it carries on up to them.
+  if (top < 0) {
+    g.fillStyle = PAINT.vineDark;
+    g.fillRect(Math.round(vine.x - camera), top, 1, vine.y - top);
+  }
   if (vine.snake) {
     snake(g, vine, camera, time);
     return;
@@ -909,29 +946,225 @@ function standOnFeet(
   g.drawImage(sprite, snap(x - wide / 2), snap(y - tall), wide, tall);
 }
 
-/** Home: a little hut in the trees at the end of the jungle. */
-function home(g: CanvasRenderingContext2D, x: number, h: number): void {
-  if (x < -40 || x > 400) {
+/**
+ * Home: one enormous tree at the end of the jungle, with the family up in
+ * its branches.
+ *
+ * Built so that while you play it is only a trunk. Its lowest branch is
+ * above the top of the picture, and the leaves overhead hide where the
+ * trunk goes; it is when the camera stands back (`HOME.zoomTo`) that the
+ * rest of it, and everybody standing in it, comes into view.
+ *
+ * In layers from the back: the cloud of leaves, the trunk up through it,
+ * the branches out across it, the tufts on their ends, and the family on
+ * top of the lot — nothing may ever be in front of a monkey, because a
+ * monkey in this tree is the point of it.
+ */
+function tree(
+  g: CanvasRenderingContext2D,
+  jungle: Jungle,
+  camera: number,
+  w: number,
+  time: number,
+  cheering: boolean,
+): void {
+  const x = Math.round(jungle.homeX - camera);
+  if (x < -HOME.leavesWide - 40 || x > w + HOME.leavesWide + 40) {
     return;
   }
   const base = WORLD.floor;
-  g.fillStyle = PAINT.homeDark;
-  g.fillRect(x - 14, base - 26, 28, 26);
-  g.fillStyle = PAINT.home;
-  g.fillRect(x - 12, base - 24, 24, 22);
-  g.fillStyle = PAINT.homeDark;
-  g.fillRect(x - 5, base - 14, 10, 14);
-  // A roof of leaves, because it is a monkey's house.
-  g.fillStyle = PAINT.canopy;
-  g.fillRect(x - 17, base - 32, 34, 7);
-  g.fillRect(x - 13, base - 36, 26, 6);
-  void h;
+
+  for (const one of puffs()) {
+    leafPuff(g, x + one.x, HOME.leavesAt + one.y, one.r);
+  }
+
+  // The trunk, tapering as it climbs, on roots that spread into the
+  // ground. A column of whole-pixel rows, so the taper is a staircase of
+  // single pixels and not a smear.
+  // It stops inside the leaves, and a puff over its end hides where:
+  // run up to the top of them, it stuck out above like a pole.
+  const crown = Math.round(HOME.leavesAt - HOME.leavesTall * 0.5);
+  for (let y = crown; y < base; y++) {
+    const up = (base - y) / (base - crown);
+    let half = HOME.trunk / 2 - up * (HOME.trunk / 4);
+    // The roots: the last dozen pixels flare out to `roots` wide.
+    const flare = Math.max(0, (y - (base - 12)) / 12);
+    half += flare * flare * (HOME.roots / 2 - HOME.trunk / 2);
+    const left = Math.round(x - half);
+    const wide = Math.round(half * 2);
+    g.fillStyle = PAINT.bark;
+    g.fillRect(left, y, wide, 1);
+    // Lit down its left side, which is where the jungle's light comes
+    // from, and dark down its right.
+    g.fillStyle = PAINT.barkLight;
+    g.fillRect(left, y, 2, 1);
+    g.fillStyle = PAINT.barkDark;
+    g.fillRect(left + wide - 3, y, 3, 1);
+    // Grooves in the bark, wandering a pixel either way as they climb.
+    for (let k = 1; k < 5; k++) {
+      const at =
+        left + Math.round((k / 5) * wide + Math.sin(y * 0.07 + k) * 1.2);
+      g.fillRect(at, y, 1, 1);
+    }
+  }
+
+  leafPuff(g, x, crown + 2, 22);
+  leafPuff(g, x - 18, crown + 12, 14);
+  leafPuff(g, x + 20, crown + 10, 15);
+  for (const branch of HOME.branches) {
+    limb(g, x, branch);
+  }
+  for (const branch of HOME.branches) {
+    // Leaves along it, hanging under it between where the family stand,
+    // and a big tuft on the end, so a branch finishes in leaves the way a
+    // branch does rather than stopping like a plank.
+    const way = Math.sign(branch.reach);
+    const long = Math.abs(branch.reach);
+    for (let d = HOME.trunk; d < long - 10; d += HOME.tuftEvery) {
+      leafPuff(
+        g,
+        x + way * d,
+        branchTop(branch, d) + branch.thick + 5,
+        HOME.tuft,
+      );
+    }
+    const tip = branchTop(branch, long);
+    leafPuff(g, x + branch.reach, tip - 4, 14);
+    leafPuff(g, x + branch.reach - way * 12, tip - 10, 10);
+    leafPuff(g, x + branch.reach + way * 6, tip + 6, 9);
+  }
+
+  family(g, jungle, camera, w, time, cheering);
 }
 
 /**
- * The monkeys waiting at home.
+ * One branch, from inside the trunk out to its reach, along the shape
+ * `branchTop` gives it: thicker at the trunk, with twigs off it, up and
+ * down by turns, each with a leaf or two on the end.
+ */
+function limb(
+  g: CanvasRenderingContext2D,
+  x: number,
+  branch: {y: number; reach: number; thick: number},
+): void {
+  const way = Math.sign(branch.reach);
+  const long = Math.abs(branch.reach);
+  for (let d = HOME.trunk / 4; d <= long; d++) {
+    const out = d / long;
+    const top = branchTop(branch, d);
+    const near = out < 0.3 ? (1 - out / 0.3) * branch.thick : 0;
+    const fat = Math.max(
+      2,
+      Math.round(branch.thick * (1.4 - out * 0.8) + near),
+    );
+    const at = Math.round(x + way * d);
+    g.fillStyle = PAINT.bark;
+    g.fillRect(at, top, 1, fat);
+    g.fillStyle = PAINT.barkLight;
+    g.fillRect(at, top, 1, 1);
+    g.fillStyle = PAINT.barkDark;
+    g.fillRect(at, top + fat - 2, 1, 2);
+  }
+  // The twigs, from the trunk out: up off the top or down off the
+  // bottom by turns, leaning outwards, each a little different.
+  let k = 0;
+  for (let d = HOME.trunk / 2 + 8; d < long - 6; d += HOME.twigEvery) {
+    k++;
+    const top = branchTop(branch, d);
+    const up = k % 2 === 0;
+    const long2 = 5 + ((k * 7 + Math.round(long)) % (HOME.twigLong - 4));
+    const startY = up ? top : top + branch.thick - 1;
+    g.fillStyle = PAINT.barkDark;
+    for (let i = 0; i < long2; i++) {
+      g.fillRect(
+        Math.round(x + way * (d + i * 0.7)),
+        startY + (up ? -i : i),
+        1,
+        1,
+      );
+    }
+    const endX = Math.round(x + way * (d + long2 * 0.7));
+    const endY = startY + (up ? -long2 : long2);
+    leafPuff(g, endX, endY, 4);
+  }
+}
+
+/** One puff of leaves: its dark underside, itself, the light on top. */
+function leafPuff(
+  g: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  r: number,
+): void {
+  disc(g, x, y + 4, r, PAINT.leafDark);
+  disc(g, x, y, r - 2, PAINT.leaf);
+  disc(
+    g,
+    x - Math.round(r * 0.2),
+    y - Math.round(r * 0.35),
+    r * 0.5,
+    PAINT.leafLight,
+  );
+}
+
+/** A filled circle, a row of whole pixels at a time. */
+function disc(
+  g: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  r: number,
+  colour: string,
+): void {
+  g.fillStyle = colour;
+  const cx = Math.round(x);
+  const cy = Math.round(y);
+  const rr = Math.round(r);
+  for (let dy = -rr; dy <= rr; dy++) {
+    const half = Math.floor(Math.sqrt(r * r - dy * dy));
+    g.fillRect(cx - half, cy + dy, half * 2 + 1, 1);
+  }
+}
+
+/**
+ * Where the puffs of the tree's leaves are, from the middle of its cloud.
  *
- * Milling about while you are away — a pixel or two either way, which is
+ * Scattered once from a fixed seed, so the tree is the same tree every
+ * time, and in order from the top down: each puff is drawn over the one
+ * above it, which puts every puff's lit top over the shadow of the last
+ * and is what turns a heap of circles into a cloud.
+ */
+let scattered: Array<{x: number; y: number; r: number}> | null = null;
+
+function puffs(): Array<{x: number; y: number; r: number}> {
+  if (scattered) {
+    return scattered;
+  }
+  let seed = 12345;
+  const rng = (): number => {
+    seed = (seed * 16807) % 2147483647;
+    return seed / 2147483647;
+  };
+  const made: Array<{x: number; y: number; r: number}> = [];
+  for (let i = 0; i < HOME.puffs; i++) {
+    // Inside an ellipse, flattened at the bottom the way a crown of
+    // leaves is.
+    const a = rng() * Math.PI * 2;
+    const d = Math.sqrt(rng());
+    const r = HOME.puffSmall + rng() * (HOME.puffBig - HOME.puffSmall);
+    made.push({
+      x: Math.cos(a) * d * (HOME.leavesWide - r),
+      y: Math.min(0.55, Math.sin(a) * d) * (HOME.leavesTall - r * 0.6),
+      r,
+    });
+  }
+  scattered = made.sort((p, q) => p.y - q.y);
+  return scattered;
+}
+
+/**
+ * The monkeys waiting at home, up in the tree.
+ *
+ * Milling about along their branches while you are away — a pixel or two either way, which is
  * enough to say "alive" at this size — and jumping with their arms up once
  * you arrive. The same sprite as the monkey being played, in other coats,
  * because they are the same animal and a family should look like one.
@@ -966,7 +1199,7 @@ function family(
           one.coat,
         ),
         x,
-        WORLD.floor,
+        one.y,
         MONKEY.detail,
       );
     } else {
@@ -979,7 +1212,7 @@ function family(
           one.coat,
         ),
         x + shift,
-        WORLD.floor,
+        one.y,
         MONKEY.detail,
       );
     }

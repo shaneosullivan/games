@@ -1,6 +1,7 @@
 import {
   COCONUT,
   EDGE,
+  HOME,
   JUNGLE,
   LAKE,
   MONKEY,
@@ -8,6 +9,7 @@ import {
   PARTY,
   RAIN,
   RIVER,
+  SCREEN,
   SIM,
   VOLCANO,
   WORLD,
@@ -64,6 +66,12 @@ export class Game {
    */
   private reviving: {sparkling: number; burst: boolean} | null = null;
   private partyIn = 0;
+  /** How long since the monkey got home, and where the camera was when it
+   *  did: the standing back starts from there. */
+  private homeFor = 0;
+  private cameraWas = 0;
+  /** What the stood-back view of home is painted into: see `standBack`. */
+  private readonly backdrop = backdrop();
   private time = 0;
   private behind = 0;
   private last = 0;
@@ -126,15 +134,21 @@ export class Game {
     }
 
     if (this.finished) {
-      // Home. The jungle carries on breathing and the party keeps going up
-      // over the hut until somebody presses the button.
+      // Home. The jungle carries on breathing, the camera stands back to
+      // show the tree, and then the party goes up over it and the card
+      // comes up, and they keep going until somebody presses the button.
       this.jungle.update(dt, this.time, null);
+      const was = this.homeFor;
+      this.homeFor += dt;
+      if (was < HOME.cardAfter && this.homeFor >= HOME.cardAfter) {
+        this.hud.setFinished(true, this.bananas, this.jungle.bananas.length);
+      }
       this.partyIn -= dt;
       if (this.partyIn <= 0) {
         this.partyIn = PARTY.every;
         this.party.burst(
-          this.jungle.homeX + (Math.random() - 0.5) * 70,
-          WORLD.floor - 30 - Math.random() * 20,
+          this.jungle.homeX + (Math.random() - 0.5) * 1.6 * HOME.leavesWide,
+          HOME.leavesAt - HOME.leavesTall + Math.random() * 40,
         );
       }
       return;
@@ -201,16 +215,16 @@ export class Game {
     const want = this.monkey.x - this.screen.wide / 3;
     const ease = 1 - Math.exp(-6 * dt);
     this.camera += (want - this.camera) * ease;
-    this.camera = Math.max(
-      0,
-      Math.min(WORLD.far - this.screen.wide + 40, this.camera),
-    );
+    this.camera = Math.max(0, Math.min(this.farthest(), this.camera));
     this.keepInView();
 
     if (this.monkey.arrived && !this.finished) {
       this.finished = true;
-      this.partyIn = 0;
-      this.hud.setFinished(true, this.bananas, this.jungle.bananas.length);
+      this.homeFor = 0;
+      this.cameraWas = this.camera;
+      // The party waits for the tree: fireworks over leaves nobody can see
+      // yet would be fireworks over nothing.
+      this.partyIn = HOME.zoomWaits + HOME.zoomFor;
     }
   }
 
@@ -603,13 +617,14 @@ export class Game {
 
   /** Where the view sits when the monkey is at a point. */
   private wantCamera(at: number): number {
-    return Math.max(
-      0,
-      Math.min(
-        this.jungle.far - this.screen.wide + 40,
-        at - this.screen.wide / 3,
-      ),
-    );
+    return Math.max(0, Math.min(this.farthest(), at - this.screen.wide / 3));
+  }
+
+  /** The farthest along the camera goes while you are playing: a little
+   *  way past the middle of the trunk, so the trunk is in the picture as
+   *  you come up to it and not cut by its edge. */
+  private farthest(): number {
+    return this.jungle.homeX + HOME.beyond - this.screen.wide;
   }
 
   /** The monkey, standing at a point, facing the way it was going. */
@@ -804,20 +819,113 @@ export class Game {
   }
 
   private draw(alpha: number): void {
-    this.hud.setProgress(this.monkey.x / this.jungle.homeX);
+    this.hud.setProgress(this.monkey.x / (this.jungle.homeX - HOME.arriveBy));
+    const t = this.finished
+      ? Math.min(1, Math.max(0, (this.homeFor - HOME.zoomWaits) / HOME.zoomFor))
+      : 0;
+    if (t <= 0) {
+      paint(
+        this.screen,
+        this.jungle,
+        this.monkey,
+        Math.round(this.camera),
+        this.time,
+        alpha,
+        this.party,
+        this.finished,
+      );
+      return;
+    }
+    this.standBack(t, alpha);
+  }
+
+  /**
+   * Home: the camera standing back from where it was to a view of the
+   * whole tree, its trunk in the middle, `t` of the way there.
+   *
+   * Painted at the end of the move every frame, stood all the way back,
+   * and the part of that the camera is showing now is blown up onto the
+   * screen. Not painted at the scale of the moment: at a scale between
+   * the whole ones every one-pixel column of ground and trunk lands
+   * between two of the canvas's pixels, and the picture comes out in
+   * stripes. Blown up without smoothing, each pixel is one pixel of the
+   * painting, and there are no stripes.
+   *
+   * Eased at both ends, so it sets off gently and settles rather than
+   * stopping dead.
+   */
+  private standBack(t: number, alpha: number): void {
+    const screen = this.screen;
+    const back = this.backdrop;
+    if (
+      back.canvas.width !== screen.canvas.width ||
+      back.canvas.height !== screen.canvas.height
+    ) {
+      back.canvas.width = screen.canvas.width;
+      back.canvas.height = screen.canvas.height;
+      back.ctx.setTransform(SCREEN.fine, 0, 0, SCREEN.fine, 0, 0);
+      back.ctx.imageSmoothingEnabled = false;
+    }
+    back.wide = screen.wide;
+    const zoomTo = HOME.zoomTo;
+    const left = Math.round(this.jungle.homeX - screen.wide / zoomTo / 2);
     paint(
-      this.screen,
+      back,
       this.jungle,
       this.monkey,
-      Math.round(this.camera),
+      left,
       this.time,
       alpha,
       this.party,
       this.finished,
+      {zoom: zoomTo},
     );
+
+    const e = t * t * (3 - 2 * t);
+    const zoom = 1 + (zoomTo - 1) * e;
+    const camera = this.cameraWas + (left - this.cameraWas) * e;
+    // Where the view of this moment is in the painting, in the painting's
+    // own pixels: it is `zoomTo * fine` of them to a picture pixel, and
+    // its top is as far above the painting's as the ground stays put.
+    const per = zoomTo * SCREEN.fine;
+    const wide = screen.wide / zoom;
+    const tall = screen.tall / zoom;
+    const fromTop = screen.tall / zoomTo - tall;
+    const g = screen.ctx;
+    g.save();
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    g.imageSmoothingEnabled = false;
+    g.drawImage(
+      back.canvas,
+      (camera - left) * per,
+      fromTop * per,
+      wide * per,
+      tall * per,
+      0,
+      0,
+      screen.canvas.width,
+      screen.canvas.height,
+    );
+    g.restore();
   }
 
   stop(): void {
     this.stopped = true;
   }
+}
+
+/** A canvas to paint into that is not the screen, with what `paint` needs
+ *  of one. Sized to match the screen when it is first used. */
+function backdrop(): {
+  canvas: HTMLCanvasElement;
+  ctx: CanvasRenderingContext2D;
+  wide: number;
+  tall: number;
+} {
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d", {alpha: false});
+  if (!ctx) {
+    throw new Error("no 2d context");
+  }
+  return {canvas, ctx, wide: SCREEN.narrowest, tall: SCREEN.tall};
 }

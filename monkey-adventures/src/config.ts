@@ -666,7 +666,7 @@ export const JUNGLE = {
  * The party at the end.
  *
  * Reaching home is the only ending this game has, so it is worth something
- * louder than a line of text: bursts of colour thrown up over the hut, a
+ * louder than a line of text: bursts of colour thrown up over the tree, a
  * few at a time, for as long as the child wants to sit and watch them.
  */
 export const PARTY = {
@@ -734,8 +734,16 @@ export const PAINT = {
   snakeDark: "#1d7a2c",
   snakeLight: "#7fd45a",
   dapple: "#fff3b0",
-  home: "#b5793f",
-  homeDark: "#8a5a2d",
+  /** The tree at home: its bark, lit and in the grooves, and its leaves
+   *  in three shades — the underside of every puff, the puff, and the
+   *  light on top of it, which is what makes a heap of circles a cloud
+   *  of leaves. */
+  bark: "#6e4a30",
+  barkDark: "#4f3321",
+  barkLight: "#8c6242",
+  leafDark: "#1d4a2e",
+  leaf: "#2d6f40",
+  leafLight: "#4f9a50",
   croc: "#3f7b3f",
   crocDark: "#2d5a2e",
   crocMouth: "#8c3a4a",
@@ -758,21 +766,95 @@ export const PAINT = {
 /**
  * The monkeys at home.
  *
- * Somebody to arrive *at*. The hut on its own is a destination; a family
- * outside it waiting is a reason, and it costs three sprites and a sine.
- * They mill about while you are away and jump up with their arms in the air
- * when you get there, which is the whole of the ending as far as they are
- * concerned.
+ * Somebody to arrive *at*: one enormous tree, and the family waiting up
+ * in its branches. While you play it is only a trunk, and when you get to
+ * the trunk the camera stands back and shows you all of it, with everybody
+ * in it jumping up with their arms in the air — which is the whole of the
+ * ending as far as they are concerned.
  */
 export const HOME = {
-  /** How many, and how far either side of the hut they stand. */
-  family: 3,
-  spread: 34,
+  /**
+   * The tree, everything measured from the middle of its trunk across and
+   * from the top of the picture down, in picture pixels.
+   *
+   * Tall enough that while you are playing only the trunk is in the
+   * picture: the lowest branch is above the top of it. Once you are home
+   * the camera stands back to `zoomTo`, which shows twice as much each
+   * way — the picture's top is then 180 pixels above where it was — and
+   * the whole tree fits in that, ground to the top of the leaves.
+   */
+  trunk: 46,
+  /** How wide the roots spread where they meet the ground. */
+  roots: 86,
+  /** The cloud of leaves: its middle, how far it reaches either way and
+   *  up and down, and how many puffs it is made of, how big. */
+  leavesAt: -100,
+  leavesWide: 215,
+  leavesTall: 76,
+  puffs: 110,
+  puffSmall: 18,
+  puffBig: 34,
+  /**
+   * The branches the family stands on, in front of the leaves: about how
+   * high the top of each is, how far out it reaches from the middle of
+   * the trunk (negative is to the left), and how thick. The shape along
+   * it is `branchTop`'s. The lowest pair are under the leaves, against
+   * the sky, the rest among them; the top pair are kept below the leaves
+   * overhead, which are the top of the picture.
+   */
+  branches: [
+    {y: -22, reach: -165, thick: 8},
+    {y: -22, reach: 168, thick: 8},
+    {y: -68, reach: -140, thick: 7},
+    {y: -62, reach: 136, thick: 7},
+    {y: -108, reach: -110, thick: 6},
+    {y: -114, reach: 104, thick: 6},
+    {y: -146, reach: -62, thick: 5},
+    {y: -146, reach: 66, thick: 5},
+  ],
+  /** Twigs off the branches: how far apart, and how long at most. */
+  twigEvery: 13,
+  twigLong: 11,
+  /** Puffs of leaves along each branch as well as on its end: how far
+   *  apart, and how big. */
+  tuftEvery: 34,
+  tuft: 11,
+  /** Where the family stand: which branch, and how far along it from the
+   *  trunk, as a share of its reach. */
+  perches: [
+    {branch: 0, along: 0.45},
+    {branch: 0, along: 0.82},
+    {branch: 1, along: 0.4},
+    {branch: 1, along: 0.8},
+    {branch: 2, along: 0.48},
+    {branch: 2, along: 0.85},
+    {branch: 3, along: 0.5},
+    {branch: 3, along: 0.86},
+    {branch: 4, along: 0.72},
+    {branch: 5, along: 0.72},
+    {branch: 6, along: 0.68},
+    {branch: 7, along: 0.66},
+  ],
   /** How fast they shift about while waiting, and how far — a pixel or
    *  two, so the end of the jungle is alive without anybody doing
    *  anything. */
   fidgets: 1.6,
   fidgetBy: 1.4,
+  /** You are home when you get to the trunk, not to the middle of it. */
+  arriveBy: 20,
+  /** How far past the middle of the trunk the camera may look while you
+   *  are on your way, so the trunk is in the picture before you get to
+   *  it rather than at its edge. */
+  beyond: 120,
+  /** How far the camera stands back once you are home, as a scale: a
+   *  half, so a picture pixel is still a whole canvas pixel and stays
+   *  sharp. How long a pause there is first, how long the standing back
+   *  takes, and when the card with the button comes up — after, so it is
+   *  not in front of the thing it is a card about. */
+  zoomTo: 0.5,
+  zoomWaits: 0.4,
+  zoomFor: 2.4,
+  cardAfter: 3.6,
 } as const;
 
 /** The fixed step the world is worked out in. The drawing interpolates
@@ -1007,6 +1089,9 @@ export const PARTS: ReadonlyArray<{
    * of the evening at home. The rain keeps its own grey: it is the sky.
    */
   sky?: {high: string; low: string};
+  /** True for home, whose picture is the whole tree, stood back as the
+   *  camera is once you get there, rather than a close-up of the trunk. */
+  whole?: boolean;
   /** True for the rain level, which is not a part of the jungle at all. */
   rain?: boolean;
   /** And for the river level, which is not either. */
@@ -1064,6 +1149,7 @@ export const PARTS: ReadonlyArray<{
     name: "Home",
     at: WORLD.far - 300,
     shows: WORLD.far - 10,
+    whole: true,
     sky: {high: "#e8b98e", low: "#f8e6b6"},
     tint: {face: "#ffd257", under: "#c98f2a", ink: "#2a1a10"},
   },

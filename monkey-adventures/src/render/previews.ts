@@ -1,4 +1,4 @@
-import {PARTS, PREVIEW, SCREEN, VOLCANO} from "../config";
+import {HOME, PARTS, PREVIEW, SCREEN, VOLCANO} from "../config";
 import {Monkey} from "../entities/monkey";
 import {Jungle} from "../world/jungle";
 import {paint} from "./draw";
@@ -42,6 +42,11 @@ export function previewOf(part: Part): HTMLCanvasElement {
   g.imageSmoothingEnabled = false;
 
   const jungle = worldOf(part);
+  if (part.whole) {
+    standingBack(ctx, jungle, wide, tall, part);
+    g.drawImage(whole, 0, 0);
+    return out;
+  }
   // The close-up is centred on what the part is named after, inside a
   // whole picture kept within the world the way the game's own camera is.
   const camera = Math.round(
@@ -73,7 +78,7 @@ export function previewOf(part: Part): HTMLCanvasElement {
     1,
     new Party(),
     false,
-    part.sky,
+    {sky: part.sky},
   );
   g.drawImage(
     whole,
@@ -87,6 +92,36 @@ export function previewOf(part: Part): HTMLCanvasElement {
     out.height,
   );
   return out;
+}
+
+/**
+ * Home's picture: the whole tree and the family in it, the way the camera
+ * shows it once you get there, with the monkey at the foot of the trunk.
+ */
+function standingBack(
+  ctx: CanvasRenderingContext2D,
+  jungle: Jungle,
+  wide: number,
+  tall: number,
+  part: Part,
+): void {
+  const monkey = new Monkey();
+  monkey.doing = "ground";
+  monkey.x = jungle.homeX - HOME.arriveBy;
+  monkey.y = jungle.floorAt(monkey.x);
+  monkey.wasX = monkey.x;
+  monkey.wasY = monkey.y;
+  paint(
+    {ctx, wide, tall},
+    jungle,
+    monkey,
+    Math.round(jungle.homeX - wide / HOME.zoomTo / 2),
+    PREVIEW.time,
+    1,
+    new Party(),
+    false,
+    {sky: part.sky, zoom: HOME.zoomTo},
+  );
 }
 
 /**

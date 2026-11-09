@@ -179,8 +179,33 @@ export interface Vent {
 }
 
 /** One of the monkeys waiting at home. */
+/**
+ * The top of one of the tree's branches, `d` out from the middle of the
+ * trunk.
+ *
+ * It leaves the trunk lower down and climbs to its height over the first
+ * third, lifts at the end the way a branch reaching for the light does,
+ * and is bumpy all along: two slow waves, a different pair for every
+ * branch. Here and not in the drawing, because the family stand on it —
+ * their feet go wherever this says the wood is.
+ */
+export function branchTop(
+  branch: {y: number; reach: number; thick: number},
+  d: number,
+): number {
+  const out = d / Math.abs(branch.reach);
+  const climb = out < 0.3 ? (1 - out / 0.3) ** 2 * branch.thick * 2 : 0;
+  const lift = out > 0.85 ? (out - 0.85) * 50 : 0;
+  const own = branch.reach * 0.37 + branch.y;
+  const bumps =
+    Math.sin(d * 0.11 + own) * 1.6 + Math.sin(d * 0.043 + own * 2) * 2.4;
+  return Math.round(branch.y + climb - lift + bumps);
+}
+
 export interface Family {
   x: number;
+  /** The top of the branch it stands on. */
+  y: number;
   /** Which coat it is wearing, and its own clock so three of them do not
    *  fidget in step. */
   coat: number;
@@ -373,18 +398,16 @@ export class Jungle {
       });
     }
 
-    // The ones waiting at home, either side of the hut.
-    for (let i = 0; i < HOME.family; i++) {
-      const at =
-        this.far +
-        ((i + 0.5) / HOME.family - 0.5) * 2 * HOME.spread +
-        (rng() - 0.5) * 8;
+    // The ones waiting at home, up on the branches of the tree.
+    for (const perch of HOME.perches) {
+      const branch = HOME.branches[perch.branch];
       this.family.push({
-        x: at,
+        x: this.homeX + branch.reach * perch.along,
+        y: branchTop(branch, Math.abs(branch.reach) * perch.along),
         coat: 1 + Math.floor(rng() * 3),
         phase: rng() * Math.PI * 2,
-        // Looking back down the jungle, which is where you are coming from.
-        facingLeft: at > this.far,
+        // Looking in, at the trunk, which is where you will be.
+        facingLeft: branch.reach > 0,
       });
     }
 

@@ -77,7 +77,7 @@ export class Hud {
     this.root.append(this.lives);
 
     this.done = document.createElement("div");
-    this.done.className = "hud-done hud-gone";
+    this.done.className = "hud-done hud-end hud-gone";
     const words = document.createElement("div");
     words.className = "hud-words";
     words.textContent = "Home!";
@@ -276,6 +276,11 @@ function inject(): void {
   align-items: center;
   gap: 14px;
   pointer-events: auto;
+}
+/* The card at home sits low, over the trunk: above it is the tree and
+   everybody standing in it, which is the thing the card is about. */
+.hud-end {
+  margin: auto auto 12%;
 }
 .hud-done.hud-gone {
   display: none;

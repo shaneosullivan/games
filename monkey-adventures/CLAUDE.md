@@ -90,7 +90,8 @@ src/
                  squeezed to AAC (see Sound.spray). Imported, and copied
                  beside index.html with a hash rather than inlined
   entities/      the monkey: running, climbing, flying, swinging
-  world/         the jungle: vines, trees, dapples, home — and the other
+  world/         the jungle: vines, trees, dapples, the tree at home with
+                 the family in its branches — and the other
                  two levels, which are the same jungle with a flag on:
                  rain (mud, coconuts, mushrooms) and river (elephants,
                  snakes)

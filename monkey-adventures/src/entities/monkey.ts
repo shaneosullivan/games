@@ -1,4 +1,4 @@
-import {CLIMB, MONKEY, RAIN, ROPE, SWING, WORLD} from "../config";
+import {CLIMB, HOME, MONKEY, RAIN, ROPE, SWING, WORLD} from "../config";
 // How long each bored thing lasts is a fact about its frames, so it is
 // read from them rather than written down a second time here.
 import {BORED} from "../art/motion";
@@ -118,7 +118,9 @@ export class Monkey {
     if (this.doing !== "swing" && this.doing !== "climb") {
       this.catchAVine(jungle);
     }
-    if (this.x >= jungle.homeX) {
+    // At the trunk, which is where home starts; the middle of it is
+    // somewhere inside the tree.
+    if (this.x >= jungle.homeX - HOME.arriveBy) {
       this.arrived = true;
     }
     this.passTheTime(dt, lean, up, tapped);
