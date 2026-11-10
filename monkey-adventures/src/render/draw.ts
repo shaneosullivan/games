@@ -876,6 +876,13 @@ function drawMonkey(
       Math.min(LAVA.length - 1, Math.floor(monkey.burning / each)),
       monkey.facingLeft,
     );
+  } else if (monkey.cheering !== null) {
+    // Home, in the tree, jumping with the family: the same as they do.
+    sprite = motionSprite(
+      "celebrate",
+      Math.floor((monkey.cheering * 1000) / CELEBRATE.ms),
+      monkey.facingLeft,
+    );
   } else if (monkey.doing === "ground" && Math.abs(monkey.vx) >= 6) {
     // Running, from the sheet: down on all fours, a frame per few pixels
     // of ground so the legs keep pace with it.

@@ -21,7 +21,7 @@ import {paint} from "./render/draw";
 import {Party} from "./render/particles";
 import {Screen} from "./render/screen";
 import {Hud} from "./ui/hud";
-import {ELEPHANT_SPRAYS, Jungle} from "./world/jungle";
+import {ELEPHANT_SPRAYS, Jungle, branchTop} from "./world/jungle";
 
 /**
  * The game: a jungle, a monkey, and the clock that drives them.
@@ -70,6 +70,9 @@ export class Game {
    *  did: the standing back starts from there. */
   private homeFor = 0;
   private cameraWas = 0;
+  /** Home, what the monkey is doing on its own: climbing the trunk,
+   *  walking along to its spot, or there and cheering. */
+  private homecoming: "climb" | "walk" | "cheer" = "climb";
   /** What the stood-back view of home is painted into: see `standBack`. */
   private readonly backdrop = backdrop();
   private time = 0;
@@ -138,9 +141,14 @@ export class Game {
       // show the tree, and then the party goes up over it and the card
       // comes up, and they keep going until somebody presses the button.
       this.jungle.update(dt, this.time, null);
-      const was = this.homeFor;
       this.homeFor += dt;
-      if (was < HOME.cardAfter && this.homeFor >= HOME.cardAfter) {
+      this.climbHome(dt);
+      if (this.monkey.cheering === null) {
+        return;
+      }
+      const was = this.monkey.cheering;
+      this.monkey.cheering += dt;
+      if (was < HOME.cardAfter && this.monkey.cheering >= HOME.cardAfter) {
         this.hud.setFinished(true, this.bananas, this.jungle.bananas.length);
       }
       this.partyIn -= dt;
@@ -224,9 +232,12 @@ export class Game {
       this.finished = true;
       this.homeFor = 0;
       this.cameraWas = this.camera;
-      // The party waits for the tree: fireworks over leaves nobody can see
-      // yet would be fireworks over nothing.
-      this.partyIn = HOME.zoomWaits + HOME.zoomFor;
+      // From here the monkey goes on its own: up the trunk, facing it.
+      this.homecoming = "climb";
+      this.monkey.doing = "climb";
+      this.monkey.facingLeft = false;
+      this.monkey.vx = 0;
+      this.monkey.vy = 0;
     }
   }
 
@@ -622,6 +633,49 @@ export class Game {
     return Math.max(0, Math.min(this.farthest(), at - this.screen.wide / 3));
   }
 
+  /**
+   * Home: the monkey climbing the trunk on its own and walking along the
+   * branch to the spot that has been kept for it, and everybody cheering
+   * when it gets there.
+   *
+   * Straight up from where it got to, which is over the branch, until its
+   * feet are on the top of it; then along it, following its bumps, the
+   * way the monkey runs on the ground and with the same frames.
+   */
+  private climbHome(dt: number): void {
+    const monkey = this.monkey;
+    monkey.wasX = monkey.x;
+    monkey.wasY = monkey.y;
+    const branch = HOME.branches[HOME.yours.branch];
+    const spot = this.jungle.homeX + HOME.yours.at;
+    const topAt = (x: number): number =>
+      branchTop(branch, x - this.jungle.homeX) ?? monkey.y;
+    if (this.homecoming === "climb") {
+      monkey.y -= HOME.climbs * dt;
+      monkey.stride += HOME.climbs * dt;
+      const top = topAt(monkey.x);
+      if (monkey.y <= top) {
+        monkey.y = top;
+        monkey.doing = "ground";
+        monkey.facingLeft = spot < monkey.x;
+        this.homecoming = "walk";
+      }
+    } else if (this.homecoming === "walk") {
+      const way = Math.sign(spot - monkey.x);
+      monkey.vx = way * HOME.walks;
+      monkey.x += monkey.vx * dt;
+      monkey.stride += HOME.walks * dt;
+      if (Math.sign(spot - monkey.x) !== way) {
+        monkey.x = spot;
+        monkey.vx = 0;
+        monkey.cheering = 0;
+        this.partyIn = 0;
+        this.homecoming = "cheer";
+      }
+      monkey.y = topAt(monkey.x);
+    }
+  }
+
   /** The farthest along the camera goes while you are playing: a little
    *  way past the middle of the trunk, so the trunk is in the picture as
    *  you come up to it and not cut by its edge. */
@@ -804,6 +858,13 @@ export class Game {
   /** Puts the monkey down in whatever level is loaded, and starts it. */
   private standAt(at: number): void {
     const monkey = this.monkey;
+    // Not home any more, whichever way you left it: the monkey is reused
+    // when the level is, and one still marked as home would be home again
+    // the moment it moved.
+    monkey.arrived = false;
+    monkey.cheering = null;
+    this.finished = false;
+    this.hud.setFinished(false);
     monkey.burning = null;
     monkey.vine = null;
     monkey.tree = null;
@@ -821,7 +882,11 @@ export class Game {
   }
 
   private draw(alpha: number): void {
-    this.hud.setProgress(this.monkey.x / (this.jungle.homeX - HOME.arriveBy));
+    // Full once home, whatever the monkey does after: it walks back along
+    // a branch to its spot, and the bar going down would say it had left.
+    this.hud.setProgress(
+      this.finished ? 1 : this.monkey.x / (this.jungle.homeX - HOME.arriveBy),
+    );
     const t = this.finished
       ? Math.min(1, Math.max(0, (this.homeFor - HOME.zoomWaits) / HOME.zoomFor))
       : 0;
@@ -834,7 +899,7 @@ export class Game {
         this.time,
         alpha,
         this.party,
-        this.finished,
+        this.monkey.cheering !== null,
       );
       return;
     }
@@ -879,7 +944,7 @@ export class Game {
       this.time,
       alpha,
       this.party,
-      this.finished,
+      this.monkey.cheering !== null,
       {zoom: zoomTo},
     );
 

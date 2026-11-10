@@ -79,6 +79,9 @@ export class Monkey {
 
   /** Whether it has reached home. */
   arrived = false;
+  /** How long it has been cheering with the family, home in the tree, or
+   *  null if it is not. */
+  cheering: number | null = null;
 
   /**
    * Where its hands are.

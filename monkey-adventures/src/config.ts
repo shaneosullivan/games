@@ -980,6 +980,16 @@ export const HOME = {
   ],
   /** The one in the fork of the trunk: how far across, and how high. */
   inTheFork: [4, -14],
+  /**
+   * The spot left empty for you, between the trunk and the rest of the
+   * family on the long arm to the left: which branch, and how far across.
+   * When you get to the trunk the monkey climbs up it on its own, how fast
+   * in picture pixels a second, and walks along the branch to here, how
+   * fast — and it is when it gets here that everybody cheers.
+   */
+  yours: {branch: 0, at: -50},
+  climbs: 60,
+  walks: 42,
   /** How fast they shift about while waiting, and how far — a pixel or
    *  two, so the end of the jungle is alive without anybody doing
    *  anything. */
@@ -993,13 +1003,14 @@ export const HOME = {
   beyond: 120,
   /** How far the camera stands back once you are home, as a scale: a
    *  half, so a picture pixel is still a whole canvas pixel and stays
-   *  sharp. How long a pause there is first, how long the standing back
-   *  takes, and when the card with the button comes up — after, so it is
-   *  not in front of the thing it is a card about. */
+   *  sharp. How long a pause there is first and how long the standing
+   *  back takes, from getting to the trunk — so it happens while the
+   *  monkey climbs — and how long after the cheering starts the card
+   *  with the button comes up, so it is not in front of it. */
   zoomTo: 0.5,
   zoomWaits: 0.4,
   zoomFor: 2.4,
-  cardAfter: 3.6,
+  cardAfter: 1.6,
 } as const;
 
 /** The fixed step the world is worked out in. The drawing interpolates
