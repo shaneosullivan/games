@@ -184,18 +184,20 @@ export type Branch = (typeof HOME.branches)[number];
 
 /**
  * Where the middle of the tree's trunk is at height `y`, across from the
- * bottom of it: leaning over to the right as it climbs, more and more,
- * with a bend one way and then the other.
+ * bottom of it: leaning over to the right as it climbs to where it
+ * splits, more and more, with a bend one way and then the other.
  */
 export function trunkMiddle(y: number): number {
-  const up = Math.max(0, (WORLD.floor - y) / (WORLD.floor - HOME.leavesTop));
+  const up = Math.max(0, (WORLD.floor - y) / (WORLD.floor - HOME.split));
   // And with a bend in it on the way: a trunk dead straight is a pole.
   return up * up * HOME.lean + Math.sin(up * Math.PI * 1.6) * HOME.bend;
 }
 
-/** A branch's points from the trunk out, starting inside the trunk. */
-export function branchPath(branch: Branch): Array<readonly [number, number]> {
-  return [[trunkMiddle(branch.y), branch.y], ...branch.points];
+/** A branch's points from where it starts out to its tip. */
+export function branchPath(
+  branch: Branch,
+): ReadonlyArray<readonly [number, number]> {
+  return branch.points;
 }
 
 /**
@@ -214,7 +216,7 @@ export function branchTop(branch: Branch, at: number): number | null {
     const [bx, by] = path[i + 1];
     const t = (at - ax) / (bx - ax);
     if (t >= 0 && t <= 1) {
-      const bumps = Math.sin(at * 0.19 + branch.y) * 0.8;
+      const bumps = Math.sin(at * 0.19 + path[0][1]) * 0.8;
       return Math.round(ay + (by - ay) * t + bumps);
     }
   }
@@ -422,13 +424,20 @@ export class Jungle {
       const branch = HOME.branches[perch.branch];
       this.family.push({
         x: this.homeX + perch.at,
-        y: branchTop(branch, perch.at) ?? branch.y,
+        y: branchTop(branch, perch.at) ?? branch.points[0][1],
         coat: 1 + Math.floor(rng() * 3),
         phase: rng() * Math.PI * 2,
         // Looking in, at the trunk, which is where you will be.
         facingLeft: perch.at > 0,
       });
     }
+    this.family.push({
+      x: this.homeX + HOME.inTheFork[0],
+      y: HOME.inTheFork[1],
+      coat: 1 + Math.floor(rng() * 3),
+      phase: rng() * Math.PI * 2,
+      facingLeft: false,
+    });
 
     // Crocodiles, spread along the water with room to swim between them.
     for (let i = 0; raining || river ? false : i < CROC.count; i++) {

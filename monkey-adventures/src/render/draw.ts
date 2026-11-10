@@ -966,9 +966,10 @@ function standOnFeet(
  * leaves sit off the middle — because a tree drawn the same both ways is
  * a drawing of a tree. Outlined, as the monkey is.
  *
- * In layers from the back: the cloud of leaves, the trunk and the two
- * limbs it splits into, the branches across the leaves with their forks
- * and twigs and leaves, and the family on top of the lot — nothing may be
+ * In layers from the back: most of the cloud of leaves, the trunk with
+ * its roots and the limbs it splits into, the rest of the leaves over the
+ * tops of those, the branches across it all with their forks and twigs
+ * and leaves, and the family on top of the lot — nothing may be
  * in front of a monkey, because a monkey in this tree is the point of it.
  */
 function tree(
@@ -984,24 +985,42 @@ function tree(
     return;
   }
 
-  for (const one of puffs()) {
+  const all = puffs();
+  const front = all.filter((one, i) => one.y < HOME.frontAbove && i % 2 === 0);
+  for (const one of all) {
+    if (!front.includes(one)) {
+      leafPuff(g, x + one.x, one.y, one.r);
+    }
+  }
+  // The limbs and the roots share their outline with the trunk: all of
+  // the outlines go down first, then the trunk, then the wood of the rest
+  // over both, so where a limb leaves the trunk or a root meets it they
+  // are one piece of wood and not two drawn round separately.
+  const strokes = [
+    ...HOME.limbs.flatMap(one => curve(x, one.points, one.from, one.to)),
+    ...HOME.roots.map(root => ({
+      ax: x + root.from[0],
+      ay: root.from[1],
+      bx: x + root.to[0],
+      by: root.to[1],
+      from: root.thick,
+      to: 2,
+    })),
+  ];
+  wood(g, strokes, "line");
+  trunk(g, x);
+  wood(g, strokes, "wood");
+
+  // Leaves in front of the limbs, up where they end, but behind the
+  // branches: the family stand on those, and a branch under leaves would
+  // leave them standing on a bush.
+  for (const one of front) {
     leafPuff(g, x + one.x, one.y, one.r);
   }
-  trunk(g, x);
-  // The two limbs the trunk splits into, up into the leaves, and a puff
-  // over the end of each: they go on up out of sight rather than stop.
-  const top = x + trunkMiddle(HOME.crown);
-  const strokes: Array<Stroke> = HOME.limbs.map(([lx, ly]) => ({
-    ax: top,
-    ay: HOME.crown + 6,
-    bx: x + lx,
-    by: ly,
-    from: 14,
-    to: 6,
-  }));
-  wood(g, strokes);
-  for (const [lx, ly] of HOME.limbs) {
-    leafPuff(g, x + lx, ly - 4, 18);
+  for (const one of HOME.limbs) {
+    const [ex, ey] = one.points[one.points.length - 1];
+    leafPuff(g, x + ex, ey - 2, 16);
+    leafPuff(g, x + ex - 12, ey + 6, 11);
   }
 
   for (const branch of HOME.branches) {
@@ -1021,8 +1040,8 @@ function tree(
  */
 function trunk(g: CanvasRenderingContext2D, x: number): void {
   const base = WORLD.floor;
-  for (let y = HOME.crown; y < base; y++) {
-    const up = (base - y) / (base - HOME.crown);
+  for (let y = HOME.split; y < base; y++) {
+    const up = (base - y) / (base - HOME.split);
     const half = HOME.trunk / 2 - up * (HOME.trunk / 5);
     // The roots: the last dozen pixels flare out, further to the left.
     const flare = Math.max(0, (y - (base - 14)) / 14) ** 2;
@@ -1040,10 +1059,20 @@ function trunk(g: CanvasRenderingContext2D, x: number): void {
     g.fillRect(left, y, 3, 1);
     g.fillStyle = PAINT.barkDark;
     g.fillRect(right - 5, y, 5, 1);
+    // Moss low down, thickest at the foot and thinning out as it climbs,
+    // and only on the shady side of the light stripe.
+    const mossy = Math.max(0, 1 - (base - y) / 34);
+    for (let k = 3; k < wide - 5; k++) {
+      if (hash(k * 13.1 + y * 7.7) < mossy * 0.55) {
+        g.fillStyle = hash(k + y) < 0.3 ? PAINT.mossLight : PAINT.moss;
+        g.fillRect(left + k, y, 1, 1);
+      }
+    }
+    g.fillStyle = PAINT.barkDark;
     // Grooves in the bark, wandering a pixel either way as they climb.
-    for (let k = 1; k < 5; k++) {
+    for (let k = 1; k < 7; k++) {
       const at =
-        left + Math.round((k / 5) * wide + Math.sin(y * 0.07 + k) * 1.2);
+        left + Math.round((k / 7) * wide + Math.sin(y * 0.07 + k) * 1.6);
       g.fillRect(at, y, 1, 1);
     }
   }
@@ -1093,30 +1122,117 @@ interface Stroke {
 }
 
 /**
- * Pieces of wood at any angle — the forks, the twigs, the limbs at the top
- * of the trunk — stamped along their length a square at a time. The
- * outline goes down first for all of them and the wood over it, so where
- * two meet they join rather than each being drawn round.
+ * Pieces of wood at any angle — the limbs, the roots, the forks, the
+ * twigs — stamped along their length a square at a time.
+ *
+ * In two goes, the outline and then the wood, and the outline goes down
+ * for all of them before the wood of any: where two meet they join rather
+ * than each being drawn round. `both` does the two at once, for the
+ * pieces nothing else has to go between.
+ *
+ * The wood is lit along its upper side and, where it is thick enough to
+ * stand on, mossy along the top.
  */
-function wood(g: CanvasRenderingContext2D, strokes: Array<Stroke>): void {
-  for (const pass of [0, 1]) {
+function wood(
+  g: CanvasRenderingContext2D,
+  strokes: Array<Stroke>,
+  pass: "line" | "wood" | "both" = "both",
+): void {
+  const passes = pass === "both" ? ["line", "wood"] : [pass];
+  for (const one of passes) {
     for (const s of strokes) {
       const long = Math.hypot(s.bx - s.ax, s.by - s.ay);
       for (let i = 0; i <= long; i += 0.5) {
-        const t = i / long;
+        const t = long > 0 ? i / long : 0;
         const fat = Math.max(1, Math.round(s.from + (s.to - s.from) * t));
-        const px = Math.round(s.ax + (s.bx - s.ax) * t - fat / 2);
-        const py = Math.round(s.ay + (s.by - s.ay) * t - fat / 2);
-        if (pass === 0) {
+        const cx = s.ax + (s.bx - s.ax) * t;
+        const cy = s.ay + (s.by - s.ay) * t;
+        const px = Math.round(cx - fat / 2);
+        const py = Math.round(cy - fat / 2);
+        if (one === "line") {
           g.fillStyle = PAINT.barkLine;
           g.fillRect(px - 1, py - 1, fat + 2, fat + 2);
-        } else {
-          g.fillStyle = fat > 2 ? PAINT.bark : PAINT.barkDark;
-          g.fillRect(px, py, fat, fat);
+          continue;
+        }
+        g.fillStyle = fat > 2 ? PAINT.bark : PAINT.barkDark;
+        g.fillRect(px, py, fat, fat);
+        if (fat >= 5) {
+          const lit = Math.max(1, Math.round(fat / 4));
+          g.fillStyle = PAINT.barkLight;
+          g.fillRect(px + 1, py, lit, lit);
+          g.fillStyle = PAINT.barkDark;
+          g.fillRect(px + fat - lit - 1, py + fat - lit, lit, lit);
+        }
+        if (fat >= 8 && hash(Math.round(cx) * 3.7 + Math.round(cy)) < 0.35) {
+          g.fillStyle =
+            hash(Math.round(cx) + 0.5) < 0.4 ? PAINT.mossLight : PAINT.moss;
+          g.fillRect(Math.round(cx), py, 2, 1);
         }
       }
     }
   }
+}
+
+/**
+ * A smooth curve through a limb's points, as short straight pieces of
+ * wood narrowing from `from` to `to` — through every point, which a
+ * curve fitted near them would not be.
+ */
+function curve(
+  x: number,
+  points: ReadonlyArray<readonly [number, number]>,
+  from: number,
+  to: number,
+): Array<Stroke> {
+  const out: Array<Stroke> = [];
+  const n = points.length - 1;
+  const at = (i: number): readonly [number, number] =>
+    points[Math.max(0, Math.min(n, i))];
+  const steps = 6;
+  let last: [number, number] | null = null;
+  for (let i = 0; i < n; i++) {
+    const [p0, p1, p2, p3] = [at(i - 1), at(i), at(i + 1), at(i + 2)];
+    for (let k = 0; k <= steps; k++) {
+      const t = k / steps;
+      const t2 = t * t;
+      const t3 = t2 * t;
+      // Catmull-Rom, which passes through every point it is given.
+      const px =
+        0.5 *
+        (2 * p1[0] +
+          (-p0[0] + p2[0]) * t +
+          (2 * p0[0] - 5 * p1[0] + 4 * p2[0] - p3[0]) * t2 +
+          (-p0[0] + 3 * p1[0] - 3 * p2[0] + p3[0]) * t3);
+      const py =
+        0.5 *
+        (2 * p1[1] +
+          (-p0[1] + p2[1]) * t +
+          (2 * p0[1] - 5 * p1[1] + 4 * p2[1] - p3[1]) * t2 +
+          (-p0[1] + 3 * p1[1] - 3 * p2[1] + p3[1]) * t3);
+      const here: [number, number] = [x + px, py];
+      if (last) {
+        const u0 = (i + (k - 1) / steps) / n;
+        const u1 = (i + t) / n;
+        out.push({
+          ax: last[0],
+          ay: last[1],
+          bx: here[0],
+          by: here[1],
+          from: from + (to - from) * u0,
+          to: from + (to - from) * u1,
+        });
+      }
+      last = here;
+    }
+  }
+  return out;
+}
+
+/** A number from 0 to 1 that is the same every time for the same `n`:
+ *  where the moss goes, so it stays put from one frame to the next. */
+function hash(n: number): number {
+  const h = Math.sin(n * 12.9898) * 43758.5453;
+  return h - Math.floor(h);
 }
 
 /**
@@ -1133,7 +1249,7 @@ function sprigs(g: CanvasRenderingContext2D, x: number, branch: Branch): void {
   const from = path[0][0];
   const to = path[path.length - 1][0];
   const way = Math.sign(to - from);
-  let seed = Math.abs(Math.round(to * 31 + branch.y * 7)) + 1;
+  let seed = Math.abs(Math.round(to * 31 + path[0][1] * 7)) + 1;
   const rng = (): number => {
     seed = (seed * 16807) % 2147483647;
     return seed / 2147483647;
@@ -1177,18 +1293,37 @@ function sprigs(g: CanvasRenderingContext2D, x: number, branch: Branch): void {
     strokes.push({ax: tx, ay: ty, bx: ex, by: ey, from: 1, to: 1});
     tips.push([ex, ey, way]);
   }
-  // And at the very end of the branch, a spray of three.
   const [ex, ey] = path[path.length - 1];
-  for (const turn of [-0.9, -0.3, 0.3]) {
-    const long = 8 + rng() * 8;
-    const bx = x + ex + way * Math.cos(turn) * long;
-    const by = ey + Math.sin(turn) * long;
-    strokes.push({ax: x + ex, ay: ey + 1, bx, by, from: 2, to: 1});
-    tips.push([bx, by, way]);
-  }
+  spray(g, x + ex, ey, way, Math.round(to));
   wood(g, strokes);
   for (const [tx, ty, w] of tips) {
     leaves(g, tx, ty, w);
+  }
+}
+
+/**
+ * A spray of three twigs off the end of a limb or a branch, splaying out
+ * the way it was going, with leaves on each.
+ */
+function spray(
+  g: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  way: number,
+  seeded: number,
+): void {
+  const strokes: Array<Stroke> = [];
+  const tips: Array<[number, number]> = [];
+  for (const [i, turn] of [-1.1, -0.45, 0.25].entries()) {
+    const long = 8 + hash(seeded + i) * 9;
+    const bx = x + way * Math.cos(turn) * long;
+    const by = y + Math.sin(turn) * long;
+    strokes.push({ax: x, ay: y, bx, by, from: 2, to: 1});
+    tips.push([bx, by]);
+  }
+  wood(g, strokes);
+  for (const [tx, ty] of tips) {
+    leaves(g, tx, ty, way);
   }
 }
 
@@ -1303,7 +1438,13 @@ function puffs(): Array<{x: number; y: number; r: number}> {
     const round = Math.sqrt(1 - (2 * along - 1) ** 2);
     const middle = (top + bottom) / 2;
     const half = ((bottom - top) / 2) * (0.35 + 0.65 * round);
-    made.push({x: across, y: middle + (rng() * 2 - 1) * half, r});
+    const y = middle + (rng() * 2 - 1) * half;
+    // Thin in the middle low down, where the limbs climb out of the
+    // trunk: a tree you can see into, rather than a lid on a pole.
+    if (Math.abs(across) < HOME.open && y > HOME.leavesTop + 90) {
+      continue;
+    }
+    made.push({x: across, y, r});
   }
   for (let i = 0; i < HOME.hangers; i++) {
     const along = (i + rng()) / HOME.hangers;
