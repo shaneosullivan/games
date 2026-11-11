@@ -1100,9 +1100,22 @@ export const COCONUT = {
   /** How far apart they hang, in pixels. Close enough that the canopy is
    *  something to watch the whole way along rather than now and then. */
   every: 86,
-  /** How close the monkey has to be before one lets go. It is the monkey
-   *  that shakes them loose, so an empty stretch of jungle stays quiet. */
-  notices: 64,
+  /**
+   * How close the monkey has to be before one might let go, and how
+   * likely it is to, in each second the monkey is that close — so each
+   * starts to shake at a moment of its own, at random.
+   *
+   * It is the monkey that shakes them loose, so an empty stretch of jungle
+   * stays quiet. The chance is what makes it a hazard: they used to notice
+   * at 64 pixels and shake at once, so every one landed the same time
+   * after you came near, and a monkey that simply kept going was always
+   * past before it hit — measured, none of the 44 in the level ever hit a
+   * monkey running straight through. A chance every moment cannot be
+   * outpaced like that; it only punishes standing underneath, and the
+   * shake still says which one is coming.
+   */
+  notices: 160,
+  chance: 0.25,
   /** How long it shakes on its stalk first, in seconds. The warning is the
    *  whole hazard: a thing that drops with no notice is a trap. */
   wobbles: 0.5,

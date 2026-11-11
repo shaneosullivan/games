@@ -583,7 +583,10 @@ export class Jungle {
         }
         continue;
       }
-      if (Math.abs(monkeyX - nut.x) < COCONUT.notices) {
+      if (
+        Math.abs(monkeyX - nut.x) < COCONUT.notices &&
+        this.rng() < COCONUT.chance * dt
+      ) {
         nut.wobble = COCONUT.wobbles;
       }
     }
