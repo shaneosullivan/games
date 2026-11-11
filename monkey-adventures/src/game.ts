@@ -339,7 +339,7 @@ export class Game {
       return;
     }
     const onTheLava =
-      this.jungle.overCrater(monkey.x) &&
+      this.jungle.inTheLava(monkey.x) &&
       monkey.y >= this.jungle.floorAt(monkey.x) - 1;
     let caught = false;
     if (!onTheLava) {

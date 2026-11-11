@@ -860,6 +860,23 @@ export class Jungle {
     return VOLCANO.hill * eased;
   }
 
+  /**
+   * Whether a monkey standing here is in the lava, as against near it.
+   *
+   * The same allowance as the lake's (`inTheWater`): half a monkey in from
+   * either rim before it counts. Measured at the true edges, a monkey with
+   * its toes a pixel over the crust burned, which is a hazard a child has
+   * no way of seeing coming.
+   */
+  inTheLava(x: number): boolean {
+    const forgive = MONKEY.wide / 2;
+    return (
+      this.overCrater(x) &&
+      x > this.craterFrom + forgive &&
+      x < this.craterTo - forgive
+    );
+  }
+
   /** Whether a point is over the lava in the crater. */
   overCrater(x: number): boolean {
     return (
